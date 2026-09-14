@@ -7,12 +7,9 @@ it equal the signed sum of what you posted, then page a statement to its empty l
 Every field, invariant and error code is catalogued in the [readme](../README.md); this page is the
 running order.
 
-> **What is live at this commit.** Steps 1–4, 9 and 10 run today — the payloads below were captured from a
-> running instance. Steps 5–8 (`POST /v1/postings`, `POST /v1/postings/batch`, `GET /v1/postings/{id}`,
-> `POST /v1/postings/{id}/reverse`, `GET /v1/accounts/{id}/statement`) answer
-> `500 NotImplementedException` until `[D1242-3]` lands. Their request and response shapes below are the
-> settled contract those routes are registered with, not a guess — but they are shapes, not captures,
-> and they are marked as such.
+> **What is live at this commit.** All ten steps run today. The one thing you cannot do is reserve
+> funds: held funds are deferred, so `heldAmount` is always `0` and `availableBalance` always equals
+> `balance`.
 
 ## Before you start
 
@@ -153,6 +150,7 @@ HTTP/1.1 201 Created
   "accountNumber": "ACC0000000001",
   "groupId": "b85813c0-3053-4d35-a0ef-3f2863f83fa9",
   "name": "Acme Pte Ltd Operating",
+  "currency": "SGD",
   "classification": "liability",
   "status": "active",
   "balance": 0,
@@ -167,9 +165,7 @@ HTTP/1.1 201 Created
 }
 ```
 
-A fresh account is `active`, at `0`, with `streamPosition` `0` and no `lastPostedOn`. The account's
-`currency` is part of the contract but is missing from this response at this commit — see
-[known deviations](../README.md).
+A fresh account is `active`, at `0`, with `streamPosition` `0` and no `lastPostedOn`.
 
 Opening an account permitted to go negative without saying how far is refused, so no account is ever
 left without a determinate floor:
@@ -191,7 +187,7 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/accounts/e87b6feb-4741-4af3-83f
 ```
 
 ```json
-{ "balance": 0.0, "availableBalance": 0.0, "heldAmount": 0.0 }
+{ "currency": "SGD", "balance": 0.0, "availableBalance": 0.0, "heldAmount": 0.0 }
 ```
 
 `heldAmount` is always `0` and `availableBalance` always equals `balance` — held funds are deferred in
@@ -199,8 +195,6 @@ this delivery, so both fields give a defined answer rather than an undefined one
 reservation flow on them yet.
 
 ## 5. Post a credit
-
-> Not live at this commit — the route is registered, its handler answers `500 NotImplementedException`.
 
 A posting is one credit or debit against one account. The amount is always **strictly positive**; the
 `direction` says which way the money moved. Send your own idempotency key in the `Idempotency-Key`
@@ -286,8 +280,6 @@ not collide with you.
 
 ## 6. Post a debit, and meet the floor
 
-> Not live at this commit.
-
 ```bash
 curl -X POST "$BASE/v1/postings" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -312,7 +304,7 @@ the balance does not move**:
 {
   "status": 422,
   "detail": "The debit would take the account past its floor.",
-  "code": "FLOOR_BREACHED"
+  "code": "INSUFFICIENT_FUNDS"
 }
 ```
 
@@ -324,12 +316,12 @@ Other refusals you will meet here, each with `nothing recorded`:
 
 | `code` | When |
 |---|---|
-| `AMOUNT_NOT_POSITIVE` | `0.00` or a negative amount — direction, not sign, carries the meaning |
-| `AMOUNT_PRECISION_EXCEEDED` | `10.555` against a 2-decimal currency |
+| `INVALID_POSTING_AMOUNT` | `0.00` or a negative amount — direction, not sign, carries the meaning — **or** an amount finer than the currency, e.g. `10.555` against a 2-decimal currency. One code, both conditions; `detail` tells you which |
 | `CURRENCY_MISMATCH` | Posting USD against an SGD account |
 | `ACCOUNT_FROZEN` | The account is frozen — it accepts nothing in either direction |
 | `ACCOUNT_DORMANT_DEBIT_REFUSED` | The account is dormant — it accepts credits only |
 | `ACCOUNT_CLOSED` | The account is closed |
+| `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing recorded — retry with the same `Idempotency-Key` |
 
 ### Two movements as one transaction
 
@@ -352,8 +344,6 @@ Both legs come back sharing one `transactionGroupId`. Leave it unset, as above, 
 generates one; set it yourself to tie a batch to a transaction you already have an id for.
 
 ## 7. Correct a mistake — reverse, never delete
-
-> Not live at this commit.
 
 There is no delete route in this service. A posting recorded in error is corrected by reversing it,
 which writes an *opposing* posting and marks the original `reversed`.
@@ -388,8 +378,6 @@ postings is an explicit, attributable act available to you at any time.
 
 ## 8. Read the statement, page by page
 
-> Not live at this commit.
-
 A statement is a date-bounded, paged read of one account's postings **in stream order** — the order they
 were recorded, never effective-date order.
 
@@ -398,9 +386,24 @@ curl -H "Authorization: Bearer $TOKEN" \
   "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331/statement?from=2026-06-01&to=2026-06-30&pageIndex=1&pageSize=10"
 ```
 
-Page through by incrementing `pageIndex` until a page comes back empty. The pages **partition** the
-stream: every posting in the range appears exactly once, none twice, none skipped. Reading past the end
-is not an error — the last page is simply empty, with `200`:
+Unlike `GET /v1/accounts` and `GET /v1/account-groups`, which return bare JSON arrays, the statement
+comes back in an envelope — the postings are under `items`:
+
+```json
+{
+  "items": [ /* up to pageSize postings, in stream order */ ],
+  "pageNumber": 1,
+  "pageSize": 10,
+  "pageCount": 3,
+  "totalItemCount": 25,
+  "hasNextPage": true,
+  "hasPreviousPage": false
+}
+```
+
+Page through by incrementing `pageIndex` (1-based) until `items` comes back empty. The pages
+**partition** the stream: every posting in the range appears exactly once, none twice, none skipped.
+Reading past the end is not an error — the last page is simply empty, with `200`:
 
 ```bash
 # after 25 postings have been read across pages 1, 2 and 3
@@ -413,18 +416,25 @@ HTTP/1.1 200 OK
 ```
 
 ```json
-[]
+{
+  "items": [],
+  "pageNumber": 4,
+  "pageSize": 10,
+  "pageCount": 3,
+  "totalItemCount": 25,
+  "hasNextPage": false,
+  "hasPreviousPage": true
+}
 ```
 
-That empty page is your loop's terminating condition — do not compute a page count and stop on it.
+An empty `items` is your loop's terminating condition. `hasNextPage` works too, and is the cheaper
+check when you want to stop one request earlier — but do not compute a page count yourself and stop on
+it.
 
 **Backdating and stream order interact.** If you record a posting dated 30 June and then record one
 backdated to 15 June, a statement covering all of June returns the 30 June posting **first**, because
 that is where it sits in the stream. `balanceAfter` only makes sense in that order. Sort client-side by
 `effectiveDate` if your reader needs a date-ordered view.
-
-At this commit this route additionally requires `AccountId` as a query parameter; see
-[known deviations](../README.md).
 
 ## 9. Prove the balance
 
@@ -464,8 +474,8 @@ curl -X PATCH "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331" \
   -d '{ "status": "Closed" }'
 ```
 
-An account cannot be closed while it holds any balance or any held amount (`ACCOUNT_HAS_BALANCE`); a
-group cannot be closed while any account it holds carries a balance (`GROUP_HAS_BALANCE`). Empty them
+An account cannot be closed while it holds any balance or any held amount (`ACCOUNT_HOLDS_BALANCE`); a
+group cannot be closed while any account it holds carries a balance (`GROUP_HOLDS_BALANCE`). Empty them
 first — by posting, not by deleting. Reopening is the same call with `{"status":"Active"}`.
 
 ## Where to go next

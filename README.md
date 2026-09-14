@@ -8,12 +8,11 @@ reconcile against.
   group, open an account, post, read the balance back, page a statement.
 - **Machine-readable contract:** `GET /openapi/v1.json` on a running instance.
 
-> **Delivery status at this commit.** Reference currencies, account groups and accounts are implemented.
-> The posting routes (`POST /v1/postings`, `POST /v1/postings/batch`, `GET /v1/postings/{id}`,
-> `POST /v1/postings/{id}/reverse`, `GET /v1/accounts/{id}/statement`) are registered with their final
-> request and response shapes but their handlers are not implemented yet — they answer
-> `500 NotImplementedException`. See [Gotchas & limits](#️-gotchas--limits) for the full list of what is
-> not live yet.
+> **Delivery status at this commit.** Every route in [the API contract](#the-api-contract) is
+> implemented and exercised by the acceptance suite — reference currencies, account groups, accounts,
+> postings, batches, reversals and statements. The one capability that is deliberately *not* built is
+> held funds: `heldAmount` and `availableBalance` exist and always answer `0` and `balance`
+> respectively. See [Gotchas & limits](#️-gotchas--limits) for that and the other deferred items.
 
 ## ✨ Why use it?
 
@@ -184,13 +183,13 @@ column. There is **no delete route anywhere in this service, for any resource.**
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `parentId`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`) |
 | `GET` | `/v1/account-groups` | List groups, filterable by `code`, `type`, `status`, `parentId`, paged by `pageIndex`/`pageSize` | `accounts.read` | — |
 | `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/account-groups/{id}` | Change `name`, `description`, `status`, `parentId`, `metadata`. `{"status":"Closed"}` closes the group | `accounts.write` | An account it holds carries a balance (`GROUP_HAS_BALANCE`); the re-parent would create a cycle (`GROUP_CYCLE`); unknown id → `404` |
+| `PATCH` | `/v1/account-groups/{id}` | Change `name`, `description`, `status`, `parentId`, `metadata`. `{"status":"Closed"}` closes the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); the re-parent would create a cycle (`GROUP_CYCLE`); unknown id → `404` |
 | `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency | `accounts.read` | — |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts, filterable by `groupId`, `currency`, `status`, paged by `pageIndex`/`pageSize` | `accounts.read` | — |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/accounts/{id}` | Change `name`, `status`, `overdraftLimit`, `minimumBalance`, `metadata`. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HAS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
+| `PATCH` | `/v1/accounts/{id}` | Change `name`, `status`, `overdraftLimit`, `minimumBalance`, `metadata`. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
 | `POST` | `/v1/postings` | Record one credit or debit. `Idempotency-Key` header. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. `Idempotency-Key` header | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
@@ -232,21 +231,24 @@ carrying a stable machine-readable `code`. `401` and `403` have empty bodies.
 | `403` | — | Credential lacks the scope for this operation class |
 | `404` | — | The resource id does not exist |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same idempotency key, different content |
-| `422` | `AMOUNT_NOT_POSITIVE` | Posting amount ≤ 0 |
-| `422` | `AMOUNT_PRECISION_EXCEEDED` | Amount has more decimals than the currency permits |
+| `422` | `INVALID_POSTING_AMOUNT` | **Both amount refusals share this one code:** the amount is ≤ 0, *or* it has more decimal places than the currency permits. The two conditions are not distinguishable from the `code` — read `detail` if you need to tell them apart |
 | `422` | `CURRENCY_MISMATCH` | Posting currency ≠ account currency |
 | `422` | `EFFECTIVE_DATE_IN_FUTURE` | Effective date later than the recording date |
-| `422` | `FLOOR_BREACHED` | A debit would take the account past its floor. Never raised for a reversal |
+| `422` | `INSUFFICIENT_FUNDS` | A debit would take the account past its floor. Never raised for a reversal |
 | `422` | `OVERDRAFT_LIMIT_REQUIRED` | Account permitted to go negative with no overdraft limit, at open or at update |
 | `422` | `ACCOUNT_FROZEN` | Any posting against a frozen account, including a reversal |
 | `422` | `ACCOUNT_DORMANT_DEBIT_REFUSED` | A debit against a dormant account, including a debiting reversal |
 | `422` | `ACCOUNT_CLOSED` | Any posting against a closed account, including a reversal |
-| `422` | `ACCOUNT_HAS_BALANCE` | Close requested while the balance or held amount ≠ 0 |
-| `422` | `GROUP_HAS_BALANCE` | Group close requested while an account it holds carries a balance |
+| `422` | `ACCOUNT_HOLDS_BALANCE` | Close requested while the balance or held amount ≠ 0 |
+| `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
 | `422` | `GROUP_CYCLE` | A parent change would make a group its own ancestor |
 | `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set |
+| `422` | `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing was recorded — retry, reusing the same `Idempotency-Key` |
+
+Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that
+file is the authority if this table and the service ever disagree.
 
 ### Invariants the service guarantees
 
@@ -380,13 +382,6 @@ not confirmed by drunkcoding, and remain open to correction:**
 
 ## ⚠️ Gotchas & limits
 
-**Not implemented at this commit.** The posting routes are registered with their final request and
-response shapes, but their handlers answer `500 NotImplementedException` until `[D1242-3]` lands:
-`POST /v1/postings`, `POST /v1/postings/batch`, `GET /v1/postings/{id}`,
-`POST /v1/postings/{id}/reverse` and `GET /v1/accounts/{id}/statement`. Everything in
-[The API contract](#the-api-contract) above is the shape those routes will answer with; nothing in this
-readme describes behaviour that is only planned beyond that.
-
 **Held funds are deferred, and the fields lie in wait, not in use.** `heldAmount` is always `0` and
 `availableBalance` always equals `balance`. Do not build a reservation flow on those fields yet — the
 fields exist so the addition is purely behavioural later, and the trigger for adding it is a caller
@@ -408,10 +403,16 @@ readme (`"Customer"`, `"Liability"`, `"Credit"`); responses return them camelCas
 **Null fields are omitted from responses.** The serializer drops nulls, so an account with no
 `overdraftLimit` has no `overdraftLimit` key at all rather than a `null` one. Treat absence as null.
 
-**Paged reads return a bare JSON array, not an envelope.** `GET /v1/accounts`, `GET /v1/account-groups`
-and the statement return the page's items and nothing else — no total, no page count, no
-`hasNextPage`. Page by incrementing `pageIndex` until a page comes back empty; do not compute a page
-count and stop on it.
+**The three paged reads do not all have the same response shape.** Two return a bare array, one returns
+an envelope:
+
+| Paged read | Response shape | How you know you are past the end |
+|---|---|---|
+| `GET /v1/accounts` | Bare JSON array of accounts — no total, no page count, no `hasNextPage` | The array comes back empty (`[]`). Increment `pageIndex` until it does; do not compute a page count and stop on it |
+| `GET /v1/account-groups` | Bare JSON array of groups — same, no envelope | The array comes back empty (`[]`), same loop |
+| `GET /v1/accounts/{id}/statement` | Envelope: `{ "items": [...], "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage" }` | Either `hasNextPage` is `false` or `items` is empty. The empty page still answers `200`, never an error — reading `items` and stopping when it is empty works here too, and is the loop the acceptance suite runs |
+
+Pages are 1-based (`pageIndex=1` is the first page) on all three.
 
 **A statement is in stream order, never date order.** If you backdate a posting, it appears where it was
 recorded. Sort client-side by `effectiveDate` if that is what your reader needs — and remember the
@@ -424,15 +425,24 @@ entries; it can never erase evidence of what it did. Plan corrections, not clean
 DRK-1248 for the squad to resolve; the tables above describe what the code actually does:
 
 - Routes are served under `/v1/...`, not the `/api/v1/...` that §5 tables.
-- The statement page parameter is `pageIndex`, not §5's `page`, and `GET /v1/accounts/{id}/statement`
-  additionally requires `AccountId` as a *query* parameter — the path `{id}` alone yields `400`.
-- The implemented refusal codes are `ACCOUNT_HOLDS_BALANCE` and `GROUP_HOLDS_BALANCE` where §5 tables
-  `ACCOUNT_HAS_BALANCE` and `GROUP_HAS_BALANCE`, and the code adds `DUPLICATE_GROUP_CODE` and
-  `UNSUPPORTED_CURRENCY`, which §5 does not list.
-- `GET /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/account-groups` and
-  `GET /v1/account-groups/{id}` answer `500` against PostgreSQL.
-- An account's `currency` is missing from the body of both `GET /v1/accounts/{id}` and
-  `GET /v1/accounts/{id}/balance`, and from the account returned by `POST /v1/accounts`.
+- The paging parameter is `pageIndex` on all three paged reads, not §5's `page`.
+- **Four §5 refusal codes are spelled differently here, and two of them collapse onto one code.** The
+  [table above](#refusals-and-error-codes) is what the service emits; §5's names are listed here only so
+  you can recognise them if you are reading the baseline contract:
+
+  | §5 names | Service emits |
+  |---|---|
+  | `ACCOUNT_HAS_BALANCE` | `ACCOUNT_HOLDS_BALANCE` |
+  | `GROUP_HAS_BALANCE` | `GROUP_HOLDS_BALANCE` |
+  | `AMOUNT_NOT_POSITIVE` | `INVALID_POSTING_AMOUNT` |
+  | `AMOUNT_PRECISION_EXCEEDED` | `INVALID_POSTING_AMOUNT` — one code covers both amount refusals, so they cannot be told apart from the `code` alone |
+  | `FLOOR_BREACHED` | `INSUFFICIENT_FUNDS` |
+
+  The service also emits three codes §5 does not list at all: `DUPLICATE_GROUP_CODE`,
+  `UNSUPPORTED_CURRENCY` and `LOCK_TIMEOUT`.
+- §5 says the statement response "states when the end of the stream has been reached". The statement
+  does (`hasNextPage`); `GET /v1/accounts` and `GET /v1/account-groups` do not — they are bare arrays,
+  and an empty page is their only end-of-stream signal.
 
 ## 🔗 Related docs
 
