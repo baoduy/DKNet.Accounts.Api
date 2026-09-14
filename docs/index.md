@@ -3,6 +3,17 @@
 Reference docs for the `DKNet.DKNet.Accounts.Template` — a NuGet solution template that scaffolds
 production-ready .NET 10 microservices using vertical-slice DDD/CQRS.
 
+## This service
+
+- [Integration Guide](integration-guide.md) — the end-to-end walkthrough for a system calling this
+  accounts and ledger service: authenticate, create a group, open an account, post, read the balance
+  back, page a statement.
+- [Readme](../README.md) — what the service is, every field of every record type, the invariants it
+  guarantees, the API contract, and the decisions on record.
+
+Everything below documents the solution template this service was scaffolded from — reach for it when
+you are changing the service, not when you are calling it.
+
 ## Getting started
 
 - [Template Usage Reference](template-usage.md) — install the template, scaffold a solution, then
