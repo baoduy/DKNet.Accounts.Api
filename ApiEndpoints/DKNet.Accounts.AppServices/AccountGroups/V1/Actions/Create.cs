@@ -2,9 +2,6 @@ using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
-// The enclosing namespace declares its own AccountGroupType (this request's own Type property, right below)
-// — this alias reaches the Domain entity's enum of the same simple name unambiguously.
-using DomainAccountGroupType = DKNet.Accounts.Domains.Features.AccountGroups.Entities.AccountGroupType;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 
@@ -68,7 +65,7 @@ internal sealed class CreateAccountGroupCommandHandler(
             request.Code,
             request.Name,
             request.Description,
-            (DomainAccountGroupType)request.Type,
+            request.Type,
             request.OwnerId,
             request.ParentId,
             request.Metadata,

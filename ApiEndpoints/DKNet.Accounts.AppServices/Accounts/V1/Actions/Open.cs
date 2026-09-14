@@ -1,9 +1,6 @@
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Share;
-// The enclosing namespace declares its own AccountClassification (this request's own Classification property,
-// right below) — this alias reaches the Domain entity's enum of the same simple name unambiguously.
-using DomainAccountClassification = DKNet.Accounts.Domains.Features.Accounts.Entities.AccountClassification;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
@@ -83,7 +80,7 @@ internal sealed class OpenAccountCommandHandler(
             accountNumber,
             request.Name,
             currency.Code,
-            (DomainAccountClassification)request.Classification,
+            request.Classification,
             request.PermittedToGoNegative,
             request.OverdraftLimit,
             request.MinimumBalance,

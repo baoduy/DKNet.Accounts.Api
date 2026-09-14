@@ -1,21 +1,6 @@
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
+
 namespace DKNet.Accounts.AppServices.Accounts.V1;
-
-public enum AccountClassification
-{
-    Asset,
-    Liability,
-    Equity,
-    Income,
-    Expense
-}
-
-public enum AccountStatus
-{
-    Active,
-    Frozen,
-    Dormant,
-    Closed
-}
 
 public sealed record AccountDto
 {

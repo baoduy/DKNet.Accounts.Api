@@ -2,10 +2,8 @@ using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 using Microsoft.EntityFrameworkCore;
-// The enclosing namespace declares its own AccountGroupStatus (this request's own Status property, below) —
-// this alias reaches the Domain entity's enum of the same simple name unambiguously.
-using DomainAccountGroupStatus = DKNet.Accounts.Domains.Features.AccountGroups.Entities.AccountGroupStatus;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 
@@ -83,7 +81,7 @@ internal sealed class UpdateAccountGroupCommandHandler(
             group.Reparent(request.ParentId, byUser);
         }
 
-        if (request.Status is not null && (DomainAccountGroupStatus?)request.Status != group.Status)
+        if (request.Status is not null && request.Status != group.Status)
         {
             if (request.Status == AccountGroupStatus.Closed)
             {

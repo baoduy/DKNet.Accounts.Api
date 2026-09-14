@@ -2,9 +2,6 @@ using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
-// The enclosing namespace declares its own AccountStatus (this request's own Status property, below) — this
-// alias reaches the Domain entity's enum of the same simple name unambiguously.
-using DomainAccountStatus = DKNet.Accounts.Domains.Features.Accounts.Entities.AccountStatus;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
@@ -84,7 +81,7 @@ internal sealed class UpdateAccountCommandHandler(
             account.ChangeMetadata(request.Metadata, byUser);
         }
 
-        if (request.Status is not null && (DomainAccountStatus?)request.Status != account.Status)
+        if (request.Status is not null && request.Status != account.Status)
         {
             if (request.Status == AccountStatus.Closed && (account.Balance != 0m || account.HeldAmount != 0m))
             {
@@ -92,7 +89,7 @@ internal sealed class UpdateAccountCommandHandler(
                     LedgerErrors.AccountHoldsBalance, "Cannot close an account while it still holds a balance."));
             }
 
-            account.ChangeStatus((DomainAccountStatus)request.Status.Value, byUser);
+            account.ChangeStatus(request.Status.Value, byUser);
         }
 
         return Result.Ok(mapper.Map<AccountDto>(account));

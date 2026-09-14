@@ -1,28 +1,6 @@
+using DKNet.Accounts.Domains.Features.Postings.Entities;
+
 namespace DKNet.Accounts.AppServices.Postings.V1;
-
-public enum PostingDirection
-{
-    Credit,
-    Debit
-}
-
-public enum PostingCategory
-{
-    Transfer,
-    Payment,
-    Fee,
-    Interest,
-    Adjustment,
-    Refund,
-    Reversal,
-    OpeningBalance
-}
-
-public enum PostingStatus
-{
-    Posted,
-    Reversed
-}
 
 public sealed record PostingDto
 {

@@ -8,6 +8,11 @@
 - API startup is in `src/ApiEndpoints/DKNet.Accounts.Api/Program.cs`: bind `FeatureOptions`, then `AddLogConfig` -> `AddAzureAppConfig` -> `AddFluentValidationConfig` -> `RunMigrationAsync` -> `AddAppConfig` -> `AddContextualRequestPopulation` -> `UseAppConfig(a => a.UseEndpointConfigs(...))`.
 - Middleware/service composition is orchestrated by `DKNet.Accounts.Api/Configs/AppConfig.cs` and `DKNet.Accounts.Api/Configs/ServiceConfigs.cs`.
 - Layer boundaries are strict: `Api` -> `AppServices` -> `Domains`, with infra wiring from `DKNet.Accounts.Infra/Extensions/InfraSetup.cs`.
+- **Domain and DTO sharing**:
+  - An enum, a value-object record (`public sealed record`) or an owned type is declared once in `Domains` and referenced by `using` from the DTO — never re-declared as an identical copy.
+  - Entities are the one exception and stay off DTOs entirely (`AppServiceTests.DtosWithGenerateDtoAttribute_ShouldNotHaveProperties_ThatAreDomainEntities`).
+  - A DTO declaring its own copy of a Domain enum is the DRK-1247 B1 defect (Mapster's default cross-type enum conversion emits a numeric cast that a `HasConversion<string>()` column rejects) — do not reintroduce it.
+  - A DTO property that renames a Domain member (e.g. `CurrencyCode` -> `Currency`) still needs an explicit `TypeAdapterConfig` `.Map(...)` in `AppSetup.cs`, because Mapster's `ProjectToType` drops an unmatched member silently instead of erroring.
 - `DKNet.Accounts.AppHost/AppHost.cs` is Aspire host orchestration (Redis + PostgreSQL + API project), not business logic.
 - Persistence uses EF Core with auto model config and seeding (`UseAutoConfigModel`, `UseAutoDataSeeding`) in `InfraSetup.AddInfraServices` **and** in `InfraMigration.MigrateDb` — both context-construction paths must wire seeding, or seed data never appears over HTTP depending on which startup path runs.
 

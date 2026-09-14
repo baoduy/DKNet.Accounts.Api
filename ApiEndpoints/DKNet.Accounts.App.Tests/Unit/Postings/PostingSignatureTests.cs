@@ -1,4 +1,5 @@
 using DKNet.Accounts.AppServices.Postings.V1;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.App.Tests.Unit.Postings;
 

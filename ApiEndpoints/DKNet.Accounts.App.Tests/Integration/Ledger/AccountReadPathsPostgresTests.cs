@@ -11,8 +11,8 @@ using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Extensions;
 using DKNet.Accounts.Share;
 using Testcontainers.PostgreSql;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DomainAccount = DKNet.Accounts.Domains.Features.Accounts.Entities.Account;
-using DomainAccountClassification = DKNet.Accounts.Domains.Features.Accounts.Entities.AccountClassification;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -71,7 +71,7 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
             accountNumber: $"ACC{Guid.NewGuid():N}"[..13],
             name: "Operating",
             currencyCode: "SGD",
-            classification: DomainAccountClassification.Liability,
+            classification: AccountClassification.Liability,
             permittedToGoNegative: false,
             overdraftLimit: null,
             minimumBalance: null,

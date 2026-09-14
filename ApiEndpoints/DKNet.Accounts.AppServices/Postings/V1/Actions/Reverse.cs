@@ -4,11 +4,6 @@ using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
 using DKNet.Accounts.AppServices.Postings.V1.Specs;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
-// The enclosing namespace declares its own PostingCategory/PostingDirection — these aliases reach the
-// Domain entity's enums of the same simple names unambiguously (see Domains import above).
-using DomainPostingCategory = DKNet.Accounts.Domains.Features.Postings.Entities.PostingCategory;
-using DomainPostingDirection = DKNet.Accounts.Domains.Features.Postings.Entities.PostingDirection;
-using DomainPostingStatus = DKNet.Accounts.Domains.Features.Postings.Entities.PostingStatus;
 
 namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
@@ -80,7 +75,7 @@ internal sealed class ReversePostingCommandHandler(
                 return Result.Fail<PostingDto>(new NotFoundError($"The posting {request.Id} was not found."));
             }
 
-            if (original.Status == DomainPostingStatus.Reversed)
+            if (original.Status == PostingStatus.Reversed)
             {
                 return Result.Fail<PostingDto>(LedgerErrors.Error(
                     LedgerErrors.PostingAlreadyReversed, "This posting has already been reversed."));
@@ -93,7 +88,7 @@ internal sealed class ReversePostingCommandHandler(
             }
 
             var recordedAt = clock.GetUtcNow();
-            var reversalIsDebit = original.Direction == DomainPostingDirection.Credit;
+            var reversalIsDebit = original.Direction == PostingDirection.Credit;
             var application = account.TryApplyPosting(reversalIsDebit, original.Amount, recordedAt, isReversal: true);
             if (!application.Success)
             {
@@ -105,14 +100,14 @@ internal sealed class ReversePostingCommandHandler(
                 account.Id,
                 postingNumber,
                 application.Position,
-                reversalIsDebit ? DomainPostingDirection.Debit : DomainPostingDirection.Credit,
+                reversalIsDebit ? PostingDirection.Debit : PostingDirection.Credit,
                 original.Amount,
                 original.Currency,
                 application.SignedValue,
                 application.BalanceAfter,
                 DateOnly.FromDateTime(recordedAt.UtcDateTime),
                 recordedAt,
-                DomainPostingCategory.Reversal,
+                PostingCategory.Reversal,
                 original.TransactionGroupId,
                 original.CounterpartyAccountId,
                 original.CounterpartyReference,

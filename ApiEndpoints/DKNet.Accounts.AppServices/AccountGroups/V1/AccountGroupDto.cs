@@ -1,19 +1,6 @@
+using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
+
 namespace DKNet.Accounts.AppServices.AccountGroups.V1;
-
-public enum AccountGroupType
-{
-    Customer,
-    Merchant,
-    Internal,
-    Suspense,
-    Settlement
-}
-
-public enum AccountGroupStatus
-{
-    Active,
-    Closed
-}
 
 public sealed record AccountGroupDto
 {

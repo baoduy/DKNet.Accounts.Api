@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.AppServices.Postings.V1;
 

@@ -3,9 +3,6 @@ using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using X.PagedList;
-// The enclosing namespace declares its own AccountStatus (the request's own filter enum, right below) — this
-// alias reaches the Domain entity's enum of the same simple name unambiguously.
-using DomainAccountStatus = DKNet.Accounts.Domains.Features.Accounts.Entities.AccountStatus;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Queries;
 
@@ -30,7 +27,7 @@ internal sealed class ListAccountsQueryHandler(IRepositorySpec repository)
 {
     public Task<IPagedList<AccountDto>> OnHandle(ListAccountsQuery request, CancellationToken cancellationToken) =>
         repository.ToPagedListAsync<Account, AccountDto>(
-            new SpecListAccounts(request.GroupId, request.Currency, (DomainAccountStatus?)request.Status),
+            new SpecListAccounts(request.GroupId, request.Currency, request.Status),
             request.PageIndex ?? ListAccountsQuery.DefaultPageIndex,
             request.PageSize ?? ListAccountsQuery.DefaultPageSize,
             cancellationToken);

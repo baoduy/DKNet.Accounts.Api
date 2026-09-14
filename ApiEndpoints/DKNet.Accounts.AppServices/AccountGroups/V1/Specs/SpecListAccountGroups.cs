@@ -1,11 +1,6 @@
 using DKNet.EfCore.Specifications.Definitions;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 using LinqKit;
-// The enclosing DKNet.Accounts.AppServices.AccountGroups.V1 namespace declares its own AccountGroupType /
-// AccountGroupStatus (the DTO/request enums) — a plain `using` for the Domain namespace above loses that
-// name clash to the enclosing namespace, so the Domain entity's enums need an alias to bind unambiguously.
-using DomainAccountGroupType = DKNet.Accounts.Domains.Features.AccountGroups.Entities.AccountGroupType;
-using DomainAccountGroupStatus = DKNet.Accounts.Domains.Features.AccountGroups.Entities.AccountGroupStatus;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 
@@ -16,8 +11,8 @@ namespace DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 internal sealed class SpecListAccountGroups : Specification<AccountGroup>
 {
     public SpecListAccountGroups(
-        DomainAccountGroupType? type = null,
-        DomainAccountGroupStatus? status = null,
+        AccountGroupType? type = null,
+        AccountGroupStatus? status = null,
         Guid? parentId = null,
         string? code = null)
     {

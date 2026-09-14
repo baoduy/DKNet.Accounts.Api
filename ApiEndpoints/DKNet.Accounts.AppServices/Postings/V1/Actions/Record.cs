@@ -5,11 +5,6 @@ using DKNet.Accounts.AppServices.Postings.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using DKNet.Accounts.Domains.Share;
-// The enclosing namespace declares its own PostingCategory/PostingDirection (this request's own Category/
-// Direction properties, right below) — these aliases reach the Domain entity's enums of the same simple
-// names unambiguously.
-using DomainPostingCategory = DKNet.Accounts.Domains.Features.Postings.Entities.PostingCategory;
-using DomainPostingDirection = DKNet.Accounts.Domains.Features.Postings.Entities.PostingDirection;
 
 namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
@@ -163,14 +158,14 @@ internal sealed class RecordPostingCommandHandler(
                 account.Id,
                 postingNumber,
                 application.Position,
-                (DomainPostingDirection)request.Direction,
+                request.Direction,
                 request.Amount,
                 currency.Code,
                 application.SignedValue,
                 application.BalanceAfter,
                 effectiveDate,
                 recordedAt,
-                (DomainPostingCategory)request.Category,
+                request.Category,
                 request.TransactionGroupId,
                 request.CounterpartyAccountId,
                 request.CounterpartyReference,
