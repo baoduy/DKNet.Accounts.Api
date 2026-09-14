@@ -18,7 +18,15 @@ internal static class DbMigration
             await InfraMigration.MigrateDb(builder.Configuration.GetConnectionString(SharedConsts.DbConnectionString)!);
             Console.WriteLine("Db migration is completed");
 
-                Environment.Exit(0);
+            Environment.Exit(0);
+        }
+        else if (features.RunDbMigrationWhenAppStart)
+        {
+            // Unlike the `migration` CLI arg above, this runs the migration as part of normal app
+            // startup and does not exit — the host keeps serving afterward.
+            Console.WriteLine("Running Db migration on app start...");
+            await InfraMigration.MigrateDb(builder.Configuration.GetConnectionString(SharedConsts.DbConnectionString)!);
+            Console.WriteLine("Db migration is completed");
         }
     }
 

@@ -16,11 +16,25 @@ Feature: Correcting and reading the ledger
     Then the request is refused and the account balance is unchanged
 
   @integration
-  Scenario: A credit is reversed even when the balance no longer covers it
-    Given PayHub recorded a credit of 100.00 SGD against an account that is not permitted to go negative
-    And that account's balance has since fallen to 20.00 SGD
-    When PayHub reverses that credit
+  Scenario: A reversal lands even when the account can no longer cover it
+    Given PayHub recorded a credit of 100.00 SGD against an account not permitted to go negative
+    And the account has since been debited down to 20.00 SGD
+    When PayHub reverses that credit of 100.00 SGD
     Then the reversal is recorded and the account balance is -80.00 SGD
+
+  @integration
+  Scenario: A reversal against a closed account is refused until the account is reopened
+    Given PayHub holds a closed account carrying a posting of 100.00 SGD
+    When PayHub asks to reverse that posting
+    Then the request is refused
+    And after PayHub returns the account to active the same reversal is recorded
+
+  @integration
+  Scenario: A reversal that debits a dormant account is refused until the account is active
+    Given PayHub holds a dormant account carrying a credit of 100.00 SGD
+    When PayHub asks to reverse that credit
+    Then the request is refused and the balance is unchanged
+    And after PayHub returns the account to active the same reversal is recorded
 
   @integration
   Scenario: A batch where one movement fails records none of them
@@ -37,17 +51,29 @@ Feature: Correcting and reading the ledger
 
   @integration
   Scenario: A statement returns an account's postings in stream order within a date range
-    Given PayHub's account has postings dated 1 September 2026, 15 September 2026 and 30 September 2026
-    When PayHub reads the statement from 10 September 2026 to 30 September 2026
-    Then the postings dated 15 September 2026 and 30 September 2026 are returned in that order
-    And the posting dated 1 September 2026 is not returned
+    Given PayHub's account has postings dated 1 June 2026, 15 June 2026 and 30 June 2026
+    When PayHub reads the statement from 10 June 2026 to 30 June 2026
+    Then the postings dated 15 June 2026 and 30 June 2026 are returned in that order
+    And the posting dated 1 June 2026 is not returned
 
   @integration
-  Scenario: A statement is read across pages without loss or repetition
-    Given PayHub's account holds twenty-five postings dated in September 2026
-    When PayHub reads the September 2026 statement in pages of ten
-    Then the three pages together return all twenty-five postings in stream order, each exactly once
-    And the third page reports that the end of the stream has been reached
+  Scenario: A backdated posting is read at the position it was recorded at
+    Given PayHub's account has a posting dated 30 June 2026 recorded before a posting backdated to 15 June 2026
+    When PayHub reads the statement covering all of June 2026
+    Then the posting dated 30 June 2026 is returned before the posting dated 15 June 2026
+
+  @integration
+  Scenario: A posting dated in the future is refused
+    Given today is 14 September 2026
+    When PayHub records a credit of 10.00 SGD taking effect on 30 September 2026
+    Then the request is refused and no posting is recorded
+
+  @integration
+  Scenario: Reading a statement page by page returns every posting exactly once
+    Given PayHub's account holds twenty-five postings within one date range
+    When PayHub reads that statement in pages of ten until a page comes back empty
+    Then twenty-five postings are returned across the pages in stream order
+    And no posting appears on two pages and none is missing
 
   @integration
   Scenario: An account balance always equals the sum of its postings

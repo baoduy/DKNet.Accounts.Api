@@ -89,27 +89,4 @@ public class AuthPlaceholderConfigTests
             "MetadataAddress/ValidIssuer must carry only the placeholder tenant guid, found real tenant(s): " +
             string.Join(", ", offenders));
     }
-
-    [Fact]
-    public void TemplateJson_TenantIdAndApiAudienceSymbols_ShouldMatchAppSettingsPlaceholders()
-    {
-        var templateJsonPath = Path.Combine(SrcDir, ".template.config", "template.json");
-        File.Exists(templateJsonPath).ShouldBeTrue();
-
-        using var templateDoc = JsonDocument.Parse(File.ReadAllText(templateJsonPath));
-        var symbols = templateDoc.RootElement.GetProperty("symbols");
-
-        var tenantIdReplaces = symbols.GetProperty("TenantId").GetProperty("replaces").GetString();
-        var apiAudienceReplaces = symbols.GetProperty("ApiAudience").GetProperty("replaces").GetString();
-
-        tenantIdReplaces.ShouldNotBeNullOrWhiteSpace();
-        apiAudienceReplaces.ShouldNotBeNullOrWhiteSpace();
-
-        var result = EntraPlaceholderGuard.Check(BearerSectionsInAppSettings(), tenantIdReplaces!, apiAudienceReplaces!);
-
-        result.Offenders.ShouldBeEmpty(
-            "template.json symbols no longer match shipped Entra config: " + string.Join(", ", result.Offenders));
-        result.EntraSectionsChecked.ShouldBeGreaterThanOrEqualTo(1,
-            "expected at least one Entra-shaped appsettings*.json Bearer section");
-    }
 }

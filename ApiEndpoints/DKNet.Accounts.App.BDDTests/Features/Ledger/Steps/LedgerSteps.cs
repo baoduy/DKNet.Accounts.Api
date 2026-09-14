@@ -146,14 +146,22 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         await RecordPostingAsync(account2, "Credit", amount2, currency2);
     }
 
-    [Given(@"the group ""([^""]+)"" holds two active accounts and one frozen account")]
-    public async Task GivenTheGroupHoldsTwoActiveAccountsAndOneFrozenAccount(string groupCode)
+    [Given(@"the group ""([^""]+)"" holds two active accounts and one closed account")]
+    public async Task GivenTheGroupHoldsTwoActiveAccountsAndOneClosedAccount(string groupCode)
     {
         var groupId = await CreateGroupAsync(groupCode, "Customer");
         await OpenAccountAsync("SGD", groupId);
         await OpenAccountAsync("SGD", groupId);
-        var frozen = await OpenAccountAsync("SGD", groupId);
-        await PatchAccountStatusAsync(frozen, "Frozen");
+        var closed = await OpenAccountAsync("SGD", groupId);
+        await PatchAccountStatusAsync(closed, "Closed");
+    }
+
+    [Given(@"PayHub has created two groups of type ""([^""]+)"" and one of type ""([^""]+)""")]
+    public async Task GivenPayHubHasCreatedTwoGroupsOfTypeAndOneOfType(string commonType, string distinctType)
+    {
+        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", commonType);
+        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", commonType);
+        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", distinctType);
     }
 
     #endregion
@@ -283,7 +291,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
             state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
     }
 
-    [Given(@"PayHub recorded a credit of ([\d.]+) (\w+) against an account that is not permitted to go negative")]
+    [Given(@"PayHub recorded a credit of ([\d.]+) (\w+) against an account not permitted to go negative")]
     public async Task GivenPayHubRecordedACreditAgainstAnAccountNotPermittedToGoNegative(decimal amount, string currency)
     {
         var accountId = await OpenAccountAsync(currency, permittedToGoNegative: false);
@@ -292,9 +300,29 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         state.Values["posting"] = postingId?.ToString() ?? "";
     }
 
-    [Given(@"that account's balance has since fallen to ([\d.]+) (\w+)")]
-    public async Task GivenThatAccountsBalanceHasSinceFallenTo(decimal amount, string currency) =>
+    [Given(@"the account has since been debited down to ([\d.]+) (\w+)")]
+    public async Task GivenTheAccountHasSinceBeenDebitedDownTo(decimal amount, string currency) =>
         await RecordPostingAsync(Account(), "Debit", amount, currency);
+
+    [Given(@"PayHub holds a closed account carrying a posting of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsAClosedAccountCarryingAPostingOf(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+        await PatchAccountStatusAsync(accountId, "Closed");
+    }
+
+    [Given(@"PayHub holds a dormant account carrying a credit of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsADormantAccountCarryingACreditOf(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+        await PatchAccountStatusAsync(accountId, "Dormant");
+    }
 
     [Given(@"PayHub's account has postings dated (.+), (.+) and (.+)")]
     public async Task GivenPayHubsAccountHasPostingsDated(string date1, string date2, string date3)
@@ -307,14 +335,23 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         }
     }
 
-    [Given(@"PayHub's account holds twenty-five postings dated in September 2026")]
-    public async Task GivenPayHubsAccountHoldsTwentyFivePostingsInSeptember2026()
+    [Given(@"PayHub's account has a posting dated (.+) recorded before a posting backdated to (.+)")]
+    public async Task GivenPayHubsAccountHasAPostingDatedRecordedBeforeAPostingBackdatedTo(string firstDate, string secondDate)
+    {
+        var accountId = await OpenAccountAsync("SGD");
+        state.Values["account"] = accountId.ToString();
+        await RecordPostingWithEffectiveDateAsync(accountId, ParseLedgerDate(firstDate));
+        await RecordPostingWithEffectiveDateAsync(accountId, ParseLedgerDate(secondDate));
+    }
+
+    [Given(@"PayHub's account holds twenty-five postings within one date range")]
+    public async Task GivenPayHubsAccountHoldsTwentyFivePostingsWithinOneDateRange()
     {
         var accountId = await OpenAccountAsync("SGD");
         state.Values["account"] = accountId.ToString();
         for (var day = 1; day <= 25; day++)
         {
-            await RecordPostingWithEffectiveDateAsync(accountId, new DateOnly(2026, 9, day));
+            await RecordPostingWithEffectiveDateAsync(accountId, new DateOnly(2026, 6, day));
         }
     }
 
@@ -376,6 +413,19 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
 
     #endregion
 
+    #region Given — clock
+
+    [Given(@"today is (.+)$")]
+    public void GivenTodayIs(string date)
+    {
+        // No fake clock is wired at this stub stage (§5 bodies all throw NotImplementedException before
+        // any clock read would happen) — the pinned date is documented here for the Build stage, which
+        // owns wiring a controllable clock per §2/R6.
+        state.Values["today"] = ParseLedgerDate(date).ToString("yyyy-MM-dd");
+    }
+
+    #endregion
+
     #region When
 
     [When(@"PayHub opens an account named ""([^""]+)"" in ""([^""]+)"" in (\w+) as an? (\w+) account")]
@@ -432,13 +482,17 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}");
     }
 
-    [When(@"PayHub lists the accounts of ""([^""]+)"" filtered to frozen")]
-    public async Task WhenPayHubListsTheAccountsOfFilteredToFrozen(string groupCode)
+    [When(@"PayHub lists the active accounts of ""([^""]+)""")]
+    public async Task WhenPayHubListsTheActiveAccountsOf(string groupCode)
     {
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}&status=Frozen");
+            state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}&status=Active");
     }
+
+    [When(@"PayHub lists the groups of type ""([^""]+)""")]
+    public async Task WhenPayHubListsTheGroupsOfType(string type) =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}?type={type}");
 
     [When(@"PayHub records a credit of ([\d.]+) (\w+) described as ""([^""]+)""")]
     public async Task WhenPayHubRecordsACreditDescribedAs(decimal amount, string currency, string description) =>
@@ -476,16 +530,41 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task WhenPayHubRecordsACreditAgainstIt(decimal amount, string currency) =>
         await RecordPostingAsync(Account(), "Credit", amount, currency);
 
+    [When(@"PayHub records a credit of ([\d.]+) (\w+) taking effect on (.+)$")]
+    public async Task WhenPayHubRecordsACreditTakingEffectOn(decimal amount, string currency, string effectiveDateText)
+    {
+        var accountId = Account();
+        if (accountId == Guid.Empty)
+        {
+            accountId = await OpenAccountAsync(currency);
+            state.Values["account"] = accountId.ToString();
+        }
+
+        var effectiveDate = ParseLedgerDate(effectiveDateText);
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, PostingsPath, new
+        {
+            accountId,
+            direction = "Credit",
+            amount,
+            currency,
+            category = "Transfer",
+            effectiveDate
+        });
+    }
+
     [When(@"PayHub records a debit of ([\d.]+) (\w+) against it")]
     public async Task WhenPayHubRecordsADebitAgainstIt(decimal amount, string currency) =>
         await RecordPostingAsync(Account(), "Debit", amount, currency);
 
-    [When(@"PayHub reverses that posting")]
-    [When(@"PayHub reverses that credit")]
+    [When(@"PayHub reverses that posting$")]
+    [When(@"PayHub reverses that credit$")]
+    [When(@"PayHub reverses that credit of [\d.]+ \w+$")]
     public async Task WhenPayHubReversesThatPosting() =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
 
     [When(@"PayHub asks to reverse that same posting again")]
+    [When(@"PayHub asks to reverse that posting$")]
+    [When(@"PayHub asks to reverse that credit$")]
     public async Task WhenPayHubAsksToReverseThatSamePostingAgain() =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
 
@@ -509,15 +588,31 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
             state, HttpMethod.Get, $"{AccountsPath}/{Account()}/statement?from={fromDate:yyyy-MM-dd}&to={toDate:yyyy-MM-dd}");
     }
 
-    [When(@"PayHub reads the September 2026 statement in pages of ten")]
-    public async Task WhenPayHubReadsTheSeptember2026StatementInPagesOfTen()
+    [When(@"PayHub reads the statement covering all of June 2026")]
+    public async Task WhenPayHubReadsTheStatementCoveringAllOfJune2026() =>
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{AccountsPath}/{Account()}/statement?from=2026-06-01&to=2026-06-30");
+
+    [When(@"PayHub reads that statement in pages of ten until a page comes back empty")]
+    public async Task WhenPayHubReadsThatStatementInPagesOfTenUntilAPageComesBackEmpty()
     {
-        for (var page = 1; page <= 3; page++)
+        for (var page = 1; page <= 50; page++)
         {
-            state.Response = await client.SendAsCallerAsync(
+            var response = await client.SendAsCallerAsync(
                 state,
                 HttpMethod.Get,
-                $"{AccountsPath}/{Account()}/statement?from=2026-09-01&to=2026-09-30&pageIndex={page}&pageSize=10");
+                $"{AccountsPath}/{Account()}/statement?from=2026-06-01&to=2026-06-30&pageIndex={page}&pageSize=10");
+            state.Response = response;
+            if (!response.IsSuccessStatusCode)
+            {
+                break;
+            }
+
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (!doc.TryGetProperty("items", out var items) || items.GetArrayLength() == 0)
+            {
+                break;
+            }
         }
     }
 
@@ -597,11 +692,18 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public void ThenItsAvailableBalanceIsAndItsHeldAmountIs(decimal available, string c1, decimal held, string c2) =>
         state.Response!.IsSuccessStatusCode.ShouldBeTrue();
 
-    [Then(@"only the frozen account is returned")]
-    public async Task ThenOnlyTheFrozenAccountIsReturned()
+    [Then(@"only the two active accounts are returned")]
+    public async Task ThenOnlyTheTwoActiveAccountsAreReturned()
     {
         var body = await state.Response!.Content.ReadAsStringAsync();
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the frozen-only list, got: {body}");
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the active-only list, got: {body}");
+    }
+
+    [Then(@"only the suspense group is returned")]
+    public async Task ThenOnlyTheSuspenseGroupIsReturned()
+    {
+        var body = await state.Response!.Content.ReadAsStringAsync();
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the suspense-only list, got: {body}");
     }
 
     [Then(@"the account balance is (-?[\d.]+) (\w+)")]
@@ -661,13 +763,26 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public void ThenThePostingDatedIsNotReturned(string date) =>
         state.Response!.IsSuccessStatusCode.ShouldBeTrue();
 
-    [Then(@"the three pages together return all twenty-five postings in stream order, each exactly once")]
-    public void ThenTheThreePagesTogetherReturnAllTwentyFivePostings() =>
+    [Then(@"the posting dated (.+) is returned before the posting dated (.+)")]
+    public void ThenThePostingDatedIsReturnedBeforeThePostingDated(string firstDate, string secondDate) =>
         state.Response!.IsSuccessStatusCode.ShouldBeTrue();
 
-    [Then(@"the third page reports that the end of the stream has been reached")]
-    public void ThenTheThirdPageReportsTheEndOfTheStream() =>
+    [Then(@"twenty-five postings are returned across the pages in stream order")]
+    public void ThenTwentyFivePostingsAreReturnedAcrossThePagesInStreamOrder() =>
         state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"no posting appears on two pages and none is missing")]
+    public void ThenNoPostingAppearsOnTwoPagesAndNoneIsMissing() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"after PayHub returns the account to active the same reversal is recorded")]
+    public async Task ThenAfterPayHubReturnsTheAccountToActiveTheSameReversalIsRecorded()
+    {
+        await PatchAccountStatusAsync(Account(), "Active");
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+        state.Response.IsSuccessStatusCode.ShouldBeTrue(
+            $"expected the reversal to be recorded after reactivation, status was {(int)state.Response.StatusCode}");
+    }
 
     [Then(@"the balance is ([\d.]+) (\w+)")]
     public void ThenTheBalanceIs(decimal amount, string currency) =>

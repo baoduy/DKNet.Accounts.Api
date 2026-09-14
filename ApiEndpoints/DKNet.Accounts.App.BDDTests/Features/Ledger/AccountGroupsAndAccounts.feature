@@ -46,7 +46,13 @@ Feature: Account groups and accounts
     Then its available balance is 100.00 SGD and its held amount is 0.00 SGD
 
   @integration
-  Scenario: PayHub lists only the frozen accounts of a group
-    Given the group "CUST-000123" holds two active accounts and one frozen account
-    When PayHub lists the accounts of "CUST-000123" filtered to frozen
-    Then only the frozen account is returned
+  Scenario: Groups can be listed filtered by type
+    Given PayHub has created two groups of type "Customer" and one of type "Suspense"
+    When PayHub lists the groups of type "Suspense"
+    Then only the suspense group is returned
+
+  @integration
+  Scenario: Accounts can be listed filtered by status
+    Given the group "CUST-000123" holds two active accounts and one closed account
+    When PayHub lists the active accounts of "CUST-000123"
+    Then only the two active accounts are returned
