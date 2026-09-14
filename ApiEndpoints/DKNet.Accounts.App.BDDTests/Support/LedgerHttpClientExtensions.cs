@@ -48,6 +48,12 @@ internal static class LedgerHttpClientExtensions
             request.Content = JsonContent.Create(body);
         }
 
-        return await client.SendAsync(request);
+        var response = await client.SendAsync(request);
+
+        // Buffers the body into memory so more than one Then step can read it (e.g. the reference-data
+        // scenario's two assertions each call ReadFromJsonAsync on the same captured response) — the network
+        // stream can only be read once and throws ObjectDisposedException on a second read otherwise.
+        await response.Content.LoadIntoBufferAsync();
+        return response;
     }
 }

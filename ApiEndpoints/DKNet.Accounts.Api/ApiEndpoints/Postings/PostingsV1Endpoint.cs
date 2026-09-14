@@ -25,7 +25,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(req, cancellationToken: ct);
                 return result.Response(isCreated: true);
             })
-            .RequireAuthorization(ScopeNames.PostingsWrite)
+            .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<PostingDto>(StatusCodes.Status201Created)
             .WithDescription(
                 "Record one credit or debit. Idempotency key is required in the header: " +
@@ -41,7 +41,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(req, cancellationToken: ct);
                 return result.Response(isCreated: true);
             })
-            .RequireAuthorization(ScopeNames.PostingsWrite)
+            .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<IReadOnlyCollection<PostingDto>>(StatusCodes.Status201Created)
             .WithDescription("Record several movements as one all-or-nothing batch.");
 
@@ -53,7 +53,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 var dto = await bus.Send(new GetPostingByIdQuery { Id = id }, cancellationToken: ct);
                 return dto is null ? Results.NotFound() : Results.Ok(dto);
             })
-            .RequireAuthorization(ScopeNames.PostingsRead)
+            .RequireScope(group, ScopeNames.PostingsRead)
             .Produces<PostingDto>()
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one posting.");
@@ -66,7 +66,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(new ReversePostingRequest { Id = id }, cancellationToken: ct);
                 return result.Response();
             })
-            .RequireAuthorization(ScopeNames.PostingsReverse)
+            .RequireScope(group, ScopeNames.PostingsReverse)
             .Produces<PostingDto>()
             .WithDescription("Reverse a posting.");
     }

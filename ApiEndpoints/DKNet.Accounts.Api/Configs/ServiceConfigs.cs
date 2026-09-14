@@ -18,6 +18,7 @@ internal static class ServiceConfigs
             .AddSingleton<IHttpContextAccessor, HttpContextAccessor>()
             .AddSingleton<ISensitiveDataPrincipalAccessor, HttpContextSensitiveDataPrincipalAccessor>()
             .AddScoped<IPrincipalProvider, PrincipalProvider>()
+            .AddScoped<ICallingSystemAccessor, CallingSystemAccessor>()
             // Also wires DKNet's DataOwnerHook onto CoreDbContext: it stamps CreatedBy/CreatedOn from
             // IDataOwnerProvider on save, never from a request property — a generated create request can
             // never set the acting user (DRK-715 R1).

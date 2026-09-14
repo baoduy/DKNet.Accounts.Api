@@ -17,6 +17,12 @@ public static class AppSetup
         TypeAdapterConfig.GlobalSettings.Default.NameMatchingStrategy(NameMatchingStrategy.Flexible);
         TypeAdapterConfig.GlobalSettings.Default.MapToConstructor(true);
         TypeAdapterConfig.GlobalSettings.Default.PreserveReference(true);
+
+        // Flexible name matching re-cases plain string dictionary keys (e.g. "region" -> "Region") as if they
+        // were member names to match — metadata bags must round-trip verbatim, so map them as data, not members.
+        TypeAdapterConfig<IReadOnlyDictionary<string, string>, IReadOnlyDictionary<string, string>>.NewConfig()
+            .MapWith(src => src);
+
         TypeAdapterConfig.GlobalSettings.ScanMaps();
         TypeAdapterConfig.GlobalSettings.Compile();
 

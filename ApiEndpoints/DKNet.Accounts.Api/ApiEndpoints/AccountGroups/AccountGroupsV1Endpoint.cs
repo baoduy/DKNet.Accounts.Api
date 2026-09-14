@@ -1,5 +1,5 @@
-using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.AccountGroups.V1;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Queries;
@@ -20,9 +20,9 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.Response(isCreated: true);
+                return result.ToLedgerResponse(isCreated: true);
             })
-            .RequireAuthorization(ScopeNames.AccountsWrite)
+            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>(StatusCodes.Status201Created)
             .WithDescription("Create an account group.");
 
@@ -34,7 +34,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var page = await bus.Send(query, cancellationToken: ct);
                 return Results.Ok(page);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("List account groups, filterable by code, type, status and parent.");
 
         group.MapGet("{id:guid}", async (
@@ -45,7 +45,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var dto = await bus.Send(new GetAccountGroupByIdQuery { Id = id }, cancellationToken: ct);
                 return dto is null ? Results.NotFound() : Results.Ok(dto);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .Produces<AccountGroupDto>()
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one account group.");
@@ -57,9 +57,9 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(req with { Id = id }, cancellationToken: ct);
-                return result.Response();
+                return result.ToLedgerResponse();
             })
-            .RequireAuthorization(ScopeNames.AccountsWrite)
+            .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
                 "Change a group's name, description, status, parent and metadata. " +
                 "{\"status\":\"Closed\"} closes the group.");
@@ -72,7 +72,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var balances = await bus.Send(new GetAccountGroupBalancesQuery { Id = id }, cancellationToken: ct);
                 return Results.Ok(balances);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read a group's total balances, one line per currency — never combined.");
     }
 }

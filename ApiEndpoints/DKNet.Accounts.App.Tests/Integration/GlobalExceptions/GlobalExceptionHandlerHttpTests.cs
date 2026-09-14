@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
+using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.Tests.Integration.GlobalExceptions;
 
@@ -103,6 +105,44 @@ public sealed class GlobalExceptionHandlerHttpTests
         result.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         result.Body.TryGetProperty("type", out var type).ShouldBeTrue();
         type.GetString().ShouldNotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task OwnershipRequiredException_Returns403WithoutLeakingEfDetail()
+    {
+        // Type is asserted in Development — the package's own problem-details customization nulls the "type"
+        // extension for every exception-originated response in other environments (see the frozen
+        // NonExceptionProblemResponse_KeepsFrameworkDefaultType test's comment above), independently of what
+        // this handler sets.
+        var result = await ThrowInHostAsync("Development", new OwnershipRequiredException());
+
+        result.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        result.Body.GetProperty("type").GetString().ShouldBe(nameof(OwnershipRequiredException));
+    }
+
+    [Fact]
+    public async Task DbUpdateException_ForAUniqueConstraintViolation_Returns409()
+    {
+        var inner = new Exception("duplicate key value violates unique constraint \"IX_Accounts_AccountNumber\"");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var result = await ThrowInHostAsync("Development", outer);
+
+        result.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        result.Body.GetProperty("type").GetString().ShouldBe(nameof(DbUpdateException));
+    }
+
+    [Fact]
+    public async Task DbUpdateException_ForAnUnrelatedFailure_Returns500()
+    {
+        // Same exception type as the 409 case above, but the inner message names neither "unique" nor
+        // "duplicate" — this is the branch's guard condition, not just its type match.
+        var inner = new Exception("could not connect to server");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var result = await ThrowInHostAsync("Production", outer);
+
+        result.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
     }
 
     private static async Task<ThrowResult> ThrowInHostAsync(string environmentName, Exception exceptionToThrow)

@@ -18,7 +18,7 @@ internal sealed class CurrenciesV1Endpoint : IEndpointConfig
                 var currencies = await bus.Send(new ListCurrenciesQuery(), cancellationToken: ct);
                 return Results.Ok(currencies);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("List supported currencies and their decimal places.");
     }
 }

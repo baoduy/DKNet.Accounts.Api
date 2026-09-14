@@ -16,6 +16,17 @@ public enum PostingAmountValidation
 /// </summary>
 public static class PostingAmount
 {
-    public static PostingAmountValidation Validate(decimal amount, Currency currency) =>
-        throw new NotImplementedException();
+    public static PostingAmountValidation Validate(decimal amount, Currency currency)
+    {
+        ArgumentNullException.ThrowIfNull(currency);
+
+        if (amount <= 0m)
+        {
+            return PostingAmountValidation.NotPositive;
+        }
+
+        return decimal.Round(amount, currency.DecimalPlaces) != amount
+            ? PostingAmountValidation.PrecisionExceeded
+            : PostingAmountValidation.Valid;
+    }
 }

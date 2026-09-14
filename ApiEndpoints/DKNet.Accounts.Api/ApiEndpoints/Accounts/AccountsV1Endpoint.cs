@@ -1,5 +1,5 @@
-using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
@@ -20,9 +20,9 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.Response(isCreated: true);
+                return result.ToLedgerResponse(isCreated: true);
             })
-            .RequireAuthorization(ScopeNames.AccountsWrite)
+            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountDto>(StatusCodes.Status201Created)
             .WithDescription("Open an account inside a group, in one currency, with an accounting classification.");
 
@@ -34,7 +34,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var page = await bus.Send(query, cancellationToken: ct);
                 return Results.Ok(page);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("List accounts, filterable by group, currency and status.");
 
         group.MapGet("{id:guid}", async (
@@ -45,7 +45,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var dto = await bus.Send(new GetAccountByIdQuery { Id = id }, cancellationToken: ct);
                 return dto is null ? Results.NotFound() : Results.Ok(dto);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .Produces<AccountDto>()
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one account.");
@@ -58,7 +58,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var balance = await bus.Send(new GetAccountBalanceQuery { Id = id }, cancellationToken: ct);
                 return balance is null ? Results.NotFound() : Results.Ok(balance);
             })
-            .RequireAuthorization(ScopeNames.AccountsRead)
+            .RequireScope(group, ScopeNames.AccountsRead)
             .Produces<AccountBalanceDto>()
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read an account's balance.");
@@ -70,9 +70,9 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(req with { Id = id }, cancellationToken: ct);
-                return result.Response();
+                return result.ToLedgerResponse();
             })
-            .RequireAuthorization(ScopeNames.AccountsWrite)
+            .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
                 "Change an account's name, status, overdraft limit, minimum balance and metadata. " +
                 "{\"status\":\"Closed\"} closes the account.");
@@ -86,7 +86,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var page = await bus.Send(query with { AccountId = id }, cancellationToken: ct);
                 return Results.Ok(page);
             })
-            .RequireAuthorization(ScopeNames.PostingsRead)
+            .RequireScope(group, ScopeNames.PostingsRead)
             .WithDescription("Read an account's postings as a date-bounded, paged statement in stream order.");
     }
 }

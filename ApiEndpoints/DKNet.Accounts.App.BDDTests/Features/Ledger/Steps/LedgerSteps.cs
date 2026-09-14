@@ -111,7 +111,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task GivenTheGroupIsAChildOfTheGroup(string childCode, string parentCode)
     {
         var parentId = await CreateGroupAsync(parentCode, "Customer");
-        await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
         {
             code = childCode,
             name = childCode,
@@ -119,6 +119,11 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
             ownerId = state.CallerClientId,
             parentId
         });
+        // Mechanics fix: the child's own id must be captured the same way CreateGroupAsync captures the
+        // parent's, or the later "make X a child of Y" step can't resolve it from state.Values and silently
+        // PATCHes with a null parentId (a no-op, not the refusal the scenario asserts).
+        var childId = await TryReadIdAsync(response);
+        state.Values[$"group:{childCode}"] = childId?.ToString() ?? "";
     }
 
     [Given(@"the group ""([^""]+)"" holds an account with a balance of ([\d.]+) (\w+)")]
@@ -813,7 +818,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Then(@"SGD is listed as denominated to two decimal places")]
     public async Task ThenSgdIsListedAsDenominatedToTwoDecimalPlaces()
     {
-        var currencies = await state.Response!.Content.ReadFromJsonAsync<JsonElement>();
+        var currencies = await ReadResponseJsonAsync();
         var sgd = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "SGD");
         sgd.GetProperty("decimalPlaces").GetInt32().ShouldBe(2);
     }
@@ -821,9 +826,21 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Then(@"JPY is listed as denominated to zero decimal places")]
     public async Task ThenJpyIsListedAsDenominatedToZeroDecimalPlaces()
     {
-        var currencies = await state.Response!.Content.ReadFromJsonAsync<JsonElement>();
+        var currencies = await ReadResponseJsonAsync();
         var jpy = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "JPY");
         jpy.GetProperty("decimalPlaces").GetInt32().ShouldBe(0);
+    }
+
+    /// <summary>
+    /// Mechanics helper: reads the response body as a string and parses it, rather than
+    /// <c>Content.ReadFromJsonAsync</c> — that API disposes the underlying stream once deserialized, so a
+    /// scenario with two Then steps reading the same captured response (both currency assertions here) would
+    /// throw <see cref="ObjectDisposedException"/> on the second read.
+    /// </summary>
+    private async Task<JsonElement> ReadResponseJsonAsync()
+    {
+        var text = await state.Response!.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<JsonElement>(text);
     }
 
     #endregion

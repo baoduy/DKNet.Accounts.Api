@@ -1,3 +1,8 @@
+using DKNet.EfCore.Specifications.Extensions;
+using DKNet.EfCore.Specifications.Repositories;
+using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
+
 namespace DKNet.Accounts.AppServices.Accounts.V1.Queries;
 
 public sealed record GetAccountBalanceQuery : Fluents.Queries.IWitResponse<AccountBalanceDto>
@@ -5,9 +10,12 @@ public sealed record GetAccountBalanceQuery : Fluents.Queries.IWitResponse<Accou
     public required Guid Id { get; init; }
 }
 
-internal sealed class GetAccountBalanceQueryHandler
+/// <summary>R8: <see cref="AccountBalanceDto.AvailableBalance"/> always equals <see cref="AccountBalanceDto.Balance"/>
+/// and <see cref="AccountBalanceDto.HeldAmount"/> is always 0 in this delivery.</summary>
+internal sealed class GetAccountBalanceQueryHandler(IRepositorySpec repository)
     : Fluents.Queries.IHandler<GetAccountBalanceQuery, AccountBalanceDto>
 {
     public Task<AccountBalanceDto?> OnHandle(GetAccountBalanceQuery request, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        repository.FirstOrDefaultAsync<Account, AccountBalanceDto>(
+            new SpecGetAccount(request.Id), cancellationToken);
 }

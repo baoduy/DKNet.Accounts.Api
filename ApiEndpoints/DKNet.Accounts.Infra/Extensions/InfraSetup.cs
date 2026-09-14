@@ -28,6 +28,7 @@ public static class InfraSetup
     {
         service
             .AddScoped<IMembershipService, MembershipService>()
+            .AddScoped<IAccountNumberGenerator, AccountNumberGenerator>()
             .AddSpecRepo<CoreDbContext>()
             .AddEventPublisher<CoreDbContext, EventPublisher>()
             .AddDbContextWithHook<CoreDbContext>((sp, builder) =>
