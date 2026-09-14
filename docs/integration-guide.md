@@ -7,7 +7,7 @@ it equal the signed sum of what you posted, then page a statement to its empty l
 Every field, invariant and error code is catalogued in the [readme](../README.md); this page is the
 running order.
 
-> **What is live at this commit.** Steps 1–4 and 9 run today — the payloads below were captured from a
+> **What is live at this commit.** Steps 1–4, 9 and 10 run today — the payloads below were captured from a
 > running instance. Steps 5–8 (`POST /v1/postings`, `POST /v1/postings/batch`, `GET /v1/postings/{id}`,
 > `POST /v1/postings/{id}/reverse`, `GET /v1/accounts/{id}/statement`) answer
 > `500 NotImplementedException` until `[D1242-3]` lands. Their request and response shapes below are the
