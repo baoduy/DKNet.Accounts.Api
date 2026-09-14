@@ -402,6 +402,8 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     {
         state.CallerClientId = "LedgerSync";
         state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.PostingsRead];
+        // §5: a credential lacking the scope for this operation class is refused 403, not the generic 422.
+        state.ExpectedRefusalStatus = HttpStatusCode.Forbidden;
     }
 
     [Given(@"PayHub is authenticated as itself")]
@@ -510,6 +512,8 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub records a credit of ([\d.]+) (\w+) under the same key")]
     public async Task WhenPayHubRecordsACreditUnderTheSameKey(decimal amount, string currency)
     {
+        // §5: same idempotency key with different content is refused 409 IDEMPOTENCY_KEY_CONFLICT, not 422.
+        state.ExpectedRefusalStatus = HttpStatusCode.Conflict;
         var key = state.Values.GetValueOrDefault("idempotencyKey");
         await RecordPostingAsync(Account(), "Credit", amount, currency, idempotencyKey: key);
     }
@@ -630,8 +634,12 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     }
 
     [When(@"an unauthenticated caller asks to read an account")]
-    public async Task WhenAnUnauthenticatedCallerAsksToReadAnAccount() =>
+    public async Task WhenAnUnauthenticatedCallerAsksToReadAnAccount()
+    {
+        // §5: no or invalid credential is refused 401, not the generic 422.
+        state.ExpectedRefusalStatus = HttpStatusCode.Unauthorized;
         state.Response = await client.SendUnauthenticatedAsync(HttpMethod.Get, $"{AccountsPath}/{Guid.NewGuid()}");
+    }
 
     [When(@"LedgerSync records a credit of ([\d.]+) (\w+)$")]
     public async Task WhenLedgerSyncRecordsACredit(decimal amount, string currency)
@@ -662,11 +670,13 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
 
     [Then(@"the request is refused(?:.*)")]
     public void ThenTheRequestIsRefused() =>
-        // 422 is the contract's status for a business-rule refusal (§5 Errors table) — asserting it
-        // specifically (not just "not successful") keeps this scenario red for the right reason: the
-        // handler is not implemented yet, not merely that something 4xx/5xx happened.
-        state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity,
-            $"expected 422 but got {(int)state.Response!.StatusCode}");
+        // state.ExpectedRefusalStatus defaults to 422 (§5's status for a business-rule refusal) — asserting
+        // a specific status (not just "not successful") keeps this scenario red for the right reason. Three
+        // scenarios name a different §5 status (401 unauthenticated, 403 wrong scope, 409 idempotency
+        // conflict); their own Given/When steps override the expected status, since the step text here is
+        // shared verbatim with other scenarios that DO want 422.
+        state.Response!.StatusCode.ShouldBe(state.ExpectedRefusalStatus,
+            $"expected {(int)state.ExpectedRefusalStatus} but got {(int)state.Response!.StatusCode}");
 
     [Then(@"the account is returned with a unique account number and a balance of ([\d.]+) (\w+)")]
     public void ThenTheAccountIsReturnedWithAUniqueAccountNumberAndABalanceOf(decimal amount, string currency) =>
