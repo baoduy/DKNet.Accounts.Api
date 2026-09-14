@@ -12,7 +12,9 @@ reconcile against.
 > implemented and exercised by the acceptance suite — reference currencies, account groups, accounts,
 > postings, batches, reversals and statements. The one capability that is deliberately *not* built is
 > held funds: `heldAmount` and `availableBalance` exist and always answer `0` and `balance`
-> respectively. See [Gotchas & limits](#️-gotchas--limits) for that and the other deferred items.
+> respectively. Three routes behave differently against a real PostgreSQL than against the in-memory
+> store the suite runs on. Read *Gotchas & limits* for those and for the deferred items before you
+> build against this.
 
 ## ✨ Why use it?
 
@@ -155,7 +157,7 @@ itself a posting.
 | `direction` | enum | `Credit` or `Debit`. The direction, not the sign of the amount, says which way money moved. |
 | `amount` | decimal | Always strictly positive, never finer than the currency permits. |
 | `currency` | string | Always equal to the account's currency. |
-| `signedAmount` | decimal | The amount resolved against the account's ledger side — this is what sums to the balance. |
+| `signedAmount` | decimal | The amount resolved against the account's ledger side — this is what sums to the balance. Always returned as `0` at this commit; see *Gotchas & limits*. |
 | `balanceAfter` | decimal | The account's balance immediately after this posting. |
 | `effectiveDate` | date | The date the movement takes effect. May be backdated; never later than the recording date. |
 | `recordedAt` | timestamp | The moment the service recorded it. |
@@ -443,6 +445,24 @@ DRK-1248 for the squad to resolve; the tables above describe what the code actua
 - §5 says the statement response "states when the end of the stream has been reached". The statement
   does (`hasNextPage`); `GET /v1/accounts` and `GET /v1/account-groups` do not — they are bare arrays,
   and an empty page is their only end-of-stream signal.
+
+**Open defects at this commit.** Reported on DRK-1248. Each is reproducible against a real PostgreSQL
+and none of them shows up against the in-memory store the acceptance suite uses, which is why the suite
+is green with these outstanding.
+
+- **Reading a posting back fails.** `GET /v1/postings/{id}` and `GET /v1/accounts/{id}/statement` both
+  answer `500` against PostgreSQL: the enum columns are stored as text and the projection asks the
+  database to read them as integers. Writes are unaffected — a posting you record is stored correctly,
+  you just cannot read it back through those two routes. The same fault on the account and group reads
+  was fixed in `d019b93`; the posting projections were missed.
+- **A batch sent with an `Idempotency-Key` fails.** `POST /v1/postings/batch` answers `500` whenever
+  the header is present — the batch's idempotency signature is the per-movement signatures
+  concatenated, and a two-leg batch already overflows the 64-character column that holds it. A batch
+  sent *without* the header records normally. Treat batch idempotency as unavailable rather than as
+  something you have.
+- **`signedAmount` is always `0`.** The field is on the response contract but nothing populates it, so
+  every posting reads `"signedAmount": 0` regardless of direction. Derive it from `direction`, `amount`
+  and the account's `classification` until this is fixed. `balance` and `balanceAfter` are correct.
 
 ## 🔗 Related docs
 

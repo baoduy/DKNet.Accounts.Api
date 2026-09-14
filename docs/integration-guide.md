@@ -7,9 +7,12 @@ it equal the signed sum of what you posted, then page a statement to its empty l
 Every field, invariant and error code is catalogued in the [readme](../README.md); this page is the
 running order.
 
-> **What is live at this commit.** All ten steps run today. The one thing you cannot do is reserve
-> funds: held funds are deferred, so `heldAmount` is always `0` and `availableBalance` always equals
-> `balance`.
+> **What is live at this commit.** Every write step runs today, and the payloads below were captured
+> from a running instance against PostgreSQL. Two reads and one write path are defective and are
+> flagged where you meet them — step 8 (the statement) and `GET /v1/postings/{id}` answer `500` against
+> PostgreSQL, and a batch sent with an `Idempotency-Key` answers `500`. The one thing that is
+> *deliberately* absent is reserving funds: held funds are deferred, so `heldAmount` is always `0` and
+> `availableBalance` always equals `balance`.
 
 ## Before you start
 
@@ -226,10 +229,10 @@ HTTP/1.1 201 Created
   "accountId": "e87b6feb-4741-4af3-83f3-1bb4d4771331",
   "streamPosition": 1,
   "direction": "credit",
-  "amount": 100.00,
+  "amount": 100.0,
   "currency": "SGD",
-  "signedAmount": 100.00,
-  "balanceAfter": 100.00,
+  "signedAmount": 0,
+  "balanceAfter": 100.0,
   "effectiveDate": "2026-09-14",
   "recordedAt": "2026-09-14T06:13:16.1063454+00:00",
   "category": "payment",
@@ -246,6 +249,10 @@ the body it would have been ignored, not rejected — the posting is still attri
 
 `effectiveDate` was unset, so it is the recording date. You may **backdate** it to record something that
 already happened outside the service; a **future** date is refused with `EFFECTIVE_DATE_IN_FUTURE`.
+
+`signedAmount` reads `0` above, and will for every posting you record: the field is on the contract but
+nothing populates it at this commit. Derive it yourself from `direction`, `amount` and the account's
+`classification`. `balanceAfter` and the account's `balance` are correct and unaffected.
 
 ### What a retry returns
 
@@ -294,7 +301,8 @@ curl -X POST "$BASE/v1/postings" \
       }'
 ```
 
-The response carries `"streamPosition": 2`, `"signedAmount": -30.00` and `"balanceAfter": 70.00`.
+The response carries `"streamPosition": 2` and `"balanceAfter": 70.0` (and `"signedAmount": 0`, per
+the caveat above).
 
 This account is not permitted to go negative and has a `minimumBalance` of `0`, so its floor is `0`. A
 debit of `90.00` would take it past that floor, and it is refused outright — **nothing is recorded and
@@ -331,7 +339,6 @@ refused, **none** of them is recorded and no balance moves.
 ```bash
 curl -X POST "$BASE/v1/postings/batch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -H "Idempotency-Key: transfer-9931" \
   -d '{
         "movements": [
           { "accountId": "<from>", "direction": "Debit",  "amount": 400.00, "currency": "SGD", "category": "Transfer" },
@@ -340,8 +347,48 @@ curl -X POST "$BASE/v1/postings/batch" \
       }'
 ```
 
-Both legs come back sharing one `transactionGroupId`. Leave it unset, as above, and the service
-generates one; set it yourself to tie a batch to a transaction you already have an id for.
+```http
+HTTP/1.1 201 Created
+```
+
+```json
+[
+  {
+    "postingNumber": "PST0000000009",
+    "accountId": "18001285-9705-4f12-a9ba-8f7ad5b9a7de",
+    "streamPosition": 2,
+    "direction": "debit",
+    "amount": 400.0,
+    "currency": "SGD",
+    "balanceAfter": 100.0,
+    "category": "transfer",
+    "status": "posted",
+    "transactionGroupId": "d42c19ca-72df-4fbd-9b73-9fe9ee4c502a",
+    "callingSystem": "PayHub"
+  },
+  {
+    "postingNumber": "PST0000000010",
+    "accountId": "c762130c-4525-45eb-bbc3-152c8baf34b7",
+    "streamPosition": 1,
+    "direction": "credit",
+    "amount": 400.0,
+    "currency": "SGD",
+    "balanceAfter": 400.0,
+    "category": "transfer",
+    "status": "posted",
+    "transactionGroupId": "d42c19ca-72df-4fbd-9b73-9fe9ee4c502a",
+    "callingSystem": "PayHub"
+  }
+]
+```
+
+Both legs share one `transactionGroupId`. Leave it unset, as above, and the service generates one; set
+it yourself to tie a batch to a transaction you already have an id for.
+
+> **Send a batch without an `Idempotency-Key` for now.** A batch carrying the header answers `500` at
+> this commit — the batch's idempotency signature is the per-movement signatures concatenated, and a
+> two-leg batch already overflows the column that stores it. Single postings are unaffected. See the
+> readme's *Gotchas & limits*.
 
 ## 7. Correct a mistake — reverse, never delete
 
@@ -352,6 +399,30 @@ which writes an *opposing* posting and marks the original `reversed`.
 curl -X POST "$BASE/v1/postings/3f0b1e4c-6a2d-4f1a-9c33-5d7b21e9a401/reverse" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{ "reason": "Invoice INV-9001 was settled twice" }'
+```
+
+```http
+HTTP/1.1 200 OK
+```
+
+```json
+{
+  "id": "617ba087-1f4c-4dea-a445-9421e62c6993",
+  "postingNumber": "PST0000000005",
+  "accountId": "6e607bcb-bb95-4da0-96c4-2ad489f14521",
+  "streamPosition": 3,
+  "direction": "debit",
+  "amount": 100.0,
+  "currency": "SGD",
+  "balanceAfter": 5.0,
+  "effectiveDate": "2026-09-14",
+  "recordedAt": "2026-09-14T07:34:07.3336271+00:00",
+  "category": "reversal",
+  "status": "posted",
+  "reversesPostingId": "884612df-0413-4c36-8a0d-98e1feabebc9",
+  "callingSystem": "PayHub",
+  "description": "Reversal of PST0000000003"
+}
 ```
 
 The reversal is a debit of the identical `100.00`, `"category": "reversal"`, with `reversesPostingId`
@@ -400,6 +471,12 @@ comes back in an envelope — the postings are under `items`:
   "hasPreviousPage": false
 }
 ```
+
+> **This route is defective at this commit.** Against PostgreSQL it answers `500` — the same enum
+> projection fault that `GET /v1/postings/{id}` hits, and the one the account and group reads had fixed
+> in `d019b93`. The envelope above is what it is declared to return, and what it returns against the
+> in-memory store the acceptance suite runs on; you cannot read a statement out of a real deployment
+> until it is fixed. See the readme's *Gotchas & limits*.
 
 Page through by incrementing `pageIndex` (1-based) until `items` comes back empty. The pages
 **partition** the stream: every posting in the range appears exactly once, none twice, none skipped.
