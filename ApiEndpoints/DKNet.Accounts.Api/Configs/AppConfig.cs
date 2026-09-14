@@ -1,0 +1,109 @@
+﻿using DKNet.AspCore.Idempotency;
+using DKNet.AspCore.Idempotency.RedisStore;
+using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
+using DKNet.Accounts.Api.Configs.RateLimits;
+using DKNet.Accounts.Api.Configs.Swagger;
+
+namespace DKNet.Accounts.Api.Configs;
+
+[ExcludeFromCodeCoverage]
+internal static class AppConfig
+{
+    #region Methods
+
+    public static IServiceCollection AddAppConfig(
+        this IServiceCollection services,
+        FeatureOptions features,
+        IConfiguration configuration)
+    {
+        if (features.EnableAntiforgery)
+        {
+            services.AddAntiforgeryConfig();
+        }
+
+        if (features.RequireAuthorization)
+        {
+            services.AddAuthConfig();
+        }
+
+        if (features.EnableSwagger)
+        {
+            services.AddOpenApiDoc();
+        }
+
+        if (features.EnableHttps)
+        {
+            services.AddHttpsConfig(configuration);
+        }
+
+        if (features.EnableRateLimit)
+        {
+            services.AddRateLimitConfig(configuration);
+        }
+
+        if (features.EnableVersioning)
+        {
+            services.AddAppVersioning();
+        }
+
+        services.AddForwardedHeadersConfig(features, configuration)
+            .AddSecurityHeadersConfig(features)
+            .AddRequestBoundsConfig(features, configuration);
+
+        services.AddHttpContextAccessor()
+            .AddFeatureManagement();
+
+        services.CacheConfig(configuration);
+
+        var redisConnectionString = configuration.GetConnectionString(SharedConsts.RedisConnectionString);
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddIdempotencyWithRedisStore(
+                redisConnectionString,
+                o => o.ConflictHandling = IdempotentConflictHandling.ConflictResponse);
+        }
+        else
+        {
+            //InMemory store
+            services.AddIdempotentKey(o => o.ConflictHandling = IdempotentConflictHandling.ConflictResponse);
+        }
+
+        return services
+            .AddCrosConfig(configuration)
+            .AddGlobalException()
+            .AddAllAppServices(configuration, features)
+            .AddHealthzConfig(features);
+    }
+
+    public static Task UseAppConfig(this WebApplication app, Action<WebApplication>? extra = null)
+    {
+        // Forwarded headers and security headers run first: forwarded headers must rewrite RemoteIpAddress
+        // before anything (CORS, rate limiting) makes a decision based on it, and security headers must wrap
+        // everything downstream, including the global exception handler, for 200/404/500 responses alike (R5).
+        app.UseForwardedHeadersConfig()
+            .UseSecurityHeadersConfig()
+            .UseAntiforgeryConfig()
+            .UseCrosConfig()
+            .UseHttpsConfig()
+            .UseHealthzConfig();
+
+        app.UseRouting();
+        app.UseRequestBoundsConfig();
+        app.UseRateLimitConfig();
+
+        //This must be after UseRouting
+        app.UseAuthConfig();
+
+        //This is UseEndpoints
+        extra?.Invoke(app);
+
+        //These have to be after UseEndpoints.
+        app.UseOpenApiDoc()
+            .UseGlobalException();
+
+        return app.RunAsync();
+    }
+
+    #endregion
+}

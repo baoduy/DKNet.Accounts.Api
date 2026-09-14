@@ -1,0 +1,12 @@
+global using NUnit.Framework;
+global using System.Net;
+global using Microsoft.Extensions.DependencyInjection;
+global using System.Text;
+global using System.Text.Json;
+global using Microsoft.EntityFrameworkCore;
+global using DKNet.Accounts.App.BDDTests.Support;
+global using DKNet.Accounts.App.TestSupport;
+global using DKNet.Accounts.Infra.Contexts;
+global using DKNet.Accounts.Share;
+global using Reqnroll;
+global using Shouldly;

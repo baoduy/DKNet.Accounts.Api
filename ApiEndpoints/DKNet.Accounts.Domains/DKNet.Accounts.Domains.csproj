@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <LangVersion>default</LangVersion>
+        <ImplicitUsings>true</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DKNet.EfCore.Abstractions"/>
+        <PackageReference Include="DKNet.EfCore.DataAuthorization"/>
+        <PackageReference Include="DKNet.EfCore.DtoGenerator">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DKNet.Accounts.Share\DKNet.Accounts.Share.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="DKNet.Accounts.App.Tests"/>
+        <InternalsVisibleTo Include="DKNet.Accounts.Infra"/>
+    </ItemGroup>
+</Project>
