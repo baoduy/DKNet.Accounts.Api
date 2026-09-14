@@ -1,0 +1,48 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsAspireHost>true</IsAspireHost>
+        <UserSecretsId>6A74D1BC-5E07-48BB-BA5B-8172227344AF</UserSecretsId>
+        <!-- Disable code analysis for test entities -->
+        <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+        <EnableNETAnalyzers>false</EnableNETAnalyzers>
+        <AnalysisMode>None</AnalysisMode>
+        <RunAnalyzers>false</RunAnalyzers>
+        <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+        <RunAnalyzersDuringLiveAnalysis>false</RunAnalyzersDuringLiveAnalysis>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <!-- ASPIRE010: dashboard/DCP deprecation warning, understood and deliberately deferred —
+             AspireUseCliBundle requires the Aspire CLI on PATH, which breaks a bare `dotnet build`
+             on a clean scaffolded machine. NoWarn keeps the template buildable everywhere. -->
+        <NoWarn>$(NoWarn);CS1591;SA1600;ASPIRE010</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.Redis" />
+        <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DKNet.Accounts.Api\DKNet.Accounts.Api.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="Configs\busConfig.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Aspire.Hosting">
+        <HintPath>bin\Debug\net10.0\Aspire.Hosting.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

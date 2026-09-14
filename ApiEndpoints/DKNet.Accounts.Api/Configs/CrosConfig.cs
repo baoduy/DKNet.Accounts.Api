@@ -1,0 +1,54 @@
+namespace DKNet.Accounts.Api.Configs;
+
+[ExcludeFromCodeCoverage]
+internal static class CrosConfig
+{
+    #region Fields
+
+    // DELETE deliberately excluded, and no tracing header (traceparent, X-Request-Id, ...) enumerated.
+    private static readonly string[] DefaultAllowedMethods = ["GET", "POST", "PUT", "PATCH"];
+
+    // "Idempotency-Key" is the header PostingsV1Endpoint actually reads — not DKNet.AspCore.Idempotency's
+    // "X-Idempotency-Key" default, which this service doesn't use.
+    private static readonly string[] DefaultAllowedHeaders =
+        ["Authorization", "Content-Type", "Accept", "Idempotency-Key"];
+
+    #endregion
+
+    #region Methods
+
+    public static IServiceCollection AddCrosConfig(this IServiceCollection services, IConfiguration configuration)
+    {
+        var origins = (configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .ToArray();
+
+        if (origins.Length == 0)
+        {
+            return services;
+        }
+
+        // Get<string[]>() returns null when the key is absent (fall back to the secure default list) but a
+        // non-null (possibly empty) array when the key is present, even as `[]` — so an explicit empty list is
+        // honoured as "no methods/headers allowed" rather than silently widened back to the default.
+        var methods = configuration.GetSection("Cors:AllowedMethods").Get<string[]>() ?? DefaultAllowedMethods;
+        var headers = configuration.GetSection("Cors:AllowedHeaders").Get<string[]>() ?? DefaultAllowedHeaders;
+
+        services.AddCors(c => c.AddDefaultPolicy(o => o.WithOrigins(origins).WithMethods(methods).WithHeaders(headers)));
+        services.MarkConfigAdded(nameof(CrosConfig));
+        return services;
+    }
+
+    public static WebApplication UseCrosConfig(this WebApplication app)
+    {
+        if (app.Services.IsConfigAdded(nameof(CrosConfig)))
+        {
+            app.UseCors();
+            Console.WriteLine("CROS enabled.");
+        }
+
+        return app;
+    }
+
+    #endregion
+}
