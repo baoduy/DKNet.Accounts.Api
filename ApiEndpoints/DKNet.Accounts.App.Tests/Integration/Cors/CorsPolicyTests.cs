@@ -86,9 +86,10 @@ public sealed class CorsPolicyTests
 
     /// <summary>
     /// DRK-1028 §5: the CORS policy enumerates methods and headers from configuration (default methods
-    /// GET/POST/PUT/PATCH — DELETE excluded; default headers Authorization/Content-Type/Accept/X-Idempotency-Key
-    /// — no tracing header enumerated). A preflight for an enumerated method/header is granted; one outside the
-    /// list is not.
+    /// GET/POST/PUT/PATCH — DELETE excluded; default headers Authorization/Content-Type/Accept/Idempotency-Key
+    /// — the header <see cref="DKNet.Accounts.Api.ApiEndpoints.Postings.PostingsV1Endpoint"/> actually reads,
+    /// not the DKNet.AspCore.Idempotency package's own default; no tracing header enumerated). A preflight for
+    /// an enumerated method/header is granted; one outside the list is not.
     /// </summary>
     public sealed class WhenAskingPreflightPermission(CorsAllowlistApiFixture fixture) : IClassFixture<CorsAllowlistApiFixture>
     {
@@ -117,6 +118,24 @@ public sealed class CorsPolicyTests
 
             response.Headers.GetValues(AllowMethodsHeader).ShouldContain(v => v.Contains("POST"));
             response.Headers.GetValues(AllowHeadersHeader).ShouldContain(v => v.Contains("Authorization", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        public async Task IdempotencyKeyHeader_PermissionIsGranted()
+        {
+            // Regression: the default allowlist named "X-Idempotency-Key" (the DKNet.AspCore.Idempotency
+            // package's own default), but PostingsV1Endpoint reads "Idempotency-Key" — a preflight naming the
+            // header the endpoint actually reads was silently refused.
+            var client = fixture.CreateClient();
+
+            var response = await client.SendAsync(Preflight("POST", "Idempotency-Key"));
+
+            // Exact match, not a substring check — "X-Idempotency-Key" (the wrong, previously-configured
+            // header) also contains the text "Idempotency-Key", so a Contains() assertion here would pass
+            // against the very defect this test exists to catch.
+            response.Headers.GetValues(AllowHeadersHeader)
+                .SelectMany(v => v.Split(',', StringSplitOptions.TrimEntries))
+                .ShouldContain(v => string.Equals(v, "Idempotency-Key", StringComparison.OrdinalIgnoreCase));
         }
 
         [Fact]
