@@ -15,10 +15,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 [Binding]
 public sealed class LedgerSteps(HttpClient client, ScenarioState state)
 {
-    private const string GroupsPath = "/api/v1/account-groups";
-    private const string AccountsPath = "/api/v1/accounts";
-    private const string PostingsPath = "/api/v1/postings";
-    private const string CurrenciesPath = "/api/v1/currencies";
+    private const string GroupsPath = "/v1/account-groups";
+    private const string AccountsPath = "/v1/accounts";
+    private const string PostingsPath = "/v1/postings";
+    private const string CurrenciesPath = "/v1/currencies";
 
     #region Shared helpers
 

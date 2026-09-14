@@ -11,10 +11,11 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
 {
     protected override void AddFeatureOverrides(IDictionary<string, string?> settings)
     {
-        // The ledger scenarios exercise real scope-based authorization (§5), so — unlike earlier BDD
-        // suites — this host needs RequireAuthorization on, paired with LedgerCallerAuthHandler below
-        // standing in for the real JWT bearer scheme.
-        settings["FeatureManagement:RequireAuthorization"] = "true";
+        // RequireAuthorization is NOT set here — Program.cs binds FeatureOptions eagerly, before this
+        // dictionary ever reaches configuration, so it would be silently ineffective (see ApiHooks
+        // .BeforeTestRun, which sets it via the one input read early enough: an environment variable).
+        // The ledger scenarios exercise real scope-based authorization (§5), paired with
+        // LedgerCallerAuthHandler below standing in for the real JWT bearer scheme.
 
         // Only the @redis scenario passes this. Setting it alone isn't enough to flip AppConfig.AddAppConfig's
         // redis-vs-fallback branch — WebApplicationFactory merges this config in after Program.cs's own

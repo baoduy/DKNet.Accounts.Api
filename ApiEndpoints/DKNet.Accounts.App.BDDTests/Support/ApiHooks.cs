@@ -19,8 +19,21 @@ public sealed class ApiHooks(IObjectContainer objectContainer)
     [BeforeTestRun]
     public static void BeforeTestRun()
     {
-        _factory = new BddApiFactory();
-        _client = _factory.CreateClient();
+        // Program.cs binds FeatureOptions eagerly from configuration before WebApplicationFactory's own
+        // ConfigureAppConfiguration override ever runs (see BddApiFactory.AddFeatureOverrides) — an
+        // environment variable is the one input CreateBuilder itself reads early enough to actually flip
+        // RequireAuthorization for this host, the same reason the xUnit AuthOn*ApiFixture variants set it
+        // this way instead of through the settings dictionary.
+        Environment.SetEnvironmentVariable("FeatureManagement__RequireAuthorization", "true");
+        try
+        {
+            _factory = new BddApiFactory();
+            _client = _factory.CreateClient();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("FeatureManagement__RequireAuthorization", null);
+        }
     }
 
     /// <summary>
