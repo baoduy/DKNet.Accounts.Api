@@ -7,11 +7,9 @@ it equal the signed sum of what you posted, then page a statement to its empty l
 Every field, invariant and error code is catalogued in the [readme](../README.md); this page is the
 running order.
 
-> **What is live at this commit.** Every write step runs today, and the payloads below were captured
-> from a running instance against PostgreSQL. Two reads and one write path are defective and are
-> flagged where you meet them — step 8 (the statement) and `GET /v1/postings/{id}` answer `500` against
-> PostgreSQL, and a batch sent with an `Idempotency-Key` answers `500`. The one thing that is
-> *deliberately* absent is reserving funds: held funds are deferred, so `heldAmount` is always `0` and
+> **What is live at this commit.** All ten steps run today, and every payload below was captured from a
+> running instance against PostgreSQL rather than transcribed from the contract. The one thing that is
+> deliberately absent is reserving funds: held funds are deferred, so `heldAmount` is always `0` and
 > `availableBalance` always equals `balance`.
 
 ## Before you start
@@ -224,17 +222,17 @@ HTTP/1.1 201 Created
 
 ```json
 {
-  "id": "3f0b1e4c-6a2d-4f1a-9c33-5d7b21e9a401",
+  "id": "e3d0d40f-9ba7-4d38-8609-f44bc310f29b",
   "postingNumber": "PST0000000001",
-  "accountId": "e87b6feb-4741-4af3-83f3-1bb4d4771331",
+  "accountId": "cf91d0e9-f876-40a4-8f52-febfc2204718",
   "streamPosition": 1,
   "direction": "credit",
   "amount": 100.0,
   "currency": "SGD",
-  "signedAmount": 0,
+  "signedAmount": 100.0,
   "balanceAfter": 100.0,
   "effectiveDate": "2026-09-14",
-  "recordedAt": "2026-09-14T06:13:16.1063454+00:00",
+  "recordedAt": "2026-09-14T08:30:29.5482505+00:00",
   "category": "payment",
   "status": "posted",
   "callingSystem": "PayHub",
@@ -250,9 +248,11 @@ the body it would have been ignored, not rejected — the posting is still attri
 `effectiveDate` was unset, so it is the recording date. You may **backdate** it to record something that
 already happened outside the service; a **future** date is refused with `EFFECTIVE_DATE_IN_FUTURE`.
 
-`signedAmount` reads `0` above, and will for every posting you record: the field is on the contract but
-nothing populates it at this commit. Derive it yourself from `direction`, `amount` and the account's
-`classification`. `balanceAfter` and the account's `balance` are correct and unaffected.
+`signedAmount` is the movement resolved against the account's ledger side, and it is what sums to
+`balance` — so **its sign follows the classification, not the direction.** This account is a
+`Liability`, where a credit raises the balance, so the credit is `+100.0`. On an `Asset` or `Expense`
+account the same credit would be `-100.0`. Sum an account's `signedAmount`s and you get its `balance`;
+that is the invariant you can check from outside.
 
 ### What a retry returns
 
@@ -301,8 +301,8 @@ curl -X POST "$BASE/v1/postings" \
       }'
 ```
 
-The response carries `"streamPosition": 2` and `"balanceAfter": 70.0` (and `"signedAmount": 0`, per
-the caveat above).
+The response carries `"streamPosition": 2`, `"signedAmount": -30.0` and `"balanceAfter": 70.0` — a
+debit is negative against this `Liability` account, and `100.0 - 30.0` is the `70.0` you can read back.
 
 This account is not permitted to go negative and has a `minimumBalance` of `0`, so its floor is `0`. A
 debit of `90.00` would take it past that floor, and it is refused outright — **nothing is recorded and
@@ -339,6 +339,7 @@ refused, **none** of them is recorded and no balance moves.
 ```bash
 curl -X POST "$BASE/v1/postings/batch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: transfer-9931" \
   -d '{
         "movements": [
           { "accountId": "<from>", "direction": "Debit",  "amount": 400.00, "currency": "SGD", "category": "Transfer" },
@@ -354,41 +355,54 @@ HTTP/1.1 201 Created
 ```json
 [
   {
-    "postingNumber": "PST0000000009",
-    "accountId": "18001285-9705-4f12-a9ba-8f7ad5b9a7de",
+    "id": "3d6d83d6-4639-41ea-b3c3-01f030d1d80c",
+    "postingNumber": "PST0000000010",
+    "accountId": "d7dae46c-3854-4a88-b385-5c62fa841703",
     "streamPosition": 2,
     "direction": "debit",
     "amount": 400.0,
     "currency": "SGD",
+    "signedAmount": -400.0,
     "balanceAfter": 100.0,
+    "effectiveDate": "2026-09-14",
+    "recordedAt": "2026-09-14T08:31:15.587368+00:00",
     "category": "transfer",
     "status": "posted",
-    "transactionGroupId": "d42c19ca-72df-4fbd-9b73-9fe9ee4c502a",
-    "callingSystem": "PayHub"
+    "transactionGroupId": "2717a380-3af8-4cc0-bd70-75b46b98912b",
+    "callingSystem": "PayHub",
+    "idempotencyKey": "transfer-9931"
   },
   {
-    "postingNumber": "PST0000000010",
-    "accountId": "c762130c-4525-45eb-bbc3-152c8baf34b7",
+    "id": "6ae71f87-5b02-42b1-bd31-c1991f33457f",
+    "postingNumber": "PST0000000011",
+    "accountId": "6eb93805-ea1c-4ca7-9314-381c5a7c54a6",
     "streamPosition": 1,
     "direction": "credit",
     "amount": 400.0,
     "currency": "SGD",
+    "signedAmount": 400.0,
     "balanceAfter": 400.0,
+    "effectiveDate": "2026-09-14",
+    "recordedAt": "2026-09-14T08:31:15.587368+00:00",
     "category": "transfer",
     "status": "posted",
-    "transactionGroupId": "d42c19ca-72df-4fbd-9b73-9fe9ee4c502a",
+    "transactionGroupId": "2717a380-3af8-4cc0-bd70-75b46b98912b",
     "callingSystem": "PayHub"
   }
 ]
 ```
 
-Both legs share one `transactionGroupId`. Leave it unset, as above, and the service generates one; set
-it yourself to tie a batch to a transaction you already have an id for.
+Both legs share one `transactionGroupId` and one `recordedAt`. Leave the id unset, as above, and the
+service generates one; set it yourself to tie a batch to a transaction you already have an id for.
 
-> **Send a batch without an `Idempotency-Key` for now.** A batch carrying the header answers `500` at
-> this commit — the batch's idempotency signature is the per-movement signatures concatenated, and a
-> two-leg batch already overflows the column that stores it. Single postings are unaffected. See the
-> readme's *Gotchas & limits*.
+Two things about the key on this route. It is recorded on the batch's **first leg only** — notice the
+second leg has no `idempotencyKey` of its own — and repeating the whole request under `transfer-9931`
+returns the same two postings with `200`, recording nothing new.
+
+**Do not share a key between `POST /v1/postings` and `POST /v1/postings/batch.`** The two routes
+compute their content signatures differently, so a key first used on one and then sent to the other is
+refused `409 IDEMPOTENCY_KEY_CONFLICT` even when the movement is identical. Keep a separate key space
+per route.
 
 ## 7. Correct a mistake — reverse, never delete
 
@@ -407,21 +421,22 @@ HTTP/1.1 200 OK
 
 ```json
 {
-  "id": "617ba087-1f4c-4dea-a445-9421e62c6993",
-  "postingNumber": "PST0000000005",
-  "accountId": "6e607bcb-bb95-4da0-96c4-2ad489f14521",
+  "id": "309fb14c-a5ee-4f36-a393-5130a2593d43",
+  "postingNumber": "PST0000000008",
+  "accountId": "038e91e4-31de-40a3-96d3-1c6e220c558f",
   "streamPosition": 3,
   "direction": "debit",
   "amount": 100.0,
   "currency": "SGD",
+  "signedAmount": -100.0,
   "balanceAfter": 5.0,
   "effectiveDate": "2026-09-14",
-  "recordedAt": "2026-09-14T07:34:07.3336271+00:00",
+  "recordedAt": "2026-09-14T08:31:04.3631317+00:00",
   "category": "reversal",
   "status": "posted",
-  "reversesPostingId": "884612df-0413-4c36-8a0d-98e1feabebc9",
+  "reversesPostingId": "a3b6f961-c181-40c9-97d0-8d9b84b9530f",
   "callingSystem": "PayHub",
-  "description": "Reversal of PST0000000003"
+  "description": "Reversal of PST0000000006"
 }
 ```
 
@@ -462,30 +477,60 @@ comes back in an envelope — the postings are under `items`:
 
 ```json
 {
-  "items": [ /* up to pageSize postings, in stream order */ ],
+  "items": [
+    {
+      "id": "a3b6f961-c181-40c9-97d0-8d9b84b9530f",
+      "postingNumber": "PST0000000006",
+      "accountId": "038e91e4-31de-40a3-96d3-1c6e220c558f",
+      "streamPosition": 1,
+      "direction": "credit",
+      "amount": 100.0,
+      "currency": "SGD",
+      "signedAmount": 100.0,
+      "balanceAfter": 100.0,
+      "effectiveDate": "2026-06-30",
+      "recordedAt": "2026-09-14T08:31:04.113925+00:00",
+      "category": "payment",
+      "status": "posted",
+      "callingSystem": "PayHub",
+      "description": "Invoice INV-9001 settled"
+    },
+    {
+      "id": "339755f9-1641-454b-b9e6-a5f7024c6cb4",
+      "postingNumber": "PST0000000007",
+      "accountId": "038e91e4-31de-40a3-96d3-1c6e220c558f",
+      "streamPosition": 2,
+      "direction": "credit",
+      "amount": 5.0,
+      "currency": "SGD",
+      "signedAmount": 5.0,
+      "balanceAfter": 105.0,
+      "effectiveDate": "2026-06-15",
+      "recordedAt": "2026-09-14T08:31:04.121027+00:00",
+      "category": "payment",
+      "status": "posted",
+      "callingSystem": "PayHub"
+    }
+  ],
+  "pageCount": 1,
   "pageNumber": 1,
   "pageSize": 10,
-  "pageCount": 3,
-  "totalItemCount": 25,
-  "hasNextPage": true,
+  "totalItemCount": 2,
+  "hasNextPage": false,
   "hasPreviousPage": false
 }
 ```
 
-> **This route is defective at this commit.** Against PostgreSQL it answers `500` — the same enum
-> projection fault that `GET /v1/postings/{id}` hits, and the one the account and group reads had fixed
-> in `d019b93`. The envelope above is what it is declared to return, and what it returns against the
-> in-memory store the acceptance suite runs on; you cannot read a statement out of a real deployment
-> until it is fixed. See the readme's *Gotchas & limits*.
+Those two are the backdating case below: the 30 June posting was recorded first, so it comes back
+first even though the 15 June one is earlier by `effectiveDate`.
 
 Page through by incrementing `pageIndex` (1-based) until `items` comes back empty. The pages
 **partition** the stream: every posting in the range appears exactly once, none twice, none skipped.
 Reading past the end is not an error — the last page is simply empty, with `200`:
 
 ```bash
-# after 25 postings have been read across pages 1, 2 and 3
 curl -H "Authorization: Bearer $TOKEN" \
-  "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331/statement?from=2026-06-01&to=2026-06-30&pageIndex=4&pageSize=10"
+  "$BASE/v1/accounts/038e91e4-31de-40a3-96d3-1c6e220c558f/statement?from=2026-06-01&to=2026-06-30&pageIndex=2&pageSize=10"
 ```
 
 ```http
@@ -495,10 +540,10 @@ HTTP/1.1 200 OK
 ```json
 {
   "items": [],
-  "pageNumber": 4,
+  "pageCount": 1,
+  "pageNumber": 2,
   "pageSize": 10,
-  "pageCount": 3,
-  "totalItemCount": 25,
+  "totalItemCount": 2,
   "hasNextPage": false,
   "hasPreviousPage": true
 }
