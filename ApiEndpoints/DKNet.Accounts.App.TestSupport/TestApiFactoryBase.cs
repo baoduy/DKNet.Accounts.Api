@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using DKNet.Accounts.Domains.Services;
+using DKNet.Accounts.Domains.Share;
 using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.TestSupport;
@@ -44,11 +45,17 @@ public abstract class TestApiFactoryBase(string? dbName = null) : WebApplication
             ["FeatureManagement:RunDbMigrationWhenAppStart"] = "false",
             ["FeatureManagement:EnableSwagger"] = "false",
             ["FeatureManagement:EnableAzureAppConfig"] = "false",
-            ["ConnectionStrings:AppDb"] = "UseInMemory"
+            ["ConnectionStrings:AppDb"] = DbConnectionString
         };
         AddFeatureOverrides(settings);
         return settings;
     }
+
+    /// <summary>
+    /// Value written to <c>ConnectionStrings:AppDb</c>. Program.cs branches on this value, so a subclass that
+    /// swaps <see cref="ConfigureDatabase"/> for a real provider must override this too.
+    /// </summary>
+    protected virtual string DbConnectionString => "UseInMemory";
 
     /// <summary>Extension point for a subclass's additional configuration overrides.</summary>
     protected virtual void AddFeatureOverrides(IDictionary<string, string?> settings)
@@ -69,17 +76,26 @@ public abstract class TestApiFactoryBase(string? dbName = null) : WebApplication
 
         // AddDbContext (rather than AddDbContextWithHook) here would silently drop the DKNet events hook —
         // AddEvent-raised and [RaisesEvent]-declared domain events would never publish under this fixture.
-        services.AddDbContextWithHook<CoreDbContext>((_, options) => options
-            .UseInMemoryDatabase(_dbName)
-            .UseAutoConfigModel([typeof(CoreDbContext).Assembly]));
+        services.AddDbContextWithHook<CoreDbContext>((_, options) =>
+        {
+            ConfigureDatabase(options);
+            options.UseAutoConfigModel([typeof(CoreDbContext).Assembly, typeof(Sequences).Assembly]);
+        });
 
         services.RemoveAll<IMembershipService>();
         services.AddSingleton<IMembershipService, TestMembershipService>();
     }
 
+    /// <summary>
+    /// Chooses the EF Core provider. Default is InMemory; a subclass overrides to point at a real
+    /// relational provider (e.g. a Testcontainers-hosted PostgreSQL instance).
+    /// </summary>
+    protected virtual void ConfigureDatabase(DbContextOptionsBuilder options) =>
+        options.UseInMemoryDatabase(_dbName);
+
     public IServiceScope CreateScope() => Services.CreateScope();
 
-    public async Task ResetDatabaseAsync()
+    public virtual async Task ResetDatabaseAsync()
     {
         using var scope = CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();

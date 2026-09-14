@@ -1,14 +1,57 @@
 using DKNet.AspCore.Idempotency;
 using DKNet.AspCore.Idempotency.RedisStore;
 using DKNet.AspCore.Idempotency.Store;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Testcontainers.PostgreSql;
 using DKNet.Accounts.App.TestSupport;
+using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
 
 public sealed class BddApiFactory(string? redisConnectionString = null) : TestApiFactoryBase("bdd-tests")
 {
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+
+    /// <summary>Starts the PostgreSQL container. Must complete before <c>CreateClient</c> is called.</summary>
+    public Task StartDatabaseAsync() => _container.StartAsync();
+
+    /// <summary>Stops the PostgreSQL container. Call after the shared factory itself is disposed.</summary>
+    public Task StopDatabaseAsync() => _container.DisposeAsync().AsTask();
+
+    protected override string DbConnectionString => _container.GetConnectionString();
+
+    protected override void ConfigureDatabase(DbContextOptionsBuilder options) =>
+        options.UseNpgsql(_container.GetConnectionString());
+
+    /// <summary>
+    /// Base <see cref="TestApiFactoryBase.ResetDatabaseAsync"/> drops and recreates the database, which
+    /// Postgres refuses ("55006: cannot drop the currently open database") while the run's single shared
+    /// container (R1) still has this app's own connections open against it. A table truncate resets scenario
+    /// data without touching the connection, so the migrated schema (R2) survives every scenario.
+    /// </summary>
+    public override async Task ResetDatabaseAsync()
+    {
+        using var scope = CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+
+        var tables = dbContext.Model.GetEntityTypes()
+            .Select(e => (Schema: e.GetSchema() ?? "public", Table: e.GetTableName()))
+            .Where(t => t.Table is not null)
+            .Distinct()
+            .Select(t => $"\"{t.Schema}\".\"{t.Table}\"")
+            .ToList();
+
+        if (tables.Count > 0)
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $"TRUNCATE TABLE {string.Join(", ", tables)} RESTART IDENTITY CASCADE");
+        }
+
+        LogCapture.Clear();
+    }
+
     protected override void AddFeatureOverrides(IDictionary<string, string?> settings)
     {
         // RequireAuthorization is NOT set here — Program.cs binds FeatureOptions eagerly, before this
