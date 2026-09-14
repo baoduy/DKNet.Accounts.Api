@@ -40,7 +40,14 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     private async Task<Guid> OpenAccountAsync(
         string currency,
         Guid? groupId = null,
-        string classification = "Asset",
+        // Mechanics fix (Build stage 3): every generic credit/debit/reversal/statement scenario in this file
+        // opens its account through this default — none of those feature scenarios name a classification, so
+        // this default is purely a fixture choice, not scenario-visible behavior. §"Recording credits and
+        // debits" expects a credit to RAISE the balance and a debit to lower it; per the signed-value rule
+        // (Asset/Expense: debit increases, credit decreases; Liability/Equity/Income: credit increases, debit
+        // decreases), only a Liability-classified account produces that outcome — "Asset" here would silently
+        // invert the sign of every one of those frozen scenarios' assertions.
+        string classification = "Liability",
         bool permittedToGoNegative = false,
         decimal? overdraftLimit = null,
         decimal? minimumBalance = null,
@@ -312,10 +319,16 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Given(@"PayHub holds a closed account carrying a posting of ([\d.]+) (\w+)")]
     public async Task GivenPayHubHoldsAClosedAccountCarryingAPostingOf(decimal amount, string currency)
     {
+        // Mechanics fix: closing is refused while the account still holds a balance (§ "Closing an account
+        // that still holds money is refused"), so "closed... carrying a posting of 100.00 SGD" can only mean
+        // the STREAM still carries that posting, not that the CURRENT balance is 100 — the balance must be
+        // brought back to zero (an independent offsetting debit, not a reversal of the credit itself, which
+        // would defeat the "reverse that posting" step right after this) before the close can succeed at all.
         var accountId = await OpenAccountAsync(currency);
         state.Values["account"] = accountId.ToString();
         var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
         state.Values["posting"] = postingId?.ToString() ?? "";
+        await RecordPostingAsync(accountId, "Debit", amount, currency);
         await PatchAccountStatusAsync(accountId, "Closed");
     }
 
@@ -654,16 +667,33 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     }
 
     [When(@"PayHub records a credit of ([\d.]+) (\w+) claiming in the request body to be LedgerSync")]
-    public async Task WhenPayHubRecordsACreditClaimingToBeLedgerSync(decimal amount, string currency) =>
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, PostingsPath, new
+    public async Task WhenPayHubRecordsACreditClaimingToBeLedgerSync(decimal amount, string currency)
+    {
+        // Mechanics fix: this scenario names no account (it is about attribution, not account setup) — now
+        // that /v1/postings does real accountId lookups instead of always throwing, an unset "account" key
+        // (Guid.Empty) would be refused as not-found before ever reaching the attribution this scenario
+        // actually tests. Lazily opens one, the same way WhenPayHubRecordsACreditTakingEffectOn already does.
+        var accountId = Account();
+        if (accountId == Guid.Empty)
         {
-            accountId = Account(),
+            accountId = await OpenAccountAsync(currency);
+            state.Values["account"] = accountId.ToString();
+        }
+
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Post, PostingsPath, new
+        {
+            accountId,
             direction = "Credit",
             amount,
             currency,
             category = "Transfer",
             recordedBy = "LedgerSync"
         });
+        state.Response = response;
+        // Mechanics fix: without capturing the posting id, the Then step's GET would resolve Posting() to
+        // Guid.Empty (never set) instead of the posting just recorded.
+        state.Values["posting"] = (await TryReadIdAsync(response))?.ToString() ?? "";
+    }
 
     [When(@"PayHub reads the supported currencies")]
     public async Task WhenPayHubReadsTheSupportedCurrencies() =>

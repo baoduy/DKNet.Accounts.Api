@@ -128,4 +128,90 @@ public class AccountTests
 
         account.Metadata.ShouldBe(metadata);
     }
+
+    [Fact]
+    public void TryApplyPosting_ACredit_AllocatesPositionOneAndRaisesTheBalance()
+    {
+        var account = NewAccount();
+        var postedAt = DateTimeOffset.UtcNow;
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 100m, postedAt: postedAt);
+
+        result.Success.ShouldBeTrue();
+        result.Refusal.ShouldBe(PostingRefusalReason.None);
+        result.Position.ShouldBe(1);
+        result.SignedValue.ShouldBe(100m);
+        result.BalanceAfter.ShouldBe(100m);
+        account.Balance.ShouldBe(100m);
+        account.StreamPosition.ShouldBe(1);
+        account.LastPostedOn.ShouldBe(postedAt);
+    }
+
+    [Fact]
+    public void TryApplyPosting_TwoPostings_AllocateConsecutivePositions()
+    {
+        var account = NewAccount();
+
+        account.TryApplyPosting(isDebit: false, amount: 100m, postedAt: DateTimeOffset.UtcNow);
+        var second = account.TryApplyPosting(isDebit: true, amount: 30m, postedAt: DateTimeOffset.UtcNow);
+
+        second.Position.ShouldBe(2);
+        second.BalanceAfter.ShouldBe(70m);
+        account.Balance.ShouldBe(70m);
+    }
+
+    [Fact]
+    public void TryApplyPosting_BelowTheFloor_RefusesAndChangesNothing()
+    {
+        var account = NewAccount(permittedToGoNegative: false);
+
+        var result = account.TryApplyPosting(isDebit: true, amount: 10m, postedAt: DateTimeOffset.UtcNow);
+
+        result.Success.ShouldBeFalse();
+        result.Refusal.ShouldBe(PostingRefusalReason.BelowFloor);
+        account.Balance.ShouldBe(0m);
+        account.StreamPosition.ShouldBe(0);
+        account.LastPostedOn.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryApplyPosting_AReversalBelowTheFloor_IsExemptFromTheFloorCheck()
+    {
+        var account = NewAccount(permittedToGoNegative: false);
+
+        var result = account.TryApplyPosting(isDebit: true, amount: 10m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
+
+        result.Success.ShouldBeTrue();
+        account.Balance.ShouldBe(-10m);
+    }
+
+    [Theory]
+    [InlineData(AccountStatus.Closed, PostingRefusalReason.AccountClosed)]
+    [InlineData(AccountStatus.Frozen, PostingRefusalReason.AccountFrozen)]
+    public void TryApplyPosting_ClosedOrFrozen_RefusesEvenAReversal(AccountStatus status, PostingRefusalReason expected)
+    {
+        var account = NewAccount();
+        account.ChangeStatus(status, "PayHub");
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 10m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
+
+        result.Success.ShouldBeFalse();
+        result.Refusal.ShouldBe(expected);
+        account.Balance.ShouldBe(0m);
+    }
+
+    [Fact]
+    public void TryApplyPosting_DormantAccount_RefusesADebitButAllowsAReversalCredit()
+    {
+        var account = NewAccount();
+        account.ChangeStatus(AccountStatus.Dormant, "PayHub");
+
+        var debit = account.TryApplyPosting(isDebit: true, amount: 10m, postedAt: DateTimeOffset.UtcNow);
+        debit.Success.ShouldBeFalse();
+        debit.Refusal.ShouldBe(PostingRefusalReason.AccountDormantDebitRefused);
+
+        var creditReversal = account.TryApplyPosting(isDebit: false, amount: 10m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
+        creditReversal.Success.ShouldBeTrue();
+        account.Balance.ShouldBe(10m);
+    }
 }

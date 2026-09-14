@@ -19,7 +19,15 @@ namespace DKNet.Accounts.App.Tests.Integration.Support;
 /// </summary>
 public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
 {
+    private const string RequireAuthorizationEnvKey = "FeatureManagement__RequireAuthorization";
+
     private readonly string _dbName = $"failing-write-{Guid.NewGuid():N}";
+
+    // Same reason LedgerApiFixture sets this in its constructor: Program.cs binds FeatureOptions eagerly, so
+    // an env var is the one input read early enough to actually turn RequireAuthorization on for this host.
+    // DRK-1242 stage 3 gave every write handler a real "caller must be authenticated" check (R5) — reaching
+    // this fixture's simulated write failure now needs a real authenticated caller, not just any request.
+    public FailingWriteApiFixture() => Environment.SetEnvironmentVariable(RequireAuthorizationEnvKey, "true");
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
@@ -36,6 +44,8 @@ public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
 
         services.RemoveAll<IMembershipService>();
         services.AddSingleton<IMembershipService, TestMembershipService>();
+
+        LedgerCallerAuthHandler.Register(services);
     }
 
     public async Task InitializeAsync()
@@ -45,4 +55,10 @@ public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
     }
 
     Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
+
+    protected override void Dispose(bool disposing)
+    {
+        Environment.SetEnvironmentVariable(RequireAuthorizationEnvKey, null);
+        base.Dispose(disposing);
+    }
 }

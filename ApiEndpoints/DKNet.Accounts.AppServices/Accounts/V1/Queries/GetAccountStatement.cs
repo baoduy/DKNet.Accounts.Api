@@ -1,5 +1,9 @@
 using X.PagedList;
+using DKNet.EfCore.Specifications.Extensions;
+using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Postings.V1;
+using DKNet.Accounts.AppServices.Postings.V1.Specs;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Queries;
 
@@ -23,11 +27,21 @@ public sealed record GetAccountStatementQuery : Fluents.Queries.IWitPageResponse
     public int? PageSize { get; init; }
 }
 
-internal sealed class GetAccountStatementQueryHandler
+/// <summary>
+/// Offset paging (page index/size), the same convention <see cref="ListAccountsQuery"/> already uses — pages
+/// partition <see cref="Posting.StreamPosition"/> order exactly under a stable sort, and a page past the end
+/// of the stream comes back as an empty page rather than an error (<c>X.PagedList</c>'s own behavior for an
+/// out-of-range page number).
+/// </summary>
+internal sealed class GetAccountStatementQueryHandler(IRepositorySpec repository)
     : Fluents.Queries.IPageHandler<GetAccountStatementQuery, PostingDto>
 {
     public Task<IPagedList<PostingDto>> OnHandle(
         GetAccountStatementQuery request,
         CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        repository.ToPagedListAsync<Posting, PostingDto>(
+            new SpecListPostingsForStatement(request.AccountId, request.From, request.To),
+            request.PageIndex ?? GetAccountStatementQuery.DefaultPageIndex,
+            request.PageSize ?? GetAccountStatementQuery.DefaultPageSize,
+            cancellationToken);
 }

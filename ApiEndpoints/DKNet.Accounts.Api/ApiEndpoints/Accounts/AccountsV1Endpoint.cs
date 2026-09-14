@@ -1,8 +1,10 @@
+using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
+using DKNet.Accounts.AppServices.Postings.V1;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
@@ -79,14 +81,33 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
 
         group.MapGet("{id:guid}/statement", async (
                 Guid id,
-                [AsParameters] GetAccountStatementQuery query,
+                DateOnly? from,
+                DateOnly? to,
+                int? pageIndex,
+                int? pageSize,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                var page = await bus.Send(query with { AccountId = id }, cancellationToken: ct);
-                return Results.Ok(page);
+                // Deliberately NOT [AsParameters] here: combined with this route's own {id} route parameter,
+                // minimal API's request-delegate factory rejects every request with an unlogged, bodyless 400
+                // (reproduced directly — every other query-string-bound route in this API binds its query
+                // object alone, with no sibling route parameter). Explicit parameters sidestep it.
+                var query = new GetAccountStatementQuery
+                {
+                    AccountId = id,
+                    From = from,
+                    To = to,
+                    PageIndex = pageIndex,
+                    PageSize = pageSize
+                };
+                var page = await bus.Send(query, cancellationToken: ct);
+                // PagedResponse (not a raw IPagedList) — System.Text.Json serializes IPagedList<T> itself as
+                // a bare JSON array (it's also an IEnumerable<T>), silently dropping HasNextPage/PageCount/etc.
+                // — the very fields a caller needs to tell "read past the end" from "a genuine empty account".
+                return Results.Ok(new PagedResponse<PostingDto>(page));
             })
             .RequireScope(group, ScopeNames.PostingsRead)
+            .Produces<PagedResponse<PostingDto>>()
             .WithDescription("Read an account's postings as a date-bounded, paged statement in stream order.");
     }
 }

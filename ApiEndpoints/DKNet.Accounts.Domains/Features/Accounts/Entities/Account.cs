@@ -159,5 +159,87 @@ public sealed class Account : AggregateRoot
         SetUpdatedBy(userId);
     }
 
+    /// <summary>
+    /// Appends one posting's effect to this account: allocates the next (gapless, recording-order) stream
+    /// position, applies the signed value the posting's direction and this account's accounting
+    /// classification produce, advances <see cref="Balance"/> and <see cref="LastPostedOn"/>. Enforces the
+    /// status gate (frozen/closed refuse everything; dormant refuses a debit only) and, unless
+    /// <paramref name="isReversal"/>, the floor (R1/R2/R3) — a reversal is exempt from the floor check only,
+    /// never from the status gate. Returns a failed <see cref="PostingApplication"/> (no state change) when
+    /// either guard refuses; callers must not call this more than once per posting.
+    /// </summary>
+    public PostingApplication TryApplyPosting(bool isDebit, decimal amount, DateTimeOffset postedAt, bool isReversal = false)
+    {
+        var refusal = AccountPostingPolicy.StatusGate(Status, isDebit);
+        if (refusal != PostingRefusalReason.None)
+        {
+            return new PostingApplication(false, refusal, 0, 0, Balance);
+        }
+
+        var signedValue = AccountPostingPolicy.SignedValue(Classification, isDebit, amount);
+        var projectedBalance = Balance + signedValue;
+
+        if (!isReversal)
+        {
+            var floor = AccountFloorPolicy.Floor(PermittedToGoNegative, OverdraftLimit, MinimumBalance);
+            if (projectedBalance < floor)
+            {
+                return new PostingApplication(false, PostingRefusalReason.BelowFloor, 0, 0, Balance);
+            }
+        }
+
+        StreamPosition += 1;
+        Balance = projectedBalance;
+        LastPostedOn = postedAt;
+
+        return new PostingApplication(true, PostingRefusalReason.None, StreamPosition, signedValue, Balance);
+    }
+
     #endregion
+}
+
+/// <summary>Why <see cref="Account.TryApplyPosting"/> refused to apply a posting, or <see cref="None"/> when
+/// it was applied.</summary>
+public enum PostingRefusalReason
+{
+    None,
+    AccountClosed,
+    AccountFrozen,
+    AccountDormantDebitRefused,
+    BelowFloor
+}
+
+/// <summary>The outcome of <see cref="Account.TryApplyPosting"/>: on success, the position/signed value/
+/// balance-after the posting must be recorded with; on refusal, <see cref="Refusal"/> names why and no state
+/// changed.</summary>
+public readonly record struct PostingApplication(
+    bool Success,
+    PostingRefusalReason Refusal,
+    long Position,
+    decimal SignedValue,
+    decimal BalanceAfter);
+
+/// <summary>
+/// R.. (DRK-1242 §3): whether a debit or a credit increases an account's balance depends on its accounting
+/// classification (Asset/Expense: debit increases; Liability/Equity/Income: credit increases) — and the
+/// status gate a posting (normal or reversal alike) must clear before it can move an account's balance at
+/// all. Kept as a pure static policy (not a method on <see cref="Account"/>) so it can be unit-tested and
+/// reused without constructing an account.
+/// </summary>
+public static class AccountPostingPolicy
+{
+    public static decimal SignedValue(AccountClassification classification, bool isDebit, decimal amount)
+    {
+        var debitIncreases = classification is AccountClassification.Asset or AccountClassification.Expense;
+        var increases = isDebit == debitIncreases;
+        return increases ? amount : -amount;
+    }
+
+    public static PostingRefusalReason StatusGate(AccountStatus status, bool isDebit) => status switch
+    {
+        AccountStatus.Closed => PostingRefusalReason.AccountClosed,
+        AccountStatus.Frozen => PostingRefusalReason.AccountFrozen,
+        AccountStatus.Dormant when isDebit => PostingRefusalReason.AccountDormantDebitRefused,
+        _ => PostingRefusalReason.None
+    };
 }

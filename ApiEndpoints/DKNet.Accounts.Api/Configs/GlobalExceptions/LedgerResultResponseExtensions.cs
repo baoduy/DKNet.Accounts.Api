@@ -11,16 +11,27 @@ namespace DKNet.Accounts.Api.Configs.GlobalExceptions;
 /// </summary>
 internal static class LedgerResultResponseExtensions
 {
+    /// <summary>Error codes that map to a status other than the default 422 — everything else with a
+    /// business-rule <see cref="LedgerErrors.CodeKey"/> metadata code is 422.</summary>
+    private static readonly IReadOnlyDictionary<string, HttpStatusCode> CodeStatusOverrides =
+        new Dictionary<string, HttpStatusCode> { [LedgerErrors.IdempotencyKeyConflict] = HttpStatusCode.Conflict };
+
     public static IResult ToLedgerResponse<T>(this IResult<T> result, bool isCreated = false)
     {
         ArgumentNullException.ThrowIfNull(result);
 
         if (!result.IsSuccess)
         {
-            return TypedResults.Problem(WithCode(result, result.ToProblemDetails(HttpStatusCode.UnprocessableEntity))!);
+            var code = FindCode(result);
+            var status = code is not null && CodeStatusOverrides.TryGetValue(code, out var overridden)
+                ? overridden
+                : HttpStatusCode.UnprocessableEntity;
+            return TypedResults.Problem(WithCode(result, result.ToProblemDetails(status), code)!);
         }
 
-        if (isCreated)
+        // An idempotent replay returns the original outcome, never a fresh 201 Created — even when the
+        // endpoint asked for isCreated on the genuinely-new path.
+        if (isCreated && !result.IsReplayed())
         {
             return TypedResults.Created("/", result.Value);
         }
@@ -28,17 +39,19 @@ internal static class LedgerResultResponseExtensions
         return result.ValueOrDefault is null ? TypedResults.Ok() : TypedResults.Json(result.Value);
     }
 
-    private static ProblemDetails? WithCode(IResultBase result, ProblemDetails? problem)
+    private static string? FindCode(IResultBase result) =>
+        result.Errors
+            .Select(e => e.Metadata.TryGetValue(LedgerErrors.CodeKey, out var value) ? value as string : null)
+            .FirstOrDefault(c => c is not null);
+
+    private static ProblemDetails? WithCode(IResultBase result, ProblemDetails? problem, string? code)
     {
         if (problem is null)
         {
             return null;
         }
 
-        var code = result.Errors
-            .Select(e => e.Metadata.TryGetValue(LedgerErrors.CodeKey, out var value) ? value as string : null)
-            .FirstOrDefault(c => c is not null);
-
+        code ??= FindCode(result);
         if (code is not null)
         {
             problem.Extensions[LedgerErrors.CodeKey] = code;

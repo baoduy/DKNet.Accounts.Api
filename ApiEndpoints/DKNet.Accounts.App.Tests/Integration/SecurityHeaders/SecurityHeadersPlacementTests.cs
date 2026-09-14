@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
+using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.App.Tests.Integration.Support;
+using DKNet.Accounts.App.TestSupport;
 
 namespace DKNet.Accounts.App.Tests.Integration.SecurityHeaders;
 
@@ -52,11 +54,25 @@ public sealed class SecurityHeadersPlacementTests
         public async Task SecurityHeadersAccompanyTheServerErrorResponse()
         {
             var client = fixture.CreateClient();
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/postings")
+
+            // Opening an account is a write that needs no pre-existing data to validate against (unlike
+            // recording a posting, which — now that DRK-1242 stage 3 replaced the stub with real business
+            // logic — refuses a nonexistent account before ever reaching a write). Any endpoint that reaches
+            // SaveChanges works for this fixture's "every write fails" simulation; this one always does. A
+            // real caller identity is required too — every write handler refuses an unauthenticated caller
+            // (R5) before ever reaching a write.
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/accounts")
             {
-                Content = JsonContent.Create(new { accountId = Guid.NewGuid(), direction = "Credit", amount = 100m, currency = "SGD" })
+                Content = JsonContent.Create(new
+                {
+                    groupId = Guid.NewGuid(),
+                    name = "Operating",
+                    currency = "SGD",
+                    classification = "Asset"
+                })
             };
-            request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+            request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, "PayHub");
+            request.Headers.Add(LedgerCallerAuthHandler.ScopesHeaderName, string.Join(' ', ScopeNames.All));
 
             var response = await client.SendAsync(request);
 

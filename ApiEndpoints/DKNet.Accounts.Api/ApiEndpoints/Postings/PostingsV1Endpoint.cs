@@ -1,6 +1,5 @@
-using DKNet.AspCore.Extensions.Responses;
-using DKNet.AspCore.Idempotency;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
 using DKNet.Accounts.AppServices.Postings.V1.Queries;
@@ -23,7 +22,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             {
                 req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.Response(isCreated: true);
+                return result.ToLedgerResponse(isCreated: true);
             })
             .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<PostingDto>(StatusCodes.Status201Created)
@@ -39,7 +38,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             {
                 req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.Response(isCreated: true);
+                return result.ToLedgerResponse(isCreated: true);
             })
             .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<IReadOnlyCollection<PostingDto>>(StatusCodes.Status201Created)
@@ -64,7 +63,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(new ReversePostingRequest { Id = id }, cancellationToken: ct);
-                return result.Response();
+                return result.ToLedgerResponse();
             })
             .RequireScope(group, ScopeNames.PostingsReverse)
             .Produces<PostingDto>()

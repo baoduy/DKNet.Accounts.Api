@@ -13,5 +13,10 @@ public enum Sequences
     /// <summary>Service-generated, unique account number (§3 row 5). Uniqueness is enforced by the database
     /// unique index on <c>Account.AccountNumber</c>, not by this sequence alone.</summary>
     [Sequence(typeof(long), FormatString = "ACC{1:0000000000}", Max = 9999999999)]
-    AccountNumber = 2
+    AccountNumber = 2,
+
+    /// <summary>Service-generated, unique posting number. Uniqueness is enforced by the database unique
+    /// index on <c>Posting.PostingNumber</c>, not by this sequence alone.</summary>
+    [Sequence(typeof(long), FormatString = "PST{1:0000000000}", Max = 9999999999)]
+    PostingNumber = 3
 }
