@@ -1,0 +1,705 @@
+using System.Globalization;
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
+using DKNet.Accounts.Api.Configs.Auth;
+
+namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
+
+/// <summary>
+/// Step bindings for the ledger acceptance scenarios (DRK-1250 §7). Every step drives the real HTTP
+/// contract (§5) through <see cref="HttpClient"/> — there is no repository to seed directly, since no
+/// Account/AccountGroup/Posting entity exists yet (§5 stubs only). Every handler behind these routes
+/// throws <c>NotImplementedException</c>, so every scenario is red because a "Given"/"When" call already
+/// comes back as an unexpected status — that is the nameable reason R2 asks for.
+/// </summary>
+[Binding]
+public sealed class LedgerSteps(HttpClient client, ScenarioState state)
+{
+    private const string GroupsPath = "/api/v1/account-groups";
+    private const string AccountsPath = "/api/v1/accounts";
+    private const string PostingsPath = "/api/v1/postings";
+    private const string CurrenciesPath = "/api/v1/currencies";
+
+    #region Shared helpers
+
+    private async Task<Guid> CreateGroupAsync(string code, string type)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
+        {
+            code,
+            name = code,
+            type,
+            ownerId = state.CallerClientId
+        });
+        state.Response = response;
+        var id = await TryReadIdAsync(response);
+        state.Values[$"group:{code}"] = id?.ToString() ?? "";
+        return id ?? Guid.Empty;
+    }
+
+    private async Task<Guid> OpenAccountAsync(
+        string currency,
+        Guid? groupId = null,
+        string classification = "Asset",
+        bool permittedToGoNegative = false,
+        decimal? overdraftLimit = null,
+        decimal? minimumBalance = null,
+        string name = "Test Account")
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
+        {
+            groupId = groupId ?? Guid.NewGuid(),
+            name,
+            currency,
+            classification,
+            permittedToGoNegative,
+            overdraftLimit,
+            minimumBalance
+        });
+        state.Response = response;
+        return await TryReadIdAsync(response) ?? Guid.Empty;
+    }
+
+    private async Task PatchAccountStatusAsync(Guid accountId, string status) =>
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Patch, $"{AccountsPath}/{accountId}", new { status });
+
+    private async Task<Guid?> RecordPostingAsync(
+        Guid accountId,
+        string direction,
+        decimal amount,
+        string currency,
+        string? description = null,
+        string? idempotencyKey = null)
+    {
+        var response = await client.SendAsCallerAsync(
+            state,
+            HttpMethod.Post,
+            PostingsPath,
+            new { accountId, direction, amount, currency, category = "Transfer", description },
+            idempotencyKey);
+        state.Response = response;
+        return await TryReadIdAsync(response);
+    }
+
+    private static async Task<Guid?> TryReadIdAsync(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return doc.TryGetProperty("id", out var idProp) && idProp.TryGetGuid(out var id) ? id : null;
+    }
+
+    private Guid Account(string key = "account") =>
+        Guid.TryParse(state.Values.GetValueOrDefault(key), out var id) ? id : Guid.Empty;
+
+    private Guid Posting(string key = "posting") =>
+        Guid.TryParse(state.Values.GetValueOrDefault(key), out var id) ? id : Guid.Empty;
+
+    #endregion
+
+    #region Given — account groups
+
+    [Given(@"PayHub has created the account group ""([^""]+)"" of type ""([^""]+)""")]
+    public async Task GivenPayHubHasCreatedTheAccountGroup(string code, string type) =>
+        await CreateGroupAsync(code, type);
+
+    [Given(@"the group ""([^""]+)"" is a child of the group ""([^""]+)""")]
+    public async Task GivenTheGroupIsAChildOfTheGroup(string childCode, string parentCode)
+    {
+        var parentId = await CreateGroupAsync(parentCode, "Customer");
+        await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
+        {
+            code = childCode,
+            name = childCode,
+            type = "Customer",
+            ownerId = state.CallerClientId,
+            parentId
+        });
+    }
+
+    [Given(@"the group ""([^""]+)"" holds an account with a balance of ([\d.]+) (\w+)")]
+    public async Task GivenTheGroupHoldsAnAccountWithABalanceOf(string groupCode, decimal amount, string currency)
+    {
+        var groupId = await CreateGroupAsync(groupCode, "Customer");
+        var accountId = await OpenAccountAsync(currency, groupId);
+        state.Values["account"] = accountId.ToString();
+        if (amount > 0)
+        {
+            await RecordPostingAsync(accountId, "Credit", amount, currency);
+        }
+    }
+
+    [Given(@"the group ""([^""]+)"" holds an account with ([\d.]+) (\w+) and an account with ([\d.]+) (\w+)")]
+    public async Task GivenTheGroupHoldsTwoAccountsWithBalances(
+        string groupCode, decimal amount1, string currency1, decimal amount2, string currency2)
+    {
+        var groupId = await CreateGroupAsync(groupCode, "Customer");
+        var account1 = await OpenAccountAsync(currency1, groupId);
+        var account2 = await OpenAccountAsync(currency2, groupId);
+        state.Values["account1"] = account1.ToString();
+        state.Values["account2"] = account2.ToString();
+        await RecordPostingAsync(account1, "Credit", amount1, currency1);
+        await RecordPostingAsync(account2, "Credit", amount2, currency2);
+    }
+
+    [Given(@"the group ""([^""]+)"" holds two active accounts and one frozen account")]
+    public async Task GivenTheGroupHoldsTwoActiveAccountsAndOneFrozenAccount(string groupCode)
+    {
+        var groupId = await CreateGroupAsync(groupCode, "Customer");
+        await OpenAccountAsync("SGD", groupId);
+        await OpenAccountAsync("SGD", groupId);
+        var frozen = await OpenAccountAsync("SGD", groupId);
+        await PatchAccountStatusAsync(frozen, "Frozen");
+    }
+
+    #endregion
+
+    #region Given — accounts
+
+    [Given(@"PayHub holds an? (?:active )?account with a balance of ([\d.]+) (\w+)$")]
+    public async Task GivenPayHubHoldsAnAccountWithABalanceOf(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        if (amount > 0)
+        {
+            await RecordPostingAsync(accountId, "Credit", amount, currency);
+        }
+    }
+
+    [Given(@"PayHub holds an account with a balance of ([\d.]+) (\w+), no minimum balance and an overdraft limit of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsAnAccountWithNoMinimumAndOverdraft(
+        decimal balance, string currency, decimal overdraftLimit, string _)
+    {
+        var accountId = await OpenAccountAsync(currency, permittedToGoNegative: true, overdraftLimit: overdraftLimit);
+        state.Values["account"] = accountId.ToString();
+        if (balance > 0)
+        {
+            await RecordPostingAsync(accountId, "Credit", balance, currency);
+        }
+    }
+
+    [Given(@"PayHub holds an account with a balance of ([\d.]+) (\w+), a minimum balance of ([\d.]+) (\w+) and an overdraft limit of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsAnAccountWithMinimumAndOverdraft(
+        decimal balance, string currency, decimal minimumBalance, string _, decimal overdraftLimit, string __)
+    {
+        var accountId = await OpenAccountAsync(
+            currency, permittedToGoNegative: true, overdraftLimit: overdraftLimit, minimumBalance: minimumBalance);
+        state.Values["account"] = accountId.ToString();
+        if (balance > 0)
+        {
+            await RecordPostingAsync(accountId, "Credit", balance, currency);
+        }
+    }
+
+    [Given(@"PayHub holds an? ([A-Z]{3}) account$")]
+    public async Task GivenPayHubHoldsACurrencyAccount(string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+    }
+
+    [Given(@"PayHub holds a frozen account")]
+    public async Task GivenPayHubHoldsAFrozenAccount()
+    {
+        var accountId = await OpenAccountAsync("SGD");
+        await PatchAccountStatusAsync(accountId, "Frozen");
+        state.Values["account"] = accountId.ToString();
+    }
+
+    [Given(@"PayHub holds a dormant account with a balance of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsADormantAccountWithABalanceOf(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        if (amount > 0)
+        {
+            await RecordPostingAsync(accountId, "Credit", amount, currency);
+        }
+
+        await PatchAccountStatusAsync(accountId, "Dormant");
+        state.Values["account"] = accountId.ToString();
+    }
+
+    [Given(@"PayHub holds an account with a balance of ([\d.]+) (\w+) that is not permitted to go negative, and an account with a balance of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsTwoAccounts_FirstNotPermittedNegative(
+        decimal amount1, string currency1, decimal amount2, string currency2)
+    {
+        var account1 = await OpenAccountAsync(currency1, permittedToGoNegative: false);
+        var account2 = await OpenAccountAsync(currency2, permittedToGoNegative: true, overdraftLimit: 0);
+        state.Values["account1"] = account1.ToString();
+        state.Values["account2"] = account2.ToString();
+        await RecordPostingAsync(account1, "Credit", amount1, currency1);
+        await RecordPostingAsync(account2, "Credit", amount2, currency2);
+    }
+
+    [Given(@"PayHub holds an account with a balance of ([\d.]+) (\w+) and an account with a balance of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHoldsTwoAccountsWithBalances(
+        decimal amount1, string currency1, decimal amount2, string currency2)
+    {
+        var account1 = await OpenAccountAsync(currency1, permittedToGoNegative: true, overdraftLimit: 0);
+        var account2 = await OpenAccountAsync(currency2, permittedToGoNegative: true, overdraftLimit: 0);
+        state.Values["account1"] = account1.ToString();
+        state.Values["account2"] = account2.ToString();
+        await RecordPostingAsync(account1, "Credit", amount1, currency1);
+        await RecordPostingAsync(account2, "Credit", amount2, currency2);
+    }
+
+    #endregion
+
+    #region Given — postings / reversal / idempotency
+
+    [Given(@"PayHub has recorded a credit of ([\d.]+) (\w+) under its idempotency key ""([^""]+)""")]
+    public async Task GivenPayHubHasRecordedACreditUnderItsIdempotencyKey(decimal amount, string currency, string key)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        state.Values["idempotencyKey"] = key;
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency, idempotencyKey: key);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+    }
+
+    [Given(@"PayHub recorded a credit of ([\d.]+) (\w+) against an account whose balance was ([\d.]+) (\w+)")]
+    public async Task GivenPayHubRecordedACreditAgainstAnAccountWhoseBalanceWas(
+        decimal amount, string currency, decimal openingBalance, string _)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+    }
+
+    [Given(@"PayHub has reversed a posting of ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHasReversedAPostingOf(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+    }
+
+    [Given(@"PayHub recorded a credit of ([\d.]+) (\w+) against an account that is not permitted to go negative")]
+    public async Task GivenPayHubRecordedACreditAgainstAnAccountNotPermittedToGoNegative(decimal amount, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency, permittedToGoNegative: false);
+        state.Values["account"] = accountId.ToString();
+        var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
+        state.Values["posting"] = postingId?.ToString() ?? "";
+    }
+
+    [Given(@"that account's balance has since fallen to ([\d.]+) (\w+)")]
+    public async Task GivenThatAccountsBalanceHasSinceFallenTo(decimal amount, string currency) =>
+        await RecordPostingAsync(Account(), "Debit", amount, currency);
+
+    [Given(@"PayHub's account has postings dated (.+), (.+) and (.+)")]
+    public async Task GivenPayHubsAccountHasPostingsDated(string date1, string date2, string date3)
+    {
+        var accountId = await OpenAccountAsync("SGD");
+        state.Values["account"] = accountId.ToString();
+        foreach (var date in new[] { date1, date2, date3 })
+        {
+            await RecordPostingWithEffectiveDateAsync(accountId, ParseLedgerDate(date));
+        }
+    }
+
+    [Given(@"PayHub's account holds twenty-five postings dated in September 2026")]
+    public async Task GivenPayHubsAccountHoldsTwentyFivePostingsInSeptember2026()
+    {
+        var accountId = await OpenAccountAsync("SGD");
+        state.Values["account"] = accountId.ToString();
+        for (var day = 1; day <= 25; day++)
+        {
+            await RecordPostingWithEffectiveDateAsync(accountId, new DateOnly(2026, 9, day));
+        }
+    }
+
+    private async Task RecordPostingWithEffectiveDateAsync(Guid accountId, DateOnly effectiveDate) =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, PostingsPath, new
+        {
+            accountId,
+            direction = "Credit",
+            amount = 10.00m,
+            currency = "SGD",
+            category = "Transfer",
+            effectiveDate
+        });
+
+    private static DateOnly ParseLedgerDate(string text) =>
+        DateOnly.ParseExact(text.Trim(), "d MMMM yyyy", CultureInfo.InvariantCulture);
+
+    [Given(@"PayHub has recorded credits of (.+?) (\w+) and debits of (.+?) (\w+) against an account opened at ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHasRecordedCreditsAndDebitsAgainstAnAccountOpenedAt(
+        string credits, string creditsCurrency, string debits, string debitsCurrency, decimal openingBalance, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["account"] = accountId.ToString();
+
+        foreach (var amount in ParseAmountList(credits))
+        {
+            await RecordPostingAsync(accountId, "Credit", amount, currency);
+        }
+
+        foreach (var amount in ParseAmountList(debits))
+        {
+            await RecordPostingAsync(accountId, "Debit", amount, currency);
+        }
+    }
+
+    private static IEnumerable<decimal> ParseAmountList(string text) =>
+        Regex.Split(text, @",|\band\b")
+            .Select(part => part.Trim())
+            .Where(part => part.Length > 0)
+            .Select(part => decimal.Parse(part, CultureInfo.InvariantCulture));
+
+    #endregion
+
+    #region Given — access control
+
+    [Given(@"LedgerSync is authorised to read accounts but not to record postings")]
+    public void GivenLedgerSyncIsAuthorisedToReadAccountsButNotToRecordPostings()
+    {
+        state.CallerClientId = "LedgerSync";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.PostingsRead];
+    }
+
+    [Given(@"PayHub is authenticated as itself")]
+    public void GivenPayHubIsAuthenticatedAsItself()
+    {
+        state.CallerClientId = "PayHub";
+        state.CallerScopes = [.. ScopeNames.All];
+    }
+
+    #endregion
+
+    #region When
+
+    [When(@"PayHub opens an account named ""([^""]+)"" in ""([^""]+)"" in (\w+) as an? (\w+) account")]
+    public async Task WhenPayHubOpensAnAccountNamedInAs(string name, string groupCode, string currency, string classification)
+    {
+        var groupId = Guid.TryParse(state.Values.GetValueOrDefault($"group:{groupCode}"), out var gid) ? gid : Guid.NewGuid();
+        var accountId = await OpenAccountAsync(currency, groupId, classification, name: name);
+        state.Values["account"] = accountId.ToString();
+    }
+
+    [When(@"PayHub opens an account in ""([^""]+)"" permitted to go negative but states no overdraft limit")]
+    public async Task WhenPayHubOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string groupCode)
+    {
+        var groupId = Guid.TryParse(state.Values.GetValueOrDefault($"group:{groupCode}"), out var gid) ? gid : Guid.NewGuid();
+        await OpenAccountAsync("SGD", groupId, permittedToGoNegative: true, overdraftLimit: null);
+    }
+
+    [When(@"PayHub asks to close that account")]
+    public async Task WhenPayHubAsksToCloseThatAccount() =>
+        await PatchAccountStatusAsync(Account(), "Closed");
+
+    [When(@"PayHub asks to close ""([^""]+)""")]
+    public async Task WhenPayHubAsksToClose(string groupCode)
+    {
+        var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
+    }
+
+    [When(@"PayHub asks to make ""([^""]+)"" a child of ""([^""]+)""")]
+    public async Task WhenPayHubAsksToMakeAChildOf(string childCode, string parentCode)
+    {
+        var childId = state.Values.GetValueOrDefault($"group:{childCode}");
+        var parentId = state.Values.GetValueOrDefault($"group:{parentCode}");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId });
+    }
+
+    [When(@"PayHub reads the balances of ""([^""]+)""")]
+    public async Task WhenPayHubReadsTheBalancesOf(string groupCode)
+    {
+        var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{groupId}/balances");
+    }
+
+    [When(@"PayHub reads that account$")]
+    public async Task WhenPayHubReadsThatAccount() =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}");
+
+    [When(@"PayHub lists the accounts of ""([^""]+)""$")]
+    public async Task WhenPayHubListsTheAccountsOf(string groupCode)
+    {
+        var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}");
+    }
+
+    [When(@"PayHub lists the accounts of ""([^""]+)"" filtered to frozen")]
+    public async Task WhenPayHubListsTheAccountsOfFilteredToFrozen(string groupCode)
+    {
+        var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}&status=Frozen");
+    }
+
+    [When(@"PayHub records a credit of ([\d.]+) (\w+) described as ""([^""]+)""")]
+    public async Task WhenPayHubRecordsACreditDescribedAs(decimal amount, string currency, string description) =>
+        state.Values["posting"] = (await RecordPostingAsync(Account(), "Credit", amount, currency, description))
+            ?.ToString() ?? "";
+
+    [When(@"PayHub repeats that request unchanged under the same key")]
+    public async Task WhenPayHubRepeatsThatRequestUnchangedUnderTheSameKey()
+    {
+        var key = state.Values.GetValueOrDefault("idempotencyKey");
+        var currency = "SGD";
+        await RecordPostingAsync(Account(), "Credit", 100.00m, currency, idempotencyKey: key);
+    }
+
+    [When(@"PayHub records a credit of ([\d.]+) (\w+) under the same key")]
+    public async Task WhenPayHubRecordsACreditUnderTheSameKey(decimal amount, string currency)
+    {
+        var key = state.Values.GetValueOrDefault("idempotencyKey");
+        await RecordPostingAsync(Account(), "Credit", amount, currency, idempotencyKey: key);
+    }
+
+    [When(@"LedgerSync records a credit of ([\d.]+) (\w+) under its own key ""([^""]+)""")]
+    public async Task WhenLedgerSyncRecordsACreditUnderItsOwnKey(decimal amount, string currency, string key)
+    {
+        state.CallerClientId = "LedgerSync";
+        state.CallerScopes = [.. ScopeNames.All];
+        await RecordPostingAsync(Account(), "Credit", amount, currency, idempotencyKey: key);
+    }
+
+    [When(@"PayHub records a debit of ([\d.]+) (\w+)$")]
+    public async Task WhenPayHubRecordsADebit(decimal amount, string currency) =>
+        await RecordPostingAsync(Account(), "Debit", amount, currency);
+
+    [When(@"PayHub records a credit of ([\d.]+) (\w+) against it")]
+    public async Task WhenPayHubRecordsACreditAgainstIt(decimal amount, string currency) =>
+        await RecordPostingAsync(Account(), "Credit", amount, currency);
+
+    [When(@"PayHub records a debit of ([\d.]+) (\w+) against it")]
+    public async Task WhenPayHubRecordsADebitAgainstIt(decimal amount, string currency) =>
+        await RecordPostingAsync(Account(), "Debit", amount, currency);
+
+    [When(@"PayHub reverses that posting")]
+    [When(@"PayHub reverses that credit")]
+    public async Task WhenPayHubReversesThatPosting() =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+
+    [When(@"PayHub asks to reverse that same posting again")]
+    public async Task WhenPayHubAsksToReverseThatSamePostingAgain() =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+
+    [When(@"PayHub submits one batch debiting ([\d.]+) (\w+) from the first and crediting ([\d.]+) (\w+) to the second")]
+    public async Task WhenPayHubSubmitsOneBatch(decimal debitAmount, string debitCurrency, decimal creditAmount, string creditCurrency) =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/batch", new
+        {
+            movements = new object[]
+            {
+                new { accountId = Account("account1"), direction = "Debit", amount = debitAmount, currency = debitCurrency, category = "Transfer" },
+                new { accountId = Account("account2"), direction = "Credit", amount = creditAmount, currency = creditCurrency, category = "Transfer" }
+            }
+        });
+
+    [When(@"PayHub reads the statement from (.+) to (.+)")]
+    public async Task WhenPayHubReadsTheStatementFromTo(string from, string to)
+    {
+        var fromDate = ParseLedgerDate(from);
+        var toDate = ParseLedgerDate(to);
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{AccountsPath}/{Account()}/statement?from={fromDate:yyyy-MM-dd}&to={toDate:yyyy-MM-dd}");
+    }
+
+    [When(@"PayHub reads the September 2026 statement in pages of ten")]
+    public async Task WhenPayHubReadsTheSeptember2026StatementInPagesOfTen()
+    {
+        for (var page = 1; page <= 3; page++)
+        {
+            state.Response = await client.SendAsCallerAsync(
+                state,
+                HttpMethod.Get,
+                $"{AccountsPath}/{Account()}/statement?from=2026-09-01&to=2026-09-30&pageIndex={page}&pageSize=10");
+        }
+    }
+
+    [When(@"PayHub reads that account's balance")]
+    public async Task WhenPayHubReadsThatAccountsBalance() =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}/balance");
+
+    [When(@"PayHub records twenty credits of ([\d.]+) (\w+) at the same time")]
+    public async Task WhenPayHubRecordsTwentyCreditsAtTheSameTime(decimal amount, string currency)
+    {
+        var accountId = Account();
+        var tasks = Enumerable.Range(0, 20)
+            .Select(_ => RecordPostingAsync(accountId, "Credit", amount, currency));
+        await Task.WhenAll(tasks);
+    }
+
+    [When(@"an unauthenticated caller asks to read an account")]
+    public async Task WhenAnUnauthenticatedCallerAsksToReadAnAccount() =>
+        state.Response = await client.SendUnauthenticatedAsync(HttpMethod.Get, $"{AccountsPath}/{Guid.NewGuid()}");
+
+    [When(@"LedgerSync records a credit of ([\d.]+) (\w+)$")]
+    public async Task WhenLedgerSyncRecordsACredit(decimal amount, string currency)
+    {
+        state.CallerClientId = "LedgerSync";
+        await RecordPostingAsync(Account(), "Credit", amount, currency);
+    }
+
+    [When(@"PayHub records a credit of ([\d.]+) (\w+) claiming in the request body to be LedgerSync")]
+    public async Task WhenPayHubRecordsACreditClaimingToBeLedgerSync(decimal amount, string currency) =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, PostingsPath, new
+        {
+            accountId = Account(),
+            direction = "Credit",
+            amount,
+            currency,
+            category = "Transfer",
+            recordedBy = "LedgerSync"
+        });
+
+    [When(@"PayHub reads the supported currencies")]
+    public async Task WhenPayHubReadsTheSupportedCurrencies() =>
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, CurrenciesPath);
+
+    #endregion
+
+    #region Then
+
+    [Then(@"the request is refused(?:.*)")]
+    public void ThenTheRequestIsRefused() =>
+        // 422 is the contract's status for a business-rule refusal (§5 Errors table) — asserting it
+        // specifically (not just "not successful") keeps this scenario red for the right reason: the
+        // handler is not implemented yet, not merely that something 4xx/5xx happened.
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity,
+            $"expected 422 but got {(int)state.Response!.StatusCode}");
+
+    [Then(@"the account is returned with a unique account number and a balance of ([\d.]+) (\w+)")]
+    public void ThenTheAccountIsReturnedWithAUniqueAccountNumberAndABalanceOf(decimal amount, string currency) =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+    [Then(@"the account appears when PayHub lists the accounts of ""([^""]+)""")]
+    public async Task ThenTheAccountAppearsWhenPayHubListsTheAccountsOf(string groupCode)
+    {
+        var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}");
+        response.IsSuccessStatusCode.ShouldBeTrue();
+    }
+
+    [Then(@"the balances show ([\d.]+) (\w+) and ([\d.]+) (\w+) as separate lines")]
+    public void ThenTheBalancesShowAsSeparateLines(decimal amount1, string currency1, decimal amount2, string currency2) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"no combined total across the two currencies is reported")]
+    public void ThenNoCombinedTotalAcrossTheTwoCurrenciesIsReported() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"its available balance is ([\d.]+) (\w+) and its held amount is ([\d.]+) (\w+)")]
+    public void ThenItsAvailableBalanceIsAndItsHeldAmountIs(decimal available, string c1, decimal held, string c2) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"only the frozen account is returned")]
+    public async Task ThenOnlyTheFrozenAccountIsReturned()
+    {
+        var body = await state.Response!.Content.ReadAsStringAsync();
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the frozen-only list, got: {body}");
+    }
+
+    [Then(@"the account balance is (-?[\d.]+) (\w+)")]
+    [Then(@"the account balance remains (-?[\d.]+) (\w+)")]
+    public void ThenTheAccountBalanceIs(decimal amount, string currency) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue(
+            $"expected balance {amount} {currency}, request status was {(int)state.Response!.StatusCode}");
+
+    [Then(@"the posting is returned with a balance-after of ([\d.]+) (\w+) and position (\d+) in the account's stream")]
+    public void ThenThePostingIsReturnedWithABalanceAfterAndPosition(decimal balanceAfter, string currency, int position) =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+    [Then(@"the originally recorded posting is returned")]
+    public void ThenTheOriginallyRecordedPostingIsReturned() =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+    [Then(@"both postings exist")]
+    public void ThenBothPostingsExist() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"a debit of ([\d.]+) (\w+) appears in the account's stream")]
+    public async Task ThenADebitAppearsInTheAccountsStream(decimal amount, string currency)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}/statement");
+        response.IsSuccessStatusCode.ShouldBeTrue();
+    }
+
+    [Then(@"the original posting is marked reversed and names the posting that reversed it")]
+    public async Task ThenTheOriginalPostingIsMarkedReversed()
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{PostingsPath}/{Posting()}");
+        response.IsSuccessStatusCode.ShouldBeTrue();
+    }
+
+    [Then(@"the reversal is recorded and the account balance is (-?[\d.]+) (\w+)")]
+    public void ThenTheReversalIsRecordedAndTheAccountBalanceIs(decimal amount, string currency) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"both balances are unchanged, and neither movement appears in either stream")]
+    public void ThenBothBalancesAreUnchangedAndNeitherMovementAppears() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeFalse();
+
+    [Then(@"the debited account reads ([\d.]+) (\w+) and the credited account reads ([\d.]+) (\w+)")]
+    public void ThenTheDebitedAccountReadsAndTheCreditedAccountReads(
+        decimal debited, string c1, decimal credited, string c2) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"both postings share one transaction group identifier")]
+    public void ThenBothPostingsShareOneTransactionGroupIdentifier() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the postings dated (.+) and (.+) are returned in that order")]
+    public void ThenThePostingsDatedAreReturnedInThatOrder(string date1, string date2) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the posting dated (.+) is not returned")]
+    public void ThenThePostingDatedIsNotReturned(string date) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the three pages together return all twenty-five postings in stream order, each exactly once")]
+    public void ThenTheThreePagesTogetherReturnAllTwentyFivePostings() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the third page reports that the end of the stream has been reached")]
+    public void ThenTheThirdPageReportsTheEndOfTheStream() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the balance is ([\d.]+) (\w+)")]
+    public void ThenTheBalanceIs(decimal amount, string currency) =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the account's stream holds twenty postings at consecutive positions")]
+    public void ThenTheAccountsStreamHoldsTwentyPostingsAtConsecutivePositions() =>
+        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+
+    [Then(@"the posting is attributed to PayHub")]
+    public async Task ThenThePostingIsAttributedToPayHub()
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{PostingsPath}/{Posting()}");
+        var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+        doc.GetProperty("callingSystem").GetString().ShouldBe("PayHub");
+    }
+
+    [Then(@"SGD is listed as denominated to two decimal places")]
+    public async Task ThenSgdIsListedAsDenominatedToTwoDecimalPlaces()
+    {
+        var currencies = await state.Response!.Content.ReadFromJsonAsync<JsonElement>();
+        var sgd = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "SGD");
+        sgd.GetProperty("decimalPlaces").GetInt32().ShouldBe(2);
+    }
+
+    [Then(@"JPY is listed as denominated to zero decimal places")]
+    public async Task ThenJpyIsListedAsDenominatedToZeroDecimalPlaces()
+    {
+        var currencies = await state.Response!.Content.ReadFromJsonAsync<JsonElement>();
+        var jpy = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "JPY");
+        jpy.GetProperty("decimalPlaces").GetInt32().ShouldBe(0);
+    }
+
+    #endregion
+}
