@@ -19,8 +19,6 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 public sealed record ReversePostingRequest : Fluents.Requests.IWitResponse<PostingDto>
 {
     public Guid Id { get; set; }
-
-    public string? Reason { get; set; }
 }
 
 /// <summary>
@@ -122,7 +120,7 @@ internal sealed class ReversePostingCommandHandler(
                 null,
                 null,
                 original.ExternalReference,
-                request.Reason ?? $"Reversal of {original.PostingNumber}",
+                $"Reversal of {original.PostingNumber}",
                 original.Metadata,
                 byUser);
             reversal.LinkAsReversalOf(original.Id);

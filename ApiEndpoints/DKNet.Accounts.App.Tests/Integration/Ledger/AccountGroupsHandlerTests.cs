@@ -120,6 +120,97 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// Rework finding 3: <c>GetAccountGroupBalances</c> had no test at all. Proves the group-by-currency
+    /// projection — one line per currency, holding the real (postings-driven) balance, never a combined total
+    /// across currencies.
+    /// </summary>
+    [Fact]
+    public async Task Balances_AGroupHoldingTwoCurrencies_ReturnsTwoSeparateLinesAndNoCombinedTotal()
+    {
+        var groupId = await CreateGroupAsync($"BAL2-{Guid.NewGuid():N}");
+
+        var sgdAccount = await OpenAccountInGroupAsync(groupId, "SGD");
+        var usdAccount = await OpenAccountInGroupAsync(groupId, "USD");
+        await RecordCreditAsync(sgdAccount, 100.00m, "SGD");
+        await RecordCreditAsync(usdAccount, 80.00m, "USD");
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{GroupsPath}/{groupId}/balances"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var lines = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().ToList();
+        lines.Count.ShouldBe(2); // no third, combined/summed line
+        lines.Single(l => l.GetProperty("currency").GetString() == "SGD")
+            .GetProperty("balance").GetDecimal().ShouldBe(100.00m);
+        lines.Single(l => l.GetProperty("currency").GetString() == "USD")
+            .GetProperty("balance").GetDecimal().ShouldBe(80.00m);
+    }
+
+    private async Task<Guid> OpenAccountInGroupAsync(Guid groupId, string currency)
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/accounts", new
+        {
+            groupId,
+            name = "Operating",
+            currency,
+            classification = "Liability",
+            permittedToGoNegative = false
+        }));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    }
+
+    private async Task RecordCreditAsync(Guid accountId, decimal amount, string currency)
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/postings", new
+        {
+            accountId,
+            direction = "Credit",
+            amount,
+            currency,
+            category = "Transfer"
+        }));
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — rename,
+    /// description change, a successful (no-balance) close, and reactivation — none reachable from the
+    /// existing reparent/duplicate-code/close-with-balance tests or the BDD acceptance scenarios.</summary>
+    [Fact]
+    public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
+    {
+        var groupId = await CreateGroupAsync($"UPD-{Guid.NewGuid():N}");
+
+        var renamed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new
+        {
+            name = "Renamed Group",
+            description = "Updated description"
+        }));
+        renamed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var renamedBody = await renamed.Content.ReadFromJsonAsync<JsonElement>();
+        renamedBody.GetProperty("name").GetString().ShouldBe("Renamed Group");
+        renamedBody.GetProperty("description").GetString().ShouldBe("Updated description");
+
+        // No account holds a balance, so closing succeeds — the success path of the Closed branch.
+        var closed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
+        closed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await closed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("closed");
+
+        // Reactivating exercises the non-Closed ("Activate") branch.
+        var reactivated = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Active" }));
+        reactivated.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await reactivated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("active");
+    }
+
+    [Fact]
+    public async Task Updating_AnUnknownGroup_IsRefused()
+    {
+        var response = await Client.SendAsync(
+            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { name = "Doesn't matter" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     [Fact]
     public async Task ClosingAGroupWhoseAccountReallyHoldsABalance_IsRefused()
     {

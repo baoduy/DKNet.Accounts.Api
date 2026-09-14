@@ -313,8 +313,18 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     }
 
     [Given(@"the account has since been debited down to ([\d.]+) (\w+)")]
-    public async Task GivenTheAccountHasSinceBeenDebitedDownTo(decimal amount, string currency) =>
-        await RecordPostingAsync(Account(), "Debit", amount, currency);
+    public async Task GivenTheAccountHasSinceBeenDebitedDownTo(decimal targetBalance, string currency)
+    {
+        // Mechanics fix (surfaced by rework finding 1's stronger assertion on the matching Then step): this
+        // step's captured amount is the TARGET balance the account must be debited DOWN TO, not the debit
+        // amount itself — recording a debit of the target balance verbatim left the account at (prior balance
+        // - target), not at the target. The debit actually posted must be (current balance - target balance).
+        var accountId = Account();
+        var balanceResponse = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{accountId}/balance");
+        var currentBalance = (await balanceResponse.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("balance").GetDecimal();
+        await RecordPostingAsync(accountId, "Debit", currentBalance - targetBalance, currency);
+    }
 
     [Given(@"PayHub holds a closed account carrying a posting of ([\d.]+) (\w+)")]
     public async Task GivenPayHubHoldsAClosedAccountCarryingAPostingOf(decimal amount, string currency)
@@ -618,6 +628,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub reads that statement in pages of ten until a page comes back empty")]
     public async Task WhenPayHubReadsThatStatementInPagesOfTenUntilAPageComesBackEmpty()
     {
+        // Rework (finding 1): every page's stream positions are captured in return order so the Then steps
+        // can assert real cross-page invariants (no gaps, no duplicates) instead of only the last status code.
+        state.StatementStreamPositions.Clear();
         for (var page = 1; page <= 50; page++)
         {
             var response = await client.SendAsCallerAsync(
@@ -635,6 +648,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
             {
                 break;
             }
+
+            state.StatementStreamPositions.AddRange(
+                items.EnumerateArray().Select(item => item.GetProperty("streamPosition").GetInt64()));
         }
     }
 
@@ -784,41 +800,112 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     }
 
     [Then(@"the reversal is recorded and the account balance is (-?[\d.]+) (\w+)")]
-    public void ThenTheReversalIsRecordedAndTheAccountBalanceIs(decimal amount, string currency) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenTheReversalIsRecordedAndTheAccountBalanceIs(decimal amount, string currency)
+    {
+        // Rework (finding 1): the reversal response body itself is the evidence — its own balanceAfter/
+        // currency, not just the HTTP status, must match the literal this step's own regex captured.
+        var doc = await ReadResponseJsonAsync();
+        doc.GetProperty("balanceAfter").GetDecimal().ShouldBe(amount);
+        doc.GetProperty("currency").GetString().ShouldBe(currency);
+    }
 
     [Then(@"both balances are unchanged, and neither movement appears in either stream")]
     public void ThenBothBalancesAreUnchangedAndNeitherMovementAppears() =>
+        // Note: unreachable under the current feature text — the compound line that names this clause
+        // ("Then the request is refused, both balances are unchanged, and neither movement appears in either
+        // stream") is matched in full by ThenTheRequestIsRefused's "the request is refused(?:.*)" pattern
+        // first, so this binding never fires today. The all-or-nothing invariant it describes is instead
+        // proven by PostingsHandlerTests.Batch_WithAnUnsupportedCurrency_IsRefused (rework finding 4), which
+        // re-reads both accounts' balance/streamPosition/statement length after the refusal. Kept as a real
+        // assertion (not just a status check) in case a future scenario ever uses this exact standalone text.
         state.Response!.IsSuccessStatusCode.ShouldBeFalse();
 
     [Then(@"the debited account reads ([\d.]+) (\w+) and the credited account reads ([\d.]+) (\w+)")]
-    public void ThenTheDebitedAccountReadsAndTheCreditedAccountReads(
-        decimal debited, string c1, decimal credited, string c2) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenTheDebitedAccountReadsAndTheCreditedAccountReads(
+        decimal debited, string c1, decimal credited, string c2)
+    {
+        // Rework (finding 1): the batch response body is the two legs themselves — matched by direction
+        // (not array index, which the contract never promises), each leg's own balanceAfter is checked
+        // against the literal this step's own regex captured.
+        var doc = await ReadResponseJsonAsync();
+        var legs = doc.EnumerateArray().ToList();
+        var debitLeg = legs.Single(l => string.Equals(l.GetProperty("direction").GetString(), "debit", StringComparison.OrdinalIgnoreCase));
+        var creditLeg = legs.Single(l => string.Equals(l.GetProperty("direction").GetString(), "credit", StringComparison.OrdinalIgnoreCase));
+        debitLeg.GetProperty("balanceAfter").GetDecimal().ShouldBe(debited);
+        debitLeg.GetProperty("currency").GetString().ShouldBe(c1);
+        creditLeg.GetProperty("balanceAfter").GetDecimal().ShouldBe(credited);
+        creditLeg.GetProperty("currency").GetString().ShouldBe(c2);
+    }
 
     [Then(@"both postings share one transaction group identifier")]
-    public void ThenBothPostingsShareOneTransactionGroupIdentifier() =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenBothPostingsShareOneTransactionGroupIdentifier()
+    {
+        // Rework (finding 1): reads the transactionGroupId every leg in the batch response actually carries —
+        // a batch with legs under more than one group id (or none) fails this, where the old check could not.
+        var doc = await ReadResponseJsonAsync();
+        var groupIds = doc.EnumerateArray()
+            .Select(p => p.GetProperty("transactionGroupId").GetGuid())
+            .Distinct()
+            .ToList();
+        groupIds.Count.ShouldBe(1);
+        groupIds[0].ShouldNotBe(Guid.Empty);
+    }
 
     [Then(@"the postings dated (.+) and (.+) are returned in that order")]
-    public void ThenThePostingsDatedAreReturnedInThatOrder(string date1, string date2) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenThePostingsDatedAreReturnedInThatOrder(string date1, string date2)
+    {
+        // Rework (finding 1): reads the statement page's own items and checks both the exact dates this
+        // step's own regex captured AND their order, rather than only the HTTP status.
+        var doc = await ReadResponseJsonAsync();
+        var items = doc.GetProperty("items").EnumerateArray().ToList();
+        items.Count.ShouldBe(2);
+        DateOnly.Parse(items[0].GetProperty("effectiveDate").GetString()!).ShouldBe(ParseLedgerDate(date1));
+        DateOnly.Parse(items[1].GetProperty("effectiveDate").GetString()!).ShouldBe(ParseLedgerDate(date2));
+    }
 
     [Then(@"the posting dated (.+) is not returned")]
-    public void ThenThePostingDatedIsNotReturned(string date) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenThePostingDatedIsNotReturned(string date)
+    {
+        // Rework (finding 1): confirms the excluded date's posting is genuinely absent from the page, not
+        // just that the request succeeded.
+        var doc = await ReadResponseJsonAsync();
+        var excluded = ParseLedgerDate(date);
+        doc.GetProperty("items").EnumerateArray()
+            .Any(item => DateOnly.Parse(item.GetProperty("effectiveDate").GetString()!) == excluded)
+            .ShouldBeFalse();
+    }
 
     [Then(@"the posting dated (.+) is returned before the posting dated (.+)")]
-    public void ThenThePostingDatedIsReturnedBeforeThePostingDated(string firstDate, string secondDate) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenThePostingDatedIsReturnedBeforeThePostingDated(string firstDate, string secondDate)
+    {
+        // Rework (finding 1): proves stream (recording) order, not effective-date order — the whole point of
+        // the scenario this step belongs to.
+        var doc = await ReadResponseJsonAsync();
+        var items = doc.GetProperty("items").EnumerateArray().ToList();
+        var firstIndex = items.FindIndex(
+            i => DateOnly.Parse(i.GetProperty("effectiveDate").GetString()!) == ParseLedgerDate(firstDate));
+        var secondIndex = items.FindIndex(
+            i => DateOnly.Parse(i.GetProperty("effectiveDate").GetString()!) == ParseLedgerDate(secondDate));
+        firstIndex.ShouldBeGreaterThanOrEqualTo(0);
+        secondIndex.ShouldBeGreaterThanOrEqualTo(0);
+        firstIndex.ShouldBeLessThan(secondIndex);
+    }
 
     [Then(@"twenty-five postings are returned across the pages in stream order")]
     public void ThenTwentyFivePostingsAreReturnedAcrossThePagesInStreamOrder() =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+        // Rework (finding 1): "twenty-five" (this step's own text) and "in stream order" checked together —
+        // the exact sequence of stream positions collected across every page must be 1..25, gapless and in
+        // order; a lost, duplicated or reordered posting anywhere across the pages fails this.
+        state.StatementStreamPositions.ShouldBe(Enumerable.Range(1, 25).Select(i => (long)i));
 
     [Then(@"no posting appears on two pages and none is missing")]
-    public void ThenNoPostingAppearsOnTwoPagesAndNoneIsMissing() =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public void ThenNoPostingAppearsOnTwoPagesAndNoneIsMissing()
+    {
+        // Rework (finding 1): distinctness (nothing repeated across two pages) and completeness (nothing
+        // missing) checked as two independent, real assertions over the actual accumulated positions.
+        state.StatementStreamPositions.Distinct().Count().ShouldBe(state.StatementStreamPositions.Count);
+        state.StatementStreamPositions.ToHashSet().ShouldBe(Enumerable.Range(1, 25).Select(i => (long)i).ToHashSet());
+    }
 
     [Then(@"after PayHub returns the account to active the same reversal is recorded")]
     public async Task ThenAfterPayHubReturnsTheAccountToActiveTheSameReversalIsRecorded()
@@ -830,12 +917,29 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     }
 
     [Then(@"the balance is ([\d.]+) (\w+)")]
-    public void ThenTheBalanceIs(decimal amount, string currency) =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenTheBalanceIs(decimal amount, string currency)
+    {
+        // Rework (finding 1): the balance response body itself is the evidence — its own balance/currency,
+        // not just the HTTP status, must match the literal this step's own regex captured.
+        var doc = await ReadResponseJsonAsync();
+        doc.GetProperty("balance").GetDecimal().ShouldBe(amount);
+        doc.GetProperty("currency").GetString().ShouldBe(currency);
+    }
 
     [Then(@"the account's stream holds twenty postings at consecutive positions")]
-    public void ThenTheAccountsStreamHoldsTwentyPostingsAtConsecutivePositions() =>
-        state.Response!.IsSuccessStatusCode.ShouldBeTrue();
+    public async Task ThenTheAccountsStreamHoldsTwentyPostingsAtConsecutivePositions()
+    {
+        // Rework (finding 1): reads the account's actual stream and checks every position 1..20 is present
+        // exactly once, in order — "twenty" and "consecutive" are this step's own words, not just a status
+        // check. Stronger than the equivalent PostingsHandlerTests xUnit test can be here: this drives the
+        // real BDD-seeded account rather than a bespoke one.
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}/statement?pageSize=50");
+        var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var positions = doc.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("streamPosition").GetInt64())
+            .ToList();
+        positions.ShouldBe(Enumerable.Range(1, 20).Select(i => (long)i));
+    }
 
     [Then(@"the posting is attributed to PayHub")]
     public async Task ThenThePostingIsAttributedToPayHub()

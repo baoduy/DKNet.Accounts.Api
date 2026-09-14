@@ -12,8 +12,8 @@ public sealed record GetAccountGroupBalancesQuery
 
 /// <summary>
 /// One line per currency, never a combined total (R4) — the group's own accounts only (Q3: consolidated
-/// parent-group balances are deferred). Every account is at a permanently zero balance in this delivery, so
-/// every line here reads 0.00 until the next stage's postings can move it.
+/// parent-group balances are deferred). Each line's balance is the real, postings-driven sum of every
+/// account the group holds in that currency.
 /// </summary>
 internal sealed class GetAccountGroupBalancesQueryHandler(IRepositorySpec repository)
     : Fluents.Queries.IHandler<GetAccountGroupBalancesQuery, IReadOnlyCollection<AccountGroupBalanceLineDto>>

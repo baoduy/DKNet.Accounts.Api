@@ -10,8 +10,9 @@ public sealed record GetAccountBalanceQuery : Fluents.Queries.IWitResponse<Accou
     public required Guid Id { get; init; }
 }
 
-/// <summary>R8: <see cref="AccountBalanceDto.AvailableBalance"/> always equals <see cref="AccountBalanceDto.Balance"/>
-/// and <see cref="AccountBalanceDto.HeldAmount"/> is always 0 in this delivery.</summary>
+/// <summary><see cref="AccountBalanceDto.Balance"/> is the account's real, postings-driven running total.
+/// R8: <see cref="AccountBalanceDto.AvailableBalance"/> always equals it and
+/// <see cref="AccountBalanceDto.HeldAmount"/> is always 0 — no hold mechanism exists yet.</summary>
 internal sealed class GetAccountBalanceQueryHandler(IRepositorySpec repository)
     : Fluents.Queries.IHandler<GetAccountBalanceQuery, AccountBalanceDto>
 {

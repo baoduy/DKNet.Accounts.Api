@@ -17,6 +17,14 @@ public sealed class ScenarioState
     public Dictionary<string, string> Values { get; } = new();
 
     /// <summary>
+    /// Rework (finding 1): the stream positions actually returned while paging a statement, accumulated in
+    /// return order across every page read. Lets the "returned ... in stream order" / "none appears on two
+    /// pages and none is missing" Then steps assert real, structural invariants (no gaps, no duplicates, in
+    /// order) instead of only checking the last page's HTTP status.
+    /// </summary>
+    public List<long> StatementStreamPositions { get; } = [];
+
+    /// <summary>
     /// The status the generic "the request is refused" catch-all asserts. Defaults to 422 — §5's status for a
     /// business-rule refusal — and is overridden by the Given/When steps of the three scenarios where §5 names
     /// a different status (401 unauthenticated, 403 wrong scope, 409 idempotency conflict). The same step text

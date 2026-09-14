@@ -81,22 +81,52 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    private readonly record struct AccountSnapshot(decimal Balance, long StreamPosition, int StatementLength);
+
+    /// <summary>Rework finding 4: the state an all-or-nothing batch refusal must leave completely untouched.</summary>
+    private async Task<AccountSnapshot> SnapshotAsync(Guid accountId)
+    {
+        var accountResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{accountId}"));
+        accountResponse.EnsureSuccessStatusCode();
+        var account = await accountResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        var statementResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{accountId}/statement"));
+        statementResponse.EnsureSuccessStatusCode();
+        var statement = await statementResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        return new AccountSnapshot(
+            account.GetProperty("balance").GetDecimal(),
+            account.GetProperty("streamPosition").GetInt64(),
+            statement.GetProperty("items").GetArrayLength());
+    }
+
     [Fact]
     public async Task Batch_WithAnUnsupportedCurrency_IsRefused()
     {
-        var account = await OpenAccountAsync();
+        // Rework finding 4: the batch's first leg (against account1) would succeed validation-wise on its
+        // own — only the second leg (against account2) fails. Re-reading BOTH accounts after the refusal
+        // proves the all-or-nothing guarantee across every account a batch touches, not just that a status
+        // code came back; the old test only checked the response, never the accounts.
+        var account1 = await OpenAccountAsync();
+        var account2 = await OpenAccountAsync();
+        var before1 = await SnapshotAsync(account1);
+        var before2 = await SnapshotAsync(account2);
 
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/batch", new
         {
             movements = new object[]
             {
-                new { accountId = account, direction = "Credit", amount = 10m, currency = "XXX", category = "Transfer" }
+                new { accountId = account1, direction = "Credit", amount = 10m, currency = "SGD", category = "Transfer" },
+                new { accountId = account2, direction = "Credit", amount = 10m, currency = "XXX", category = "Transfer" }
             }
         }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("code").GetString().ShouldBe(LedgerErrors.UnsupportedCurrency);
+
+        (await SnapshotAsync(account1)).ShouldBe(before1);
+        (await SnapshotAsync(account2)).ShouldBe(before2);
     }
 
     [Fact]
@@ -282,6 +312,56 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var body = await conflict.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("code").GetString().ShouldBe(LedgerErrors.IdempotencyKeyConflict);
+    }
+
+    /// <summary>
+    /// Rework finding 5 — reproduction: a posting recorded via the single-posting endpoint carries no
+    /// <c>TransactionGroupId</c> (it is optional there, unlike the batch endpoint which always assigns one —
+    /// <see cref="DKNet.Accounts.AppServices.Postings.V1.Actions.RecordPostingRequest.TransactionGroupId"/> vs
+    /// <see cref="DKNet.Accounts.AppServices.Postings.V1.Actions.RecordPostingBatchRequest.TransactionGroupId"/>).
+    /// A one-movement batch reusing that same idempotency key with identical content computes the same
+    /// signature as the original single posting (<c>RecordBatch.ComputeBatchSignature</c>'s
+    /// <c>string.Join('|', [x])</c> over one movement equals <c>Record</c>'s own signature for that content),
+    /// so it takes the replay branch and used to dereference <c>existing.TransactionGroupId!.Value</c> while
+    /// null — an unhandled <see cref="InvalidOperationException"/> surfacing as a 500, not a clean replay.
+    /// </summary>
+    [Fact]
+    public async Task Batch_ReplayingAKeyFirstUsedBySingletonPosting_DoesNotThrow()
+    {
+        var account = await OpenAccountAsync();
+        var key = $"cross-{Guid.NewGuid():N}";
+
+        var singleResponse = await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
+        {
+            accountId = account,
+            direction = "Credit",
+            amount = 30m,
+            currency = "SGD",
+            category = "Transfer"
+        }, key));
+        singleResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var singleId = (await singleResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var batchResponse = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/batch", new
+        {
+            movements = new object[]
+            {
+                new { accountId = account, direction = "Credit", amount = 30m, currency = "SGD", category = "Transfer" }
+            }
+        }, key));
+
+        // Chosen fix: replay the single posting itself when its TransactionGroupId is null, instead of
+        // querying a "group" that never existed. Not 500, and not a fresh duplicate posting either.
+        batchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var batchBody = await batchResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var legs = batchBody.EnumerateArray().ToList();
+        legs.Count.ShouldBe(1);
+        legs[0].GetProperty("id").GetGuid().ShouldBe(singleId);
+
+        // Nothing new recorded: the account's balance still reflects exactly the one 30 SGD credit.
+        var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));
+        var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
+        balance.GetProperty("balance").GetDecimal().ShouldBe(30m);
     }
 
     [Fact]

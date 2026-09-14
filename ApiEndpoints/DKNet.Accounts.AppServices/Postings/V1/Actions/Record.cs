@@ -105,6 +105,12 @@ internal sealed class RecordPostingCommandHandler(
             request.Description, request.CounterpartyAccountId, request.CounterpartyReference,
             request.ExternalReference, request.Metadata);
 
+        // ponytail: this read happens before the account lock below is acquired, so two simultaneous
+        // first-uses of the same key can both miss here and both proceed — the second is refused 409 by the
+        // DB's unique (CallingSystem, IdempotencyKey) index instead of getting the documented replay. Accepted:
+        // the race is rare and fails safe (a clear conflict, not silent double-posting or data loss), not
+        // worth moving the read inside the lock without a redesign (the lock keys on account id, not on the
+        // idempotency key/calling-system pair this check reads).
         if (!string.IsNullOrEmpty(request.IdempotencyKey))
         {
             var existing = await repository.FirstOrDefaultAsync(

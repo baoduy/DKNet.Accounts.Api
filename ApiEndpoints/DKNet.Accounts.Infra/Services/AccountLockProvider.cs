@@ -16,6 +16,9 @@ namespace DKNet.Accounts.Infra.Services;
 /// </remarks>
 internal sealed class AccountLockProvider : IAccountLockProvider
 {
+    // ponytail: entries are never evicted, so this grows by one SemaphoreSlim per distinct account ever
+    // posted against, for the process's lifetime — fine at the stated ceiling (<100 postings/sec against a
+    // bounded account set); an LRU/expiry eviction would be needed well before that stops holding.
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
 
     public async Task<IDisposable> AcquireAsync(Guid accountId, TimeSpan timeout, CancellationToken cancellationToken)

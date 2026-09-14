@@ -118,8 +118,14 @@ internal sealed class RecordPostingBatchCommandHandler(
                         "This idempotency key was already used for a different request."));
                 }
 
-                var priorLegs = await repository.ToListAsync(
-                    new SpecListPostingsByTransactionGroup(existing.TransactionGroupId!.Value), cancellationToken);
+                // Rework finding 5: `existing` is matched on (CallingSystem, IdempotencyKey) alone, so it can
+                // be a posting written by the single-posting endpoint, where TransactionGroupId is optional
+                // (Record.cs) — unlike a batch leg, which always carries one. A one-movement batch replaying
+                // that key computes the same signature as the original single posting, so it must replay that
+                // single posting directly rather than querying a "group" that was never created.
+                var priorLegs = existing.TransactionGroupId is { } groupId
+                    ? await repository.ToListAsync(new SpecListPostingsByTransactionGroup(groupId), cancellationToken)
+                    : [existing];
                 return LedgerErrors.Replayed<IReadOnlyCollection<PostingDto>>(
                     priorLegs.Select(p => mapper.Map<PostingDto>(p)).ToList());
             }

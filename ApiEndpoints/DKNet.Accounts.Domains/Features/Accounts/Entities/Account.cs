@@ -20,10 +20,9 @@ public enum AccountStatus
 }
 
 /// <summary>
-/// A single-currency account inside an <c>AccountGroup</c> (referenced by id only — DKNET-AGG-004). Postings
-/// are the next stage; this delivery keeps every account at a permanently zero balance (R8), so the invariants
-/// below (floor, status, close-with-balance) are enforced structurally even though the "still holds a
-/// balance" guards can never actually trigger until postings exist.
+/// A single-currency account inside an <c>AccountGroup</c> (referenced by id only — DKNET-AGG-004).
+/// <see cref="TryApplyPosting"/> is the only way <see cref="Balance"/>/<see cref="StreamPosition"/> move — the
+/// invariants below (floor, status, close-with-balance) guard that real, postings-driven balance.
 /// </summary>
 public sealed class Account : AggregateRoot
 {
@@ -89,13 +88,14 @@ public sealed class Account : AggregateRoot
 
     public AccountStatus Status { get; private set; }
 
-    /// <summary>Always 0 in this delivery — postings (the only thing that would move it) are the next stage.</summary>
+    /// <summary>The running total of every posting applied via <see cref="TryApplyPosting"/> (signed per
+    /// <see cref="AccountPostingPolicy.SignedValue"/>) — not permanently 0.</summary>
     public decimal Balance { get; private set; }
 
-    /// <summary>R8: always 0 in this delivery — no hold mechanism exists yet.</summary>
+    /// <summary>Always 0 — no hold mechanism exists yet (still R8, unchanged by postings landing).</summary>
     public decimal HeldAmount { get; private set; }
 
-    /// <summary>R8: always equal to <see cref="Balance"/> in this delivery.</summary>
+    /// <summary>Always equal to <see cref="Balance"/> — there is nothing to hold against yet.</summary>
     public decimal AvailableBalance => Balance;
 
     public decimal? OverdraftLimit { get; private set; }
@@ -104,7 +104,7 @@ public sealed class Account : AggregateRoot
 
     public bool PermittedToGoNegative { get; private set; }
 
-    /// <summary>Always 0 until the next stage's postings advance it.</summary>
+    /// <summary>The account's own posting count — advanced by one on every successful <see cref="TryApplyPosting"/>.</summary>
     public long StreamPosition { get; private set; }
 
     public DateTimeOffset? LastPostedOn { get; private set; }
