@@ -252,8 +252,12 @@ internal sealed class RecordPostingBatchCommandHandler(
         }
     }
 
+    // Joining N per-leg 64-char signatures with '|' grows past the IdempotencySignature column's varchar(64)
+    // at 2+ legs (129 chars for 2) — Postgres rejects the insert outright. Re-hashing the joined string keeps
+    // the stored value a canonical 64-char digest regardless of leg count, and — as a side effect — makes a
+    // 1-leg batch's signature differ from that same leg's bare single-posting signature (DRK-1247 B3).
     private static string ComputeBatchSignature(IReadOnlyCollection<PostingBatchMovement> movements, DateOnly recordingDate) =>
-        string.Join('|', movements.Select(m => PostingSignature.Compute(
+        PostingSignature.Hash(string.Join('|', movements.Select(m => PostingSignature.Compute(
             m.AccountId, m.Direction, m.Amount, m.Currency, m.Category, m.EffectiveDate ?? recordingDate,
-            m.Description, m.CounterpartyAccountId, m.CounterpartyReference, m.ExternalReference, m.Metadata)));
+            m.Description, m.CounterpartyAccountId, m.CounterpartyReference, m.ExternalReference, m.Metadata))));
 }

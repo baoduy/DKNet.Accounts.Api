@@ -1,5 +1,6 @@
 ﻿using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
 // AppServices declares its own DTO-facing AccountClassification/AccountStatus/AccountGroupType/AccountGroupStatus
 // enums (same names, same members, kept separate from Domain on purpose) — the DTO side is aliased here so the
 // Domain enum members can be referenced unaliased (plainer to read) in the explicit projection maps below.
@@ -10,6 +11,10 @@ using AccountStatusDto = DKNet.Accounts.AppServices.Accounts.V1.AccountStatus;
 using AccountGroupDto = DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto;
 using AccountGroupTypeDto = DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupType;
 using AccountGroupStatusDto = DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupStatus;
+using PostingDto = DKNet.Accounts.AppServices.Postings.V1.PostingDto;
+using PostingDirectionDto = DKNet.Accounts.AppServices.Postings.V1.PostingDirection;
+using PostingCategoryDto = DKNet.Accounts.AppServices.Postings.V1.PostingCategory;
+using PostingStatusDto = DKNet.Accounts.AppServices.Postings.V1.PostingStatus;
 
 namespace DKNet.Accounts.AppServices;
 
@@ -82,6 +87,33 @@ public static class AppSetup
             .Map(dest => dest.Status, src => src.Status == AccountGroupStatus.Active
                 ? AccountGroupStatusDto.Active
                 : AccountGroupStatusDto.Closed);
+
+        // Same defect again, found verifying the fixes above against the posting read paths (DRK-1247 B1) —
+        // plus SignedValue -> SignedAmount (DRK-1247 B2), which has no name match at all so Mapster silently
+        // left the DTO field at its default (0) rather than erroring.
+        TypeAdapterConfig<Posting, PostingDto>.NewConfig()
+            .Map(dest => dest.SignedAmount, src => src.SignedValue)
+            .Map(dest => dest.Direction, src => src.Direction == PostingDirection.Credit
+                ? PostingDirectionDto.Credit
+                : PostingDirectionDto.Debit)
+            .Map(dest => dest.Category, src => src.Category == PostingCategory.Transfer
+                ? PostingCategoryDto.Transfer
+                : src.Category == PostingCategory.Payment
+                    ? PostingCategoryDto.Payment
+                    : src.Category == PostingCategory.Fee
+                        ? PostingCategoryDto.Fee
+                        : src.Category == PostingCategory.Interest
+                            ? PostingCategoryDto.Interest
+                            : src.Category == PostingCategory.Adjustment
+                                ? PostingCategoryDto.Adjustment
+                                : src.Category == PostingCategory.Refund
+                                    ? PostingCategoryDto.Refund
+                                    : src.Category == PostingCategory.Reversal
+                                        ? PostingCategoryDto.Reversal
+                                        : PostingCategoryDto.OpeningBalance)
+            .Map(dest => dest.Status, src => src.Status == PostingStatus.Posted
+                ? PostingStatusDto.Posted
+                : PostingStatusDto.Reversed);
 
         TypeAdapterConfig.GlobalSettings.ScanMaps();
         TypeAdapterConfig.GlobalSettings.Compile();

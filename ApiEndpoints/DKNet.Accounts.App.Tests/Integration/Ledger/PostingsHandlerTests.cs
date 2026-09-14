@@ -319,11 +319,18 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     /// <c>TransactionGroupId</c> (it is optional there, unlike the batch endpoint which always assigns one —
     /// <see cref="DKNet.Accounts.AppServices.Postings.V1.Actions.RecordPostingRequest.TransactionGroupId"/> vs
     /// <see cref="DKNet.Accounts.AppServices.Postings.V1.Actions.RecordPostingBatchRequest.TransactionGroupId"/>).
-    /// A one-movement batch reusing that same idempotency key with identical content computes the same
-    /// signature as the original single posting (<c>RecordBatch.ComputeBatchSignature</c>'s
-    /// <c>string.Join('|', [x])</c> over one movement equals <c>Record</c>'s own signature for that content),
-    /// so it takes the replay branch and used to dereference <c>existing.TransactionGroupId!.Value</c> while
-    /// null — an unhandled <see cref="InvalidOperationException"/> surfacing as a 500, not a clean replay.
+    /// Before DRK-1247 B3's fix, a one-movement batch reusing that same idempotency key with identical content
+    /// computed the SAME signature as the original single posting (<c>RecordBatch.ComputeBatchSignature</c>'s
+    /// <c>string.Join('|', [x])</c> over one movement was byte-identical to <c>Record</c>'s own signature for
+    /// that content), so it took the replay branch and used to dereference
+    /// <c>existing.TransactionGroupId!.Value</c> while null — an unhandled
+    /// <see cref="InvalidOperationException"/> surfacing as a 500, not a clean replay. The chosen fix for that
+    /// (replay the single posting itself when its TransactionGroupId is null) still stands as defense in
+    /// depth, but B3's re-hash of the joined batch signature means this collision no longer happens in the
+    /// first place: a 1-leg batch's signature is now a double hash, distinguishable from the single-posting
+    /// endpoint's own (single-hashed) signature for the identical content. Reusing the same idempotency key
+    /// across the two different endpoints is therefore correctly told apart as "a different request reusing
+    /// the same key" (409), not silently replayed as if it were the same request.
     /// </summary>
     [Fact]
     public async Task Batch_ReplayingAKeyFirstUsedBySingletonPosting_DoesNotThrow()
@@ -340,7 +347,6 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             category = "Transfer"
         }, key));
         singleResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var singleId = (await singleResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
         var batchResponse = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/batch", new
         {
@@ -350,13 +356,12 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             }
         }, key));
 
-        // Chosen fix: replay the single posting itself when its TransactionGroupId is null, instead of
-        // querying a "group" that never existed. Not 500, and not a fresh duplicate posting either.
-        batchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        // Not a 500 (the original finding-5 crash) and not a silent duplicate posting either: the two
+        // signatures no longer collide, so this is correctly refused as the same key reused for a different
+        // request (different endpoint/shape), a clean 409 — not a crash, not a false-positive replay.
+        batchResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var batchBody = await batchResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var legs = batchBody.EnumerateArray().ToList();
-        legs.Count.ShouldBe(1);
-        legs[0].GetProperty("id").GetGuid().ShouldBe(singleId);
+        batchBody.GetProperty("code").GetString().ShouldBe(LedgerErrors.IdempotencyKeyConflict);
 
         // Nothing new recorded: the account's balance still reflects exactly the one 30 SGD credit.
         var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));

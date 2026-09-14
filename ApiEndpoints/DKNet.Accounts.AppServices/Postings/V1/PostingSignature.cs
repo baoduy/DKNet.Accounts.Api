@@ -43,7 +43,18 @@ internal static class PostingSignature
         };
 
         var json = JsonSerializer.Serialize(canonical);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return Hash(json);
+    }
+
+    /// <summary>
+    /// Canonicalizes an arbitrary string down to the same 64-char SHA-256 hex digest shape <see cref="Compute"/>
+    /// produces. Used to fold several per-leg signatures (joined with a separator) into one batch signature that
+    /// still fits the <c>IdempotencySignature</c> column's <c>varchar(64)</c> regardless of leg count, and that
+    /// differs from a bare single-leg signature even when there is only one leg (DRK-1247 B3).
+    /// </summary>
+    public static string Hash(string value)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return Convert.ToHexString(hash);
     }
 }
