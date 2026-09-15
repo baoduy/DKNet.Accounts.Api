@@ -246,6 +246,12 @@ condition. Full contract, including the exact error cases:
 > This is
 > [the DTO-field-must-map-to-a-real-column trap](docs/generic-list-endpoint.md#trap-a-dto-field-must-map-to-a-real-column)
 > stated from the other side — `CurrencyCode` is queryable *because* it is a real column.
+>
+> `availableBalance` and `openedOn` are the other two response fields with no query counterpart, for
+> the same reason: both are computed on the account rather than stored
+> (`Account.cs:100`, `Account.cs:118`). `filter` or `orderBy` on either is a `400`. Use `balance` in
+> place of `availableBalance` — they are equal while held funds are deferred — and note that a bare
+> listing is already newest-opened-first, which is the ordering `openedOn` would have given.
 
 #### Which routes are generated, and which are hand-written
 
