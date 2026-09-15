@@ -250,7 +250,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 25
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" of type \"Asset\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPS-CASH\" of type \"Internal\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 26
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
@@ -287,11 +287,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 31
-    await testRunner.GivenAsync("the account groups \"OPS-CASH\" of type \"Asset\" and \"OPS-FEES\" of type \"Revenue\" ex" +
-                        "ist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account groups \"OPS-CASH\" of type \"Internal\" and \"OPS-FEES\" of type \"Settleme" +
+                        "nt\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 32
-    await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups of type \"Asset\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups of type \"Internal\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 33
     await testRunner.ThenAsync("it receives \"OPS-CASH\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

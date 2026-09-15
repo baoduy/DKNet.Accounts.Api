@@ -22,14 +22,14 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @new @integration
   Scenario: An account group is read back in full
-    Given the account group "OPS-CASH" of type "Asset" owned by "acme-pte-ltd" exists
+    Given the account group "OPS-CASH" of type "Internal" owned by "acme-pte-ltd" exists
     When the calling system "treasury-ops" reads that group
     Then it receives the group's code, name, type, status, owner and parent
 
   @existing @integration
   Scenario: Account groups can still be narrowed to one type
-    Given the account groups "OPS-CASH" of type "Asset" and "OPS-FEES" of type "Revenue" exist
-    When the calling system "treasury-ops" lists the account groups of type "Asset"
+    Given the account groups "OPS-CASH" of type "Internal" and "OPS-FEES" of type "Settlement" exist
+    When the calling system "treasury-ops" lists the account groups of type "Internal"
     Then it receives "OPS-CASH"
     And it does not receive "OPS-FEES"
 

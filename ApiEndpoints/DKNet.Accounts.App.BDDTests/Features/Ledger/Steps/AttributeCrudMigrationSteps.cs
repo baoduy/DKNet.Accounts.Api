@@ -184,13 +184,16 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Given(@"the account group ""([^""]+)"" of type ""([^""]+)"" owned by ""([^""]+)"" exists")]
     public async Task GivenTheAccountGroupOfTypeOwnedByExists(string code, string type, string owner)
     {
-        // "Asset" is not an AccountGroupType member (Customer/Merchant/Internal/Suspense/Settlement) — passed
-        // through verbatim per §7, so a mismatch between this literal and the domain model surfaces honestly
-        // as a 400 rather than being silently "fixed" to a value the spec didn't ask for.
-        var id = await CreateGroupAsync(code, type, owner);
+        // A real parent (not just a null one) so the Then step's parent assertion can pin an exact value —
+        // a null ParentId is omitted from the JSON entirely (DefaultIgnoreCondition.WhenWritingNull), so
+        // presence-checking a null field can't tell "field removed from the DTO" from "field null this time".
+        var parentId = await CreateGroupAsync($"{code}-PARENT", type);
+        var id = await CreateGroupAsync(code, type, owner, extra: new { parentId });
         state.Values["lastGroupId"] = id?.ToString() ?? Guid.NewGuid().ToString();
         state.Values["lastGroupCode"] = code;
         state.Values["lastGroupOwner"] = owner;
+        state.Values["lastGroupType"] = type;
+        state.Values["lastGroupParentId"] = parentId?.ToString() ?? "";
     }
 
     [Given(@"the account groups ""([^""]+)"" of type ""([^""]+)"" and ""([^""]+)"" of type ""([^""]+)"" exist")]
@@ -430,9 +433,16 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         var doc = await ReadJsonAsync(state.Response);
         doc.GetProperty("code").GetString().ShouldBe(state.Values["lastGroupCode"]);
         doc.GetProperty("name").GetString().ShouldNotBeNullOrEmpty();
-        doc.GetProperty("type").GetString().ShouldNotBeNullOrEmpty();
-        doc.GetProperty("status").GetString().ShouldNotBeNullOrEmpty();
+        // Pinned to the actual literals (not presence-only) so an `[Exclude]` on either field in the
+        // Build-stage [GenerateDto] conversion turns this scenario red instead of passing on whatever the
+        // generated DTO happens to still contain.
+        doc.GetProperty("type").GetString().ShouldBe(state.Values["lastGroupType"].ToLowerInvariant());
+        doc.GetProperty("status").GetString().ShouldBe("active");
         doc.GetProperty("ownerId").GetString().ShouldBe(state.Values["lastGroupOwner"]);
+        // A real (non-null) parent — removing ParentId from the DTO drops this key entirely, catching the
+        // same class of silent field loss; a null parent would be indistinguishable either way, since null
+        // properties are omitted from the response regardless of whether the DTO still declares them.
+        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values["lastGroupParentId"]));
     }
 
     [Then(@"it receives ""([^""]+)""")]
