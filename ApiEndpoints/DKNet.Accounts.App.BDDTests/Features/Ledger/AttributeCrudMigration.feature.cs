@@ -105,7 +105,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 19);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 23);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -226,17 +226,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("An account group is read back in full")]
+        [global::NUnit.Framework.DescriptionAttribute("An account is renamed")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task AnAccountGroupIsReadBackInFull()
+        public async global::System.Threading.Tasks.Task AnAccountIsRenamed()
         {
             string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account group is read back in full", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account is renamed", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 24
@@ -250,12 +250,52 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 25
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" of type \"Internal\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account \"1000000002\" of currency \"SGD\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 26
-    await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 27
+    await testRunner.WhenAsync("it renames that account to \"Operations Reserve\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 28
+    await testRunner.ThenAsync("the account\'s name is \"Operations Reserve\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("An account group is read back in full")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task AnAccountGroupIsReadBackInFull()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "4";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account group is read back in full", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 31
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 32
+    await testRunner.GivenAsync("the account group \"OPS-CASH\" of type \"Internal\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 33
+    await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 34
     await testRunner.ThenAsync("it receives the group\'s code, name, type, status, owner and parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -272,11 +312,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
+            string pickleIndex = "5";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Account groups can still be narrowed to one type", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 30
+#line 37
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -286,17 +326,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 31
+#line 38
     await testRunner.GivenAsync("the account groups \"OPS-CASH\" of type \"Internal\" and \"OPS-FEES\" of type \"Settleme" +
                         "nt\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 32
+#line 39
     await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups of type \"Internal\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 33
+#line 40
     await testRunner.ThenAsync("it receives \"OPS-CASH\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 34
+#line 41
     await testRunner.AndAsync("it does not receive \"OPS-FEES\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -313,11 +353,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
+            string pickleIndex = "6";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Reading an account group that does not exist is not-found", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 37
+#line 44
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -327,13 +367,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 38
+#line 45
     await testRunner.GivenAsync("no account group \"OPS-GHOST\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 39
+#line 46
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 40
+#line 47
     await testRunner.ThenAsync("the request is refused as not-found", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -350,11 +390,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "6";
+            string pickleIndex = "7";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Updating an account that does not exist is not-found", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 43
+#line 50
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -364,16 +404,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 44
+#line 51
     await testRunner.GivenAsync("no account \"9999999999\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 45
+#line 52
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 46
+#line 53
     await testRunner.WhenAsync("it renames that account to \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 47
+#line 54
     await testRunner.ThenAsync("the request is refused as not-found", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -390,11 +430,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "7";
+            string pickleIndex = "8";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A calling system without the write scope cannot create an account group", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 50
+#line 57
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -404,13 +444,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 51
+#line 58
     await testRunner.GivenAsync("the calling system \"reporting-bot\" is authorised only to read accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 52
+#line 59
     await testRunner.WhenAsync("it creates the account group \"OPS-CASH\" named \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 53
+#line 60
     await testRunner.ThenAsync("the request is refused as forbidden", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -427,11 +467,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
+            string pickleIndex = "9";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A calling system without the reverse scope cannot reverse a posting", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 56
+#line 63
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -441,20 +481,20 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 57
+#line 64
     await testRunner.GivenAsync("the posting \"P-0001\" of 100.00 SGD exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 58
+#line 65
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to record and read postings but n" +
                         "ot to reverse them", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 59
+#line 66
     await testRunner.WhenAsync("it reverses that posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 60
+#line 67
     await testRunner.ThenAsync("the request is refused as forbidden", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 61
+#line 68
     await testRunner.AndAsync("the posting is still not reversed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -471,11 +511,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "9";
+            string pickleIndex = "10";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Closing a group that still holds a balance is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 64
+#line 71
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -485,19 +525,19 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 65
+#line 72
     await testRunner.GivenAsync("the account group \"OPS-CASH\" holds an account with a balance of 250.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 66
+#line 73
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 67
+#line 74
     await testRunner.WhenAsync("it closes the group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 68
+#line 75
     await testRunner.ThenAsync("the request is refused as unprocessable", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 69
+#line 76
     await testRunner.AndAsync("the refusal carries the code \"GROUP_HOLDS_BALANCE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -514,11 +554,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "10";
+            string pickleIndex = "11";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting recorded twice under one idempotency key is recorded once", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 72
+#line 79
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -528,20 +568,20 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 73
+#line 80
     await testRunner.GivenAsync("the account \"1000000001\" has a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 74
+#line 81
     await testRunner.AndAsync("the calling system \"treasury-ops\" recorded a credit of 100.00 SGD under idempoten" +
                         "cy key \"batch-7741\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 75
+#line 82
     await testRunner.WhenAsync("it records the same credit again under idempotency key \"batch-7741\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 76
+#line 83
     await testRunner.ThenAsync("it receives the original posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 77
+#line 84
     await testRunner.AndAsync("the account\'s balance is 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -558,11 +598,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "11";
+            string pickleIndex = "12";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account permitted to go negative must state its overdraft limit", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 80
+#line 87
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -572,17 +612,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 81
+#line 88
     await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 82
+#line 89
     await testRunner.WhenAsync("it opens an account named \"Operations Cash\" permitted to go negative with no over" +
                         "draft limit", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 83
+#line 90
     await testRunner.ThenAsync("the request is refused as unprocessable", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 84
+#line 91
     await testRunner.AndAsync("the refusal carries the code \"OVERDRAFT_LIMIT_REQUIRED\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -599,11 +639,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "12";
+            string pickleIndex = "13";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A bare listing still returns records older than the default activity window", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 87
+#line 94
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -613,13 +653,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 88
+#line 95
     await testRunner.GivenAsync("an account group created four months ago exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 89
+#line 96
     await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups with no date bounds", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 90
+#line 97
     await testRunner.ThenAsync("it receives that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -630,10 +670,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.DescriptionAttribute("Every route still requires the scope it required before")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("POST /v1/account-groups", "accounts.write", "13", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups/{id}", "accounts.read", "14", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}/statement", "postings.read", "15", null)]
-        [global::NUnit.Framework.TestCaseAttribute("POST /v1/postings/{id}/reverse", "postings.reverse", "16", null)]
+        [global::NUnit.Framework.TestCaseAttribute("POST /v1/account-groups", "accounts.write", "14", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups", "accounts.read", "15", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups/{id}", "accounts.read", "16", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts", "accounts.read", "17", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}", "accounts.read", "18", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}/statement", "postings.read", "19", null)]
+        [global::NUnit.Framework.TestCaseAttribute("POST /v1/postings/{id}/reverse", "postings.reverse", "20", null)]
         public async global::System.Threading.Tasks.Task EveryRouteStillRequiresTheScopeItRequiredBefore(string route, string scope, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -651,7 +694,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Every route still requires the scope it required before", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 93
+#line 100
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -661,13 +704,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 94
+#line 101
     await testRunner.GivenAsync(string.Format("the calling system \"reporting-bot\" holds every ledger scope except {0}", scope), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 95
+#line 102
     await testRunner.WhenAsync(string.Format("it calls {0}", route), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 96
+#line 103
     await testRunner.ThenAsync("the request is refused as forbidden", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }

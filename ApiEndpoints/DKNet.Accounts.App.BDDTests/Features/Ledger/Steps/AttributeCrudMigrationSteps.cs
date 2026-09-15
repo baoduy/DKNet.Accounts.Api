@@ -6,12 +6,13 @@ using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 
 /// <summary>
-/// Step bindings for the DRK-1279 §7 characterization scenarios: this is a pure refactor (§1 — externally
-/// observable behaviour is unchanged), so unlike a new-feature AT suite most of these scenarios describe
-/// behaviour the hand-written implementation already satisfies at the RED SHA — they exist to pin that
-/// behaviour through the Build stage's CRUD-plumbing swap, not to fail against today's code. Two scenarios
-/// (group "type" of "Asset"/"Revenue") are genuinely red today for a nameable reason: <see cref="AccountGroupType"/>
-/// has no such members (see the per-scenario table in the completion report).
+/// Step bindings for the DRK-1279 §7 characterization scenarios, revised per §11's widened mandate (owner:
+/// new/changed routes are fine, maximum auto-flow, less code). Most scenarios pin behaviour the hand-written
+/// implementation already satisfies and stay green through Build's plumbing swap. The two account-group list
+/// scenarios now drive the *target* generated-list contract (`filter=Field:Operation:Value`,
+/// `pageNumber`/`pageSize`, `{items:[...]}` envelope) instead of today's bare-array/`?type=` shape, and are
+/// expected red until Build moves `GET /v1/account-groups` onto the generated route — see the completion
+/// report's route table and per-scenario results.
 /// </summary>
 [Binding]
 public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState state, BddApiFactory factory)
@@ -266,6 +267,13 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Values["idempotencyCurrency"] = currency;
     }
 
+    [Given(@"the account ""([^""]+)"" of currency ""([^""]+)"" exists")]
+    public async Task GivenTheAccountOfCurrencyExists(string accountNumber, string currency)
+    {
+        var accountId = await OpenAccountAsync(currency);
+        state.Values["lastAccountId"] = accountId?.ToString() ?? "";
+    }
+
     [Given(@"an account group created four months ago exists")]
     public async Task GivenAnAccountGroupCreatedFourMonthsAgoExists()
     {
@@ -312,18 +320,23 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [When(@"the calling system ""([^""]+)"" lists the account groups of type ""([^""]+)""")]
     public async Task WhenTheCallingSystemListsTheAccountGroupsOfType(string name, string type)
     {
+        // Target generated-list syntax (§11 — take the generated shape): filter=Field:Operation:Value, not
+        // ?type=. Red until Build moves GET /v1/account-groups onto MapGetList.
         state.CallerClientId = name;
         state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Get, $"{GroupsPath}?type={Uri.EscapeDataString(type)}");
+            state, HttpMethod.Get, $"{GroupsPath}?filter={Uri.EscapeDataString($"Type:Equal:{type}")}");
     }
 
     [When(@"the calling system ""([^""]+)"" lists the account groups with no date bounds")]
     public async Task WhenTheCallingSystemListsTheAccountGroupsWithNoDateBounds(string name)
     {
+        // Target generated-list syntax: pageNumber/pageSize, not pageSize alone against the hand-written
+        // query. Red until Build moves GET /v1/account-groups onto MapGetList.
         state.CallerClientId = name;
         state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}?pageSize=1000");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{GroupsPath}?pageNumber=1&pageSize=1000");
     }
 
     [When(@"it renames that account to ""([^""]+)""")]
@@ -377,14 +390,15 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
             state.CallerScopes = [.. ScopeNames.All];
 
             Guid id;
-            if (path.Contains("/statement"))
-            {
-                id = (await OpenAccountAsync("SGD"))!.Value;
-            }
-            else if (path.Contains("/reverse"))
+            if (path.Contains("/reverse"))
             {
                 var accountId = (await OpenAccountAsync("SGD"))!.Value;
                 id = (await RecordPostingAsync(accountId, 10.00m, "SGD"))!.Value;
+            }
+            else if (path.StartsWith(AccountsPath))
+            {
+                // Covers both /v1/accounts/{id} and /v1/accounts/{id}/statement.
+                id = (await OpenAccountAsync("SGD"))!.Value;
             }
             else
             {
@@ -426,6 +440,14 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("name").GetString().ShouldBe(expectedName);
     }
 
+    [Then(@"the account's name is ""([^""]+)""")]
+    public async Task ThenTheAccountsNameIs(string expectedName)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{LastAccountId}");
+        var doc = await ReadJsonAsync(response);
+        doc.GetProperty("name").GetString().ShouldBe(expectedName);
+    }
+
     [Then(@"it receives the group's code, name, type, status, owner and parent")]
     public async Task ThenItReceivesTheGroupsFields()
     {
@@ -448,10 +470,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Then(@"it receives ""([^""]+)""")]
     public async Task ThenItReceives(string expectedCode)
     {
+        // Target contract (§11/§5B): PagedResponse<T>'s {items:[...]} envelope, not today's bare JSON array —
+        // red until Build moves GET /v1/account-groups onto the generated MapGetList route.
         var doc = await ReadJsonAsync(state.Response!);
-        // Today's list route returns a bare JSON array (Results.Ok(page) over IPagedList<T>, which is also
-        // IEnumerable<T>) — not the {items:[...]} envelope §5B names for the future generated route.
-        var items = doc.EnumerateArray().Select(i => i.GetProperty("code").GetString());
+        var items = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString());
         items.ShouldContain(expectedCode);
     }
 
@@ -459,7 +481,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     public async Task ThenItDoesNotReceive(string unexpectedCode)
     {
         var doc = await ReadJsonAsync(state.Response!);
-        var items = doc.EnumerateArray().Select(i => i.GetProperty("code").GetString());
+        var items = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString());
         items.ShouldNotContain(unexpectedCode);
     }
 
@@ -517,7 +539,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     public async Task ThenItReceivesThatGroup()
     {
         var doc = await ReadJsonAsync(state.Response!);
-        var codes = doc.EnumerateArray().Select(i => i.GetProperty("code").GetString());
+        var codes = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString());
         codes.ShouldContain(state.Values["lastGroupCode"]);
     }
 

@@ -14,6 +14,17 @@ namespace DKNet.Accounts.App.TestSupport;
 /// unauthenticated — <see cref="AuthenticateResult.NoResult"/> — so the default-deny fallback policy
 /// refuses it, exercising the "no credential" scenarios without a real token.
 /// </summary>
+/// <remarks>
+/// Also carries a <see cref="ClaimTypes.NameIdentifier"/> subject claim (§11 — dev-leader, DRK-1279): once Build
+/// drops the explicit <c>StampCreatedBy</c>/<c>AggregateRoot(Guid)</c> path and relies on
+/// <c>DataOwnerHook</c>/<c>PrincipalProvider</c> alone, <c>CreatedBy</c> is stamped from
+/// <c>IDataOwnerProvider.GetOwnershipKey()</c> — which <c>PrincipalProvider.Initialize</c> resolves from a
+/// subject claim (<c>oid</c>/<c>ClaimTypes.NameIdentifier</c>/<c>sub</c>), not from <c>Identity.Name</c>. Set to
+/// the same client-id value as the name claim so the acceptance scenarios' "author is X"
+/// assertions keep reading the calling system's own identity, in production a machine-to-machine credential
+/// carries no such subject claim at all — this mock is a test-side stand-in only, and <c>CreatedBy</c> stays
+/// unset on the real service until that token work lands.
+/// </remarks>
 public sealed class LedgerCallerAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
@@ -38,7 +49,8 @@ public sealed class LedgerCallerAuthHandler(
         var claims = new List<Claim>
         {
             new("client_id", clientId!),
-            new(ClaimTypes.Name, clientId!)
+            new(ClaimTypes.Name, clientId!),
+            new(ClaimTypes.NameIdentifier, clientId!)
         };
 
         if (Request.Headers.TryGetValue(ScopesHeaderName, out var scopes) && !string.IsNullOrEmpty(scopes))

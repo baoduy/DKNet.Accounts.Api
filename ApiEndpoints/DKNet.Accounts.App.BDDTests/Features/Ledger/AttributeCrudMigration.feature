@@ -21,6 +21,13 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Then the group's name is "Operations Cash Pool"
 
   @new @integration
+  Scenario: An account is renamed
+    Given the account "1000000002" of currency "SGD" exists
+    And the calling system "treasury-ops" is authorised to write accounts
+    When it renames that account to "Operations Reserve"
+    Then the account's name is "Operations Reserve"
+
+  @new @integration
   Scenario: An account group is read back in full
     Given the account group "OPS-CASH" of type "Internal" owned by "acme-pte-ltd" exists
     When the calling system "treasury-ops" reads that group
@@ -98,6 +105,9 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Examples:
       | route                                 | scope               |
       | POST /v1/account-groups               | accounts.write      |
+      | GET  /v1/account-groups                | accounts.read       |
       | GET  /v1/account-groups/{id}          | accounts.read       |
+      | GET  /v1/accounts                      | accounts.read       |
+      | GET  /v1/accounts/{id}                 | accounts.read       |
       | GET  /v1/accounts/{id}/statement      | postings.read       |
       | POST /v1/postings/{id}/reverse        | postings.reverse    |
