@@ -17,8 +17,7 @@ public class SpecListAccountGroupsTests
         type: type,
         ownerId: "PayHub",
         parentId: parentId,
-        metadata: null,
-        byUser: "PayHub");
+        metadata: null);
 
     private static bool Matches(SpecListAccountGroups spec, AccountGroup group) =>
         spec.FilterQuery!.Compile().Invoke(group);

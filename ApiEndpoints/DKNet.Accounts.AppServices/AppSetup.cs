@@ -30,6 +30,12 @@ public static class AppSetup
         TypeAdapterConfig<IReadOnlyDictionary<string, string>, IReadOnlyDictionary<string, string>>.NewConfig()
             .MapWith(src => src);
 
+        // ScanMaps registers a baseline TypeAdapterConfig for every [GenerateDto]/[MapsFrom] type (AccountDto,
+        // AccountGroupDto and PostingDto among them, DRK-1277) via the non-generic Type-keyed NewConfig(...)
+        // overload — which, called for a (source, destination) pair a second time, resets that pair's rules.
+        // The explicit renames below MUST run after it, so they are the ones left standing.
+        TypeAdapterConfig.GlobalSettings.ScanMaps();
+
         // DTOs share the Domain's own enums (AGENTS.md "Domain/DTO sharing") — enum members match by name and
         // type, so ProjectToType maps them directly with no cast. Only genuine renames still need an explicit
         // map: ProjectToType silently omits an unmatched member from the SELECT list rather than erroring, so
@@ -43,7 +49,6 @@ public static class AppSetup
         TypeAdapterConfig<Posting, PostingDto>.NewConfig()
             .Map(dest => dest.SignedAmount, src => src.SignedValue);
 
-        TypeAdapterConfig.GlobalSettings.ScanMaps();
         TypeAdapterConfig.GlobalSettings.Compile();
 
         services

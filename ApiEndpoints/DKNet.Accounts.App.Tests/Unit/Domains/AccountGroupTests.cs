@@ -11,8 +11,7 @@ public class AccountGroupTests
         type: AccountGroupType.Customer,
         ownerId: "PayHub",
         parentId: parentId,
-        metadata: new Dictionary<string, string> { ["k"] = "v" },
-        byUser: "PayHub");
+        metadata: new Dictionary<string, string> { ["k"] = "v" });
 
     [Fact]
     public void NewGroup_IsActiveWithTheGivenFields()
@@ -27,7 +26,22 @@ public class AccountGroupTests
         group.ParentId.ShouldBeNull();
         group.Metadata.ShouldNotBeNull();
         group.Status.ShouldBe(AccountGroupStatus.Active);
-        group.CreatedBy.ShouldBe("PayHub");
+    }
+
+    [Fact]
+    public void NewGroup_LeavesCreatedByUnset_UntilStampCreatedByIsCalled()
+    {
+        // DRK-1277 C3: the [CrudCreate]-attributed constructor takes no acting-user parameter, so a
+        // generated request can never carry one. The create handler stamps it explicitly afterwards, from
+        // the trusted calling-system identity — never from DataOwnerHook, which resolves a human principal
+        // this machine-to-machine API never has (see AccountGroup.StampCreatedBy).
+        var group = NewGroup();
+
+        group.CreatedBy.ShouldBeNullOrEmpty();
+
+        group.StampCreatedBy("treasury-ops");
+
+        group.CreatedBy.ShouldBe("treasury-ops");
     }
 
     [Fact]

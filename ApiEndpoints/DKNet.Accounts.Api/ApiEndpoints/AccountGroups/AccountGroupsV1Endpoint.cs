@@ -3,6 +3,8 @@ using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.AccountGroups.V1;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Queries;
+using DKNet.Accounts.AppServices.Crud;
+using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.AccountGroups;
 
@@ -14,6 +16,12 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Create (GEN-REQ, DRK-1277 §3 row 9): CreateAccountGroupRequest is generated from AccountGroup's
+        // [CrudCreate] constructor (DKNet.Accounts.AppServices.Crud), but the ROUTE stays hand-mapped — the
+        // generated Map{Entity}Crud composite's MapPost hardcodes the package's default FluentResults->IResult
+        // conversion (400 on any failure), which cannot express this service's LedgerErrors->422 mapping (R3,
+        // LedgerResultResponseExtensions.ToLedgerResponse). Handler stays hand-written for the duplicate-code
+        // pre-check.
         group.MapPost("/", async (
                 CreateAccountGroupRequest req,
                 IMessageBus bus,
@@ -37,17 +45,12 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("List account groups, filterable by code, type, status and parent.");
 
-        group.MapGet("{id:guid}", async (
-                Guid id,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var dto = await bus.Send(new GetAccountGroupByIdQuery { Id = id }, cancellationToken: ct);
-                return dto is null ? Results.NotFound() : Results.Ok(dto);
-            })
+        // Get-by-id (GEN, DRK-1277 §3 row 9): plain generic entity mapper — no SlimBus handler or [CrudCreate]
+        // /[CrudUpdate]/[CrudAction] involved, so none of the Map{Entity}Crud caveats above apply. The
+        // explicit "{id:guid}" endpoint keeps the same route pattern this used before (the mapper's own
+        // default is the looser "{id}").
+        group.MapGetById<AccountGroup, Guid, AccountGroupDto>("{id:guid}")
             .RequireScope(group, ScopeNames.AccountsRead)
-            .Produces<AccountGroupDto>()
-            .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one account group.");
 
         group.MapPatch("{id:guid}", async (

@@ -12,6 +12,11 @@ public abstract class DomainEntity : AuditedEntity<Guid>
         SetCreatedBy(createdBy, createdOn);
     }
 
+    /// <summary>Assigns a fresh identity only, leaving <c>CreatedBy</c> for the save-time hook to stamp.</summary>
+    protected DomainEntity(Guid id) : base(id)
+    {
+    }
+
     /// <inheritdoc />
     protected DomainEntity()
     {

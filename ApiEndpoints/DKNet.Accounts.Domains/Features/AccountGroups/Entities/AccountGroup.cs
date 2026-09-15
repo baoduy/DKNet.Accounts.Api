@@ -1,3 +1,4 @@
+using DKNet.EfCore.Abstractions.Attributes;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.AccountGroups.Entities;
@@ -30,7 +31,17 @@ public sealed class AccountGroup : AggregateRoot
 {
     #region Constructors
 
-    /// <summary>Creates a new, active account group.</summary>
+    /// <summary>
+    /// Creates a new, active account group. No acting-user parameter (DRK-1277 C3) — this constructor is
+    /// <see cref="CrudCreateAttribute"/>-generated into <c>CreateAccountGroupRequest</c>, so any trailing
+    /// user parameter would be a caller-settable body field. <c>CreatedBy</c> is stamped afterwards by
+    /// <see cref="StampCreatedBy"/>, called once by the hand-written create handler — this API is
+    /// machine-to-machine only, and <c>DataOwnerHook</c>'s generic <c>IPrincipalProvider</c> resolves a human
+    /// principal (a claim shape no calling system here ever carries; see
+    /// <c>ICallingSystemAccessor</c>/<c>CallingSystemAccessor</c>'s own remarks), so it cannot be relied on for
+    /// this stamp.
+    /// </summary>
+    [CrudCreate]
     public AccountGroup(
         string code,
         string name,
@@ -38,9 +49,8 @@ public sealed class AccountGroup : AggregateRoot
         AccountGroupType type,
         string ownerId,
         Guid? parentId,
-        IReadOnlyDictionary<string, string>? metadata,
-        string byUser)
-        : base(byUser)
+        IReadOnlyDictionary<string, string>? metadata)
+        : base(Guid.NewGuid())
     {
         Code = code;
         Name = name;
@@ -79,6 +89,14 @@ public sealed class AccountGroup : AggregateRoot
     #endregion
 
     #region Methods
+
+    /// <summary>
+    /// Stamps the creator explicitly. Called once, immediately after construction, by the hand-written
+    /// create handler using <c>ICallingSystemAccessor</c>'s trusted calling-system identity — never from any
+    /// request field, since this member is never attached to the generated request the way a constructor or
+    /// <see cref="Rename"/>'s <c>userId</c> parameter would be.
+    /// </summary>
+    public void StampCreatedBy(string byUser) => SetCreatedBy(byUser);
 
     public void Rename(string name, string userId)
     {

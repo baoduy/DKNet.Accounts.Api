@@ -2,19 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1.Specs;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
-/// <summary>
-/// Reverses a posting. Exempt from the account's floor but not from its status (§ invariants) — a
-/// posting can be reversed at most once.
-/// </summary>
-public sealed record ReversePostingRequest : Fluents.Requests.IWitResponse<PostingDto>
-{
-    public Guid Id { get; set; }
-}
+// ReversePostingRequest ({Id} only) is generated from Posting's [CrudAction("reverse")] marker (DRK-1277 §3
+// row 16). Reverses a posting. Exempt from the account's floor but not from its status (§ invariants) — a
+// posting can be reversed at most once.
 
 /// <summary>
 /// Writes an opposing posting (same amount, opposite direction, category Reversal, effective-dated the day
