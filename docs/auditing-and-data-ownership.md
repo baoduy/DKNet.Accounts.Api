@@ -101,11 +101,13 @@ request payload is ignored"* (which sends an `author` field and asserts it is no
 `UpdatedBy` after a `PUT` rename — the case that proves the hook covers the generated update routes and
 not just creates.
 
-> **Known gap.** The `client_id` fallback in step 2 above is covered by unit tests
-> (`PrincipalProviderTests`) but is not exercised end to end: the acceptance suite's auth handler sets
-> a subject claim alongside `client_id`, so every scenario resolves through step 1 and never reaches
-> the fallback. No test in this repository sends a caller shaped like the real production credential —
-> `client_id` only, no subject claim. Recorded by DRK-1277.
+The `client_id` fallback in step 2 is pinned twice: in isolation by `PrincipalProviderTests`, and end
+to end by
+`ApiEndpoints/DKNet.Accounts.App.Tests/Integration/Ledger/ClientIdOnlyCallerTests.cs`, which creates a
+group as a caller carrying `client_id` and a scope and **no subject claim at all** — the real
+machine-to-machine credential shape — and asserts `CreatedBy` comes back as that client id. Remove the
+fallback and that create turns into a `403` rather than a `201`, because
+`EnsureOwnershipResolvable` refuses a row it cannot attribute.
 
 ## Row-level ownership filtering
 
