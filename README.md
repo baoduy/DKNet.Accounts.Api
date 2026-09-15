@@ -186,20 +186,104 @@ column. There is **no delete route anywhere in this service, for any resource.**
 |---|---|---|---|---|
 | `GET` | `/v1/currencies` | List supported currencies and their decimal places | `accounts.read` | — |
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `parentId`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`) |
-| `GET` | `/v1/account-groups` | List groups, filterable by `code`, `type`, `status`, `parentId`, paged by `pageIndex`/`pageSize` | `accounts.read` | — |
+| `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/account-groups/{id}` | Change `name`, `description`, `status`, `parentId`, `metadata`. `{"status":"Closed"}` closes the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); the re-parent would create a cycle (`GROUP_CYCLE`); unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}` | Rename a group. Body: `name`. Returns `200` + the group | `accounts.write` | Unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Unknown id → `404` |
+| `PATCH` | `/v1/account-groups/{id}` | Change `status` and `parentId` **only**. `{"status":"Closed"}` closes the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); the re-parent would create a cycle (`GROUP_CYCLE`); unknown id → `404` |
 | `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency | `accounts.read` | — |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
-| `GET` | `/v1/accounts` | List accounts, filterable by `groupId`, `currency`, `status`, paged by `pageIndex`/`pageSize` | `accounts.read` | — |
+| `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}` | Rename an account. Body: `name`. Returns `200` + the account | `accounts.write` | Unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}/change-metadata` | Change an account's metadata. Body: `metadata` | `accounts.write` | Unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/accounts/{id}` | Change `name`, `status`, `overdraftLimit`, `minimumBalance`, `metadata`. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
+| `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
 | `POST` | `/v1/postings` | Record one credit or debit. `Idempotency-Key` header. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. `Idempotency-Key` header | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
 | `POST` | `/v1/postings/{id}/reverse` | Reverse a posting | `postings.reverse` | Already reversed (`POSTING_ALREADY_REVERSED`); the account's status does not accept a movement in the reversal's own direction |
+
+#### Listing groups and accounts
+
+`GET /v1/account-groups` and `GET /v1/accounts` share one generic query surface. Conditions are named
+as colon-delimited triples and repeated to AND them together:
+
+```
+GET /v1/account-groups?filter=Type:Equal:Internal&filter=Status:Equal:Active&pageNumber=1&pageSize=50
+GET /v1/accounts?filter=GroupId:Equal:b85813c0-3053-4d35-a0ef-3f2863f83fa9&orderBy=Name
+```
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `filter` | none | `Field:Operation:Value`, repeatable, AND-combined, at most 20. Operations: `Equal`, `NotEqual`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `Contains`, `NotContains`, `StartsWith`, `EndsWith`, `In`, `NotIn`, `IsNull`, `IsNotNull` |
+| `search` | none | Free-text `Contains` across the record's text fields, OR'd, then ANDed with `filter`. Minimum 2 characters |
+| `orderBy` / `desc` | newest first | One field name; `desc=true` reverses it. `Id` descending is always appended as tie-breaker so paging is deterministic |
+| `pageNumber` | `1` | 1-based. Below `1` is clamped, not refused |
+| `pageSize` | `1000` | Clamped to `1..1000`, not refused |
+| `fromDate` / `toDate` | unbounded | Inclusive ISO-8601 bounds on when a record was last active. **This service leaves a bare listing unbounded in time** — `ListQueryOptions.DefaultActivityWindowMonths` is set to `0` in `ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:64`, overriding the package's three-month default, so a listing with no bounds returns your full history |
+
+`Field` is matched case-insensitively and normalised to PascalCase, so `group_id`, `group-id` and
+`GroupId` all resolve to the same field. **It must be a field of the record the route returns** — a
+group's `code`, `name`, `description`, `type`, `status`, `ownerId`, `parentId`, `metadata`; an
+account's `accountNumber`, `groupId`, `name`, `classification`, `status`, `balance`, `heldAmount`,
+`overdraftLimit`, `minimumBalance`, `permittedToGoNegative`, `streamPosition`, `lastPostedOn`,
+`externalReference`, `metadata`, `closedOn`. An unknown field is a `400`, never a silently dropped
+condition. Full contract, including the exact error cases:
+[docs/generic-list-endpoint.md](docs/generic-list-endpoint.md).
+
+> **An account's `currency` is not a queryable field on this route.** It is present in the response
+> but is named `CurrencyCode` on the stored record (`ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:86`)
+> and re-declared as `Currency` on the returned one
+> (`ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/AccountDto.cs:19`), so neither spelling
+> resolves. Narrow by `groupId` and filter currencies client-side. The old hand-written route did
+> accept `?currency=`; this is the one query capability the generated route does not carry over.
+> `search` reaches every text field of a record automatically, so on `GET /v1/accounts` prefer an
+> explicit `filter` over `search` until this mismatch is settled — see
+> [the trap it belongs to](docs/generic-list-endpoint.md#trap-a-dto-field-must-map-to-a-real-column).
+
+#### Which routes are generated, and which are hand-written
+
+Most of this contract is now emitted by `DKNet.SlimBus.Generators` from `[CrudCreate]`/`[CrudUpdate]`
+attributes on the aggregates, mapped through `DKNet.AspCore.Extensions`' generic
+`MapGetList`/`MapGetById`/`MapPutById`. **This changes nothing a caller can see** beyond what the
+table above states — it is recorded here because it tells you which routes move as a group when the
+generator is upgraded, and which carry service-specific logic that has to be read.
+
+A route stays hand-written for exactly one reason: it orchestrates something a generated route has
+nowhere to put — a business refusal that must be `422` rather than the generator's `400`, a lock, a
+lookup, or a shape that is not one record of one entity.
+
+| Route | Source | The orchestration that keeps it hand-written |
+|---|---|---|
+| `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
+| `POST /v1/account-groups` | **request generated**, route and handler hand-written | Duplicate-code pre-check, refused `422 DUPLICATE_GROUP_CODE`; the generated `MapPost` can only emit `400` |
+| `GET /v1/account-groups` | **generated** | — |
+| `GET /v1/account-groups/{id}` | **generated** | — |
+| `PUT /v1/account-groups/{id}` | **generated** | — |
+| `PUT /v1/account-groups/{id}/change-description` | **generated** | — |
+| `PUT /v1/account-groups/{id}/change-metadata` | **generated** | — |
+| `PATCH /v1/account-groups/{id}` | hand-written | Walks the whole ancestor chain to refuse a cycle (`GROUP_CYCLE`) and checks every account the group holds before closing it (`GROUP_HOLDS_BALANCE`) — two cross-aggregate `422`s |
+| `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
+| `POST /v1/accounts` | hand-written | Allocates the account number server-side, resolves the currency against the reference set (`UNSUPPORTED_CURRENCY`) and enforces a determinate floor (`OVERDRAFT_LIMIT_REQUIRED`). A generated request would expose the account number as a caller-settable field |
+| `GET /v1/accounts` | **generated** | — |
+| `GET /v1/accounts/{id}` | **generated** | — |
+| `PUT /v1/accounts/{id}` | **generated** | — |
+| `PUT /v1/accounts/{id}/change-metadata` | **generated** | — |
+| `GET /v1/accounts/{id}/balance` | hand-written | Projects the three money fields plus the currency into a narrower record than the account itself |
+| `PATCH /v1/accounts/{id}` | hand-written | Refuses a close while the account holds a balance (`ACCOUNT_HOLDS_BALANCE`) and re-checks the floor when a control changes (`OVERDRAFT_LIMIT_REQUIRED`) |
+| `GET /v1/accounts/{id}/statement` | hand-written | A date-bounded page over another aggregate's stream, in stream order |
+| `POST /v1/postings` | hand-written | Idempotency replay/conflict resolution, the per-account posting lock, and the floor, status and currency refusals |
+| `POST /v1/postings/batch` | hand-written | The same, all-or-nothing across several accounts under one transaction group |
+| `GET /v1/postings/{id}` | **generated** | — |
+| `POST /v1/postings/{id}/reverse` | hand-written | Writes the opposing posting and flips the original's status in one step, with its own `422` refusals |
+
+Route registration is in `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/` — one `*V1Endpoint.cs` per
+resource, each generated route commented with why it is generated.
+`ApiEndpoints/DKNet.Accounts.App.Tests/Architecture/RouteScopeCoverageTests.cs` enumerates the live
+routes and fails the build if any one loses the scope this table names, however it was registered.
 
 **Authentication.** JWT bearer, machine-to-machine only, default-deny — any route not explicitly
 anonymous needs an authenticated caller. The calling system's identity is read from the credential's
@@ -414,16 +498,20 @@ readme (`"Customer"`, `"Liability"`, `"Credit"`); responses return them camelCas
 **Null fields are omitted from responses.** The serializer drops nulls, so an account with no
 `overdraftLimit` has no `overdraftLimit` key at all rather than a `null` one. Treat absence as null.
 
-**The three paged reads do not all have the same response shape.** Two return a bare array, one returns
-an envelope:
+**All three paged reads return the same envelope, but not under the same parameter name.** Every one
+answers with `{ "items": [...], "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage",
+"hasPreviousPage" }`, and on every one you are past the end when `hasNextPage` is `false` or `items` is
+empty — the empty page still answers `200`, never an error.
 
-| Paged read | Response shape | How you know you are past the end |
+| Paged read | Page parameter | Default page size |
 |---|---|---|
-| `GET /v1/accounts` | Bare JSON array of accounts — no total, no page count, no `hasNextPage` | The array comes back empty (`[]`). Increment `pageIndex` until it does; do not compute a page count and stop on it |
-| `GET /v1/account-groups` | Bare JSON array of groups — same, no envelope | The array comes back empty (`[]`), same loop |
-| `GET /v1/accounts/{id}/statement` | Envelope: `{ "items": [...], "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage" }` | Either `hasNextPage` is `false` or `items` is empty. The empty page still answers `200`, never an error — reading `items` and stopping when it is empty works here too, and is the loop the acceptance suite runs |
+| `GET /v1/account-groups` | `pageNumber` | 1000 |
+| `GET /v1/accounts` | `pageNumber` | 1000 |
+| `GET /v1/accounts/{id}/statement` | `pageIndex` | 20 |
 
-Pages are 1-based (`pageIndex=1` is the first page) on all three.
+Pages are 1-based on all three. The two list routes are generated and take the query surface in
+[Listing groups and accounts](#listing-groups-and-accounts); the statement is hand-written and keeps
+its own `from`/`to`/`pageIndex`/`pageSize` parameters.
 
 **A statement is in stream order, never date order.** If you backdate a posting, it appears where it was
 recorded. Sort client-side by `effectiveDate` if that is what your reader needs — and remember the
@@ -436,7 +524,8 @@ entries; it can never erase evidence of what it did. Plan corrections, not clean
 favour of the code — §5 is the stale side. The tables above describe what you actually call:
 
 - Routes are served under `/v1/...`, not the `/api/v1/...` that §5 tables.
-- The paging parameter is `pageIndex` on all three paged reads, not §5's `page`.
+- The paging parameter is neither §5's `page` nor one name across the three paged reads: it is
+  `pageNumber` on the two list routes and `pageIndex` on the statement.
 - **Four §5 refusal codes are spelled differently here, and two of them collapse onto one code.** The
   [table above](#refusals-and-error-codes) is what the service emits; §5's names are listed here only so
   you can recognise them if you are reading the baseline contract:
@@ -451,9 +540,11 @@ favour of the code — §5 is the stale side. The tables above describe what you
 
   The service also emits three codes §5 does not list at all: `DUPLICATE_GROUP_CODE`,
   `UNSUPPORTED_CURRENCY` and `LOCK_TIMEOUT`.
-- §5 says the statement response "states when the end of the stream has been reached". The statement
-  does (`hasNextPage`); `GET /v1/accounts` and `GET /v1/account-groups` do not — they are bare arrays,
-  and an empty page is their only end-of-stream signal.
+- §5 says the statement response "states when the end of the stream has been reached". All three paged
+  reads now do, through the same `hasNextPage` field.
+- §5 has no `PUT` routes. Renaming a group or an account, and changing its description or metadata, are
+  `PUT` routes of their own; `PATCH` is left with the changes that carry a business refusal (status,
+  re-parent, the account's floor controls).
 
 **A posting's sign depends on the account's classification, not on the direction alone.** A credit
 raises a `Liability`, `Equity` or `Income` account and lowers an `Asset` or `Expense` one. On a fresh

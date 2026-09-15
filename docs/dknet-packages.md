@@ -1,5 +1,12 @@
 # DKNet Package Inventory
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 The DKNet family ships one NuGet package per capability, each with its own reference doc in the
 [DKNet repo](https://github.com/baoduy/DKNet.Accounts.Api). This page lists only what this template actually
 wires up. Follow a package's link for its full API surface.

@@ -4,6 +4,12 @@ This page traces everything that happens to a request before it reaches a handle
 actually runs. The feature guides cover what each handler does; this page covers only the pipeline
 stages upstream of it, which aren't visible from reading a single handler.
 
+> **Worked examples on this page use the `Product` sample, which is fictional.** It comes from the
+> `DKNet.Templates` solution template this service was scaffolded from; **no `Product` entity and no
+> `/v1/products` route exists in this repository**. The pipeline stages described are real and every
+> request to this service crosses them — only the illustrative payloads are borrowed. This service's
+> routes are listed in [the README's API contract](../README.md#the-api-contract).
+
 ## At a glance
 
 Every `Default` below is the value the shipped base `appsettings.json` produces — that is what an
@@ -275,7 +281,8 @@ in service registration, never in an endpoint filter or a request handler.
 
 ### What the caller sees
 
-`GET /v1/products/{id}` for an authenticated caller **in the `pricing` role** (audit fields
+`GET /v1/products/{id}` — the template's sample route, not one this service serves — for an
+authenticated caller **in the `pricing` role** (audit fields
 `id`/`createdBy`/`createdOn`/`updatedBy`/`updatedOn` elided for length):
 
 ```json
