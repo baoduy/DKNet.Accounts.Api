@@ -230,19 +230,22 @@ GET /v1/accounts?filter=GroupId:Equal:b85813c0-3053-4d35-a0ef-3f2863f83fa9&order
 group's `code`, `name`, `description`, `type`, `status`, `ownerId`, `parentId`, `metadata`; an
 account's `accountNumber`, `groupId`, `name`, `classification`, `status`, `balance`, `heldAmount`,
 `overdraftLimit`, `minimumBalance`, `permittedToGoNegative`, `streamPosition`, `lastPostedOn`,
-`externalReference`, `metadata`, `closedOn`. An unknown field is a `400`, never a silently dropped
+`externalReference`, `metadata`, `closedOn`, and `currencyCode` — which is queryable without being
+part of the response body, see the note below. An unknown field is a `400`, never a silently dropped
 condition. Full contract, including the exact error cases:
 [docs/generic-list-endpoint.md](docs/generic-list-endpoint.md).
 
-> **An account's `currency` is not a queryable field on this route.** It is present in the response
-> but is named `CurrencyCode` on the stored record (`ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:86`)
-> and re-declared as `Currency` on the returned one
-> (`ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/AccountDto.cs:19`), so neither spelling
-> resolves. Narrow by `groupId` and filter currencies client-side. The old hand-written route did
-> accept `?currency=`; this is the one query capability the generated route does not carry over.
-> `search` reaches every text field of a record automatically, so on `GET /v1/accounts` prefer an
-> explicit `filter` over `search` until this mismatch is settled — see
-> [the trap it belongs to](docs/generic-list-endpoint.md#trap-a-dto-field-must-map-to-a-real-column).
+> **On `GET /v1/accounts`, narrow by currency as `CurrencyCode`, not `Currency`.** The response body
+> reads `currency`, but the query surface takes the other spelling: `?filter=CurrencyCode:Equal:SGD`
+> and `?orderBy=CurrencyCode` both work, while `?filter=Currency:Equal:SGD` is a `400`. The asymmetry
+> is deliberate. `CurrencyCode` is the entity's real, mapped column
+> (`ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:86`), declared on the
+> returned record purely so the query engine can resolve it and never serialized
+> (`ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/AccountDto.cs:48-49`); `Currency` is the
+> response-only re-declaration (`AccountDto.cs:30`) that maps to no column, so it cannot be queried.
+> This is
+> [the DTO-field-must-map-to-a-real-column trap](docs/generic-list-endpoint.md#trap-a-dto-field-must-map-to-a-real-column)
+> stated from the other side — `CurrencyCode` is queryable *because* it is a real column.
 
 #### Which routes are generated, and which are hand-written
 
