@@ -1,4 +1,3 @@
-using DKNet.EfCore.Abstractions.Attributes;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.Postings.Entities;
@@ -192,19 +191,6 @@ public sealed class Posting : AggregateRoot
         IdempotencyKey = idempotencyKey;
         IdempotencySignature = signature;
     }
-
-    /// <summary>
-    /// CRUD-attribute marker only (DRK-1277 §3 row 16) — shapes the generated <c>POST {id}/reverse</c> route
-    /// and its <c>Id</c>-only request record. Takes no parameters so the request carries nothing beyond the
-    /// route-bound id (a reversal has no caller-suppliable data: the opposing posting, its number and the
-    /// lock/at-most-once check are all orchestration). <c>ReversePostingCommandHandler</c> is registered as
-    /// this request's hand-written handler (matched by name), so this method itself is never invoked.
-    /// </summary>
-    [CrudAction("reverse")]
-    public void Reverse() =>
-        throw new NotSupportedException(
-            $"{nameof(Reverse)} is a CRUD-attribute marker only; " +
-            "ReversePostingCommandHandler handles every reversal request.");
 
     #endregion
 }

@@ -2,7 +2,6 @@ using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
-using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Postings;
@@ -51,12 +50,14 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.PostingsRead)
             .WithDescription("Read one posting.");
 
-        // Reverse (GEN-REQ, DRK-1277 §3 row 16): ReversePostingRequest is generated from Posting's
-        // [CrudAction("reverse")] marker (DKNet.Accounts.AppServices.Crud), but the ROUTE stays hand-mapped —
-        // the generated composite's MapActionById hardcodes the package's default FluentResults->IResult
-        // conversion (400 on any failure), which cannot express this service's LedgerErrors->422 mapping (R3,
-        // LedgerResultResponseExtensions.ToLedgerResponse). Handler stays hand-written for the
-        // lock/at-most-once orchestration.
+        // Reverse (HAND, DRK-1277 §3 row 16): stays fully hand-written. A [CrudAction] marker would only buy
+        // the three-line Id-only request record, at the cost of a public entity method the generator's own
+        // name-matching binds by convention — a rename, a generator version bump or a namespace move could
+        // silently rebind this request onto the generated handler instead of ReversePostingCommandHandler,
+        // turning every reversal into an unhandled call to a throwing stub. Also: the generated composite's
+        // MapActionById hardcodes the package's default FluentResults->IResult conversion (400 on any
+        // failure), which cannot express this service's LedgerErrors->422 mapping (R3,
+        // LedgerResultResponseExtensions.ToLedgerResponse) — so the route stays hand-mapped either way.
         group.MapPost("{id:guid}/reverse", async (
                 Guid id,
                 IMessageBus bus,

@@ -82,15 +82,4 @@ public class PostingTests
         posting.IdempotencyKey.ShouldBe("key-1");
         posting.IdempotencySignature.ShouldBe("signature-1");
     }
-
-    [Fact]
-    public void Reverse_IsAMarkerOnly_AndIsNeverActuallyInvoked()
-    {
-        // DRK-1277 §3 row 16: [CrudAction("reverse")] shapes the generated route/request only —
-        // ReversePostingCommandHandler is the request's registered hand-written handler, so this method must
-        // never run in the real reversal flow. Proves the marker's own guard, not that it is unreachable.
-        var posting = NewPosting();
-
-        Should.Throw<NotSupportedException>(() => posting.Reverse());
-    }
 }
