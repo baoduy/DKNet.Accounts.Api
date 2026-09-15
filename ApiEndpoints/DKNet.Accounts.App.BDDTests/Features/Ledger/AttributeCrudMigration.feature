@@ -75,6 +75,21 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Then the request is refused as unprocessable
     And the refusal carries the code "GROUP_HOLDS_BALANCE"
 
+  @new @integration
+  Scenario: A group's status can still be changed once rename and metadata move off the PATCH
+    Given the account group "OPS-ARCHIVE" named "Operations Archive" exists
+    And the calling system "treasury-ops" is authorised to write accounts
+    When it closes the group
+    Then the group's status is "Closed"
+
+  @new @integration
+  Scenario: A group can still be reparented once rename and metadata move off the PATCH
+    Given the account group "OPS-CHILD" named "Child Group" exists
+    And the account group "OPS-PARENT2" named "Parent Group" exists
+    And the calling system "treasury-ops" is authorised to write accounts
+    When it reparents "OPS-CHILD" to "OPS-PARENT2"
+    Then the group's parent is "OPS-PARENT2"
+
   @existing @integration
   Scenario: A posting recorded twice under one idempotency key is recorded once
     Given the account "1000000001" has a balance of 0.00 SGD

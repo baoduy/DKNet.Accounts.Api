@@ -8,10 +8,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 /// <summary>
 /// Step bindings for the DRK-1279 §7 characterization scenarios, revised per §11's widened mandate (owner:
 /// new/changed routes are fine, maximum auto-flow, less code). Most scenarios pin behaviour the hand-written
-/// implementation already satisfies and stay green through Build's plumbing swap. The two account-group list
-/// scenarios now drive the *target* generated-list contract (`filter=Field:Operation:Value`,
-/// `pageNumber`/`pageSize`, `{items:[...]}` envelope) instead of today's bare-array/`?type=` shape, and are
-/// expected red until Build moves `GET /v1/account-groups` onto the generated route — see the completion
+/// implementation already satisfies and stay green through Build's plumbing swap. The account-group list
+/// scenarios and both rename scenarios now drive the *target* contract (generated list syntax/envelope; `PUT
+/// {id}` for rename, since `[CrudUpdate]` on `Rename` is the first such member on both entities) instead of
+/// today's shapes, and are expected red until Build actually builds the target routes — see the completion
 /// report's route table and per-scenario results.
 /// </summary>
 [Binding]
@@ -306,8 +306,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     [When(@"it renames the group to ""([^""]+)""")]
     public async Task WhenItRenamesTheGroupTo(string newName) =>
+        // Target route (row 4, narrowed): PUT {id}, generated from [CrudUpdate] on Rename — the first such
+        // member on AccountGroup. Red until Build builds it; today's PATCH stays for ChangeStatus/Reparent.
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{LastGroupId}", new { name = newName });
+            state, HttpMethod.Put, $"{GroupsPath}/{LastGroupId}", new { name = newName });
 
     [When(@"the calling system ""([^""]+)"" reads that group")]
     public async Task WhenTheCallingSystemReadsThatGroup(string name)
@@ -341,13 +343,30 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     [When(@"it renames that account to ""([^""]+)""")]
     public async Task WhenItRenamesThatAccountTo(string newName) =>
+        // Target route (row 10, narrowed): PUT {id}, generated from [CrudUpdate] on Rename — the first such
+        // member on Account. Red until Build builds it. Also drives "Updating an account that does not exist
+        // is not-found" — a 404 holds either way (unmatched route today, id-lookup once the route exists).
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{AccountsPath}/{LastAccountId}", new { name = newName });
+            state, HttpMethod.Put, $"{AccountsPath}/{LastAccountId}", new { name = newName });
 
     [When(@"it closes the group")]
     public async Task WhenItClosesTheGroup() =>
+        // Row 4 (narrowed): ChangeStatus/Close stays HAND — the held-balance refusal (GROUP_HOLDS_BALANCE →
+        // 422) has nowhere to live in a generated route. Still PATCH.
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Patch, $"{GroupsPath}/{LastGroupId}", new { status = "Closed" });
+
+    [When(@"it reparents ""([^""]+)"" to ""([^""]+)""")]
+    public async Task WhenItReparentsTo(string childCode, string parentCode)
+    {
+        // Row 4 (narrowed): Reparent stays HAND — the ancestor-cycle walk has nowhere to live in a generated
+        // route. Still PATCH.
+        var childId = state.Values[$"group:{childCode}"];
+        var parentId = state.Values[$"group:{parentCode}"];
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId });
+        state.Values["lastGroupId"] = childId;
+    }
 
     [When(@"it opens an account named ""([^""]+)"" permitted to go negative with no overdraft limit")]
     public async Task WhenItOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string name) =>
@@ -438,6 +457,22 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
         var doc = await ReadJsonAsync(response);
         doc.GetProperty("name").GetString().ShouldBe(expectedName);
+    }
+
+    [Then(@"the group's status is ""([^""]+)""")]
+    public async Task ThenTheGroupsStatusIs(string expectedStatus)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
+        var doc = await ReadJsonAsync(response);
+        doc.GetProperty("status").GetString().ShouldBe(expectedStatus.ToLowerInvariant());
+    }
+
+    [Then(@"the group's parent is ""([^""]+)""")]
+    public async Task ThenTheGroupsParentIs(string parentCode)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
+        var doc = await ReadJsonAsync(response);
+        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values[$"group:{parentCode}"]));
     }
 
     [Then(@"the account's name is ""([^""]+)""")]
