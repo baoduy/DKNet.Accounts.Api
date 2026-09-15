@@ -1,27 +1,18 @@
+using DKNet.EfCore.DtoGenerator;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1;
 
-public sealed record AccountGroupDto
-{
-    public Guid Id { get; init; }
-
-    public string Code { get; init; } = null!;
-
-    public string Name { get; init; } = null!;
-
-    public string? Description { get; init; }
-
-    public AccountGroupType Type { get; init; }
-
-    public AccountGroupStatus Status { get; init; }
-
-    public string OwnerId { get; init; } = null!;
-
-    public Guid? ParentId { get; init; }
-
-    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
-}
+// Reproduces exactly today's nine hand-written fields (DRK-1277 §3 row 5): the six audit properties
+// AccountGroup exposes via AggregateRoot/AuditedEntity are excluded so the generated shape matches, field
+// for field, what callers received before this DTO was generator-backed.
+[GenerateDto(typeof(AccountGroup), Exclude =
+[
+    nameof(AccountGroup.CreatedBy), nameof(AccountGroup.CreatedOn),
+    nameof(AccountGroup.UpdatedBy), nameof(AccountGroup.UpdatedOn),
+    nameof(AccountGroup.LastModifiedBy), nameof(AccountGroup.LastModifiedOn)
+])]
+public sealed partial record AccountGroupDto;
 
 /// <summary>
 /// One line per currency (R: balances across different currencies are never summed together).

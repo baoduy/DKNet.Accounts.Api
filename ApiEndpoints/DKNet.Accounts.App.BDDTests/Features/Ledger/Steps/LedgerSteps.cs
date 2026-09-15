@@ -508,21 +508,27 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub lists the accounts of ""([^""]+)""$")]
     public async Task WhenPayHubListsTheAccountsOf(string groupCode)
     {
+        // Target generated-list syntax (DRK-1279 §11 round 2 — row 7 moves to GEN): filter=Field:Operation:Value,
+        // not ?groupId=. Red until Build moves GET /v1/accounts onto MapGetList.
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{AccountsPath}?filter={Uri.EscapeDataString($"GroupId:Equal:{groupId}")}");
     }
 
     [When(@"PayHub lists the active accounts of ""([^""]+)""")]
     public async Task WhenPayHubListsTheActiveAccountsOf(string groupCode)
     {
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
+        var groupFilter = Uri.EscapeDataString($"GroupId:Equal:{groupId}");
+        var statusFilter = Uri.EscapeDataString("Status:Equal:Active");
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}&status=Active");
+            state, HttpMethod.Get, $"{AccountsPath}?filter={groupFilter}&filter={statusFilter}");
     }
 
     [When(@"PayHub lists the groups of type ""([^""]+)""")]
     public async Task WhenPayHubListsTheGroupsOfType(string type) =>
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}?type={type}");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{GroupsPath}?filter={Uri.EscapeDataString($"Type:Equal:{type}")}");
 
     [When(@"PayHub records a credit of ([\d.]+) (\w+) described as ""([^""]+)""")]
     public async Task WhenPayHubRecordsACreditDescribedAs(decimal amount, string currency, string description) =>
@@ -736,9 +742,15 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Then(@"the account appears when PayHub lists the accounts of ""([^""]+)""")]
     public async Task ThenTheAccountAppearsWhenPayHubListsTheAccountsOf(string groupCode)
     {
+        // Target generated-list syntax + {items:[...]} envelope (row 7 moves to GEN) — and actually checks the
+        // account is present, not just that the request succeeded.
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
-        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}?groupId={groupId}");
+        var response = await client.SendAsCallerAsync(
+            state, HttpMethod.Get, $"{AccountsPath}?filter={Uri.EscapeDataString($"GroupId:Equal:{groupId}")}");
         response.IsSuccessStatusCode.ShouldBeTrue();
+        var doc = JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync());
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid());
+        ids.ShouldContain(Guid.Parse(state.Values["account"]));
     }
 
     [Then(@"the balances show ([\d.]+) (\w+) and ([\d.]+) (\w+) as separate lines")]
@@ -756,8 +768,14 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Then(@"only the two active accounts are returned")]
     public async Task ThenOnlyTheTwoActiveAccountsAreReturned()
     {
+        // Target generated-list envelope — checks the filtered set itself (count and status), not just that
+        // the request succeeded.
         var body = await state.Response!.Content.ReadAsStringAsync();
         state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the active-only list, got: {body}");
+        var doc = JsonSerializer.Deserialize<JsonElement>(body);
+        var items = doc.GetProperty("items").EnumerateArray().ToList();
+        items.Count.ShouldBe(2);
+        items.ShouldAllBe(i => i.GetProperty("status").GetString() == "active");
     }
 
     [Then(@"only the suspense group is returned")]
@@ -765,6 +783,10 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     {
         var body = await state.Response!.Content.ReadAsStringAsync();
         state.Response!.IsSuccessStatusCode.ShouldBeTrue($"expected the suspense-only list, got: {body}");
+        var doc = JsonSerializer.Deserialize<JsonElement>(body);
+        var items = doc.GetProperty("items").EnumerateArray().ToList();
+        items.Count.ShouldBe(1);
+        items[0].GetProperty("type").GetString().ShouldBe("suspense");
     }
 
     [Then(@"the account balance is (-?[\d.]+) (\w+)")]

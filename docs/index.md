@@ -14,6 +14,11 @@ production-ready .NET 10 microservices using vertical-slice DDD/CQRS.
 Everything below documents the solution template this service was scaffolded from — reach for it when
 you are changing the service, not when you are calling it.
 
+**Their worked examples are fictional.** The template pages use `Product`/`AutomatedSample` and
+`PurchaseOrder`/`ManualSample` throughout; **neither entity, nor a `/v1/products` route, exists in
+this repository**. The mechanics they describe are real and this service uses them — the payloads and
+route names are not. Each page carries a note at the top pointing at this service's real equivalents.
+
 ## Getting started
 
 - [Template Usage Reference](template-usage.md) — install the template, scaffold a solution, then

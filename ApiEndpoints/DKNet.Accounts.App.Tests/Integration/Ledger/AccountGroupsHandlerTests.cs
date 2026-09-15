@@ -75,7 +75,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         // were member names ("region" -> "Region") — see the matching Account-level test for the root cause.
         var id = await CreateGroupAsync($"MD-{Guid.NewGuid():N}");
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{id}", new
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{id}/change-metadata", new
         {
             metadata = new Dictionary<string, string> { ["region"] = "SG" }
         }));
@@ -173,23 +173,29 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — rename,
-    /// description change, a successful (no-balance) close, and reactivation — none reachable from the
-    /// existing reparent/duplicate-code/close-with-balance tests or the BDD acceptance scenarios.</summary>
+    /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — a
+    /// successful (no-balance) close and reactivation — plus the generated Rename/ChangeDescription routes
+    /// (DRK-1277 §11/§12) — none reachable from the existing reparent/duplicate-code/close-with-balance tests
+    /// or the BDD acceptance scenarios.</summary>
     [Fact]
     public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
     {
         var groupId = await CreateGroupAsync($"UPD-{Guid.NewGuid():N}");
 
-        var renamed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new
+        var renamed = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}", new
         {
-            name = "Renamed Group",
-            description = "Updated description"
+            name = "Renamed Group"
         }));
         renamed.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var renamedBody = await renamed.Content.ReadFromJsonAsync<JsonElement>();
-        renamedBody.GetProperty("name").GetString().ShouldBe("Renamed Group");
-        renamedBody.GetProperty("description").GetString().ShouldBe("Updated description");
+        (await renamed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString().ShouldBe("Renamed Group");
+
+        var described = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}/change-description", new
+        {
+            description = "Updated description"
+        }));
+        described.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await described.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("description").GetString()
+            .ShouldBe("Updated description");
 
         // No account holds a balance, so closing succeeds — the success path of the Closed branch.
         var closed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
@@ -206,7 +212,16 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     public async Task Updating_AnUnknownGroup_IsRefused()
     {
         var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { name = "Doesn't matter" }));
+            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Renaming_AnUnknownGroup_IsRefused()
+    {
+        var response = await Client.SendAsync(
+            AsPayHub(HttpMethod.Put, $"{GroupsPath}/{Guid.NewGuid()}", new { name = "Doesn't matter" }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

@@ -1,52 +1,20 @@
+using DKNet.EfCore.DtoGenerator;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.AppServices.Postings.V1;
 
-public sealed record PostingDto
+// Reproduces exactly today's hand-written fields (DRK-1277 §3 row 7, needed now that Posting carries
+// [CrudAction]): IdempotencySignature is internal-only and never reaches the API contract; SignedValue is
+// excluded and re-declared as SignedAmount below (Mapster's Posting->PostingDto map in AppSetup already
+// carries that rename); the six audit properties are excluded like every other DTO in this migration.
+[GenerateDto(typeof(Posting), Exclude =
+[
+    nameof(Posting.SignedValue), nameof(Posting.IdempotencySignature),
+    nameof(Posting.CreatedBy), nameof(Posting.CreatedOn),
+    nameof(Posting.UpdatedBy), nameof(Posting.UpdatedOn),
+    nameof(Posting.LastModifiedBy), nameof(Posting.LastModifiedOn)
+])]
+public sealed partial record PostingDto
 {
-    public Guid Id { get; init; }
-
-    public string PostingNumber { get; init; } = null!;
-
-    public Guid AccountId { get; init; }
-
-    public long StreamPosition { get; init; }
-
-    public PostingDirection Direction { get; init; }
-
-    public decimal Amount { get; init; }
-
-    public string Currency { get; init; } = null!;
-
-    public decimal SignedAmount { get; init; }
-
-    public decimal BalanceAfter { get; init; }
-
-    public DateOnly EffectiveDate { get; init; }
-
-    public DateTimeOffset RecordedAt { get; init; }
-
-    public PostingCategory Category { get; init; }
-
-    public PostingStatus Status { get; init; }
-
-    public Guid? ReversesPostingId { get; init; }
-
-    public Guid? ReversedByPostingId { get; init; }
-
-    public Guid? TransactionGroupId { get; init; }
-
-    public Guid? CounterpartyAccountId { get; init; }
-
-    public string? CounterpartyReference { get; init; }
-
-    public string CallingSystem { get; init; } = null!;
-
-    public string? IdempotencyKey { get; init; }
-
-    public string? ExternalReference { get; init; }
-
-    public string? Description { get; init; }
-
-    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+    public required decimal SignedAmount { get; init; }
 }

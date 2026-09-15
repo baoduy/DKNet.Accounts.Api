@@ -2,7 +2,7 @@ using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
-using DKNet.Accounts.AppServices.Postings.V1.Queries;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Postings;
 
@@ -44,19 +44,20 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .Produces<IReadOnlyCollection<PostingDto>>(StatusCodes.Status201Created)
             .WithDescription("Record several movements as one all-or-nothing batch.");
 
-        group.MapGet("{id:guid}", async (
-                Guid id,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var dto = await bus.Send(new GetPostingByIdQuery { Id = id }, cancellationToken: ct);
-                return dto is null ? Results.NotFound() : Results.Ok(dto);
-            })
+        // Get-by-id (GEN, DRK-1277 §3 row 11): plain generic entity mapper. The explicit "{id:guid}" endpoint
+        // keeps the same route pattern this used before (the mapper's own default is the looser "{id}").
+        group.MapGetById<Posting, Guid, PostingDto>("{id:guid}")
             .RequireScope(group, ScopeNames.PostingsRead)
-            .Produces<PostingDto>()
-            .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one posting.");
 
+        // Reverse (HAND, DRK-1277 §3 row 16): stays fully hand-written. A [CrudAction] marker would only buy
+        // the three-line Id-only request record, at the cost of a public entity method the generator's own
+        // name-matching binds by convention — a rename, a generator version bump or a namespace move could
+        // silently rebind this request onto the generated handler instead of ReversePostingCommandHandler,
+        // turning every reversal into an unhandled call to a throwing stub. Also: the generated composite's
+        // MapActionById hardcodes the package's default FluentResults->IResult conversion (400 on any
+        // failure), which cannot express this service's LedgerErrors->422 mapping (R3,
+        // LedgerResultResponseExtensions.ToLedgerResponse) — so the route stays hand-mapped either way.
         group.MapPost("{id:guid}/reverse", async (
                 Guid id,
                 IMessageBus bus,

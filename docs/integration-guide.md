@@ -472,8 +472,10 @@ curl -H "Authorization: Bearer $TOKEN" \
   "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331/statement?from=2026-06-01&to=2026-06-30&pageIndex=1&pageSize=10"
 ```
 
-Unlike `GET /v1/accounts` and `GET /v1/account-groups`, which return bare JSON arrays, the statement
-comes back in an envelope — the postings are under `items`:
+The statement comes back in an envelope — the postings are under `items`. `GET /v1/accounts` and
+`GET /v1/account-groups` answer with the same envelope, but page with `pageNumber` rather than the
+statement's `pageIndex`; see the README's
+[API contract](../README.md#the-api-contract) for their query surface.
 
 ```json
 {

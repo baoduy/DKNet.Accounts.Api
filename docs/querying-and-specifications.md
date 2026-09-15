@@ -1,5 +1,12 @@
 # Querying and Specifications
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 This page covers the read side of the template: how a query travels from an HTTP request to a
 filtered, paged, projected result, and why it goes through `DKNet.EfCore.Specifications` instead
 of a raw `IQueryable`.

@@ -1,5 +1,19 @@
 # Generic List Endpoint (filter · search · order · page)
 
+> **The `Product` and `PurchaseOrder` samples on this page are fictional.** They come from the
+> `DKNet.Templates` solution template this service was scaffolded from; **no such entity, slice or
+> `/v1/products` route exists in this repository** and none ever will. Read them as illustrations of
+> the package contract, never as calls you can make here.
+>
+> The two routes in this service that actually use this contract are `GET /v1/account-groups` and
+> `GET /v1/accounts`, mapped in
+> `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs:40` and
+> `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs:34`. For their concrete
+> query surface — the fields you may filter and order by, the defaults this service sets, and the one
+> field that is *not* queryable — read
+> [the README's API contract](../README.md#listing-groups-and-accounts) instead. Everything below is
+> the underlying package contract both of them inherit.
+
 Every generator-driven CRUD slice gets a `GET /` list route for free. It is a single, uniform query
 surface — pagination, multi-field filtering, free-text search, and ordering — driven entirely by the
 query string, with **no per-feature code to write**. This page is the full contract for that route.
@@ -171,7 +185,8 @@ GET /v1/products?fromDate=2026-06-01T00:00:00Z&toDate=2026-06-30T23:59:59Z
 - **Records with no audit timestamps:** the bounds have no meaning and are **ignored, not refused** — a
   listing over a non-audited entity answers the same with or without them.
 - **Neither bound given, over audited records:** the listing covers the **last three months of
-  activity**, not all history.
+  activity**, not all history — *unless the host switches the default window off, which this service
+  does*; see [Configuring the defaults](#configuring-the-defaults).
 - **Either bound given:** exactly the bounds you named, open-ended on the side you left out. Your bounds
   **replace** the default window rather than being narrowed by it — which makes
   `?fromDate=0001-01-01T00:00:00Z` the documented way to ask for **all history**.
@@ -198,6 +213,13 @@ The page size and the window length are host settings on `ListQueryOptions`, bou
 
 A service that configures its own values keeps them — the figures above are only the built-in fallbacks
 used when a service configures nothing.
+
+**This service configures one of them.**
+`ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:64` sets `DefaultActivityWindowMonths = 0`, so the
+default activity window described above is **off** on `GET /v1/account-groups` and `GET /v1/accounts`: a
+bare listing here returns the caller's full history, not the last three months. A ledger that quietly
+withheld older records would answer a question it was not asked. `DefaultPageSize` and `MaxPageSize` are
+left at the package defaults of 1000.
 
 ## Response envelope
 

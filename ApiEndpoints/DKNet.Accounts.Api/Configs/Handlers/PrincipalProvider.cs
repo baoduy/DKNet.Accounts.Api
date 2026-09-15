@@ -87,6 +87,19 @@ internal sealed class PrincipalProvider(IHttpContextAccessor accessor) : IPrinci
             }
         }
 
+        // Fallback for a machine-to-machine caller that carries no subject claim at all (DRK-1277 §11/§12):
+        // the same "client_id" claim ICallingSystemAccessor/CallingSystemAccessor reads. Without this, a real
+        // M2M create throws OwnershipRequiredException once the explicit AccountGroup.StampCreatedBy stamp is
+        // gone — production still has no name claim to fall further back to until that token work lands.
+        if (string.IsNullOrWhiteSpace(_ownershipKey))
+        {
+            var clientId = context.User.FindFirst(c => string.Equals(c.Type, "client_id", StringComparison.OrdinalIgnoreCase));
+            if (clientId != null && !string.IsNullOrWhiteSpace(clientId.Value))
+            {
+                _ownershipKey = clientId.Value;
+            }
+        }
+
         //Get email
         var email = context.User.FindFirst(c =>
             c.Type.Equals("emails", StringComparison.OrdinalIgnoreCase) ||

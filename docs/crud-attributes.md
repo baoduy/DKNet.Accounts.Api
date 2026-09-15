@@ -1,8 +1,26 @@
 # CRUD Attributes — the Generator-Driven Vertical Slice
 
+> **The `Product` and `PurchaseOrder` samples on this page are fictional.** They come from the
+> `DKNet.Templates` solution template this service was scaffolded from; **no such entity, slice or
+> `/v1/products` route exists in this repository** and none ever will. Read them as illustrations of
+> the generator's mechanics, never as calls you can make here.
+>
+> This service does use these attributes, on its own aggregates. The real instances:
+>
+> | Attribute | Where it is, in this repository | What it produces |
+> |---|---|---|
+> | `[CrudCreate]` | `AccountGroup`'s constructor — `ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs:40` | `CreateAccountGroupRequest`; the route and handler stay hand-written for the duplicate-code refusal |
+> | `[CrudUpdate]` | `AccountGroup.Rename` / `ChangeDescription` / `ChangeMetadata` — `AccountGroup.cs:93`, `:100`, `:107` | `PUT /v1/account-groups/{id}`, `{id}/change-description`, `{id}/change-metadata` |
+> | `[CrudUpdate]` | `Account.Rename` / `ChangeMetadata` — `ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:131`, `:163` | `PUT /v1/accounts/{id}`, `{id}/change-metadata` |
+> | `[GenerateDto]` | `AccountGroupDto`, `AccountDto`, `PostingDto` | The records those routes return |
+> | `[CrudAction]` | *unused* — `POST /v1/postings/{id}/reverse` is hand-written on purpose; see `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs:53` |  |
+>
+> Which of this service's routes are generated and which are hand-written, and why, is recorded in
+> [the README](../README.md#which-routes-are-generated-and-which-are-hand-written).
+
 How `AutomatedSample`/`Product` builds a full CRUD slice from four attributes instead of the
 hand-written files `ManualSample`/`PurchaseOrder` uses. Read
-[`docs/samples/manual-vs-automated.md`](samples/manual-vs-automated.md) first — it's the
+`docs/samples/manual-vs-automated.md` in `DKNet.Templates` first if you have it — it's the
 layer-by-layer comparison of what each shape costs; this page only walks the mechanics of the
 generated shape.
 
@@ -289,7 +307,7 @@ Rule of thumb: if you would be uncomfortable with a client's retry-on-timeout po
 call unattended, it is an action, not an update.
 
 > **What an action does not give you.** Everything the generated create/update path gives up, an
-> action gives up too — the [validation gap](samples/manual-vs-automated.md#1-request-validation-that-looks-wired-but-never-runs-the-sharpest-gap)
+> action gives up too — the validation gap
 > (`DataAnnotations` on an action's parameters are forwarded onto the request and never evaluated),
 > no idempotency filter, and the DTO's every-audited-field default. One is worth calling out
 > specifically: **a generated action has nowhere to hang a pre-condition.** `Discontinue` on an

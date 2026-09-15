@@ -1,26 +1,15 @@
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
+using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 
-public sealed record CreateAccountGroupRequest : Fluents.Requests.IWitResponse<AccountGroupDto>
-{
-    public string Code { get; set; } = null!;
-
-    public string Name { get; set; } = null!;
-
-    public string? Description { get; set; }
-
-    public AccountGroupType Type { get; set; }
-
-    public string OwnerId { get; set; } = null!;
-
-    public Guid? ParentId { get; set; }
-
-    public IReadOnlyDictionary<string, string>? Metadata { get; set; }
-}
+// CreateAccountGroupRequest is generated from AccountGroup's [CrudCreate] constructor (DRK-1277 §3 row 1) —
+// same shape as the hand-written record this replaced (Code, Name, Description, Type, OwnerId, ParentId,
+// Metadata). This handler is registered as its hand-written IHandler, matched by request-type name, so the
+// generated handler is skipped in favour of the duplicate-code pre-check below.
 
 internal sealed class CreateAccountGroupCommandValidator : AbstractValidator<CreateAccountGroupRequest>
 {
@@ -68,9 +57,10 @@ internal sealed class CreateAccountGroupCommandHandler(
             request.Type,
             request.OwnerId,
             request.ParentId,
-            request.Metadata,
-            byUser);
+            request.Metadata);
 
+        // CreatedBy is left unset by the constructor and stamped on save by DataOwnerHook/PrincipalProvider
+        // (DRK-1277 §11/§12) — not here.
         await repository.AddAsync(group, cancellationToken);
 
         // Lazy mapping — resolves AFTER SaveChanges, so generated/audit fields are populated.

@@ -6,24 +6,22 @@ using DKNet.Accounts.Domains.Features.Accounts.Entities;
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
 /// <summary>
-/// Partial update — <c>PATCH /accounts/{id}</c>. Setting <see cref="Status"/> to
-/// <see cref="AccountStatus.Closed"/> is how an account is closed; refused while it holds any balance or
-/// held amount. R9: every other status change, including <c>Closed</c> → <c>Active</c> (reopening) and
-/// <c>Dormant</c> → <c>Active</c>, is permitted freely.
+/// Partial update — <c>PATCH /accounts/{id}</c>, narrowed to <see cref="Status"/>, <see cref="OverdraftLimit"/>
+/// and <see cref="MinimumBalance"/> (DRK-1277 §11/§12): rename and metadata moved off this route onto their
+/// own generated <c>[CrudUpdate]</c> routes. Setting <see cref="Status"/> to <see cref="AccountStatus.Closed"/>
+/// is how an account is closed; refused while it holds any balance or held amount. R9: every other status
+/// change, including <c>Closed</c> → <c>Active</c> (reopening) and <c>Dormant</c> → <c>Active</c>, is
+/// permitted freely.
 /// </summary>
 public sealed record UpdateAccountRequest : Fluents.Requests.IWitResponse<AccountDto>
 {
     public Guid Id { get; set; }
-
-    public string? Name { get; set; }
 
     public AccountStatus? Status { get; set; }
 
     public decimal? OverdraftLimit { get; set; }
 
     public decimal? MinimumBalance { get; set; }
-
-    public IReadOnlyDictionary<string, string>? Metadata { get; set; }
 }
 
 internal sealed class UpdateAccountCommandHandler(
@@ -44,11 +42,6 @@ internal sealed class UpdateAccountCommandHandler(
         if (account is null)
         {
             return Result.Fail<AccountDto>(new NotFoundError($"The account {request.Id} was not found."));
-        }
-
-        if (request.Name is not null)
-        {
-            account.Rename(request.Name, byUser);
         }
 
         if (request.OverdraftLimit is not null || request.MinimumBalance is not null)
@@ -74,11 +67,6 @@ internal sealed class UpdateAccountCommandHandler(
             {
                 account.ChangeMinimumBalance(request.MinimumBalance, byUser);
             }
-        }
-
-        if (request.Metadata is not null)
-        {
-            account.ChangeMetadata(request.Metadata, byUser);
         }
 
         if (request.Status is not null && request.Status != account.Status)
