@@ -1,5 +1,12 @@
 # SlimMessageBus Messaging
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 This page covers how the template wires [SlimMessageBus](https://github.com/zarusz/SlimMessageBus) as
 its command/query/event backbone, and how to forward a domain event to an external broker. For the
 full `DKNet.SlimBus.Extensions` API surface — request/response contracts, `LazyMapper`, and more —

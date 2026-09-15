@@ -1,5 +1,12 @@
 # Template Feature List
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 Everything `dotnet new dknet-dknet.accounts` wires up before you write a line of feature code. For the
 full list of DKNet NuGet packages behind these features, see
 [`docs/dknet-packages.md`](dknet-packages.md).
@@ -125,7 +132,7 @@ Once those resources are up, the host also populates the two sample entities —
 filtering have a realistic dataset with no manual step. The records are freshly randomised on every
 start, so consecutive runs do not present the same data, and they are synthetic throughout — no
 real personal data. Exactly one product is the deliberate exception: a fixed
-[demonstration row](samples/automated-products/README.md#platform-capabilities-it-carries) carrying
+demonstration row carrying
 both role-gated `[SensitiveData]` properties, so response filtering is visible on a host you just
 started — it counts toward the 10 000 rather than adding to it. They are attributed to
 `SharedConsts.SystemAccount` (`"System"`), the same

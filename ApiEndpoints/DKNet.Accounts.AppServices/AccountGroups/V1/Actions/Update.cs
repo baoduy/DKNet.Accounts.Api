@@ -8,27 +8,23 @@ using Microsoft.EntityFrameworkCore;
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 
 /// <summary>
-/// Partial update — <c>PATCH /account-groups/{id}</c>. Unset properties leave the current value untouched.
+/// Partial update — <c>PATCH /account-groups/{id}</c>, narrowed to <see cref="Status"/> and
+/// <see cref="ParentId"/> (DRK-1277 §11/§12): rename, description and metadata moved off this route onto
+/// their own generated <c>[CrudUpdate]</c> routes. Unset properties leave the current value untouched.
 /// Setting <see cref="Status"/> to <see cref="AccountGroupStatus.Closed"/> is how a group is closed.
 /// </summary>
 public sealed record UpdateAccountGroupRequest : Fluents.Requests.IWitResponse<AccountGroupDto>
 {
     public Guid Id { get; set; }
 
-    public string? Name { get; set; }
-
-    public string? Description { get; set; }
-
     public AccountGroupStatus? Status { get; set; }
 
     public Guid? ParentId { get; set; }
-
-    public IReadOnlyDictionary<string, string>? Metadata { get; set; }
 }
 
 /// <summary>
-/// Applies each provided field, re-parents (walking the whole ancestor chain to refuse a cycle — R7), and
-/// closes only when no account it holds still carries a balance.
+/// Re-parents (walking the whole ancestor chain to refuse a cycle — R7) and closes only when no account it
+/// holds still carries a balance.
 /// </summary>
 internal sealed class UpdateAccountGroupCommandHandler(
     IRepositorySpec repository,
@@ -53,21 +49,6 @@ internal sealed class UpdateAccountGroupCommandHandler(
         if (group is null)
         {
             return Result.Fail<AccountGroupDto>(new NotFoundError($"The account group {request.Id} was not found."));
-        }
-
-        if (request.Name is not null)
-        {
-            group.Rename(request.Name, byUser);
-        }
-
-        if (request.Description is not null)
-        {
-            group.ChangeDescription(request.Description, byUser);
-        }
-
-        if (request.Metadata is not null)
-        {
-            group.ChangeMetadata(request.Metadata, byUser);
         }
 
         if (request.ParentId is not null && request.ParentId != group.ParentId)

@@ -56,7 +56,7 @@ public class AccountTests
     {
         var account = NewAccount();
 
-        account.Rename("New Name", "PayHub");
+        account.Rename("New Name");
 
         account.Name.ShouldBe("New Name");
     }
@@ -124,7 +124,7 @@ public class AccountTests
         var account = NewAccount();
         var metadata = new Dictionary<string, string> { ["region"] = "SG" };
 
-        account.ChangeMetadata(metadata, "PayHub");
+        account.ChangeMetadata(metadata);
 
         account.Metadata.ShouldBe(metadata);
     }

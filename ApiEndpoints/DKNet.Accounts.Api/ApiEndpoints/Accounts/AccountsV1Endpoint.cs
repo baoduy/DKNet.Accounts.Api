@@ -4,7 +4,9 @@ using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
+using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
@@ -28,29 +30,26 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             .Produces<AccountDto>(StatusCodes.Status201Created)
             .WithDescription("Open an account inside a group, in one currency, with an accounting classification.");
 
-        group.MapGet("/", async (
-                [AsParameters] ListAccountsQuery query,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var page = await bus.Send(query, cancellationToken: ct);
-                return Results.Ok(page);
-            })
+        // List (GEN, DRK-1277 §11/§12): same reasoning as account groups — generated list syntax/envelope.
+        group.MapGetList<Account, Guid, AccountDto>()
             .RequireScope(group, ScopeNames.AccountsRead)
-            .WithDescription("List accounts, filterable by group, currency and status.");
+            .WithDescription("List accounts. Filter as 'field:operation:value', e.g. filter=GroupId:Equal:{id}.");
 
-        group.MapGet("{id:guid}", async (
-                Guid id,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var dto = await bus.Send(new GetAccountByIdQuery { Id = id }, cancellationToken: ct);
-                return dto is null ? Results.NotFound() : Results.Ok(dto);
-            })
+        // Get-by-id (GEN, DRK-1277 §11/§12): plain generic entity mapper — no SlimBus handler involved.
+        group.MapGetById<Account, Guid, AccountDto>("{id:guid}")
             .RequireScope(group, ScopeNames.AccountsRead)
-            .Produces<AccountDto>()
-            .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read one account.");
+
+        // Rename (GEN, DRK-1277 §11/§12): [CrudUpdate] on Account.Rename — the first such member on the type,
+        // so it lands on the plain "{id}" route. Same reasoning as AccountGroup.Rename: 404 is its only
+        // failure mode, so R3 doesn't block it, and MapPutById returns its own chainable builder.
+        group.MapPutById<RenameAccountRequest, Guid, AccountDto>("{id:guid}")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Rename an account.");
+
+        group.MapPutById<ChangeMetadataAccountRequest, Guid, AccountDto>("{id:guid}/change-metadata")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Change an account's metadata.");
 
         group.MapGet("{id:guid}/balance", async (
                 Guid id,
@@ -65,6 +64,10 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read an account's balance.");
 
+        // Partial update (HAND, narrowed, DRK-1277 §11/§12): rename and metadata moved off this route onto
+        // their own generated routes above; only Status (AccountHoldsBalance refusal) and overdraft/minimum
+        // balance (OverdraftLimitRequired refusal) remain, since neither refusal has anywhere to live in a
+        // generated route (R3).
         group.MapPatch("{id:guid}", async (
                 Guid id,
                 UpdateAccountRequest req,
@@ -76,7 +79,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             })
             .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
-                "Change an account's name, status, overdraft limit, minimum balance and metadata. " +
+                "Change an account's status, overdraft limit and minimum balance. " +
                 "{\"status\":\"Closed\"} closes the account.");
 
         group.MapGet("{id:guid}/statement", async (

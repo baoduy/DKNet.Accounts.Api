@@ -1,3 +1,4 @@
+using DKNet.EfCore.Abstractions.Attributes;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.AccountGroups.Entities;
@@ -30,7 +31,13 @@ public sealed class AccountGroup : AggregateRoot
 {
     #region Constructors
 
-    /// <summary>Creates a new, active account group.</summary>
+    /// <summary>
+    /// Creates a new, active account group. No acting-user parameter (DRK-1277 C3) — this constructor is
+    /// <see cref="CrudCreateAttribute"/>-generated into <c>CreateAccountGroupRequest</c>, so any trailing
+    /// user parameter would be a caller-settable body field. <c>CreatedBy</c> is left unset here and stamped
+    /// on save by <c>DataOwnerHook</c>/<c>IPrincipalProvider</c> (DRK-1277 §11/§12).
+    /// </summary>
+    [CrudCreate]
     public AccountGroup(
         string code,
         string name,
@@ -38,9 +45,7 @@ public sealed class AccountGroup : AggregateRoot
         AccountGroupType type,
         string ownerId,
         Guid? parentId,
-        IReadOnlyDictionary<string, string>? metadata,
-        string byUser)
-        : base(byUser)
+        IReadOnlyDictionary<string, string>? metadata)
     {
         Code = code;
         Name = name;
@@ -80,22 +85,29 @@ public sealed class AccountGroup : AggregateRoot
 
     #region Methods
 
-    public void Rename(string name, string userId)
+    /// <summary>
+    /// Renames the group. No acting-user parameter (DRK-1277 C3) — this is the first <see cref="CrudUpdateAttribute"/>
+    /// member declared on this type, so it lands on the plain <c>PUT {id}</c> route; <c>UpdatedBy</c> is left
+    /// for <c>DataOwnerHook</c> to stamp on save.
+    /// </summary>
+    [CrudUpdate]
+    public void Rename(string name)
     {
         Name = name;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeDescription(string? description, string userId)
+    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-description</c>.</summary>
+    [CrudUpdate]
+    public void ChangeDescription(string? description)
     {
         Description = description;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata, string userId)
+    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-metadata</c>.</summary>
+    [CrudUpdate]
+    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata)
     {
         Metadata = metadata;
-        SetUpdatedBy(userId);
     }
 
     /// <summary>

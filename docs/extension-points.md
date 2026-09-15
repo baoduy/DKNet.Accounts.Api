@@ -1,5 +1,12 @@
 # Extension Points
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 Where your own code attaches to a solution scaffolded by `dotnet new dknet-dknet.accounts`. Each seam
 below is discovered by convention or by assembly scan — none of them has a registration list you
 must remember to update.
@@ -57,8 +64,8 @@ Two rules the template's own endpoints follow, both enforced by
 - Keep every `Map*` call **literal**. .NET 10's validation source generator only sees literal
   `Map*(string, Delegate)` calls in the compiling project's own source; a route registered through
   a generic library wrapper silently loses DataAnnotations validation. See
-  [`api-pipeline.md`](api-pipeline.md) and
-  [`samples/manual-vs-automated.md`](samples/manual-vs-automated.md#1-request-validation-that-looks-wired-but-never-runs-the-sharpest-gap).
+  [`api-pipeline.md`](api-pipeline.md), and `docs/samples/manual-vs-automated.md` in
+  `DKNet.Templates`.
 
 The `Program.cs` call also sets `ConfigureGroup`, which runs for every discovered group after the
 contextual-population filter and before authorization. The template uses it for exactly one thing

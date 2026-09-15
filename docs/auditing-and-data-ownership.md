@@ -16,9 +16,22 @@ Every aggregate in this template ultimately derives from `AuditedEntity<TKey>`
 | `CreatedBy` / `CreatedOn` | Who created the row, and when |
 | `UpdatedBy` / `UpdatedOn` | Who last modified the row, and when |
 
-`DKNet.Accounts.Domains/Share/DomainEntity.cs` extends `AuditedEntity<Guid>` and calls `SetCreatedBy` from
-its constructor. `DKNet.Accounts.Domains/Share/AggregateRoot.cs` extends `DomainEntity` and is the base
-every feature aggregate (`PurchaseOrder`, `Product`) ultimately uses.
+`DKNet.Accounts.Domains/Share/DomainEntity.cs` extends `AuditedEntity<Guid>`.
+`DKNet.Accounts.Domains/Share/AggregateRoot.cs` extends `DomainEntity` and is the base every feature
+aggregate in this service (`AccountGroup`, `Account`, `Posting`) uses.
+
+Both expose two constructor shapes, and **which one an aggregate uses decides who stamps its
+`CreatedBy`**:
+
+| Constructor | Who stamps `CreatedBy` |
+|---|---|
+| `DomainEntity(Guid id, string createdBy, …)` / `AggregateRoot(string createdBy, …)` (`AggregateRoot.cs:7`) | The aggregate itself, in the constructor |
+| `DomainEntity()` / `AggregateRoot()` — parameterless, assigns a fresh id only (`DomainEntity.cs:20`) | `DataOwnerHook`, on save |
+
+The parameterless pair exists because a `[CrudCreate]` constructor must not take an acting-user
+parameter: the generated create request's shape is that constructor's parameter list, so a trailing
+`createdBy` would become a caller-settable body field. `AccountGroup` takes the parameterless route for
+exactly that reason (`ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs:40`).
 
 ## Who is allowed to set them
 
@@ -26,36 +39,50 @@ every feature aggregate (`PurchaseOrder`, `Product`) ultimately uses.
 from a request property.** A generated create request deliberately carries no acting-user
 parameter.
 
-Two mechanisms enforce this, depending on which sample you're looking at:
+In this service one mechanism does it for every aggregate: **`DKNet.EfCore.DataAuthorization`'s
+`DataOwnerHook`, stamping on `SaveChanges`** from `IDataOwnerProvider.GetOwnershipKey()`. No aggregate
+stamps its own `CreatedBy`/`UpdatedBy` from a request field, and no create or update request in this
+service carries an acting-user property for a caller to set. Some hand-written domain methods do call
+`SetUpdatedBy` — `Account.ChangeStatus` (`Account.cs:147`) among them — but the value they pass comes
+from `ICallingSystemAccessor`, resolved from the credential; the hook then leaves that stamp alone
+(step 2 below).
 
-| | `Product` (automated) | `PurchaseOrder` (manual) |
-|---|---|---|
-| Mechanism | `DKNet.EfCore.DataAuthorization`'s `DataOwnerHook`, stamping on `SaveChanges` | `[FromClaim]` populates a request property; the aggregate stamps itself |
-| Where the acting user is read | `IDataOwnerProvider.GetOwnershipKey()` | `ClaimTypes.Name`, via the pipeline's contextual request population |
-| Use it when | The entity is plain CRUD and an audit stamp is all you need | A domain method needs the acting user's identity as domain data, not just an audit stamp |
+> The template this service was scaffolded from also demonstrates a second shape — `[FromClaim]`
+> populating a request property that the aggregate then stamps itself, shown there on the fictional
+> `PurchaseOrder` sample. **This service does not use it for audit fields.** The pipeline's
+> `[FromClaim]` population is still wired (`DKNet.Accounts.Api/Program.cs:23`), and the same idea
+> appears once for a different purpose — `RecordPostingRequest.RecordedBy`
+> (`ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs:43`) — but the value a
+> posting is attributed to comes from `ICallingSystemAccessor`, not from the body.
 
-### Automated sample (`Product`) — the hook stamps it
+### How the acting identity is resolved
 
-`DKNet.Accounts.Domains/Features/AutomatedSample/Entities/Product.cs`'s `[CrudCreate]` constructor takes
-only `name` and `price`. There is no `createdBy`/`byUser` parameter to spoof, because the generated
-create request's shape comes straight from that constructor's parameter list.
+`DKNet.Accounts.Api/Configs/Handlers/PrincipalProvider.cs` implements `IPrincipalProvider` (which
+extends `IDataOwnerProvider`, adding `ProfileId`/`Email`/`UserName`). `GetOwnershipKey()` returns, in
+order:
 
-`CreatedBy`/`UpdatedBy` are stamped instead by `DKNet.EfCore.DataAuthorization`'s `DataOwnerHook`,
-wired via:
+1. The caller's **subject claim** — the first non-empty of
+   `http://schemas.microsoft.com/identity/claims/objectidentifier`, `oid`, `ClaimTypes.NameIdentifier`,
+   `sub` (`PrincipalProvider.cs:76`).
+2. Failing that, the caller's **`client_id` claim** (`PrincipalProvider.cs:94`) — the same claim
+   `CallingSystemAccessor` reads. This service authenticates machine-to-machine callers, whose
+   credentials carry no subject claim at all; without this fallback such a caller's first write would
+   be refused by `EnsureOwnershipResolvable` (see [below](#when-the-caller-cannot-be-attributed))
+   rather than attributed.
+3. For an unauthenticated caller, `SharedConsts.SystemAccount` (`PrincipalProvider.cs:68`).
 
-- `DKNet.Accounts.AppServices/Share/IPrincipalProvider.cs` — extends `IDataOwnerProvider`, adding
-  `ProfileId`/`Email`/`UserName` read from the bearer token's claims.
-- `DKNet.Accounts.Api/Configs/Handlers/PrincipalProvider.cs` — the implementation. `GetOwnershipKey()`
-  returns the caller's subject claim, never their name: the first non-empty of
-  `http://schemas.microsoft.com/identity/claims/objectidentifier`, `oid`,
-  `ClaimTypes.NameIdentifier`, `sub`. When the caller is not authenticated it returns
-  `SharedConsts.SystemAccount` instead. (`ProfileId` on the same class exposes that key parsed as a
-  `Guid`, or `Guid.Empty` when it does not parse — it is a convenience for domain code, not what
-  the hook stamps.)
-- `DKNet.Accounts.Api/Configs/ServiceConfigs.cs`: `.AddDataOwnerProvider<CoreDbContext, PrincipalProvider>()`
-  registers the provider and wires `DataOwnerHook` onto `CoreDbContext`.
+`ProfileId` on the same class exposes that key parsed as a `Guid`, or `Guid.Empty` when it does not
+parse — a convenience for domain code, not what the hook stamps.
 
-On `SaveChanges`, `DataOwnerHook`:
+`DKNet.Accounts.Api/Configs/ServiceConfigs.cs`: `.AddDataOwnerProvider<CoreDbContext, PrincipalProvider>()`
+registers the provider and wires `DataOwnerHook` onto `CoreDbContext`.
+
+**`ICallingSystemAccessor` is deliberately separate.** `CallingSystemAccessor.cs:12` reads `client_id`
+and nothing else, and it is what handlers pass into domain methods and record on a posting's
+`callingSystem`. The two answer different questions — who acted, versus which machine called — and a
+handler that reached for the wrong one would misattribute a ledger entry.
+
+### What the hook does on save
 
 1. Stamps `CreatedBy`/ownership on every newly-added entity, from `IDataOwnerProvider.GetOwnershipKey()`.
 2. On a modified entity, stamps `UpdatedBy`/`UpdatedOn` from the same ownership key. The hook first
@@ -65,39 +92,22 @@ On `SaveChanges`, `DataOwnerHook`:
 3. Guards `IOwnedBy.OwnedBy` on a modified entity against reassignment to a key the current context
    doesn't hold, preventing cross-tenant transfer.
 
-Because the payload has no acting-user field at all, there is nothing for a caller to smuggle in.
-This is proven by `DKNet.Accounts.App.Tests/Integration/AutomatedSample/V1/ProductSecurityTests.cs`:
-`Create_ShouldStampCreatedByFromAuthenticatedCallersOwnershipKey`,
-`Create_ShouldIgnoreAnyExtraActingUserFieldInThePayload`, and
-`Update_ShouldStampUpdatedByFromAuthenticatedCallersOwnershipKey` all assert the stamped value
-matches the authenticated caller, never an attacker-supplied one.
+Because no create or update payload has an acting-user field, there is nothing for a caller to smuggle
+in. Three acceptance scenarios in
+`ApiEndpoints/DKNet.Accounts.App.BDDTests/Features/Ledger/AttributeCrudMigration.feature` pin this end
+to end: *"A new account group records the calling system as its author"*, *"An author named in the
+request payload is ignored"* (which sends an `author` field and asserts it is not what is stored), and
+*"A rename through the generated route records the acting system as its modifier"*, which asserts
+`UpdatedBy` after a `PUT` rename — the case that proves the hook covers the generated update routes and
+not just creates.
 
-### Manual sample (`PurchaseOrder`) — `[FromClaim]` populates it, the aggregate stamps it itself
-
-`PurchaseOrder` is hand-written end to end — no declarative attribute raises its event or stamps its
-audit fields. Instead, `DKNet.Accounts.AppServices/ManualSample/V1/Actions/Create.cs` declares:
-
-```csharp
-[FromClaim(ClaimTypes.Name)]
-public string? ByUser { get; set; }
-```
-
-The endpoint pipeline's contextual request population (`DKNet.AspCore.Extensions`, see
-[api-pipeline.md](./api-pipeline.md)) overwrites `ByUser` from the caller's `ClaimTypes.Name` claim
-**before** validation and before the handler runs. Any value the caller sent in the body or query
-string is discarded unconditionally, never trusted. The handler then passes `request.ByUser` into
-the aggregate's constructor (`PurchaseOrder(customerName, amount, byUser)` → `base(byUser)` →
-`SetCreatedBy`), and `PurchaseOrder.ChangeAmount` calls `SetUpdatedBy(userId)` itself on update.
-
-Use this pattern instead of relying on `DataOwnerHook` when a domain method needs the acting user's
-identity as domain data, not just an audit stamp. For example, to pass it into a further business
-rule, or when the entity's own methods (not just `SaveChanges`) need to record who called them.
-
-This is pinned by `DKNet.Accounts.App.Tests/Integration/ManualSample/V1/PurchaseOrderSecurityTests.cs`:
-`Create_ShouldAttributeCreatedByToAuthenticatedCaller_IgnoringPayloadByUser` and
-`Update_ShouldAttributeUpdatedByToAuthenticatedCaller_IgnoringPayloadByUser` both send
-`"byUser": "someone-else"` in the payload and assert the stored value is the authenticated caller's
-name, never the spoofed one.
+The `client_id` fallback in step 2 is pinned twice: in isolation by `PrincipalProviderTests`, and end
+to end by
+`ApiEndpoints/DKNet.Accounts.App.Tests/Integration/Ledger/ClientIdOnlyCallerTests.cs`, which creates a
+group as a caller carrying `client_id` and a scope and **no subject claim at all** — the real
+machine-to-machine credential shape — and asserts `CreatedBy` comes back as that client id. Remove the
+fallback and that create turns into a `403` rather than a `201`, because
+`EnsureOwnershipResolvable` refuses a row it cannot attribute.
 
 ## Row-level ownership filtering
 

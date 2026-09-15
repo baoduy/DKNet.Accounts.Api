@@ -3,10 +3,12 @@ using Microsoft.Extensions.Configuration;
 using SlimMessageBus.Host;
 using SlimMessageBus.Host.Memory;
 using SlimMessageBus.Host.Serialization.SystemTextJson;
+using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices;
 using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
+using DKNet.Accounts.AppServices.Accounts.V1.Specs;
 using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Extensions;
 using DKNet.Accounts.Share;
@@ -86,11 +88,15 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
     [Fact]
     public async Task GetById_ProjectsClassificationStatusAndCurrency_AgainstRealPostgres()
     {
+        // Row 8 moved to the generic MapGetById<Account, Guid, AccountDto> mapper (DRK-1277 §11/§12), which
+        // hides its own specification type — this drives the same repository.FirstOrDefaultAsync<TEntity,
+        // TModel> Mapster projection over AccountDto that mapper calls, the thing this test actually guards.
         var id = await SeedAccountAsync();
         using var scope = _services.CreateScope();
-        var handler = new GetAccountByIdQueryHandler(scope.ServiceProvider.GetRequiredService<IRepositorySpec>());
+        var repository = scope.ServiceProvider.GetRequiredService<IRepositorySpec>();
 
-        var dto = await handler.OnHandle(new GetAccountByIdQuery { Id = id }, CancellationToken.None);
+        var dto = await repository.FirstOrDefaultAsync<Account, AccountDto>(
+            new SpecGetAccount(byId: id), CancellationToken.None);
 
         dto.ShouldNotBeNull();
         dto.Classification.ShouldBe(AccountClassification.Liability);
@@ -101,11 +107,14 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
     [Fact]
     public async Task List_ProjectsClassificationStatusAndCurrency_AgainstRealPostgres()
     {
+        // Row 7 moved to the generic MapGetList<Account, Guid, AccountDto> mapper (DRK-1277 §11/§12) — same
+        // reasoning as GetById above.
         var id = await SeedAccountAsync();
         using var scope = _services.CreateScope();
-        var handler = new ListAccountsQueryHandler(scope.ServiceProvider.GetRequiredService<IRepositorySpec>());
+        var repository = scope.ServiceProvider.GetRequiredService<IRepositorySpec>();
 
-        var page = await handler.OnHandle(new ListAccountsQuery(), CancellationToken.None);
+        var page = await repository.ToPagedListAsync<Account, AccountDto>(
+            new SpecListAccounts(), 1, 20, CancellationToken.None);
 
         var dto = page.ShouldHaveSingleItem();
         dto.Id.ShouldBe(id);

@@ -1,5 +1,12 @@
 # EF Core Domain Events
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 How this template wires `DKNet.EfCore.Events`. Events are collected on the entity during a unit of
 work and dispatched only after `SaveChanges` succeeds, so a handler never runs against a write that
 gets rolled back. For the package's own API surface — the `AddEvent`/`IEventPublisher` contracts,

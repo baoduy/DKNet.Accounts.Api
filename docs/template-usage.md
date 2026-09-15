@@ -1,5 +1,12 @@
 # Template Usage Reference
 
+> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
+> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
+> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
+> mechanics described are real — the payloads and route names are not. This service's own slices are
+> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
+> [the README's API contract](../README.md#the-api-contract).
+
 How to install `DKNet.DKNet.Accounts.Template`, scaffold a new solution from it, and run, test, migrate,
 and publish that solution.
 
@@ -109,8 +116,7 @@ The Aspire path leaves you a populated database: the migration's three reference
 plus 10 000 generated products and 10 000 generated purchase orders, freshly randomised on every
 start — with one deliberate exception. Exactly one of those products is fixed, not random:
 `Demo-Product-With-Supplier-Data` is the only row carrying both role-gated `[SensitiveData]`
-properties, so the response filtering is visible from a running host
-([`docs/samples/automated-products/README.md`](./samples/automated-products/README.md#platform-capabilities-it-carries)).
+properties, so the response filtering is visible from a running host.
 It counts toward the requested total rather than adding to it.
 
 To start empty instead, set `"SampleData": { "RecordsPerEntity": 0 }` in
