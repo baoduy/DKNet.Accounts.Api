@@ -6,10 +6,10 @@ using DKNet.Accounts.App.Tests.Integration.Support;
 namespace DKNet.Accounts.App.Tests.Architecture;
 
 /// <summary>
-/// DRK-1277 §3 row 16: enumerates the live endpoint data source and asserts every one of the sixteen ledger
-/// routes (§2) still carries the exact scope it names, whatever mechanism registered that route — hand-mapped
-/// or generated. The regression this guards: a route silently losing its scope requirement because a future
-/// change swaps a hand-mapped registration for one whose path never chains
+/// DRK-1277 §3 row 16 (tightened per §11/§12): enumerates the live endpoint data source and asserts every
+/// ledger route still carries the exact scope it names, whatever mechanism registered that route —
+/// hand-mapped or generated. The regression this guards: a route silently losing its scope requirement
+/// because a future change swaps a hand-mapped registration for one whose path never chains
 /// <c>ConditionalScopeAuthorization.RequireScope</c> (or an equivalent).
 /// </summary>
 public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFixture<LedgerApiFixture>
@@ -22,12 +22,17 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
             [("POST", $"{V1}/account-groups/")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/account-groups/")] = ScopeNames.AccountsRead,
             [("GET", $"{V1}/account-groups/{{id:guid}}")] = ScopeNames.AccountsRead,
+            [("PUT", $"{V1}/account-groups/{{id:guid}}")] = ScopeNames.AccountsWrite,
+            [("PUT", $"{V1}/account-groups/{{id:guid}}/change-description")] = ScopeNames.AccountsWrite,
+            [("PUT", $"{V1}/account-groups/{{id:guid}}/change-metadata")] = ScopeNames.AccountsWrite,
             [("PATCH", $"{V1}/account-groups/{{id:guid}}")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/account-groups/{{id:guid}}/balances")] = ScopeNames.AccountsRead,
             [("POST", $"{V1}/accounts/")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/accounts/")] = ScopeNames.AccountsRead,
             [("GET", $"{V1}/accounts/{{id:guid}}")] = ScopeNames.AccountsRead,
             [("GET", $"{V1}/accounts/{{id:guid}}/balance")] = ScopeNames.AccountsRead,
+            [("PUT", $"{V1}/accounts/{{id:guid}}")] = ScopeNames.AccountsWrite,
+            [("PUT", $"{V1}/accounts/{{id:guid}}/change-metadata")] = ScopeNames.AccountsWrite,
             [("PATCH", $"{V1}/accounts/{{id:guid}}")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/accounts/{{id:guid}}/statement")] = ScopeNames.PostingsRead,
             [("GET", $"{V1}/currencies/")] = ScopeNames.AccountsRead,

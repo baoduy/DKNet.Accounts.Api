@@ -57,7 +57,7 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var id = await OpenAccountAsync();
 
         var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{id}", new { name = "New Name" }));
+            AsPayHub(HttpMethod.Put, $"{AccountsPath}/{id}", new { name = "New Name" }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -86,7 +86,7 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     {
         var id = await OpenAccountAsync();
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{id}", new
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{AccountsPath}/{id}/change-metadata", new
         {
             metadata = new Dictionary<string, string> { ["region"] = "SG" }
         }));
@@ -115,7 +115,16 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     public async Task Update_ReturnsNotFound_ForAnUnknownAccount()
     {
         var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{Guid.NewGuid()}", new { name = "x" }));
+            AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Renaming_AnUnknownAccount_IsRefused()
+    {
+        var response = await Client.SendAsync(
+            AsPayHub(HttpMethod.Put, $"{AccountsPath}/{Guid.NewGuid()}", new { name = "x" }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

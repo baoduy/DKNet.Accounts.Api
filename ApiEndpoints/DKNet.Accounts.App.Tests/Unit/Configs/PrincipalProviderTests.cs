@@ -98,6 +98,35 @@ public sealed class PrincipalProviderTests
         provider.GetOwnershipKey().ShouldBeNull();
     }
 
+    /// <summary>DRK-1277 §11/§12: the fallback that lets a real machine-to-machine credential (no subject
+    /// claim at all) still resolve an ownership key, the same "client_id" claim
+    /// <see cref="DKNet.Accounts.Api.Configs.Handlers.CallingSystemAccessor"/> reads.</summary>
+    [Fact]
+    public void GetOwnershipKey_ShouldFallBackToClientId_WhenNoSubjectClaimIsPresent()
+    {
+        var provider = CreateProvider(AuthenticatedContext(new Claim("client_id", "PayHub")));
+
+        provider.GetOwnershipKey().ShouldBe("PayHub");
+    }
+
+    [Fact]
+    public void GetOwnershipKey_ShouldPreferSubjectClaim_OverClientId_WhenBothArePresent()
+    {
+        var provider = CreateProvider(AuthenticatedContext(
+            new Claim(ClaimTypes.NameIdentifier, "opaque-pairwise-sub"),
+            new Claim("client_id", "PayHub")));
+
+        provider.GetOwnershipKey().ShouldBe("opaque-pairwise-sub");
+    }
+
+    [Fact]
+    public void GetOwnershipKey_ShouldReturnNull_WhenClientIdClaimValueIsEmpty()
+    {
+        var provider = CreateProvider(AuthenticatedContext(new Claim("client_id", "   ")));
+
+        provider.GetOwnershipKey().ShouldBeNull();
+    }
+
     [Fact]
     public void GetAccessibleKeys_ShouldBeEmpty_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
     {

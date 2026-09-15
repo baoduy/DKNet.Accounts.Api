@@ -34,16 +34,12 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .Produces<AccountGroupDto>(StatusCodes.Status201Created)
             .WithDescription("Create an account group.");
 
-        group.MapGet("/", async (
-                [AsParameters] ListAccountGroupsQuery query,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var page = await bus.Send(query, cancellationToken: ct);
-                return Results.Ok(page);
-            })
+        // List (GEN, DRK-1277 §11/§12): a list is not a mutation, but the owner's widened mandate takes the
+        // generated list syntax/envelope wherever a caller can still ask everything the old shape let it ask
+        // (R4) — plain generic entity mapper, no SlimBus handler, R3 doesn't apply.
+        group.MapGetList<AccountGroup, Guid, AccountGroupDto>()
             .RequireScope(group, ScopeNames.AccountsRead)
-            .WithDescription("List account groups, filterable by code, type, status and parent.");
+            .WithDescription("List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer.");
 
         // Get-by-id (GEN, DRK-1277 §3 row 9): plain generic entity mapper — no SlimBus handler or [CrudCreate]
         // /[CrudUpdate]/[CrudAction] involved, so none of the Map{Entity}Crud caveats above apply. The
@@ -53,6 +49,30 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read one account group.");
 
+        // Rename (GEN, DRK-1277 §11/§12): [CrudUpdate] on AccountGroup.Rename — the first such member on the
+        // type, so the generator lands it on the plain "{id}" route. Generated request AND handler; only the
+        // route registration is a direct call instead of going through Map{Entity}Crud (whose composite
+        // discards the RouteHandlerBuilder it needs to chain .RequireScope onto) — MapPutById itself returns
+        // a chainable builder, so no hand-written plumbing is added. Rename's only failure mode is 404
+        // (NotFoundError, mapped by the default .Response()), so R3 does not block this one.
+        group.MapPutById<RenameAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Rename an account group.");
+
+        // ChangeDescription/ChangeMetadata (GEN, DRK-1277 §11/§12): same reasoning as Rename — each additional
+        // [CrudUpdate] member lands on "{id}/{kebab-case-method-name}".
+        group.MapPutById<ChangeDescriptionAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}/change-description")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Change an account group's description.");
+
+        group.MapPutById<ChangeMetadataAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}/change-metadata")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Change an account group's metadata.");
+
+        // Partial update (HAND, narrowed, DRK-1277 §11/§12): rename, description and metadata moved off this
+        // route onto their own generated routes above; only Reparent (R7 ancestor-cycle walk) and
+        // Activate/Close (GROUP_HOLDS_BALANCE refusal) remain, since neither's business refusal has anywhere
+        // to live in a generated route (R3).
         group.MapPatch("{id:guid}", async (
                 Guid id,
                 UpdateAccountGroupRequest req,
@@ -64,8 +84,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             })
             .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
-                "Change a group's name, description, status, parent and metadata. " +
-                "{\"status\":\"Closed\"} closes the group.");
+                "Change a group's status and parent. {\"status\":\"Closed\"} closes the group.");
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,

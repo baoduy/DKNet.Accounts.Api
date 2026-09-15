@@ -124,6 +124,18 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         return group?.CreatedBy;
     }
 
+    /// <summary>Reads <see cref="AccountGroup.UpdatedBy"/> directly — the one new scenario DRK-1277 §12
+    /// authorises (the generated Rename route no longer calls <c>SetUpdatedBy</c> itself, per C3; only
+    /// <c>DataOwnerHook</c> stamping it on save proves the modifier is still recorded). Same no-new-seam
+    /// reasoning as <see cref="ReadGroupCreatedByAsync"/>.</summary>
+    private async Task<string?> ReadGroupUpdatedByAsync(Guid groupId)
+    {
+        using var scope = factory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+        var group = await db.Set<AccountGroup>().AsNoTracking().FirstOrDefaultAsync(g => g.Id == groupId);
+        return group?.UpdatedBy;
+    }
+
     /// <summary>Backdates a group's CreatedOn column directly via SQL — there is no API to set it (creation is
     /// always "now"), and no new seam is needed since the DB is already reachable the same way
     /// <see cref="Support.BddApiFactory.ResetDatabaseAsync"/> reaches it for the truncate.</summary>
@@ -449,6 +461,16 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     {
         var createdBy = await ReadGroupCreatedByAsync(LastGroupId);
         createdBy.ShouldBe(expectedAuthor);
+    }
+
+    /// <summary>DRK-1277 §12's one authorised new scenario: pins that <c>DataOwnerHook</c> — not the
+    /// generated Rename handler, which no longer calls <c>SetUpdatedBy</c> per C3 — stamps <c>UpdatedBy</c>
+    /// on the generated route.</summary>
+    [Then(@"the group's modifier is recorded as ""([^""]+)""")]
+    public async Task ThenTheGroupsModifierIsRecordedAs(string expectedModifier)
+    {
+        var updatedBy = await ReadGroupUpdatedByAsync(LastGroupId);
+        updatedBy.ShouldBe(expectedModifier);
     }
 
     [Then(@"the group's name is ""([^""]+)""")]

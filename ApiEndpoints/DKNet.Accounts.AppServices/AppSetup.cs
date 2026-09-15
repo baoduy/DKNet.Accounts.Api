@@ -1,4 +1,5 @@
-﻿using DKNet.Accounts.Domains.Features.Accounts.Entities;
+﻿using DKNet.AspCore.Extensions.Endpoints;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using AccountDto = DKNet.Accounts.AppServices.Accounts.V1.AccountDto;
 using AccountBalanceDto = DKNet.Accounts.AppServices.Accounts.V1.AccountBalanceDto;
@@ -54,6 +55,13 @@ public static class AppSetup
         services
             .AddSingleton(TypeAdapterConfig.GlobalSettings)
             .AddScoped<IMapper, ServiceMapper>();
+
+        // The generic list endpoints (DKNet.AspCore.Extensions' MapGetList, DRK-1277 §11/§12) default to a
+        // 3-month "recent activity" window on audited entities when a caller supplies neither fromDate nor
+        // toDate. This ledger's bare listings must still return the caller's full history (R4: what can be
+        // answered must not shrink) — disabled here instead of per-call, so every generated list route on
+        // every entity gets the same "no default window" behaviour.
+        services.AddListQueryOptions(options => options.DefaultActivityWindowMonths = 0);
 
         return services;
     }

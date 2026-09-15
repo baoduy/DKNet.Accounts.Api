@@ -29,30 +29,24 @@ public class AccountGroupTests
     }
 
     [Fact]
-    public void NewGroup_LeavesCreatedByUnset_UntilStampCreatedByIsCalled()
+    public void NewGroup_LeavesCreatedByUnset_ForDataOwnerHookToStampOnSave()
     {
-        // DRK-1277 C3: the [CrudCreate]-attributed constructor takes no acting-user parameter, so a
-        // generated request can never carry one. The create handler stamps it explicitly afterwards, from
-        // the trusted calling-system identity — never from DataOwnerHook, which resolves a human principal
-        // this machine-to-machine API never has (see AccountGroup.StampCreatedBy).
+        // DRK-1277 C3/§11/§12: the [CrudCreate]-attributed constructor takes no acting-user parameter, so a
+        // generated request can never carry one. CreatedBy is left unset here and stamped on save by
+        // DataOwnerHook/PrincipalProvider instead — never assigned in-process.
         var group = NewGroup();
 
         group.CreatedBy.ShouldBeNullOrEmpty();
-
-        group.StampCreatedBy("treasury-ops");
-
-        group.CreatedBy.ShouldBe("treasury-ops");
     }
 
     [Fact]
-    public void Rename_ChangesNameAndStampsUpdatedBy()
+    public void Rename_ChangesName()
     {
         var group = NewGroup();
 
-        group.Rename("New Name", "LedgerSync");
+        group.Rename("New Name");
 
         group.Name.ShouldBe("New Name");
-        group.LastModifiedBy.ShouldBe("LedgerSync");
     }
 
     [Fact]
@@ -60,7 +54,7 @@ public class AccountGroupTests
     {
         var group = NewGroup();
 
-        group.ChangeDescription(null, "PayHub");
+        group.ChangeDescription(null);
 
         group.Description.ShouldBeNull();
     }
@@ -71,7 +65,7 @@ public class AccountGroupTests
         var group = NewGroup();
         var metadata = new Dictionary<string, string> { ["region"] = "SG" };
 
-        group.ChangeMetadata(metadata, "PayHub");
+        group.ChangeMetadata(metadata);
 
         group.Metadata.ShouldBe(metadata);
     }

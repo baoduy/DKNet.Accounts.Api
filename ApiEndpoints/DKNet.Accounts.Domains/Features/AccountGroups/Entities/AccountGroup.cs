@@ -34,12 +34,8 @@ public sealed class AccountGroup : AggregateRoot
     /// <summary>
     /// Creates a new, active account group. No acting-user parameter (DRK-1277 C3) — this constructor is
     /// <see cref="CrudCreateAttribute"/>-generated into <c>CreateAccountGroupRequest</c>, so any trailing
-    /// user parameter would be a caller-settable body field. <c>CreatedBy</c> is stamped afterwards by
-    /// <see cref="StampCreatedBy"/>, called once by the hand-written create handler — this API is
-    /// machine-to-machine only, and <c>DataOwnerHook</c>'s generic <c>IPrincipalProvider</c> resolves a human
-    /// principal (a claim shape no calling system here ever carries; see
-    /// <c>ICallingSystemAccessor</c>/<c>CallingSystemAccessor</c>'s own remarks), so it cannot be relied on for
-    /// this stamp.
+    /// user parameter would be a caller-settable body field. <c>CreatedBy</c> is left unset here and stamped
+    /// on save by <c>DataOwnerHook</c>/<c>IPrincipalProvider</c> (DRK-1277 §11/§12).
     /// </summary>
     [CrudCreate]
     public AccountGroup(
@@ -50,7 +46,6 @@ public sealed class AccountGroup : AggregateRoot
         string ownerId,
         Guid? parentId,
         IReadOnlyDictionary<string, string>? metadata)
-        : base(Guid.NewGuid())
     {
         Code = code;
         Name = name;
@@ -91,29 +86,28 @@ public sealed class AccountGroup : AggregateRoot
     #region Methods
 
     /// <summary>
-    /// Stamps the creator explicitly. Called once, immediately after construction, by the hand-written
-    /// create handler using <c>ICallingSystemAccessor</c>'s trusted calling-system identity — never from any
-    /// request field, since this member is never attached to the generated request the way a constructor or
-    /// <see cref="Rename"/>'s <c>userId</c> parameter would be.
+    /// Renames the group. No acting-user parameter (DRK-1277 C3) — this is the first <see cref="CrudUpdateAttribute"/>
+    /// member declared on this type, so it lands on the plain <c>PUT {id}</c> route; <c>UpdatedBy</c> is left
+    /// for <c>DataOwnerHook</c> to stamp on save.
     /// </summary>
-    public void StampCreatedBy(string byUser) => SetCreatedBy(byUser);
-
-    public void Rename(string name, string userId)
+    [CrudUpdate]
+    public void Rename(string name)
     {
         Name = name;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeDescription(string? description, string userId)
+    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-description</c>.</summary>
+    [CrudUpdate]
+    public void ChangeDescription(string? description)
     {
         Description = description;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata, string userId)
+    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-metadata</c>.</summary>
+    [CrudUpdate]
+    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata)
     {
         Metadata = metadata;
-        SetUpdatedBy(userId);
     }
 
     /// <summary>

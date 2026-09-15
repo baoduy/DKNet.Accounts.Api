@@ -21,6 +21,13 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Then the group's name is "Operations Cash Pool"
 
   @new @integration
+  Scenario: A rename through the generated route records the acting system as its modifier
+    Given the account group "OPS-CASH" named "Operations Cash" exists
+    And the calling system "treasury-ops" is authorised to write accounts
+    When it renames the group to "Operations Cash Pool"
+    Then the group's modifier is recorded as "treasury-ops"
+
+  @new @integration
   Scenario: An account is renamed
     Given the account "1000000002" of currency "SGD" exists
     And the calling system "treasury-ops" is authorised to write accounts

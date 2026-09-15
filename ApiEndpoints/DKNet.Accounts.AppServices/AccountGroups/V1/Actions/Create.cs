@@ -58,8 +58,9 @@ internal sealed class CreateAccountGroupCommandHandler(
             request.OwnerId,
             request.ParentId,
             request.Metadata);
-        group.StampCreatedBy(byUser);
 
+        // CreatedBy is left unset by the constructor and stamped on save by DataOwnerHook/PrincipalProvider
+        // (DRK-1277 §11/§12) — not here.
         await repository.AddAsync(group, cancellationToken);
 
         // Lazy mapping — resolves AFTER SaveChanges, so generated/audit fields are populated.
