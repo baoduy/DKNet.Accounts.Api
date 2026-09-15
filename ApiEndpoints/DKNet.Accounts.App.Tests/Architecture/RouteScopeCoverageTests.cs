@@ -12,9 +12,21 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 /// because a future change swaps a hand-mapped registration for one whose path never chains
 /// <c>ConditionalScopeAuthorization.RequireScope</c> (or an equivalent).
 /// </summary>
+/// <remarks>
+/// Fails closed both ways (pr-reviewer, round 1): <see cref="ExpectedScopes"/> is walked to catch a
+/// documented route losing its scope, and every live route under a ledger prefix is walked back against
+/// <see cref="ExpectedScopes"/> to catch the opposite — a NEW route (e.g. anything ever routed through the
+/// generated <c>Map{Entity}Crud</c> composite, whose <c>MapDeleteById</c> call this API never invokes today)
+/// appearing with no entry, and therefore no asserted scope, at all.
+/// </remarks>
 public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFixture<LedgerApiFixture>
 {
     private const string V1 = "/v{version:apiVersion}";
+
+    private static readonly string[] LedgerPathPrefixes =
+    [
+        $"{V1}/account-groups", $"{V1}/accounts", $"{V1}/postings", $"{V1}/currencies"
+    ];
 
     private static readonly IReadOnlyDictionary<(string Method, string Path), string> ExpectedScopes =
         new Dictionary<(string, string), string>
@@ -77,5 +89,29 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
 
         missing.ShouldBeEmpty($"Routes not found in the live endpoint data source: {string.Join("; ", missing)}");
         wrongScope.ShouldBeEmpty($"Routes missing their documented scope: {string.Join("; ", wrongScope)}");
+
+        // Fail closed: a ledger route present in the live data source but absent from ExpectedScopes would
+        // otherwise stay green with no scope assertion at all.
+        var undocumented = new List<string>();
+        foreach (var endpoint in routeEndpoints)
+        {
+            var path = endpoint.RoutePattern.RawText;
+            if (path is null || !LedgerPathPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            var methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [];
+            foreach (var method in methods)
+            {
+                if (!ExpectedScopes.ContainsKey((method, path)))
+                {
+                    undocumented.Add($"{method} {path}");
+                }
+            }
+        }
+
+        undocumented.ShouldBeEmpty(
+            $"Ledger routes present but not asserted by this test: {string.Join("; ", undocumented)}");
     }
 }

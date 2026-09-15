@@ -42,7 +42,9 @@ public static class AppSetup
         // map: ProjectToType silently omits an unmatched member from the SELECT list rather than erroring, so
         // the DTO field would otherwise come back null/default (DRK-1247 B1/B2).
         TypeAdapterConfig<Account, AccountDto>.NewConfig()
-            .Map(dest => dest.Currency, src => src.CurrencyCode);
+            .Map(dest => dest.Currency, src => src.CurrencyCode)
+            .Map(dest => dest.AvailableBalanceAmount, src => src.AvailableBalance)
+            .Map(dest => dest.AccountOpenedOn, src => src.OpenedOn);
 
         TypeAdapterConfig<Account, AccountBalanceDto>.NewConfig()
             .Map(dest => dest.Currency, src => src.CurrencyCode);

@@ -93,7 +93,7 @@ internal sealed class PrincipalProvider(IHttpContextAccessor accessor) : IPrinci
         // gone — production still has no name claim to fall further back to until that token work lands.
         if (string.IsNullOrWhiteSpace(_ownershipKey))
         {
-            var clientId = context.User.FindFirst("client_id");
+            var clientId = context.User.FindFirst(c => string.Equals(c.Type, "client_id", StringComparison.OrdinalIgnoreCase));
             if (clientId != null && !string.IsNullOrWhiteSpace(clientId.Value))
             {
                 _ownershipKey = clientId.Value;
