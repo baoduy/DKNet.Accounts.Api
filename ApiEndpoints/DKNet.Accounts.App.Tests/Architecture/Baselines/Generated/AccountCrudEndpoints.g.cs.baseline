@@ -13,16 +13,32 @@ public static class AccountCrudEndpointExtensions
     {
         var options = new global::DKNet.AspCore.Extensions.Endpoints.CrudMapOptions();
         configure?.Invoke(options);
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetById))
-            group.MapGetById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>();
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetList))
-            group.MapGetList<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>();
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Delete))
-            group.MapDeleteById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid>();
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update))
-            group.MapPutById<RenameAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}");
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update))
-            group.MapPutById<ChangeMetadataAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}/change-metadata");
+        options.ValidateRouteNames("Account", "GetById", "GetList", "Delete", "Rename", "ChangeMetadata");
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetById) && !options.IsExcluded("GetById"))
+        {
+            var routeBuilder = group.MapGetById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>();
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetById, "GetById", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetList) && !options.IsExcluded("GetList"))
+        {
+            var routeBuilder = group.MapGetList<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>();
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetList, "GetList", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Delete) && !options.IsExcluded("Delete"))
+        {
+            var routeBuilder = group.MapDeleteById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, DeleteAccountRequest>();
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Delete, "Delete", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update) && !options.IsExcluded("Rename"))
+        {
+            var routeBuilder = group.MapPutById<RenameAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}");
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "Rename", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update) && !options.IsExcluded("ChangeMetadata"))
+        {
+            var routeBuilder = group.MapPutById<ChangeMetadataAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}/change-metadata");
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "ChangeMetadata", routeBuilder);
+        }
         return group;
     }
 }

@@ -26,3 +26,10 @@ public sealed partial record ChangeMetadataAccountRequest :
     public global::System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get; init; }
 }
 
+/// <summary>Delete request generated for Account, carrying the target's key bound from the route.</summary>
+public sealed partial record DeleteAccountRequest : global::DKNet.SlimBus.Extensions.Fluents.Requests.IWithKey<global::System.Guid>
+{
+    /// <summary>The target Account identifier (bound from route).</summary>
+    public global::System.Guid Id { get; set; }
+}
+

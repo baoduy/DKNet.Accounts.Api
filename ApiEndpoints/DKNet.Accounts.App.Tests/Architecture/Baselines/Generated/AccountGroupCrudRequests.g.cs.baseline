@@ -63,3 +63,10 @@ public sealed partial record ChangeMetadataAccountGroupRequest :
     public global::System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get; init; }
 }
 
+/// <summary>Delete request generated for AccountGroup, carrying the target's key bound from the route.</summary>
+public sealed partial record DeleteAccountGroupRequest : global::DKNet.SlimBus.Extensions.Fluents.Requests.IWithKey<global::System.Guid>
+{
+    /// <summary>The target AccountGroup identifier (bound from route).</summary>
+    public global::System.Guid Id { get; set; }
+}
+
