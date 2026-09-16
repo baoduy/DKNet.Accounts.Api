@@ -404,8 +404,8 @@ per route.
 
 ## 7. Correct a mistake — reverse, never delete
 
-There is no delete route in this service. A posting recorded in error is corrected by reversing it,
-which writes an *opposing* posting and marks the original `reversed`.
+The ledger has no delete route. A posting recorded in error is corrected by reversing it, which writes
+an *opposing* posting and marks the original `reversed`.
 
 ```bash
 curl -X POST "$BASE/v1/postings/3f0b1e4c-6a2d-4f1a-9c33-5d7b21e9a401/reverse" \
@@ -586,9 +586,13 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/account-groups/b85813c0-3053-4d
 A group holding `100.00 SGD` and `80.00 USD` returns two lines. There is no combined total across
 currencies, and there never will be — the service has no exchange rate and is not going to invent one.
 
+This read sums accounts *by* group id and never looks the group up, so a group holding no account
+answers `200` with `[]` — and so does an identifier that matches no group at all. An empty list is not
+evidence that the group exists; read the group itself if you need that.
+
 ## 10. Closing up
 
-Closing is a `PATCH`, not a `DELETE`:
+An account closes with a `PATCH`, and reopens with the same call carrying `{"status":"Active"}`:
 
 ```bash
 curl -X PATCH "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331" \
@@ -596,9 +600,37 @@ curl -X PATCH "$BASE/v1/accounts/e87b6feb-4741-4af3-83f3-1bb4d4771331" \
   -d '{ "status": "Closed" }'
 ```
 
+A group closes and reopens on its own routes, each of which takes no request body — the group is named
+entirely by the address:
+
+```bash
+curl -X POST "$BASE/v1/account-groups/b85813c0-3053-4d35-a0ef-3f2863f83fa9/close" \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X POST "$BASE/v1/account-groups/b85813c0-3053-4d35-a0ef-3f2863f83fa9/activate" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+A `PATCH` to `/v1/account-groups/{id}` is no longer offered at all — that address answers `405`.
+
 An account cannot be closed while it holds any balance or any held amount (`ACCOUNT_HOLDS_BALANCE`); a
 group cannot be closed while any account it holds carries a balance (`GROUP_HOLDS_BALANCE`). Empty them
-first — by posting, not by deleting. Reopening is the same call with `{"status":"Active"}`.
+first — by posting, not by deleting.
+
+A group that holds no account can also be deleted outright, which is the one delete route in the
+service:
+
+```bash
+curl -X DELETE "$BASE/v1/account-groups/b85813c0-3053-4d35-a0ef-3f2863f83fa9" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+It answers `204` with no body. While the group still holds any account the delete is refused
+`422 GROUP_NOT_EMPTY` — closed, zero-balance accounts included, because those accounts still exist.
+
+**Calling this from a browser?** The shipped `Cors:AllowedMethods` default is
+`GET, POST, PUT, PATCH` — it does not include `DELETE`, so a browser front-end that deletes a group has
+to add `DELETE` to that list. See [`configuration-reference.md`](configuration-reference.md#cors).
 
 ## Where to go next
 
