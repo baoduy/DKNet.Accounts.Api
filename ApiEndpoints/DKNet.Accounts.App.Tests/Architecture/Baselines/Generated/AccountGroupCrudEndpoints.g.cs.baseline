@@ -13,7 +13,7 @@ public static class AccountGroupCrudEndpointExtensions
     {
         var options = new global::DKNet.AspCore.Extensions.Endpoints.CrudMapOptions();
         configure?.Invoke(options);
-        options.ValidateRouteNames("AccountGroup", "GetById", "GetList", "Create", "Delete", "Rename", "ChangeDescription", "ChangeMetadata");
+        options.ValidateRouteNames("AccountGroup", "GetById", "GetList", "Create", "Delete", "Rename", "ChangeDescription", "ChangeMetadata", "Activate", "Close");
         if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetById) && !options.IsExcluded("GetById"))
         {
             var routeBuilder = group.MapGetById<global::DKNet.Accounts.Domains.Features.AccountGroups.Entities.AccountGroup, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>();
@@ -48,6 +48,16 @@ public static class AccountGroupCrudEndpointExtensions
         {
             var routeBuilder = group.MapPutById<ChangeMetadataAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/change-metadata");
             options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "ChangeMetadata", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action) && !options.IsExcluded("Activate"))
+        {
+            var routeBuilder = group.MapActionById<ActivateAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/activate", "POST");
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action, "Activate", routeBuilder);
+        }
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action) && !options.IsExcluded("Close"))
+        {
+            var routeBuilder = group.MapActionById<CloseAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/close", "POST");
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action, "Close", routeBuilder);
         }
         return group;
     }

@@ -189,7 +189,7 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
         else
         {
             state.Response = await client.SendAsCallerAsync(
-                state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
+                state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close");
         }
 
         state.Values["lastGroupId"] = groupId.ToString();
@@ -200,7 +200,7 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
     {
         var groupId = await GetOrCreateGroupIdAsync(code);
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed", author = claimedAuthor });
+            state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close", new { author = claimedAuthor });
         state.Values["lastGroupId"] = groupId.ToString();
     }
 

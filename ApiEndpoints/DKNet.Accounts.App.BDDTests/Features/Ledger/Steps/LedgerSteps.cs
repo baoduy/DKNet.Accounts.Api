@@ -462,8 +462,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task WhenPayHubAsksToClose(string groupCode)
     {
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close");
     }
 
     [When(@"PayHub reads the balances of ""([^""]+)""")]

@@ -1,3 +1,4 @@
+using FluentValidation;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.AccountGroups.V1;
@@ -16,22 +17,14 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
-        // Create (GEN-REQ, DRK-1277 §3 row 9): CreateAccountGroupRequest is generated from AccountGroup's
-        // [CrudCreate] constructor (DKNet.Accounts.AppServices.Crud), but the ROUTE stays hand-mapped — the
-        // generated Map{Entity}Crud composite's MapPost hardcodes the package's default FluentResults->IResult
-        // conversion (400 on any failure), which cannot express this service's LedgerErrors->422 mapping (R3,
-        // LedgerResultResponseExtensions.ToLedgerResponse). Handler stays hand-written for the duplicate-code
-        // pre-check.
-        group.MapPost("/", async (
-                CreateAccountGroupRequest req,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var result = await bus.Send(req, cancellationToken: ct);
-                return result.ToLedgerResponse(isCreated: true);
-            })
+        // Create (GEN, DRK-1418 §3 row 8): CreateAccountGroupRequest is generated from AccountGroup's
+        // [CrudCreate] constructor; the duplicate-code refusal now lives in
+        // CreateAccountGroupCommandValidator (FluentValidation), so the route can use the package's own
+        // MapPost — its failure path answers through LedgerErrorResponseOptions (AddErrorResponses,
+        // FluentValidationConfig), which gives DUPLICATE_GROUP_CODE the same 422+code shape
+        // LedgerResultResponseExtensions gives every hand-mapped route.
+        group.MapPost<CreateAccountGroupRequest, AccountGroupDto>("/")
             .RequireScope(group, ScopeNames.AccountsWrite)
-            .Produces<AccountGroupDto>(StatusCodes.Status201Created)
             .WithDescription("Create an account group.");
 
         // List (GEN, DRK-1277 §11/§12): a list is not a mutation, but the owner's widened mandate takes the
@@ -69,21 +62,49 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription("Change an account group's metadata.");
 
-        // Partial update (HAND, narrowed, DRK-1277 §11/§12): rename, description and metadata moved off this
-        // route onto their own generated routes above; only Activate/Close (GROUP_HOLDS_BALANCE refusal)
-        // remains, since that business refusal has nowhere to live in a generated route (R3).
-        group.MapPatch("{id:guid}", async (
+        // Close (request/handler GEN from [CrudAction] on AccountGroup.Close, DRK-1418 §3 row 1; route HAND,
+        // §3 row 8 deviation): the generated composite's MapActionById binds its command from the JSON body
+        // only and requires one — every close call sends none, since the id comes entirely from the route —
+        // so the route is hand-mapped instead, constructing the request from the route id and running
+        // CloseAccountGroupRequestValidator explicitly before dispatch (FluentValidation's endpoint
+        // auto-validation only inspects arguments already bound to the delegate, so it would never see a
+        // request built after binding completes either way).
+        group.MapPost("{id:guid}/close", async (
                 Guid id,
-                UpdateAccountGroupRequest req,
                 IMessageBus bus,
+                IValidator<CloseAccountGroupRequest> validator,
                 CancellationToken ct) =>
             {
-                var result = await bus.Send(req with { Id = id }, cancellationToken: ct);
+                var request = new CloseAccountGroupRequest { Id = id };
+                var validation = await validator.ValidateAsync(request, ct);
+                if (!validation.IsValid)
+                {
+                    var failure = validation.Errors[0];
+                    return Result.Fail<AccountGroupDto>(LedgerErrors.Error(failure.ErrorCode, failure.ErrorMessage))
+                        .ToLedgerResponse();
+                }
+
+                var result = await bus.Send(request, cancellationToken: ct);
                 return result.ToLedgerResponse();
             })
             .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription(
-                "Change a group's status. {\"status\":\"Closed\"} closes the group.");
+            .Produces<AccountGroupDto>()
+            .WithDescription("Close an account group. Refused while any account it holds still carries a balance.");
+
+        // Activate (request/handler GEN from [CrudAction] on AccountGroup.Activate, DRK-1418 §3 row 1; route
+        // HAND for the same reason as Close — no other properties to bind from an empty body). No business
+        // refusal, so no validator to run.
+        group.MapPost("{id:guid}/activate", async (
+                Guid id,
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var result = await bus.Send(new ActivateAccountGroupRequest { Id = id }, cancellationToken: ct);
+                return result.ToLedgerResponse();
+            })
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .Produces<AccountGroupDto>()
+            .WithDescription("Reactivate a closed account group.");
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,

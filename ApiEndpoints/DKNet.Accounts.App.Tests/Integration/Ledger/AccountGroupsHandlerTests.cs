@@ -10,7 +10,7 @@ using DKNet.Accounts.Infra.Contexts;
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
 /// <summary>
-/// Covers AccountGroups Create/Update handler branches the BDD acceptance scenarios don't reach: duplicate
+/// Covers AccountGroups Create/Close/Activate branches the BDD acceptance scenarios don't reach: duplicate
 /// group code, get-by-id (found and not-found), and closing a group whose account genuinely holds a balance
 /// (set directly on the tracked entity — postings are the next stage, so there is no API path to a non-zero
 /// balance yet; see <see cref="Account"/> tests for the entity-level guard).
@@ -158,10 +158,10 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — a
-    /// successful (no-balance) close and reactivation — plus the generated Rename/ChangeDescription routes
-    /// (DRK-1277 §11/§12) — none reachable from the existing duplicate-code/close-with-balance tests or the
-    /// BDD acceptance scenarios.</summary>
+    /// <summary>Covers the generated Rename/ChangeDescription routes (DRK-1277 §11/§12) plus a successful
+    /// (no-balance) close and reactivation through the generated Close/Activate actions (DRK-1418 §3 row 1) —
+    /// none reachable from the existing duplicate-code/close-with-balance tests or the BDD acceptance
+    /// scenarios.</summary>
     [Fact]
     public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
     {
@@ -182,24 +182,39 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         (await described.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("description").GetString()
             .ShouldBe("Updated description");
 
-        // No account holds a balance, so closing succeeds — the success path of the Closed branch.
-        var closed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
+        // No account holds a balance, so closing succeeds — the success path of the close route.
+        var closed = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/close"));
         closed.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await closed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("closed");
 
-        // Reactivating exercises the non-Closed ("Activate") branch.
-        var reactivated = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Active" }));
+        // Reactivating exercises the activate route.
+        var reactivated = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/activate"));
         reactivated.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await reactivated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("active");
     }
 
     [Fact]
-    public async Task Updating_AnUnknownGroup_IsRefused()
+    public async Task Closing_AnUnknownGroup_IsRefused()
     {
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{Guid.NewGuid()}/close"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Activating_AnUnknownGroup_IsRefused()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{Guid.NewGuid()}/activate"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ClosingTheStatusOnlyPatchRoute_IsNoLongerRegistered()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]
@@ -237,8 +252,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
             await dbContext.SaveChangesAsync();
         }
 
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/close"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
