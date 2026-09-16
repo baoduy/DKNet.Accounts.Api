@@ -13,7 +13,7 @@ public static class LedgerErrors
     public const string OverdraftLimitRequired = "OVERDRAFT_LIMIT_REQUIRED";
     public const string AccountHoldsBalance = "ACCOUNT_HOLDS_BALANCE";
     public const string GroupHoldsBalance = "GROUP_HOLDS_BALANCE";
-    public const string GroupCycle = "GROUP_CYCLE";
+    public const string GroupNotEmpty = "GROUP_NOT_EMPTY";
     public const string DuplicateGroupCode = "DUPLICATE_GROUP_CODE";
     public const string UnsupportedCurrency = "UNSUPPORTED_CURRENCY";
 

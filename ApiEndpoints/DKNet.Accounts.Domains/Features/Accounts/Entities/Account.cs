@@ -44,9 +44,7 @@ public sealed class Account : AggregateRoot
         decimal? overdraftLimit,
         decimal? minimumBalance,
         string? externalReference,
-        IReadOnlyDictionary<string, string>? metadata,
-        string byUser)
-        : base(byUser)
+        IReadOnlyDictionary<string, string>? metadata)
     {
         if (AccountFloorPolicy.RequiresOverdraftLimit(permittedToGoNegative, overdraftLimit))
         {
@@ -140,23 +138,20 @@ public sealed class Account : AggregateRoot
     /// cross-aggregate-free but still handler-owned check (it reads <see cref="Balance"/>/<see cref="HeldAmount"/>
     /// before calling this) — this method only assigns the terminal status and its timestamp.
     /// </summary>
-    public void ChangeStatus(AccountStatus status, string userId)
+    public void ChangeStatus(AccountStatus status)
     {
         Status = status;
         ClosedOn = status == AccountStatus.Closed ? DateTimeOffset.UtcNow : null;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeOverdraftLimit(decimal? overdraftLimit, string userId)
+    public void ChangeOverdraftLimit(decimal? overdraftLimit)
     {
         OverdraftLimit = overdraftLimit;
-        SetUpdatedBy(userId);
     }
 
-    public void ChangeMinimumBalance(decimal? minimumBalance, string userId)
+    public void ChangeMinimumBalance(decimal? minimumBalance)
     {
         MinimumBalance = minimumBalance;
-        SetUpdatedBy(userId);
     }
 
     /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-metadata</c>.</summary>

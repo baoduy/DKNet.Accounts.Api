@@ -7,7 +7,10 @@ namespace DKNet.Accounts.App.Tests.Unit.Generics;
 /// A dknet.accounts <see cref="DomainEntity"/> double that lets a test pin <see cref="CreatedOn"/> directly, since
 /// the real feature entities only ever set it once at construction time (via <c>SetCreatedBy</c>).
 /// </summary>
-file sealed class ProbeEntity(DateTimeOffset createdOn) : DomainEntity(Guid.NewGuid(), "probe", createdOn);
+file sealed class ProbeEntity : DomainEntity
+{
+    public ProbeEntity(DateTimeOffset createdOn) => SetCreatedBy("probe", createdOn);
+}
 
 /// <summary>
 /// DRK-506 §5 "Status counts over the full history": the supplied From/To bounds must filter the same way

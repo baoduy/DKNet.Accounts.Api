@@ -36,8 +36,8 @@ internal sealed class ReversePostingCommandHandler(
 {
     public async Task<IResult<PostingDto>> OnHandle(ReversePostingRequest request, CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<PostingDto>("The caller is not authenticated.");
         }
@@ -111,16 +111,15 @@ internal sealed class ReversePostingCommandHandler(
                 original.TransactionGroupId,
                 original.CounterpartyAccountId,
                 original.CounterpartyReference,
-                byUser,
+                callingSystemId,
                 null,
                 null,
                 original.ExternalReference,
                 $"Reversal of {original.PostingNumber}",
-                original.Metadata,
-                byUser);
+                original.Metadata);
             reversal.LinkAsReversalOf(original.Id);
 
-            original.MarkReversedBy(reversal.Id, byUser);
+            original.MarkReversedBy(reversal.Id);
 
             await repository.AddAsync(reversal, cancellationToken);
             await repository.SaveChangesAsync(cancellationToken);

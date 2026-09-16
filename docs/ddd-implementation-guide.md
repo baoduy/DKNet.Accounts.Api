@@ -74,7 +74,7 @@ Reference: `DKNet.Accounts.Domains/Features/ManualSample/Entities/PurchaseOrder.
 ```csharp
 public sealed class PurchaseOrder : AggregateRoot
 {
-    public PurchaseOrder(string customerName, decimal amount, string byUser) : base(byUser)
+    public PurchaseOrder(string customerName, decimal amount)
     {
         CustomerName = customerName;
         Amount = amount;
@@ -86,16 +86,18 @@ public sealed class PurchaseOrder : AggregateRoot
     public decimal Amount { get; private set; }
     public PurchaseOrderStatus Status { get; private set; }
 
-    public void ChangeAmount(decimal amount, string userId) { Amount = amount; SetUpdatedBy(userId); }
-    public void Cancel(string userId) { Status = PurchaseOrderStatus.Cancelled; SetUpdatedBy(userId); }
+    public void ChangeAmount(decimal amount) => Amount = amount;
+    public void Cancel() => Status = PurchaseOrderStatus.Cancelled;
 }
 ```
 
 Rules that matter:
 
 - `AggregateRoot` → `DomainEntity` → `AuditedEntity<Guid>` (from `DKNet.EfCore.Abstractions`)
-  supplies `Id`, `CreatedBy`, `CreatedOn`, `UpdatedBy`, `UpdatedOn` — don't redeclare them.
-  `base(byUser)` stamps `CreatedBy` immediately at construction.
+  supplies `Id`, `CreatedBy`, `CreatedOn`, `UpdatedBy`, `UpdatedOn` — don't redeclare them. Never give
+  a constructor or a method an acting-user parameter: there is no base overload that takes one, and
+  `DataOwnerHook` stamps `CreatedBy`/`UpdatedBy` on save from the caller's credential. See
+  [`auditing-and-data-ownership.md`](auditing-and-data-ownership.md).
 - Every property setter is `private`. All mutation goes through entity methods (`ChangeAmount`,
   `Cancel`) — never expose a public setter and never mutate from a handler.
   `DKNet.Accounts.App.Tests/Architecture/*` (NetArchTest) enforces shape rules like this. A public

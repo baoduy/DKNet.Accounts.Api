@@ -38,7 +38,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
   Scenario: An account group is read back in full
     Given the account group "OPS-CASH" of type "Internal" owned by "acme-pte-ltd" exists
     When the calling system "treasury-ops" reads that group
-    Then it receives the group's code, name, type, status, owner and parent
+    Then it receives the group's code, name, type, status and owner
 
   @existing @integration
   Scenario: Account groups can still be narrowed to one type
@@ -89,14 +89,6 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     When it closes the group
     Then the group's status is "Closed"
 
-  @new @integration
-  Scenario: A group can still be reparented once rename and metadata move off the PATCH
-    Given the account group "OPS-CHILD" named "Child Group" exists
-    And the account group "OPS-PARENT2" named "Parent Group" exists
-    And the calling system "treasury-ops" is authorised to write accounts
-    When it reparents "OPS-CHILD" to "OPS-PARENT2"
-    Then the group's parent is "OPS-PARENT2"
-
   @existing @integration
   Scenario: A posting recorded twice under one idempotency key is recorded once
     Given the account "1000000001" has a balance of 0.00 SGD
@@ -119,6 +111,53 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Then it receives that group
 
   @new @integration
+  Scenario: An empty group is deleted
+    Given the account group "TREASURY-OLD" holds no account
+    When treasury-ops deletes the account group "TREASURY-OLD"
+    Then the request succeeds with no content
+    And reading "TREASURY-OLD" reports that it does not exist
+
+  @new @integration
+  Scenario Outline: A group holding an account is refused
+    Given the account group "TREASURY-MAIN" holds one <account>
+    When treasury-ops deletes the account group "TREASURY-MAIN"
+    Then the request is refused with 422 and the code "GROUP_NOT_EMPTY"
+    And the account group "TREASURY-MAIN" still exists
+    And that account still holds the same group, status and balance
+
+    Examples:
+      | account                          |
+      | open account holding 100.00 SGD  |
+      | open account holding 0.00 SGD    |
+      | closed account holding 0.00 SGD  |
+
+  @new @integration
+  Scenario: An unknown group is reported as not found
+    Given no account group has the identifier "6f1d2c40-1111-4222-8333-444455556666"
+    When treasury-ops deletes that identifier
+    Then the request is answered with 404
+
+  @new @integration
+  Scenario: A badly formed identifier is rejected, not refused
+    Given "not-a-group-id" is not a well formed identifier
+    When treasury-ops deletes that identifier
+    Then the request is answered with 400
+    And no account group is deleted
+
+  @new @integration
+  Scenario: A read-only caller cannot delete a group
+    Given the account group "TREASURY-OLD" holds no account
+    And reporting-bot holds the accounts read permission only
+    When reporting-bot deletes the account group "TREASURY-OLD"
+    Then the request is refused with 403
+    And the account group "TREASURY-OLD" still exists
+
+  @new @integration
+  Scenario: The delete route carries the write permission
+    When the account-group routes are listed
+    Then the delete route requires the accounts write permission
+
+  @new @integration
   Scenario Outline: Every route still requires the scope it required before
     Given the calling system "reporting-bot" holds every ledger scope except <scope>
     When it calls <route>
@@ -133,3 +172,61 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
       | GET  /v1/accounts/{id}                 | accounts.read       |
       | GET  /v1/accounts/{id}/statement      | postings.read       |
       | POST /v1/postings/{id}/reverse        | postings.reverse    |
+
+  # DRK-1438 §5: the seven account-group routes register through one generated call instead of one
+  # hand-written call each. Four of them (read, rename, change-description, change-metadata) also stop
+  # restricting the identifier's shape in the route pattern, so a malformed identifier becomes a 400
+  # instead of a 404 route miss.
+
+  @new @integration
+  Scenario: A caller with write permission creates a group through the generated route
+    Given the calling system "treasury-ops" is authorised to write accounts
+    When it creates the account group "TREASURY-SG" named "Treasury Singapore"
+    Then the group is created
+    And the created group is readable at its own address
+
+  @new @integration
+  Scenario: A caller with read permission reads a group through the generated route
+    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    When the calling system "treasury-ops" reads that group
+    Then the response is 200
+    And the response carries the code "TREASURY-SG"
+
+  @new @integration
+  Scenario Outline: A caller without write permission is refused on every generated write route
+    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    And the calling system "report-reader" is authorised only to read accounts
+    When "report-reader" sends <operation> for that group
+    Then the response is 403
+
+    Examples:
+      | operation             |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |
+      | a delete              |
+
+  @new @integration
+  Scenario Outline: A badly formed identifier is answered as a bad request on every generated route
+    When "treasury-ops" sends <operation> for the identifier "not-a-guid"
+    Then the response is 400
+
+    Examples:
+      | operation             |
+      | a read                |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |
+
+  @new @integration
+  Scenario Outline: A well-formed identifier of a group that does not exist is still answered as not found on every generated route
+    Given no account group has the identifier "3f7c1b28-0d4a-4e19-9a5b-7c2e10d4f6ab"
+    When "treasury-ops" sends <operation> for that identifier
+    Then the response is 404
+
+    Examples:
+      | operation             |
+      | a read                |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |

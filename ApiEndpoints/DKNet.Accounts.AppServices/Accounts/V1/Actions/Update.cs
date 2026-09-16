@@ -32,8 +32,8 @@ internal sealed class UpdateAccountCommandHandler(
 {
     public async Task<IResult<AccountDto>> OnHandle(UpdateAccountRequest request, CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<AccountDto>("The caller is not authenticated.");
         }
@@ -60,12 +60,12 @@ internal sealed class UpdateAccountCommandHandler(
 
             if (request.OverdraftLimit is not null)
             {
-                account.ChangeOverdraftLimit(request.OverdraftLimit, byUser);
+                account.ChangeOverdraftLimit(request.OverdraftLimit);
             }
 
             if (request.MinimumBalance is not null)
             {
-                account.ChangeMinimumBalance(request.MinimumBalance, byUser);
+                account.ChangeMinimumBalance(request.MinimumBalance);
             }
         }
 
@@ -77,7 +77,7 @@ internal sealed class UpdateAccountCommandHandler(
                     LedgerErrors.AccountHoldsBalance, "Cannot close an account while it still holds a balance."));
             }
 
-            account.ChangeStatus(request.Status.Value, byUser);
+            account.ChangeStatus(request.Status.Value);
         }
 
         return Result.Ok(mapper.Map<AccountDto>(account));

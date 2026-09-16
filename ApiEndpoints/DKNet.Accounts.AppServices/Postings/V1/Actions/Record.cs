@@ -67,8 +67,8 @@ internal sealed class RecordPostingCommandHandler(
 {
     public async Task<IResult<PostingDto>> OnHandle(RecordPostingRequest request, CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<PostingDto>("The caller is not authenticated.");
         }
@@ -109,7 +109,7 @@ internal sealed class RecordPostingCommandHandler(
         if (!string.IsNullOrEmpty(request.IdempotencyKey))
         {
             var existing = await repository.FirstOrDefaultAsync(
-                new SpecGetPosting(byCallingSystem: byUser, byIdempotencyKey: request.IdempotencyKey),
+                new SpecGetPosting(byCallingSystem: callingSystemId, byIdempotencyKey: request.IdempotencyKey),
                 cancellationToken);
             if (existing is not null)
             {
@@ -169,13 +169,12 @@ internal sealed class RecordPostingCommandHandler(
                 request.TransactionGroupId,
                 request.CounterpartyAccountId,
                 request.CounterpartyReference,
-                byUser,
+                callingSystemId,
                 request.IdempotencyKey,
                 string.IsNullOrEmpty(request.IdempotencyKey) ? null : signature,
                 request.ExternalReference,
                 request.Description,
-                request.Metadata,
-                byUser);
+                request.Metadata);
 
             await repository.AddAsync(posting, cancellationToken);
             await repository.SaveChangesAsync(cancellationToken);

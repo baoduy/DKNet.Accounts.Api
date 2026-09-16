@@ -71,9 +71,6 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -93,8 +90,6 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("ParentId");
 
                     b.ToTable("AccountGroups", "pro");
                 });

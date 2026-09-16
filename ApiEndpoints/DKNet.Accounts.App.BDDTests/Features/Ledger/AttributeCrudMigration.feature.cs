@@ -105,7 +105,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 26);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 47);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -336,7 +336,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 41
-    await testRunner.ThenAsync("it receives the group\'s code, name, type, status, owner and parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("it receives the group\'s code, name, type, status and owner", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -627,17 +627,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A group can still be reparented once rename and metadata move off the PATCH")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.DescriptionAttribute("A posting recorded twice under one idempotency key is recorded once")]
+        [global::NUnit.Framework.CategoryAttribute("existing")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task AGroupCanStillBeReparentedOnceRenameAndMetadataMoveOffThePATCH()
+        public async global::System.Threading.Tasks.Task APostingRecordedTwiceUnderOneIdempotencyKeyIsRecordedOnce()
         {
             string[] tagsOfScenario = new string[] {
-                    "new",
+                    "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "13";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A group can still be reparented once rename and metadata move off the PATCH", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting recorded twice under one idempotency key is recorded once", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 93
@@ -651,62 +651,19 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 94
-    await testRunner.GivenAsync("the account group \"OPS-CHILD\" named \"Child Group\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 95
-    await testRunner.AndAsync("the account group \"OPS-PARENT2\" named \"Parent Group\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 96
-    await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 97
-    await testRunner.WhenAsync("it reparents \"OPS-CHILD\" to \"OPS-PARENT2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 98
-    await testRunner.ThenAsync("the group\'s parent is \"OPS-PARENT2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A posting recorded twice under one idempotency key is recorded once")]
-        [global::NUnit.Framework.CategoryAttribute("existing")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task APostingRecordedTwiceUnderOneIdempotencyKeyIsRecordedOnce()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "existing",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "14";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting recorded twice under one idempotency key is recorded once", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 101
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 102
     await testRunner.GivenAsync("the account \"1000000001\" has a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 103
+#line 95
     await testRunner.AndAsync("the calling system \"treasury-ops\" recorded a credit of 100.00 SGD under idempoten" +
                         "cy key \"batch-7741\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 104
+#line 96
     await testRunner.WhenAsync("it records the same credit again under idempotency key \"batch-7741\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 105
+#line 97
     await testRunner.ThenAsync("it receives the original posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 106
+#line 98
     await testRunner.AndAsync("the account\'s balance is 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -723,11 +680,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "existing",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "15";
+            string pickleIndex = "14";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account permitted to go negative must state its overdraft limit", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 109
+#line 101
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -737,17 +694,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 110
+#line 102
     await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 111
+#line 103
     await testRunner.WhenAsync("it opens an account named \"Operations Cash\" permitted to go negative with no over" +
                         "draft limit", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 112
+#line 104
     await testRunner.ThenAsync("the request is refused as unprocessable", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 113
+#line 105
     await testRunner.AndAsync("the refusal carries the code \"OVERDRAFT_LIMIT_REQUIRED\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -764,11 +721,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "16";
+            string pickleIndex = "15";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A bare listing still returns records older than the default activity window", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 116
+#line 108
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -778,14 +735,260 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 117
+#line 109
     await testRunner.GivenAsync("an account group created four months ago exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 118
+#line 110
     await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups with no date bounds", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 119
+#line 111
     await testRunner.ThenAsync("it receives that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("An empty group is deleted")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task AnEmptyGroupIsDeleted()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "16";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An empty group is deleted", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 114
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 115
+    await testRunner.GivenAsync("the account group \"TREASURY-OLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 116
+    await testRunner.WhenAsync("treasury-ops deletes the account group \"TREASURY-OLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 117
+    await testRunner.ThenAsync("the request succeeds with no content", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 118
+    await testRunner.AndAsync("reading \"TREASURY-OLD\" reports that it does not exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A group holding an account is refused")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        [global::NUnit.Framework.TestCaseAttribute("open account holding 100.00 SGD", "17", null)]
+        [global::NUnit.Framework.TestCaseAttribute("open account holding 0.00 SGD", "18", null)]
+        [global::NUnit.Framework.TestCaseAttribute("closed account holding 0.00 SGD", "19", null)]
+        public async global::System.Threading.Tasks.Task AGroupHoldingAnAccountIsRefused(string account, string @__pickleIndex, string[] exampleTags)
+        {
+            string[] @__tags = new string[] {
+                    "new",
+                    "integration"};
+            if ((exampleTags != null))
+            {
+                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
+            }
+            string[] tagsOfScenario = @__tags;
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            argumentsOfScenario.Add("account", account);
+            string pickleIndex = @__pickleIndex;
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A group holding an account is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 121
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 122
+    await testRunner.GivenAsync(string.Format("the account group \"TREASURY-MAIN\" holds one {0}", account), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 123
+    await testRunner.WhenAsync("treasury-ops deletes the account group \"TREASURY-MAIN\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 124
+    await testRunner.ThenAsync("the request is refused with 422 and the code \"GROUP_NOT_EMPTY\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 125
+    await testRunner.AndAsync("the account group \"TREASURY-MAIN\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 126
+    await testRunner.AndAsync("that account still holds the same group, status and balance", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("An unknown group is reported as not found")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task AnUnknownGroupIsReportedAsNotFound()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "20";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An unknown group is reported as not found", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 135
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 136
+    await testRunner.GivenAsync("no account group has the identifier \"6f1d2c40-1111-4222-8333-444455556666\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 137
+    await testRunner.WhenAsync("treasury-ops deletes that identifier", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 138
+    await testRunner.ThenAsync("the request is answered with 404", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A badly formed identifier is rejected, not refused")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task ABadlyFormedIdentifierIsRejectedNotRefused()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "21";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A badly formed identifier is rejected, not refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 141
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 142
+    await testRunner.GivenAsync("\"not-a-group-id\" is not a well formed identifier", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 143
+    await testRunner.WhenAsync("treasury-ops deletes that identifier", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 144
+    await testRunner.ThenAsync("the request is answered with 400", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 145
+    await testRunner.AndAsync("no account group is deleted", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A read-only caller cannot delete a group")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task ARead_OnlyCallerCannotDeleteAGroup()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "22";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A read-only caller cannot delete a group", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 148
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 149
+    await testRunner.GivenAsync("the account group \"TREASURY-OLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 150
+    await testRunner.AndAsync("reporting-bot holds the accounts read permission only", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 151
+    await testRunner.WhenAsync("reporting-bot deletes the account group \"TREASURY-OLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 152
+    await testRunner.ThenAsync("the request is refused with 403", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 153
+    await testRunner.AndAsync("the account group \"TREASURY-OLD\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("The delete route carries the write permission")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task TheDeleteRouteCarriesTheWritePermission()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "23";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The delete route carries the write permission", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 156
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 157
+    await testRunner.WhenAsync("the account-group routes are listed", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 158
+    await testRunner.ThenAsync("the delete route requires the accounts write permission", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -795,13 +998,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.DescriptionAttribute("Every route still requires the scope it required before")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("POST /v1/account-groups", "accounts.write", "17", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups", "accounts.read", "18", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups/{id}", "accounts.read", "19", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts", "accounts.read", "20", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}", "accounts.read", "21", null)]
-        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}/statement", "postings.read", "22", null)]
-        [global::NUnit.Framework.TestCaseAttribute("POST /v1/postings/{id}/reverse", "postings.reverse", "23", null)]
+        [global::NUnit.Framework.TestCaseAttribute("POST /v1/account-groups", "accounts.write", "24", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups", "accounts.read", "25", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/account-groups/{id}", "accounts.read", "26", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts", "accounts.read", "27", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}", "accounts.read", "28", null)]
+        [global::NUnit.Framework.TestCaseAttribute("GET  /v1/accounts/{id}/statement", "postings.read", "29", null)]
+        [global::NUnit.Framework.TestCaseAttribute("POST /v1/postings/{id}/reverse", "postings.reverse", "30", null)]
         public async global::System.Threading.Tasks.Task EveryRouteStillRequiresTheScopeItRequiredBefore(string route, string scope, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -819,7 +1022,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Every route still requires the scope it required before", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 122
+#line 161
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -829,14 +1032,237 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 123
+#line 162
     await testRunner.GivenAsync(string.Format("the calling system \"reporting-bot\" holds every ledger scope except {0}", scope), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 124
+#line 163
     await testRunner.WhenAsync(string.Format("it calls {0}", route), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 125
+#line 164
     await testRunner.ThenAsync("the request is refused as forbidden", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A caller with write permission creates a group through the generated route")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task ACallerWithWritePermissionCreatesAGroupThroughTheGeneratedRoute()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "31";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A caller with write permission creates a group through the generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 182
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 183
+    await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 184
+    await testRunner.WhenAsync("it creates the account group \"TREASURY-SG\" named \"Treasury Singapore\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 185
+    await testRunner.ThenAsync("the group is created", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 186
+    await testRunner.AndAsync("the created group is readable at its own address", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A caller with read permission reads a group through the generated route")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task ACallerWithReadPermissionReadsAGroupThroughTheGeneratedRoute()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "32";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A caller with read permission reads a group through the generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 189
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 190
+    await testRunner.GivenAsync("the account group \"TREASURY-SG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 191
+    await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 192
+    await testRunner.ThenAsync("the response is 200", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 193
+    await testRunner.AndAsync("the response carries the code \"TREASURY-SG\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A caller without write permission is refused on every generated write route")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        [global::NUnit.Framework.TestCaseAttribute("a rename", "33", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a description change", "34", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "35", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a delete", "36", null)]
+        public async global::System.Threading.Tasks.Task ACallerWithoutWritePermissionIsRefusedOnEveryGeneratedWriteRoute(string operation, string @__pickleIndex, string[] exampleTags)
+        {
+            string[] @__tags = new string[] {
+                    "new",
+                    "integration"};
+            if ((exampleTags != null))
+            {
+                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
+            }
+            string[] tagsOfScenario = @__tags;
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            argumentsOfScenario.Add("operation", operation);
+            string pickleIndex = @__pickleIndex;
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A caller without write permission is refused on every generated write route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 196
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 197
+    await testRunner.GivenAsync("the account group \"TREASURY-SG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 198
+    await testRunner.AndAsync("the calling system \"report-reader\" is authorised only to read accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 199
+    await testRunner.WhenAsync(string.Format("\"report-reader\" sends {0} for that group", operation), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 200
+    await testRunner.ThenAsync("the response is 403", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A badly formed identifier is answered as a bad request on every generated route")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        [global::NUnit.Framework.TestCaseAttribute("a read", "37", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a rename", "38", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a description change", "39", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "40", null)]
+        public async global::System.Threading.Tasks.Task ABadlyFormedIdentifierIsAnsweredAsABadRequestOnEveryGeneratedRoute(string operation, string @__pickleIndex, string[] exampleTags)
+        {
+            string[] @__tags = new string[] {
+                    "new",
+                    "integration"};
+            if ((exampleTags != null))
+            {
+                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
+            }
+            string[] tagsOfScenario = @__tags;
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            argumentsOfScenario.Add("operation", operation);
+            string pickleIndex = @__pickleIndex;
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A badly formed identifier is answered as a bad request on every generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 210
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 211
+    await testRunner.WhenAsync(string.Format("\"treasury-ops\" sends {0} for the identifier \"not-a-guid\"", operation), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 212
+    await testRunner.ThenAsync("the response is 400", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A well-formed identifier of a group that does not exist is still answered as not " +
+            "found on every generated route")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        [global::NUnit.Framework.TestCaseAttribute("a read", "41", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a rename", "42", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a description change", "43", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "44", null)]
+        public async global::System.Threading.Tasks.Task AWell_FormedIdentifierOfAGroupThatDoesNotExistIsStillAnsweredAsNotFoundOnEveryGeneratedRoute(string operation, string @__pickleIndex, string[] exampleTags)
+        {
+            string[] @__tags = new string[] {
+                    "new",
+                    "integration"};
+            if ((exampleTags != null))
+            {
+                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
+            }
+            string[] tagsOfScenario = @__tags;
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            argumentsOfScenario.Add("operation", operation);
+            string pickleIndex = @__pickleIndex;
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A well-formed identifier of a group that does not exist is still answered as not " +
+                    "found on every generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 222
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 223
+    await testRunner.GivenAsync("no account group has the identifier \"3f7c1b28-0d4a-4e19-9a5b-7c2e10d4f6ab\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 224
+    await testRunner.WhenAsync(string.Format("\"treasury-ops\" sends {0} for that identifier", operation), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 225
+    await testRunner.ThenAsync("the response is 404", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

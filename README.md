@@ -23,8 +23,9 @@ reconcile against.
 - **A retry is free.** Every posting write is keyed by your own `Idempotency-Key`, scoped to your
   credential — a repeat returns the original outcome instead of double-posting, and the same key used by
   another calling system never collides with yours.
-- **Nothing is ever erased.** There is no delete route anywhere in this service. A mistake is corrected
-  by writing an opposing posting, so the original and the correction both stay readable and attributable.
+- **Nothing in the ledger is ever erased.** A recorded posting is never altered or removed. A mistake is
+  corrected by writing an opposing posting, so the original and the correction both stay readable and
+  attributable. The service's one delete route is on an account group, and only while it holds no account.
 - **Two systems can be reconciled.** Every system integrating here agrees on what a posting is, what a
   balance means, and how a stream is ordered — which is the thing per-system bookkeeping can never give
   you.
@@ -91,8 +92,9 @@ to. That precision is enforced on every posting amount. The set is fixed referen
 ### Account groups — the bucket accounts belong to
 
 A named, uniquely coded bucket that accounts sit inside, classified by what it represents, carrying its
-own owner identifier and metadata, and optionally pointing at a parent group. Groups can be listed and
-filtered, re-named, re-parented, closed, and their balances read one line per currency.
+own owner identifier and metadata. A group holds accounts only, never another group. Groups can be
+listed and filtered, re-named, closed and reactivated, deleted while they hold no account, and their
+balances read one line per currency.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -103,7 +105,6 @@ filtered, re-named, re-parented, closed, and their balances read one line per cu
 | `type` | enum | What the group represents: `Customer`, `Merchant`, `Internal`, `Suspense`, `Settlement`. Fixed at creation. |
 | `status` | enum | `Active` or `Closed`. Closing is refused while any account it holds carries a balance. |
 | `ownerId` | string (≤100) | Your own identifier for whoever owns this group — a customer id, a merchant id, a cost centre. |
-| `parentId` | uuid? | The group this one sits under. A change that would make a group its own ancestor is refused. |
 | `metadata` | map<string,string>? | Free-form key/value pairs. Keys round-trip verbatim. |
 
 A group's balances are a separate read (`GET /v1/account-groups/{id}/balances`), returning one line per
@@ -112,7 +113,7 @@ currency:
 | Field | Type | Meaning |
 |---|---|---|
 | `currency` | string | The currency this line totals. |
-| `balance` | decimal | The sum of the group's own accounts in that currency. Never combined across currencies, never rolled up from child groups. |
+| `balance` | decimal | The sum of the group's own accounts in that currency. Never combined across currencies. |
 
 ### Accounts — where a balance lives
 
@@ -180,19 +181,21 @@ itself a posting.
 ### The API contract
 
 Every route sits under `/v1`, needs an authenticated machine identity, and needs the scope in the last
-column. There is **no delete route anywhere in this service, for any resource.**
+column. The **only delete route is on an empty account group**; nothing in the ledger is ever removed.
 
 | Method | Route | What it does | Scope | Refused when |
 |---|---|---|---|---|
 | `GET` | `/v1/currencies` | List supported currencies and their decimal places | `accounts.read` | — |
-| `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `parentId`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`) |
+| `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`); a malformed body → `400` |
 | `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
-| `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}` | Rename a group. Body: `name`. Returns `200` + the group | `accounts.write` | Unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Unknown id → `404` |
-| `PATCH` | `/v1/account-groups/{id}` | Change `status` and `parentId` **only**. `{"status":"Closed"}` closes the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); the re-parent would create a cycle (`GROUP_CYCLE`); unknown id → `404` |
-| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency | `accounts.read` | — |
+| `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}` | Rename a group. Body: `name`. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
+| `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); unknown or malformed id → `404` |
+| `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Unknown or malformed id → `404` |
+| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Unknown id → `404` |
@@ -227,7 +230,7 @@ GET /v1/accounts?filter=GroupId:Equal:b85813c0-3053-4d35-a0ef-3f2863f83fa9&order
 
 `Field` is matched case-insensitively and normalised to PascalCase, so `group_id`, `group-id` and
 `GroupId` all resolve to the same field. **It must be a field of the record the route returns** — a
-group's `code`, `name`, `description`, `type`, `status`, `ownerId`, `parentId`, `metadata`; an
+group's `code`, `name`, `description`, `type`, `status`, `ownerId`, `metadata`; an
 account's `accountNumber`, `groupId`, `name`, `classification`, `status`, `balance`, `heldAmount`,
 `overdraftLimit`, `minimumBalance`, `permittedToGoNegative`, `streamPosition`, `lastPostedOn`,
 `externalReference`, `metadata`, `closedOn`, and `currencyCode` — which is queryable without being
@@ -255,26 +258,26 @@ condition. Full contract, including the exact error cases:
 
 #### Which routes are generated, and which are hand-written
 
-Most of this contract is now emitted by `DKNet.SlimBus.Generators` from `[CrudCreate]`/`[CrudUpdate]`
-attributes on the aggregates, mapped through `DKNet.AspCore.Extensions`' generic
-`MapGetList`/`MapGetById`/`MapPutById`. **This changes nothing a caller can see** beyond what the
-table above states — it is recorded here because it tells you which routes move as a group when the
-generator is upgraded, and which carry service-specific logic that has to be read.
+Most of this contract is now emitted by `DKNet.SlimBus.Generators` from `[CrudCreate]`, `[CrudUpdate]`
+and `[CrudAction]` attributes on the aggregates, published either through `DKNet.AspCore.Extensions`'
+generic `MapGetList`/`MapGetById`/`MapPutById` or — for account groups — through one composite
+registration that also carries create and delete. The table below says which is which, and where only
+the request and handler are generated while the route stays hand-written. **This changes nothing a
+caller can see** beyond what the table above states — it is recorded here because it tells you which
+routes move as a group when the generator is upgraded, and which carry service-specific logic that has
+to be read.
 
-A route stays hand-written for exactly one reason: it orchestrates something a generated route has
-nowhere to put — a business refusal that must be `422` rather than the generator's `400`, a lock, a
-lookup, or a shape that is not one record of one entity.
+A generated registration covers every operation the generator can express; a route sits outside it only
+when the generator cannot carry that route's shape — a business refusal the handler cannot reach, a lock,
+a lookup, a command with nothing to bind from the request body, or a shape that is not one record of one
+entity.
 
 | Route | Source | The orchestration that keeps it hand-written |
 |---|---|---|
 | `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
-| `POST /v1/account-groups` | **request generated**, route and handler hand-written | Duplicate-code pre-check, refused `422 DUPLICATE_GROUP_CODE`; the generated `MapPost` can only emit `400` |
-| `GET /v1/account-groups` | **generated** | — |
-| `GET /v1/account-groups/{id}` | **generated** | — |
-| `PUT /v1/account-groups/{id}` | **generated** | — |
-| `PUT /v1/account-groups/{id}/change-description` | **generated** | — |
-| `PUT /v1/account-groups/{id}/change-metadata` | **generated** | — |
-| `PATCH /v1/account-groups/{id}` | hand-written | Walks the whole ancestor chain to refuse a cycle (`GROUP_CYCLE`) and checks every account the group holds before closing it (`GROUP_HOLDS_BALANCE`) — two cross-aggregate `422`s |
+| Create, list, read, rename, change-description, change-metadata and delete on `/v1/account-groups` | **generated** — all seven from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
+| `POST /v1/account-groups/{id}/close` | **request and handler generated**, route hand-written | The generated action route binds its command from the JSON body and demands one, and every close call sends none — the id comes entirely from the address. The hand-written route builds the request from the route id and runs the close validator before dispatch (`GROUP_HOLDS_BALANCE`) |
+| `POST /v1/account-groups/{id}/activate` | **request and handler generated**, route hand-written | The same empty-body binding gap as close; no business refusal, so no validator to run |
 | `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
 | `POST /v1/accounts` | hand-written | Allocates the account number server-side, resolves the currency against the reference set (`UNSUPPORTED_CURRENCY`) and enforces a determinate floor (`OVERDRAFT_LIMIT_REQUIRED`). A generated request would expose the account number as a caller-settable field |
 | `GET /v1/accounts` | **generated** | — |
@@ -290,7 +293,8 @@ lookup, or a shape that is not one record of one entity.
 | `POST /v1/postings/{id}/reverse` | hand-written | Writes the opposing posting and flips the original's status in one step, with its own `422` refusals |
 
 Route registration is in `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/` — one `*V1Endpoint.cs` per
-resource, each generated route commented with why it is generated.
+resource. Account groups now carry one commented generated registration covering all seven routes at
+once; elsewhere each generated route is still commented individually.
 `ApiEndpoints/DKNet.Accounts.App.Tests/Architecture/RouteScopeCoverageTests.cs` enumerates the live
 routes and fails the build if any one loses the scope this table names, however it was registered.
 
@@ -345,7 +349,7 @@ carrying a stable machine-readable `code`. `401` and `403` have empty bodies.
 | `422` | `ACCOUNT_CLOSED` | Any posting against a closed account, including a reversal |
 | `422` | `ACCOUNT_HOLDS_BALANCE` | Close requested while the balance or held amount ≠ 0 |
 | `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
-| `422` | `GROUP_CYCLE` | A parent change would make a group its own ancestor |
+| `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
 | `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set |
@@ -399,8 +403,7 @@ write a test for every one of them against your own integration.
 - **A closed account accepts no posting, and an account cannot be closed while it holds any balance or
   any held amount.** A frozen account accepts nothing in either direction; a dormant account accepts
   credits only.
-- **A group cannot be closed while any account it holds carries a balance**, and a group can never be
-  its own ancestor.
+- **A group cannot be closed while any account it holds carries a balance.**
 - **A posting can be reversed at most once**, and its reversal carries the identical amount in the
   opposite direction, dated the day it is written rather than the date the original took effect.
 - **A posting's effective date is never later than the date it is recorded.** Leave it unset and it is
@@ -471,7 +474,6 @@ Confirmed by drunkcoding on 2026-09-14:
 - **Machine-to-machine credentials only**, authorised per operation class.
 - **Postings are retained online indefinitely**; there is no archival in this delivery.
 - Designed for **fewer than one hundred postings per second**.
-- **Group hierarchy is represented but roll-up balance queries are not built.**
 - **Any caller authorised to reverse may reverse**, with no time window, because both the original and
   the reversal remain readable.
 
@@ -496,7 +498,6 @@ needing to reserve funds ahead of settling.
 | Deferred | Added when |
 |---|---|
 | Daily closing snapshots | Statement volume makes reading the stream too slow, or an audit demands an immutable daily close |
-| Consolidated parent-group balances | Someone asks. Group hierarchy is represented; roll-up reads are not built |
 | Outbound change notifications | A downstream needs push rather than poll |
 | Interest, fees and currency conversion | Never — permanently out. Compute them and record the result here |
 
@@ -526,8 +527,9 @@ its own `from`/`to`/`pageIndex`/`pageSize` parameters.
 recorded. Sort client-side by `effectiveDate` if that is what your reader needs — and remember the
 balance-after column only makes sense in stream order.
 
-**There is no way to delete anything.** A compromised credential can add attributable, reversible
-entries; it can never erase evidence of what it did. Plan corrections, not clean-up.
+**Nothing in the ledger can be erased.** A compromised credential can add attributable, reversible
+entries; it can never erase evidence of what it did. The service's one delete route removes an account
+group that holds no account — never a posting, never an account. Plan corrections, not clean-up.
 
 **Known deviations from the `[D1242-1]` §5 baseline contract at this commit.** Each was settled in
 favour of the code — §5 is the stale side. The tables above describe what you actually call:
@@ -553,7 +555,7 @@ favour of the code — §5 is the stale side. The tables above describe what you
   reads now do, through the same `hasNextPage` field.
 - §5 has no `PUT` routes. Renaming a group or an account, and changing its description or metadata, are
   `PUT` routes of their own; `PATCH` is left with the changes that carry a business refusal (status,
-  re-parent, the account's floor controls).
+  the account's floor controls).
 
 **A posting's sign depends on the account's classification, not on the direction alone.** A credit
 raises a `Liability`, `Equity` or `Income` account and lowers an `Asset` or `Expense` one. On a fresh

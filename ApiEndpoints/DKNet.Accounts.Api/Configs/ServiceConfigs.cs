@@ -31,6 +31,12 @@ internal static class ServiceConfigs
             //Service Bus
             .AddServiceBus(configuration, typeof(AppSetup).Assembly, features);
 
+        // GROUP_NOT_EMPTY's 422+code mapping (DRK-1421 §3 row 3) is registered once, alongside every other
+        // stable LedgerErrors code, via AddFluentValidationConfig's AddErrorResponses call
+        // (FluentValidationConfig.cs, LedgerErrorResponseOptions) — AddErrorResponses may only be called
+        // once (it registers a single ErrorResponseOptions instance); a second call here would silently
+        // discard whichever call runs first (DRK-1423 merge finding).
+
         return services;
     }
 

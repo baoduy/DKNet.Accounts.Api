@@ -1,6 +1,10 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Routing;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
@@ -53,6 +57,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Response = response;
         return await TryReadIdAsync(response);
     }
+
+    private async Task PatchAccountStatusAsync(Guid accountId, string status) =>
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Patch, $"{AccountsPath}/{accountId}", new { status });
 
     private async Task<Guid?> RecordPostingAsync(Guid accountId, decimal amount, string currency, string? idempotencyKey = null)
     {
@@ -197,16 +205,11 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Given(@"the account group ""([^""]+)"" of type ""([^""]+)"" owned by ""([^""]+)"" exists")]
     public async Task GivenTheAccountGroupOfTypeOwnedByExists(string code, string type, string owner)
     {
-        // A real parent (not just a null one) so the Then step's parent assertion can pin an exact value —
-        // a null ParentId is omitted from the JSON entirely (DefaultIgnoreCondition.WhenWritingNull), so
-        // presence-checking a null field can't tell "field removed from the DTO" from "field null this time".
-        var parentId = await CreateGroupAsync($"{code}-PARENT", type);
-        var id = await CreateGroupAsync(code, type, owner, extra: new { parentId });
+        var id = await CreateGroupAsync(code, type, owner);
         state.Values["lastGroupId"] = id?.ToString() ?? Guid.NewGuid().ToString();
         state.Values["lastGroupCode"] = code;
         state.Values["lastGroupOwner"] = owner;
         state.Values["lastGroupType"] = type;
-        state.Values["lastGroupParentId"] = parentId?.ToString() ?? "";
     }
 
     [Given(@"the account groups ""([^""]+)"" of type ""([^""]+)"" and ""([^""]+)"" of type ""([^""]+)"" exist")]
@@ -296,6 +299,76 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Values["lastGroupCode"] = code;
     }
 
+    // DRK-1421 §7: "the account group ... holds no account" is already bound by
+    // FlatAccountGroupsSteps.GivenTheAccountGroupHoldsNoAccount — reused verbatim, not duplicated here.
+
+    [Given(@"the account group ""([^""]+)"" holds one (open|closed) account holding ([\d.]+) (\w+)")]
+    public async Task GivenTheAccountGroupHoldsOneAccountHolding(string code, string status, decimal amount, string currency)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [.. ScopeNames.All];
+
+        var groupId = await CreateGroupAsync(code, "Customer");
+        state.Values["lastGroupId"] = groupId?.ToString() ?? "";
+        state.Values["lastGroupCode"] = code;
+
+        var accountId = await OpenAccountAsync(currency, groupId);
+        state.Values["lastAccountId"] = accountId?.ToString() ?? "";
+        if (amount > 0)
+        {
+            await RecordPostingAsync(accountId!.Value, amount, currency);
+        }
+
+        if (status == "closed")
+        {
+            await PatchAccountStatusAsync(accountId!.Value, "Closed");
+        }
+
+        // The delete attempt is refused before it can change anything, so the account's fields at Given time
+        // are exactly what "still holds the same group, status and balance" must find afterwards (R3: the
+        // refusal fires on existence alone, whatever this status/balance combination is).
+        state.Values["expectedAccountGroupId"] = groupId?.ToString() ?? "";
+        state.Values["expectedAccountStatus"] = status == "closed" ? "closed" : "active";
+        state.Values["expectedAccountBalance"] = amount.ToString(CultureInfo.InvariantCulture);
+        state.Values["expectedAccountCurrency"] = currency;
+    }
+
+    [Given(@"no account group has the identifier ""([^""]+)""")]
+    public void GivenNoAccountGroupHasTheIdentifier(string identifier) => state.Values["lastIdentifier"] = identifier;
+
+    [Given(@"""([^""]+)"" is not a well formed identifier")]
+    public void GivenIsNotAWellFormedIdentifier(string identifier) => state.Values["lastIdentifier"] = identifier;
+
+    [Given(@"reporting-bot holds the accounts read permission only")]
+    public void GivenReportingBotHoldsTheAccountsReadPermissionOnly()
+    {
+        state.CallerClientId = "reporting-bot";
+        state.CallerScopes = [ScopeNames.AccountsRead];
+    }
+
+    #endregion
+
+    #region DRK-1438 §5 shared helpers
+
+    /// <summary>Dispatches one of the four generated-route operations §5's outlines name, against
+    /// whatever identifier the scenario supplies — a real group id, a well-formed but unknown one, or a
+    /// malformed string. Request bodies carry field names only; none of these calls is expected to reach
+    /// body validation (route/model binding or authorization refuses first in every outline this backs).</summary>
+    private Task<HttpResponseMessage> DispatchGeneratedRouteOperationAsync(string operation, string identifier) =>
+        operation switch
+        {
+            "a read" => client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{identifier}"),
+            "a rename" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}", new { name = "Ignored" }),
+            "a description change" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-description", new { description = "Ignored" }),
+            "a metadata change" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-metadata",
+                new { metadata = new Dictionary<string, string>() }),
+            "a delete" => client.SendAsCallerAsync(state, HttpMethod.Delete, $"{GroupsPath}/{identifier}"),
+            _ => throw new NotSupportedException($"Unknown operation '{operation}'.")
+        };
+
     #endregion
 
     #region When
@@ -319,7 +392,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [When(@"it renames the group to ""([^""]+)""")]
     public async Task WhenItRenamesTheGroupTo(string newName) =>
         // Target route (row 4, narrowed): PUT {id}, generated from [CrudUpdate] on Rename — the first such
-        // member on AccountGroup. Red until Build builds it; today's PATCH stays for ChangeStatus/Reparent.
+        // member on AccountGroup. Red until Build builds it; today's PATCH stays for ChangeStatus only.
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Put, $"{GroupsPath}/{LastGroupId}", new { name = newName });
 
@@ -363,22 +436,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     [When(@"it closes the group")]
     public async Task WhenItClosesTheGroup() =>
-        // Row 4 (narrowed): ChangeStatus/Close stays HAND — the held-balance refusal (GROUP_HOLDS_BALANCE →
-        // 422) has nowhere to live in a generated route. Still PATCH.
+        // DRK-1418 §3 row 1/row 8: Close is now [CrudAction]-generated onto its own POST {id}/close route;
+        // the GROUP_HOLDS_BALANCE refusal moved into CloseAccountGroupRequestValidator.
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{LastGroupId}", new { status = "Closed" });
-
-    [When(@"it reparents ""([^""]+)"" to ""([^""]+)""")]
-    public async Task WhenItReparentsTo(string childCode, string parentCode)
-    {
-        // Row 4 (narrowed): Reparent stays HAND — the ancestor-cycle walk has nowhere to live in a generated
-        // route. Still PATCH.
-        var childId = state.Values[$"group:{childCode}"];
-        var parentId = state.Values[$"group:{parentCode}"];
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId });
-        state.Values["lastGroupId"] = childId;
-    }
+            state, HttpMethod.Post, $"{GroupsPath}/{LastGroupId}/close");
 
     [When(@"it opens an account named ""([^""]+)"" permitted to go negative with no overdraft limit")]
     public async Task WhenItOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string name) =>
@@ -448,6 +509,57 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Response = await client.SendAsCallerAsync(state, method, path, body);
     }
 
+    [When(@"treasury-ops deletes the account group ""([^""]+)""")]
+    public async Task WhenTreasuryOpsDeletesTheAccountGroup(string code)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Delete, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
+    }
+
+    [When(@"treasury-ops deletes that identifier")]
+    public async Task WhenTreasuryOpsDeletesThatIdentifier()
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Delete, $"{GroupsPath}/{state.Values["lastIdentifier"]}");
+    }
+
+    [When(@"reporting-bot deletes the account group ""([^""]+)""")]
+    public async Task WhenReportingBotDeletesTheAccountGroup(string code) =>
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Delete, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
+
+    [When(@"""[^""]+"" sends (a rename|a description change|a metadata change|a delete) for that group$")]
+    public async Task WhenSendsOperationForThatGroup(string operation) =>
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, LastGroupId.ToString());
+
+    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for the identifier ""([^""]+)""")]
+    public async Task WhenSendsOperationForTheIdentifier(string operation, string identifier)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, identifier);
+    }
+
+    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for that identifier$")]
+    public async Task WhenSendsOperationForThatIdentifier(string operation)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, state.Values["lastIdentifier"]);
+    }
+
+    [When(@"the account-group routes are listed")]
+    public void WhenTheAccountGroupRoutesAreListed()
+    {
+        // Route metadata is read directly by the matching Then step below, the same EndpointDataSource
+        // mechanism RouteScopeCoverageTests uses — this step exists only for the Gherkin's natural-language
+        // flow (§7 slice note: this scenario is route metadata, not an HTTP call).
+    }
+
     #endregion
 
     #region Then
@@ -489,14 +601,6 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("status").GetString().ShouldBe(expectedStatus.ToLowerInvariant());
     }
 
-    [Then(@"the group's parent is ""([^""]+)""")]
-    public async Task ThenTheGroupsParentIs(string parentCode)
-    {
-        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
-        var doc = await ReadJsonAsync(response);
-        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values[$"group:{parentCode}"]));
-    }
-
     [Then(@"the account's name is ""([^""]+)""")]
     public async Task ThenTheAccountsNameIs(string expectedName)
     {
@@ -505,7 +609,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("name").GetString().ShouldBe(expectedName);
     }
 
-    [Then(@"it receives the group's code, name, type, status, owner and parent")]
+    [Then(@"it receives the group's code, name, type, status and owner")]
     public async Task ThenItReceivesTheGroupsFields()
     {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -518,10 +622,6 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("type").GetString().ShouldBe(state.Values["lastGroupType"].ToLowerInvariant());
         doc.GetProperty("status").GetString().ShouldBe("active");
         doc.GetProperty("ownerId").GetString().ShouldBe(state.Values["lastGroupOwner"]);
-        // A real (non-null) parent — removing ParentId from the DTO drops this key entirely, catching the
-        // same class of silent field loss; a null parent would be indistinguishable either way, since null
-        // properties are omitted from the response regardless of whether the DTO still declares them.
-        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values["lastGroupParentId"]));
     }
 
     [Then(@"it receives ""([^""]+)""")]
@@ -598,6 +698,99 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         var doc = await ReadJsonAsync(state.Response!);
         var codes = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("code").GetString());
         codes.ShouldContain(state.Values["lastGroupCode"]);
+    }
+
+    [Then(@"the request succeeds with no content")]
+    public void ThenTheRequestSucceedsWithNoContent() =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+    [Then(@"reading ""([^""]+)"" reports that it does not exist")]
+    public async Task ThenReadingReportsThatItDoesNotExist(string code)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    // Scoped (DRK-1421): the frozen spec's exact wording — "the request is refused with 422 and the code
+    // ..." — would otherwise also match LedgerSteps' broad "the request is refused(?! with status)(?:.*)"
+    // catch-all (that lookahead excludes only "with status", not "with 422"), throwing an ambiguous-step
+    // error. Scoping to this scenario resolves it without touching LedgerSteps.cs (out of §3).
+    [Then(@"the request is refused with 422 and the code ""([^""]+)""")]
+    [Scope(Scenario = "A group holding an account is refused")]
+    public async Task ThenTheRequestIsRefusedWith422AndTheCode(string expectedCode)
+    {
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var doc = await ReadJsonAsync(state.Response!);
+        doc.GetProperty(LedgerErrors.CodeKey).GetString().ShouldBe(expectedCode);
+    }
+
+    [Then(@"the account group ""([^""]+)"" still exists")]
+    public async Task ThenTheAccountGroupStillExists(string code)
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
+        response.IsSuccessStatusCode.ShouldBeTrue($"expected {code} to still exist, got {(int)response.StatusCode}");
+    }
+
+    [Then(@"that account still holds the same group, status and balance")]
+    public async Task ThenThatAccountStillHoldsTheSameGroupStatusAndBalance()
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{LastAccountId}");
+        var doc = await ReadJsonAsync(response);
+        doc.GetProperty("groupId").GetGuid().ShouldBe(Guid.Parse(state.Values["expectedAccountGroupId"]));
+        doc.GetProperty("status").GetString().ShouldBe(state.Values["expectedAccountStatus"]);
+
+        var balanceDoc = await ReadJsonAsync(
+            await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{LastAccountId}/balance"));
+        balanceDoc.GetProperty("balance").GetDecimal()
+            .ShouldBe(decimal.Parse(state.Values["expectedAccountBalance"], CultureInfo.InvariantCulture));
+        balanceDoc.GetProperty("currency").GetString().ShouldBe(state.Values["expectedAccountCurrency"]);
+    }
+
+    [Then(@"the request is answered with 404")]
+    public void ThenTheRequestIsAnsweredWith404() =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+    [Then(@"the request is answered with 400")]
+    public void ThenTheRequestIsAnsweredWith400() =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+    [Then(@"no account group is deleted")]
+    public void ThenNoAccountGroupIsDeleted() =>
+        // The prior "answered with 400" step already pins the status; a malformed identifier fails route
+        // binding before any handler (and so any delete) ever runs, so a non-204/non-2xx response is itself
+        // the proof nothing was deleted.
+        state.Response!.IsSuccessStatusCode.ShouldBeFalse();
+
+    // Scoped for the same reason as the 422 binding above — "the request is refused with 403" also matches
+    // LedgerSteps' catch-all.
+    [Then(@"the request is refused with 403")]
+    [Scope(Scenario = "A read-only caller cannot delete a group")]
+    public void ThenTheRequestIsRefusedWith403() =>
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+    [Then(@"the response is (\d+)")]
+    public void ThenTheResponseIs(int statusCode) =>
+        state.Response!.StatusCode.ShouldBe((HttpStatusCode)statusCode);
+
+    [Then(@"the created group is readable at its own address")]
+    public async Task ThenTheCreatedGroupIsReadableAtItsOwnAddress()
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Then(@"the delete route requires the accounts write permission")]
+    public void ThenTheDeleteRouteRequiresTheAccountsWritePermission()
+    {
+        const string path = "/v{version:apiVersion}/account-groups/{id}";
+        var dataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+        var endpoint = dataSource.Endpoints.OfType<RouteEndpoint>().FirstOrDefault(e =>
+            e.RoutePattern.RawText == path &&
+            (e.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods.Contains("DELETE") ?? false));
+
+        endpoint.ShouldNotBeNull($"expected a DELETE {path} route in the live endpoint data source");
+        var policies = endpoint!.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy);
+        policies.ShouldContain(ScopeNames.AccountsWrite);
     }
 
     #endregion

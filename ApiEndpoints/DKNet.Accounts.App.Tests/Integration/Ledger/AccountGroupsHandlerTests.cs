@@ -10,10 +10,10 @@ using DKNet.Accounts.Infra.Contexts;
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
 /// <summary>
-/// Covers AccountGroups Create/Update handler branches the BDD acceptance scenarios don't reach: successful
-/// re-parenting, duplicate group code, get-by-id (found and not-found), and closing a group whose account
-/// genuinely holds a balance (set directly on the tracked entity — postings are the next stage, so there is
-/// no API path to a non-zero balance yet; see <see cref="Account"/> tests for the entity-level guard).
+/// Covers AccountGroups Create/Close/Activate branches the BDD acceptance scenarios don't reach: duplicate
+/// group code, get-by-id (found and not-found), and closing a group whose account genuinely holds a balance
+/// (set directly on the tracked entity — postings are the next stage, so there is no API path to a non-zero
+/// balance yet; see <see cref="Account"/> tests for the entity-level guard).
 /// </summary>
 public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClassFixture<LedgerApiFixture>
 {
@@ -34,15 +34,14 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         return request;
     }
 
-    private async Task<Guid> CreateGroupAsync(string code, string? parentId = null)
+    private async Task<Guid> CreateGroupAsync(string code)
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
         {
             code,
             name = code,
             type = "Customer",
-            ownerId = "PayHub",
-            parentId
+            ownerId = "PayHub"
         }));
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -83,20 +82,6 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("metadata").GetProperty("region").GetString().ShouldBe("SG");
-    }
-
-    [Fact]
-    public async Task ReparentingToAnUnrelatedExistingGroup_Succeeds()
-    {
-        var parentId = await CreateGroupAsync($"PAR-{Guid.NewGuid():N}");
-        var childId = await CreateGroupAsync($"CHI-{Guid.NewGuid():N}");
-
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId }));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("parentId").GetGuid().ShouldBe(parentId);
     }
 
     [Fact]
@@ -173,10 +158,10 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — a
-    /// successful (no-balance) close and reactivation — plus the generated Rename/ChangeDescription routes
-    /// (DRK-1277 §11/§12) — none reachable from the existing reparent/duplicate-code/close-with-balance tests
-    /// or the BDD acceptance scenarios.</summary>
+    /// <summary>Covers the generated Rename/ChangeDescription routes (DRK-1277 §11/§12) plus a successful
+    /// (no-balance) close and reactivation through the generated Close/Activate actions (DRK-1418 §3 row 1) —
+    /// none reachable from the existing duplicate-code/close-with-balance tests or the BDD acceptance
+    /// scenarios.</summary>
     [Fact]
     public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
     {
@@ -197,24 +182,39 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         (await described.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("description").GetString()
             .ShouldBe("Updated description");
 
-        // No account holds a balance, so closing succeeds — the success path of the Closed branch.
-        var closed = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
+        // No account holds a balance, so closing succeeds — the success path of the close route.
+        var closed = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/close"));
         closed.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await closed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("closed");
 
-        // Reactivating exercises the non-Closed ("Activate") branch.
-        var reactivated = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Active" }));
+        // Reactivating exercises the activate route.
+        var reactivated = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/activate"));
         reactivated.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await reactivated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString().ShouldBe("active");
     }
 
     [Fact]
-    public async Task Updating_AnUnknownGroup_IsRefused()
+    public async Task Closing_AnUnknownGroup_IsRefused()
     {
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{Guid.NewGuid()}/close"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Activating_AnUnknownGroup_IsRefused()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{Guid.NewGuid()}/activate"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ClosingTheStatusOnlyPatchRoute_IsNoLongerRegistered()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{Guid.NewGuid()}", new { status = "Closed" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]
@@ -224,6 +224,30 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
             AsPayHub(HttpMethod.Put, $"{GroupsPath}/{Guid.NewGuid()}", new { name = "Doesn't matter" }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// DRK-1421 §3 row 7: <c>AddErrorResponses</c> is wired globally (row 3) for every stable
+    /// <see cref="LedgerErrors"/> code (DUPLICATE_GROUP_CODE, GROUP_HOLDS_BALANCE, GROUP_NOT_EMPTY, and every
+    /// other slice's code), not GROUP_NOT_EMPTY alone. Proves every OTHER validator refusal — one whose
+    /// FluentValidation rule carries no <c>WithErrorCode</c> — still gets today's plain 400 validation-problem
+    /// body, widened to 422 for none of them.
+    /// </summary>
+    [Fact]
+    public async Task CreatingAGroupWithInvalidInput_StillAnswers400WithTodaysBody()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
+        {
+            code = "",
+            name = "Missing code",
+            type = "Customer",
+            ownerId = "PayHub"
+        }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty(LedgerErrors.CodeKey, out _).ShouldBeFalse();
+        body.GetProperty("errors").GetProperty("Code")[0].GetString().ShouldBe("'Code' must not be empty.");
     }
 
     [Fact]
@@ -252,8 +276,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
             await dbContext.SaveChangesAsync();
         }
 
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" }));
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/close"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();

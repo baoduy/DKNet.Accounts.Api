@@ -127,7 +127,8 @@ The same module sets `AddServerHeader = false`: no response names the web-server
 served, but the response carries no `Access-Control-Allow-*` header, so the browser refuses to hand
 it to the calling page. This is "not wired", not "wired but permissive". When the array is
 non-empty, the default policy allows exactly those origins and exactly the methods and headers
-enumerated in `Cors:AllowedMethods` (default `GET, POST, PUT, PATCH` — **no `DELETE`**) and
+enumerated in `Cors:AllowedMethods` (default `GET, POST, PUT, PATCH` — **no `DELETE`**, so a browser
+front-end calling the service's one delete route, `DELETE /v1/account-groups/{id}`, has to add it) and
 `Cors:AllowedHeaders` (default `Authorization`, `Content-Type`, `Accept`, `X-Idempotency-Key`, the
 header the template's own create route requires); an origin, method or header that isn't listed is
 never reflected back, so its preflight fails. Credentials are never allowed — `AllowCredentials()`

@@ -88,8 +88,8 @@ internal sealed class RecordPostingBatchCommandHandler(
         RecordPostingBatchRequest request,
         CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<IReadOnlyCollection<PostingDto>>("The caller is not authenticated.");
         }
@@ -102,7 +102,7 @@ internal sealed class RecordPostingBatchCommandHandler(
         if (!string.IsNullOrEmpty(request.IdempotencyKey))
         {
             var existing = await repository.FirstOrDefaultAsync(
-                new SpecGetPosting(byCallingSystem: byUser, byIdempotencyKey: request.IdempotencyKey),
+                new SpecGetPosting(byCallingSystem: callingSystemId, byIdempotencyKey: request.IdempotencyKey),
                 cancellationToken);
             if (existing is not null)
             {
@@ -216,13 +216,12 @@ internal sealed class RecordPostingBatchCommandHandler(
                     transactionGroupId,
                     movement.CounterpartyAccountId,
                     movement.CounterpartyReference,
-                    byUser,
+                    callingSystemId,
                     null,
                     null,
                     movement.ExternalReference,
                     movement.Description,
-                    movement.Metadata,
-                    byUser));
+                    movement.Metadata));
             }
 
             // The batch's idempotency key/signature live on its first leg only — a DB unique index on

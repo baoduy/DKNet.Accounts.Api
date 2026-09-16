@@ -56,9 +56,7 @@ public sealed class Posting : AggregateRoot
         string? idempotencySignature,
         string? externalReference,
         string? description,
-        IReadOnlyDictionary<string, string>? metadata,
-        string byUser)
-        : base(byUser)
+        IReadOnlyDictionary<string, string>? metadata)
     {
         AccountId = accountId;
         PostingNumber = postingNumber;
@@ -163,7 +161,7 @@ public sealed class Posting : AggregateRoot
     /// holding the account's lock) so a refusal surfaces as a business-rule result, not this exception; this
     /// is the last line of defence against applying a reversal twice.
     /// </summary>
-    public void MarkReversedBy(Guid reversalPostingId, string userId)
+    public void MarkReversedBy(Guid reversalPostingId)
     {
         if (Status == PostingStatus.Reversed)
         {
@@ -172,7 +170,6 @@ public sealed class Posting : AggregateRoot
 
         Status = PostingStatus.Reversed;
         ReversedByPostingId = reversalPostingId;
-        SetUpdatedBy(userId);
     }
 
     /// <summary>Links this (newly-constructed) posting back to the original it reverses. Called once, right

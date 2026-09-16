@@ -4,13 +4,12 @@ namespace DKNet.Accounts.App.Tests.Unit.Domains;
 
 public class AccountGroupTests
 {
-    private static AccountGroup NewGroup(Guid? parentId = null) => new(
+    private static AccountGroup NewGroup() => new(
         code: "CUST-000123",
         name: "Acme",
         description: "desc",
         type: AccountGroupType.Customer,
         ownerId: "PayHub",
-        parentId: parentId,
         metadata: new Dictionary<string, string> { ["k"] = "v" });
 
     [Fact]
@@ -23,7 +22,6 @@ public class AccountGroupTests
         group.Description.ShouldBe("desc");
         group.Type.ShouldBe(AccountGroupType.Customer);
         group.OwnerId.ShouldBe("PayHub");
-        group.ParentId.ShouldBeNull();
         group.Metadata.ShouldNotBeNull();
         group.Status.ShouldBe(AccountGroupStatus.Active);
     }
@@ -71,44 +69,44 @@ public class AccountGroupTests
     }
 
     [Fact]
-    public void Reparent_OnlyAssigns_LeavingCycleDetectionToTheCaller()
-    {
-        var group = NewGroup();
-        var newParentId = Guid.NewGuid();
-
-        group.Reparent(newParentId, "PayHub");
-
-        group.ParentId.ShouldBe(newParentId);
-    }
-
-    [Fact]
-    public void Reparent_AcceptsNullToClearTheParent()
-    {
-        var group = NewGroup(parentId: Guid.NewGuid());
-
-        group.Reparent(null, "PayHub");
-
-        group.ParentId.ShouldBeNull();
-    }
-
-    [Fact]
     public void Close_SetsClosedStatus()
     {
         var group = NewGroup();
 
-        group.Close("PayHub");
+        group.Close();
 
         group.Status.ShouldBe(AccountGroupStatus.Closed);
+    }
+
+    [Fact]
+    public void Close_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var group = NewGroup();
+
+        group.Close();
+
+        group.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
     public void Activate_ReopensAClosedGroup()
     {
         var group = NewGroup();
-        group.Close("PayHub");
+        group.Close();
 
-        group.Activate("PayHub");
+        group.Activate();
 
         group.Status.ShouldBe(AccountGroupStatus.Active);
+    }
+
+    [Fact]
+    public void Activate_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var group = NewGroup();
+        group.Close();
+
+        group.Activate();
+
+        group.UpdatedBy.ShouldBeNullOrEmpty();
     }
 }

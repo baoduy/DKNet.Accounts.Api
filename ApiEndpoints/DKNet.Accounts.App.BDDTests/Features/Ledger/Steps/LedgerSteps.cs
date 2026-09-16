@@ -114,25 +114,6 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task GivenPayHubHasCreatedTheAccountGroup(string code, string type) =>
         await CreateGroupAsync(code, type);
 
-    [Given(@"the group ""([^""]+)"" is a child of the group ""([^""]+)""")]
-    public async Task GivenTheGroupIsAChildOfTheGroup(string childCode, string parentCode)
-    {
-        var parentId = await CreateGroupAsync(parentCode, "Customer");
-        var response = await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
-        {
-            code = childCode,
-            name = childCode,
-            type = "Customer",
-            ownerId = state.CallerClientId,
-            parentId
-        });
-        // Mechanics fix: the child's own id must be captured the same way CreateGroupAsync captures the
-        // parent's, or the later "make X a child of Y" step can't resolve it from state.Values and silently
-        // PATCHes with a null parentId (a no-op, not the refusal the scenario asserts).
-        var childId = await TryReadIdAsync(response);
-        state.Values[$"group:{childCode}"] = childId?.ToString() ?? "";
-    }
-
     [Given(@"the group ""([^""]+)"" holds an account with a balance of ([\d.]+) (\w+)")]
     public async Task GivenTheGroupHoldsAnAccountWithABalanceOf(string groupCode, decimal amount, string currency)
     {
@@ -481,17 +462,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task WhenPayHubAsksToClose(string groupCode)
     {
         var groupId = state.Values.GetValueOrDefault($"group:{groupCode}");
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
-    }
-
-    [When(@"PayHub asks to make ""([^""]+)"" a child of ""([^""]+)""")]
-    public async Task WhenPayHubAsksToMakeAChildOf(string childCode, string parentCode)
-    {
-        var childId = state.Values.GetValueOrDefault($"group:{childCode}");
-        var parentId = state.Values.GetValueOrDefault($"group:{parentCode}");
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId });
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close");
     }
 
     [When(@"PayHub reads the balances of ""([^""]+)""")]
@@ -725,7 +696,10 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
 
     #region Then
 
-    [Then(@"the request is refused(?:.*)")]
+    // Mechanics fix (DRK-1397): the lookahead excludes "...with status ..." so this catch-all doesn't swallow
+    // FlatAccountGroupsSteps' two DRK-1393 §5 scenarios that spell out a literal status (and, for one, a
+    // code) in the same sentence — those get their own dedicated bindings instead.
+    [Then(@"the request is refused(?! with status)(?:.*)")]
     public void ThenTheRequestIsRefused() =>
         // state.ExpectedRefusalStatus defaults to 422 (§5's status for a business-rule refusal) — asserting
         // a specific status (not just "not successful") keeps this scenario red for the right reason. Three
