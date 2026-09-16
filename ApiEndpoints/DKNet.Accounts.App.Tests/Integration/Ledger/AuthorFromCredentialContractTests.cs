@@ -11,6 +11,21 @@ namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 public sealed class AuthorFromCredentialContractTests(SwaggerOnApiFixture fixture)
     : IClassFixture<SwaggerOnApiFixture>
 {
+    /// <summary>
+    /// Exact, case-insensitive field names that would let a caller name the acting user (DRK-1372 §3: "the
+    /// system must offer no author field on any request, generated or hand-written"). A future
+    /// <c>[CrudUpdate]</c>/<c>[CrudCreate]</c> on a method like <c>Account.ChangeStatus(AccountStatus, string
+    /// userId)</c> (<c>Account.cs:143</c>) generates a request whose shape is that trailing parameter — this is
+    /// what would actually reintroduce the field the scenario guards against, not a property literally called
+    /// "author". Exact names, not a substring match on "by"/"user" — that would misfire on the legitimate
+    /// <c>ownerId</c> field on the account-group create request.
+    /// </summary>
+    private static readonly string[] AuthorFieldNames =
+    [
+        "author", "authorId", "byUser", "userId", "actingUser", "actingUserId",
+        "createdBy", "updatedBy", "modifiedBy", "changedBy"
+    ];
+
     [Fact]
     public async Task NoWriteRouteRequestShape_CarriesAFieldForTheAuthorOfTheChange()
     {
@@ -20,7 +35,7 @@ public sealed class AuthorFromCredentialContractTests(SwaggerOnApiFixture fixtur
         var doc = JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync());
         var schemas = doc.GetProperty("components").GetProperty("schemas");
 
-        var offendingRoutes = new List<string>();
+        var offending = new List<string>();
         foreach (var path in doc.GetProperty("paths").EnumerateObject())
         {
             foreach (var operation in path.Value.EnumerateObject())
@@ -36,28 +51,53 @@ public sealed class AuthorFromCredentialContractTests(SwaggerOnApiFixture fixtur
                 }
 
                 var schema = requestBody.GetProperty("content").GetProperty("application/json").GetProperty("schema");
-                if (SchemaHasAuthorField(schema, schemas, []))
+                var field = FindAuthorField(schema, schemas, []);
+                if (field is not null)
                 {
-                    offendingRoutes.Add($"{operation.Name.ToUpperInvariant()} {path.Name}");
+                    offending.Add($"{operation.Name.ToUpperInvariant()} {path.Name} ({field})");
                 }
             }
         }
 
-        offendingRoutes.ShouldBeEmpty(
-            $"route(s) with a field for the author of the change: {string.Join(", ", offendingRoutes)}");
+        offending.ShouldBeEmpty(
+            $"route(s) with a field for the author of the change: {string.Join(", ", offending)}");
     }
 
-    private static bool SchemaHasAuthorField(JsonElement schema, JsonElement schemas, HashSet<string> visitedRefs)
+    /// <summary>Negative control (dev-leader review): proves the matcher actually fires, so the scenario above
+    /// can tell "no such field" from "the matcher never fires" — without this, a matcher that silently stopped
+    /// matching anything would leave the scenario green for the wrong reason.</summary>
+    [Fact]
+    public void FindAuthorField_MatchesAKnownActingUserFieldName()
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>("""{"properties":{"userId":{"type":"string"}}}""");
+        var noSchemas = JsonSerializer.Deserialize<JsonElement>("{}");
+
+        FindAuthorField(schema, noSchemas, []).ShouldBe("userId");
+    }
+
+    private static string? FindAuthorField(JsonElement schema, JsonElement schemas, HashSet<string> visitedRefs)
     {
         if (schema.TryGetProperty("$ref", out var refProp))
         {
             var schemaName = refProp.GetString()!.Split('/')[^1];
-            return visitedRefs.Add(schemaName)
-                   && schemas.TryGetProperty(schemaName, out var resolved)
-                   && SchemaHasAuthorField(resolved, schemas, visitedRefs);
+            return visitedRefs.Add(schemaName) && schemas.TryGetProperty(schemaName, out var resolved)
+                ? FindAuthorField(resolved, schemas, visitedRefs)
+                : null;
         }
 
-        return schema.TryGetProperty("properties", out var properties)
-               && properties.EnumerateObject().Any(p => string.Equals(p.Name, "author", StringComparison.OrdinalIgnoreCase));
+        if (!schema.TryGetProperty("properties", out var properties))
+        {
+            return null;
+        }
+
+        foreach (var property in properties.EnumerateObject())
+        {
+            if (AuthorFieldNames.Any(name => string.Equals(name, property.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                return property.Name;
+            }
+        }
+
+        return null;
     }
 }
