@@ -24,8 +24,7 @@ public class PostingTests
         idempotencySignature: null,
         externalReference: null,
         description: null,
-        metadata: null,
-        byUser: "PayHub");
+        metadata: null);
 
     [Fact]
     public void NewPosting_IsPostedAndUnlinked()
@@ -43,7 +42,7 @@ public class PostingTests
         var posting = NewPosting();
         var reversalId = Guid.NewGuid();
 
-        posting.MarkReversedBy(reversalId, "PayHub");
+        posting.MarkReversedBy(reversalId);
 
         posting.Status.ShouldBe(PostingStatus.Reversed);
         posting.ReversedByPostingId.ShouldBe(reversalId);
@@ -56,9 +55,9 @@ public class PostingTests
         // repeat surfaces as a business refusal, not this exception — this proves the one-way transition can
         // never silently apply twice even if that check were ever bypassed.
         var posting = NewPosting();
-        posting.MarkReversedBy(Guid.NewGuid(), "PayHub");
+        posting.MarkReversedBy(Guid.NewGuid());
 
-        Should.Throw<InvalidOperationException>(() => posting.MarkReversedBy(Guid.NewGuid(), "PayHub"));
+        Should.Throw<InvalidOperationException>(() => posting.MarkReversedBy(Guid.NewGuid()));
     }
 
     [Fact]

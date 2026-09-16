@@ -39,8 +39,8 @@ internal sealed class UpdateAccountGroupCommandHandler(
         UpdateAccountGroupRequest request,
         CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<AccountGroupDto>("The caller is not authenticated.");
         }
@@ -59,7 +59,7 @@ internal sealed class UpdateAccountGroupCommandHandler(
                     LedgerErrors.GroupCycle, "A group cannot become its own ancestor."));
             }
 
-            group.Reparent(request.ParentId, byUser);
+            group.Reparent(request.ParentId);
         }
 
         if (request.Status is not null && request.Status != group.Status)
@@ -75,11 +75,11 @@ internal sealed class UpdateAccountGroupCommandHandler(
                         "Cannot close a group while any account it holds still carries a balance."));
                 }
 
-                group.Close(byUser);
+                group.Close();
             }
             else
             {
-                group.Activate(byUser);
+                group.Activate();
             }
         }
 

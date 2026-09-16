@@ -48,8 +48,8 @@ internal sealed class OpenAccountCommandHandler(
 {
     public async Task<IResult<AccountDto>> OnHandle(OpenAccountRequest request, CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<AccountDto>("The caller is not authenticated.");
         }
@@ -85,8 +85,7 @@ internal sealed class OpenAccountCommandHandler(
             request.OverdraftLimit,
             request.MinimumBalance,
             request.ExternalReference,
-            request.Metadata,
-            byUser);
+            request.Metadata);
 
         await repository.AddAsync(account, cancellationToken);
 

@@ -76,7 +76,7 @@ public class AccountGroupTests
         var group = NewGroup();
         var newParentId = Guid.NewGuid();
 
-        group.Reparent(newParentId, "PayHub");
+        group.Reparent(newParentId);
 
         group.ParentId.ShouldBe(newParentId);
     }
@@ -86,7 +86,7 @@ public class AccountGroupTests
     {
         var group = NewGroup(parentId: Guid.NewGuid());
 
-        group.Reparent(null, "PayHub");
+        group.Reparent(null);
 
         group.ParentId.ShouldBeNull();
     }
@@ -96,7 +96,7 @@ public class AccountGroupTests
     {
         var group = NewGroup();
 
-        group.Close("PayHub");
+        group.Close();
 
         group.Status.ShouldBe(AccountGroupStatus.Closed);
     }
@@ -105,9 +105,9 @@ public class AccountGroupTests
     public void Activate_ReopensAClosedGroup()
     {
         var group = NewGroup();
-        group.Close("PayHub");
+        group.Close();
 
-        group.Activate("PayHub");
+        group.Activate();
 
         group.Status.ShouldBe(AccountGroupStatus.Active);
     }
