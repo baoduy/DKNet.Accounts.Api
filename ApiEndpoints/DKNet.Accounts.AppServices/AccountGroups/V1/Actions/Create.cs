@@ -7,9 +7,9 @@ using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Actions;
 
 // CreateAccountGroupRequest is generated from AccountGroup's [CrudCreate] constructor (DRK-1277 §3 row 1) —
-// same shape as the hand-written record this replaced (Code, Name, Description, Type, OwnerId, ParentId,
-// Metadata). This handler is registered as its hand-written IHandler, matched by request-type name, so the
-// generated handler is skipped in favour of the duplicate-code pre-check below.
+// same shape as the hand-written record this replaced (Code, Name, Description, Type, OwnerId, Metadata).
+// This handler is registered as its hand-written IHandler, matched by request-type name, so the generated
+// handler is skipped in favour of the duplicate-code pre-check below.
 
 internal sealed class CreateAccountGroupCommandValidator : AbstractValidator<CreateAccountGroupRequest>
 {
@@ -56,7 +56,6 @@ internal sealed class CreateAccountGroupCommandHandler(
             request.Description,
             request.Type,
             request.OwnerId,
-            request.ParentId,
             request.Metadata);
 
         // CreatedBy is left unset by the constructor and stamped on save by DataOwnerHook/PrincipalProvider

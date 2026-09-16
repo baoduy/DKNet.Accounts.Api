@@ -175,7 +175,7 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
 
     #region When
 
-    [When(@"""([^""]+)"" sends (a rename to ""[^""]+""|a close|a move under group ""[^""]+"") for ""([^""]+)""")]
+    [When(@"""([^""]+)"" sends (a rename to ""[^""]+""|a close) for ""([^""]+)""")]
     public async Task WhenSendsForGroup(string caller, string request, string code)
     {
         var groupId = await GetOrCreateGroupIdAsync(code);
@@ -186,17 +186,10 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
             state.Response = await client.SendAsCallerAsync(
                 state, HttpMethod.Put, $"{GroupsPath}/{groupId}", new { name = newName });
         }
-        else if (request == "a close")
+        else
         {
             state.Response = await client.SendAsCallerAsync(
                 state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
-        }
-        else
-        {
-            var targetCode = request["a move under group \"".Length..^1];
-            var parentId = await GetOrCreateGroupIdAsync(targetCode);
-            state.Response = await client.SendAsCallerAsync(
-                state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { parentId });
         }
 
         state.Values["lastGroupId"] = groupId.ToString();

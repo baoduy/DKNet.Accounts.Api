@@ -22,10 +22,9 @@ public enum AccountGroupStatus
 }
 
 /// <summary>
-/// A named, ownable collection of accounts. Groups can nest under a mutable parent; the ancestor chain must
-/// never form a cycle (R7) — that check needs the repository to walk the chain, so it lives in the command
-/// handler (<see cref="Reparent"/> only assigns). Closing a group whose accounts still hold a balance is
-/// refused — again a cross-aggregate check the handler performs before calling <see cref="Close"/>.
+/// A named, ownable collection of accounts — flat, holds accounts only, never another group. Closing a group
+/// whose accounts still hold a balance is refused — a cross-aggregate check the handler performs before
+/// calling <see cref="Close"/>.
 /// </summary>
 public sealed class AccountGroup : AggregateRoot
 {
@@ -44,7 +43,6 @@ public sealed class AccountGroup : AggregateRoot
         string? description,
         AccountGroupType type,
         string ownerId,
-        Guid? parentId,
         IReadOnlyDictionary<string, string>? metadata)
     {
         Code = code;
@@ -52,7 +50,6 @@ public sealed class AccountGroup : AggregateRoot
         Description = description;
         Type = type;
         OwnerId = ownerId;
-        ParentId = parentId;
         Metadata = metadata;
         Status = AccountGroupStatus.Active;
     }
@@ -76,8 +73,6 @@ public sealed class AccountGroup : AggregateRoot
     public AccountGroupStatus Status { get; private set; }
 
     public string OwnerId { get; private set; } = null!;
-
-    public Guid? ParentId { get; private set; }
 
     public IReadOnlyDictionary<string, string>? Metadata { get; private set; }
 
@@ -108,15 +103,6 @@ public sealed class AccountGroup : AggregateRoot
     public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata)
     {
         Metadata = metadata;
-    }
-
-    /// <summary>
-    /// Re-parents this group to <paramref name="parentId"/> (or clears it). Ancestor-cycle detection (R7)
-    /// needs the full chain from the repository and is the caller's responsibility — this method only assigns.
-    /// </summary>
-    public void Reparent(Guid? parentId)
-    {
-        ParentId = parentId;
     }
 
     public void Activate()

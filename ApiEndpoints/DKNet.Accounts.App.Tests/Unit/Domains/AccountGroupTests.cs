@@ -4,13 +4,12 @@ namespace DKNet.Accounts.App.Tests.Unit.Domains;
 
 public class AccountGroupTests
 {
-    private static AccountGroup NewGroup(Guid? parentId = null) => new(
+    private static AccountGroup NewGroup() => new(
         code: "CUST-000123",
         name: "Acme",
         description: "desc",
         type: AccountGroupType.Customer,
         ownerId: "PayHub",
-        parentId: parentId,
         metadata: new Dictionary<string, string> { ["k"] = "v" });
 
     [Fact]

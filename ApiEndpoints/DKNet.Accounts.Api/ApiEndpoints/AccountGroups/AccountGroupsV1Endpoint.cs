@@ -70,9 +70,8 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .WithDescription("Change an account group's metadata.");
 
         // Partial update (HAND, narrowed, DRK-1277 §11/§12): rename, description and metadata moved off this
-        // route onto their own generated routes above; only Reparent (R7 ancestor-cycle walk) and
-        // Activate/Close (GROUP_HOLDS_BALANCE refusal) remain, since neither's business refusal has anywhere
-        // to live in a generated route (R3).
+        // route onto their own generated routes above; only Activate/Close (GROUP_HOLDS_BALANCE refusal)
+        // remains, since that business refusal has nowhere to live in a generated route (R3).
         group.MapPatch("{id:guid}", async (
                 Guid id,
                 UpdateAccountGroupRequest req,
@@ -84,7 +83,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             })
             .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
-                "Change a group's status and parent. {\"status\":\"Closed\"} closes the group.");
+                "Change a group's status. {\"status\":\"Closed\"} closes the group.");
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,

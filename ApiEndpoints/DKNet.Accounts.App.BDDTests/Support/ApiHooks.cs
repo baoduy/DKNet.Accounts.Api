@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Reqnroll.BoDi;
+using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
@@ -49,6 +50,19 @@ public sealed class ApiHooks(IObjectContainer objectContainer)
         using var scope = _factory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
         db.Database.MigrateAsync().GetAwaiter().GetResult();
+
+        // DRK-1394 §5's legacy-nesting scenario seeds a row shaped like it looked before the
+        // RemoveAccountGroupNesting migration by writing the old "ParentId" column directly
+        // (FlatAccountGroupsSteps.SetLegacyParentAsync) — the migration above already dropped it for
+        // real, proving the DDL itself applies cleanly. Restore it here as a plain, unmapped column so
+        // that raw SQL still has somewhere to write; AccountGroup's model never references it again, and
+        // every other scenario is driven by the API/DTO shape, not the physical schema, so this has no
+        // other effect.
+        var entityType = db.Model.FindEntityType(typeof(AccountGroup))!;
+        var table = $"\"{entityType.GetSchema() ?? "public"}\".\"{entityType.GetTableName()}\"";
+        db.Database.ExecuteSqlRawAsync(
+                $"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS \"ParentId\" uuid NULL")
+            .GetAwaiter().GetResult();
     }
 
     /// <summary>

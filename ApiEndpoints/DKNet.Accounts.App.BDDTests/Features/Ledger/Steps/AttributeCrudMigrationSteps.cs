@@ -314,7 +314,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [When(@"it renames the group to ""([^""]+)""")]
     public async Task WhenItRenamesTheGroupTo(string newName) =>
         // Target route (row 4, narrowed): PUT {id}, generated from [CrudUpdate] on Rename — the first such
-        // member on AccountGroup. Red until Build builds it; today's PATCH stays for ChangeStatus/Reparent.
+        // member on AccountGroup. Red until Build builds it; today's PATCH stays for ChangeStatus only.
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Put, $"{GroupsPath}/{LastGroupId}", new { name = newName });
 

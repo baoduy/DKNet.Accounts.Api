@@ -105,7 +105,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AuthorFromCredential.feature.ndjson", 12);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AuthorFromCredential.feature.ndjson", 11);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -114,7 +114,6 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.CategoryAttribute("integration")]
         [global::NUnit.Framework.TestCaseAttribute("a rename to \"SG Retail\"", "0", null)]
         [global::NUnit.Framework.TestCaseAttribute("a close", "1", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a move under group \"SG-ROOT\"", "2", null)]
         public async global::System.Threading.Tasks.Task ThePersonWhoCallsIsRecordedAsTheAuthorOfAChange(string request, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -170,11 +169,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "3";
+            string pickleIndex = "2";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An author named in the request body is ignored", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 18
+#line 17
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -184,19 +183,19 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 19
+#line 18
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 20
+#line 19
     await testRunner.AndAsync("an active, empty account group \"SG-RETAIL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 21
+#line 20
     await testRunner.WhenAsync("\"priya.menon\" sends a close for \"SG-RETAIL\" naming \"audit-bot\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 22
+#line 21
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 23
+#line 22
     await testRunner.AndAsync("the account group\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -213,11 +212,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
+            string pickleIndex = "3";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A new account group records the caller as its author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 26
+#line 25
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -227,13 +226,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 27
+#line 26
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 28
+#line 27
     await testRunner.WhenAsync("\"priya.menon\" creates account group \"SG-WHOLESALE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 29
+#line 28
     await testRunner.ThenAsync("the account group\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -250,11 +249,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
+            string pickleIndex = "4";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A new account records the caller as its author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 32
+#line 31
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -264,13 +263,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 33
+#line 32
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 34
+#line 33
     await testRunner.WhenAsync("\"priya.menon\" opens account \"SGD-0001\" in group \"SG-RETAIL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 35
+#line 34
     await testRunner.ThenAsync("the account\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -287,11 +286,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "6";
+            string pickleIndex = "5";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Changing an account limit records the caller as the last editor", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 38
+#line 37
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -301,16 +300,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 39
+#line 38
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 40
+#line 39
     await testRunner.AndAsync("an active account \"SGD-0001\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 41
+#line 40
     await testRunner.WhenAsync("\"priya.menon\" sets the overdraft limit of \"SGD-0001\" to 500.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 42
+#line 41
     await testRunner.ThenAsync("the account\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -327,11 +326,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "7";
+            string pickleIndex = "6";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting by a person records the person and keeps the calling system", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 45
+#line 44
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -341,16 +340,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 46
+#line 45
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 47
+#line 46
     await testRunner.WhenAsync("\"priya.menon\" records a credit of 100.00 SGD to account \"SGD-0001\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 48
+#line 47
     await testRunner.ThenAsync("the posting\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 49
+#line 48
     await testRunner.AndAsync("the posting\'s calling system is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -367,11 +366,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
+            string pickleIndex = "7";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting by a system with no person records the system as the author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 52
+#line 51
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -381,16 +380,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 53
+#line 52
     await testRunner.GivenAsync("\"treasury-ops\" is an authenticated calling system that identifies no person", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 54
+#line 53
     await testRunner.WhenAsync("\"treasury-ops\" records a credit of 50.00 SGD to account \"SGD-0001\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 55
+#line 54
     await testRunner.ThenAsync("the posting\'s created-by is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 56
+#line 55
     await testRunner.AndAsync("the posting\'s calling system is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -407,11 +406,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "9";
+            string pickleIndex = "8";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Reversing a posting records the caller as the last editor", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 59
+#line 58
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -421,16 +420,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 60
+#line 59
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 61
+#line 60
     await testRunner.AndAsync("a posted credit of 100.00 SGD on account \"SGD-0001\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 62
+#line 61
     await testRunner.WhenAsync("\"priya.menon\" reverses that posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 63
+#line 62
     await testRunner.ThenAsync("the original posting\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
