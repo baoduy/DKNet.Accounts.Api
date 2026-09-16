@@ -111,6 +111,53 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Then it receives that group
 
   @new @integration
+  Scenario: An empty group is deleted
+    Given the account group "TREASURY-OLD" holds no account
+    When treasury-ops deletes the account group "TREASURY-OLD"
+    Then the request succeeds with no content
+    And reading "TREASURY-OLD" reports that it does not exist
+
+  @new @integration
+  Scenario Outline: A group holding an account is refused
+    Given the account group "TREASURY-MAIN" holds one <account>
+    When treasury-ops deletes the account group "TREASURY-MAIN"
+    Then the request is refused with 422 and the code "GROUP_NOT_EMPTY"
+    And the account group "TREASURY-MAIN" still exists
+    And that account still holds the same group, status and balance
+
+    Examples:
+      | account                          |
+      | open account holding 100.00 SGD  |
+      | open account holding 0.00 SGD    |
+      | closed account holding 0.00 SGD  |
+
+  @new @integration
+  Scenario: An unknown group is reported as not found
+    Given no account group has the identifier "6f1d2c40-1111-4222-8333-444455556666"
+    When treasury-ops deletes that identifier
+    Then the request is answered with 404
+
+  @new @integration
+  Scenario: A badly formed identifier is rejected, not refused
+    Given "not-a-group-id" is not a well formed identifier
+    When treasury-ops deletes that identifier
+    Then the request is answered with 400
+    And no account group is deleted
+
+  @new @integration
+  Scenario: A read-only caller cannot delete a group
+    Given the account group "TREASURY-OLD" holds no account
+    And reporting-bot holds the accounts read permission only
+    When reporting-bot deletes the account group "TREASURY-OLD"
+    Then the request is refused with 403
+    And the account group "TREASURY-OLD" still exists
+
+  @new @integration
+  Scenario: The delete route carries the write permission
+    When the account-group routes are listed
+    Then the delete route requires the accounts write permission
+
+  @new @integration
   Scenario Outline: Every route still requires the scope it required before
     Given the calling system "reporting-bot" holds every ledger scope except <scope>
     When it calls <route>

@@ -3,13 +3,15 @@ using DKNet.AspCore.Extensions.Responses;
 namespace DKNet.Accounts.Api.Configs.GlobalExceptions;
 
 /// <summary>
-/// This service's <see cref="ErrorResponseOptions"/> setting (§3 row 6): a refusal carrying one of
-/// <see cref="LedgerErrors"/>'s own codes answers 422 and puts that code on the response body's <c>code</c>
-/// extension (R1) — giving routes that dispatch through the package's own <c>.Response()</c>/<c>MapActionById</c>
-/// (account-group create/close/activate) the same shape <see cref="LedgerResultResponseExtensions"/> already
-/// gives the hand-mapped account/posting/currency routes. Any other failure — including every FluentValidation
-/// shape refusal, whose <c>ErrorCode</c> is the validator's own name (e.g. <c>NotEmptyValidator</c>), never one
-/// of these codes — keeps today's status and carries no code (R1, R3).
+/// This service's one and only <see cref="ErrorResponseOptions"/> registration (§3 row 6; <c>AddErrorResponses</c>
+/// may only be called once — a second call silently discards whichever call registered first): a refusal
+/// carrying one of <see cref="LedgerErrors"/>'s own codes answers 422 and puts that code on the response
+/// body's <c>code</c> extension (R1) — giving routes that dispatch through the package's own
+/// <c>.Response()</c>/<c>MapActionById</c>/<c>MapDeleteById</c> (account-group create/close/activate/delete)
+/// the same shape <see cref="LedgerResultResponseExtensions"/> already gives the hand-mapped account/posting/
+/// currency routes. Any other failure — including every FluentValidation shape refusal, whose <c>ErrorCode</c>
+/// is the validator's own name (e.g. <c>NotEmptyValidator</c>), never one of these codes — keeps today's
+/// status and carries no code (R1, R3).
 /// </summary>
 internal static class LedgerErrorResponseOptions
 {
@@ -18,6 +20,7 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.OverdraftLimitRequired,
         LedgerErrors.AccountHoldsBalance,
         LedgerErrors.GroupHoldsBalance,
+        LedgerErrors.GroupNotEmpty,
         LedgerErrors.DuplicateGroupCode,
         LedgerErrors.UnsupportedCurrency,
         LedgerErrors.InvalidPostingAmount,
