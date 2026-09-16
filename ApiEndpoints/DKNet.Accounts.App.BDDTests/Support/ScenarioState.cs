@@ -11,6 +11,10 @@ public sealed class ScenarioState
     /// <summary>The calling system the next request authenticates as. Defaults to PayHub, full scope.</summary>
     public string CallerClientId { get; set; } = "PayHub";
 
+    /// <summary>The person named in the next request's credential, alongside <see cref="CallerClientId"/>'s
+    /// calling system. Null (default) means the credential names no person — today's behaviour.</summary>
+    public string? CallerSubject { get; set; }
+
     public string[] CallerScopes { get; set; } = [.. ScopeNames.All];
 
     /// <summary>Free-form bag for values one step captures and a later step in the same scenario needs.</summary>

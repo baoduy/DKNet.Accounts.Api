@@ -5,7 +5,8 @@ namespace DKNet.Accounts.App.BDDTests.Support;
 
 /// <summary>
 /// Sends a request as the scenario's current caller (<see cref="ScenarioState.CallerClientId"/> /
-/// <see cref="ScenarioState.CallerScopes"/>) via <see cref="LedgerCallerAuthHandler"/>'s headers. Headers are
+/// <see cref="ScenarioState.CallerSubject"/> / <see cref="ScenarioState.CallerScopes"/>) via
+/// <see cref="LedgerCallerAuthHandler"/>'s headers. Headers are
 /// set per-request rather than on the shared <see cref="HttpClient"/> so one scenario's caller never bleeds
 /// into the next.
 /// </summary>
@@ -18,7 +19,9 @@ internal static class LedgerHttpClientExtensions
         string requestUri,
         object? body = null,
         string? idempotencyKey = null) =>
-        SendAsAsync(client, state.CallerClientId, state.CallerScopes, method, requestUri, body, idempotencyKey);
+        SendAsAsync(
+            client, state.CallerClientId, state.CallerSubject, state.CallerScopes, method, requestUri, body,
+            idempotencyKey);
 
     public static Task<HttpResponseMessage> SendUnauthenticatedAsync(
         this HttpClient client,
@@ -29,6 +32,7 @@ internal static class LedgerHttpClientExtensions
     private static async Task<HttpResponseMessage> SendAsAsync(
         HttpClient client,
         string clientId,
+        string? subject,
         string[] scopes,
         HttpMethod method,
         string requestUri,
@@ -37,6 +41,11 @@ internal static class LedgerHttpClientExtensions
     {
         using var request = new HttpRequestMessage(method, requestUri);
         request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, clientId);
+        if (subject is not null)
+        {
+            request.Headers.Add(LedgerCallerAuthHandler.SubjectHeaderName, subject);
+        }
+
         request.Headers.Add(LedgerCallerAuthHandler.ScopesHeaderName, string.Join(' ', scopes));
         if (idempotencyKey is not null)
         {
