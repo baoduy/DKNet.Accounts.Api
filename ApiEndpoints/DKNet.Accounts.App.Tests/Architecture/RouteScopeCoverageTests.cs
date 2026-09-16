@@ -38,6 +38,7 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
             [("PUT", $"{V1}/account-groups/{{id:guid}}/change-description")] = ScopeNames.AccountsWrite,
             [("PUT", $"{V1}/account-groups/{{id:guid}}/change-metadata")] = ScopeNames.AccountsWrite,
             [("PATCH", $"{V1}/account-groups/{{id:guid}}")] = ScopeNames.AccountsWrite,
+            [("DELETE", $"{V1}/account-groups/{{id}}")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/account-groups/{{id:guid}}/balances")] = ScopeNames.AccountsRead,
             [("POST", $"{V1}/accounts/")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/accounts/")] = ScopeNames.AccountsRead,
