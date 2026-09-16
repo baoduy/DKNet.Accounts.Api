@@ -223,7 +223,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.ThenAsync("one request creates the group", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 22
-    await testRunner.AndAsync("the other is refused with 409", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the other is refused and the refusal carries the code \"DUPLICATE_GROUP_CODE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 23
     await testRunner.AndAsync("exactly one account group holds the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");

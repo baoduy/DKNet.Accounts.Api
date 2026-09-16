@@ -267,11 +267,14 @@ public sealed class AccountGroupValidationRefusalsSteps(HttpClient client, Scena
          _secondRaceResponse!.StatusCode == HttpStatusCode.Created).ShouldBeTrue(
             $"expected one 201, got {(int)_firstRaceResponse!.StatusCode} and {(int)_secondRaceResponse!.StatusCode}");
 
-    [Then(@"the other is refused with 409")]
-    public void ThenTheOtherIsRefusedWith409() =>
-        (_firstRaceResponse!.StatusCode == HttpStatusCode.Conflict ||
-         _secondRaceResponse!.StatusCode == HttpStatusCode.Conflict).ShouldBeTrue(
-            $"expected one 409, got {(int)_firstRaceResponse!.StatusCode} and {(int)_secondRaceResponse!.StatusCode}");
+    [Then(@"the other is refused and the refusal carries the code ""([^""]+)""")]
+    public async Task ThenTheOtherIsRefusedAndTheRefusalCarriesTheCode(string expectedCode)
+    {
+        var other = _firstRaceResponse!.StatusCode == HttpStatusCode.Created ? _secondRaceResponse! : _firstRaceResponse!;
+        other.IsSuccessStatusCode.ShouldBeFalse($"expected the other request to be refused, got {(int)other.StatusCode}");
+        var doc = await ReadJsonAsync(other);
+        doc.GetProperty("code").GetString().ShouldBe(expectedCode);
+    }
 
     [Then(@"exactly one account group holds the code ""([^""]+)""")]
     public async Task ThenExactlyOneAccountGroupHoldsTheCode(string code)

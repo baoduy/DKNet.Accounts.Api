@@ -19,7 +19,7 @@ Feature: Account group refusals decided by validation
     Given no account group holds the code "TREASURY-OPS"
     When two requests create a group with code "TREASURY-OPS" at the same moment
     Then one request creates the group
-    And the other is refused with 409
+    And the other is refused and the refusal carries the code "DUPLICATE_GROUP_CODE"
     And exactly one account group holds the code "TREASURY-OPS"
 
   @new @integration
