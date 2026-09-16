@@ -586,6 +586,10 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/account-groups/b85813c0-3053-4d
 A group holding `100.00 SGD` and `80.00 USD` returns two lines. There is no combined total across
 currencies, and there never will be — the service has no exchange rate and is not going to invent one.
 
+This read sums accounts *by* group id and never looks the group up, so a group holding no account
+answers `200` with `[]` — and so does an identifier that matches no group at all. An empty list is not
+evidence that the group exists; read the group itself if you need that.
+
 ## 10. Closing up
 
 An account closes with a `PATCH`, and reopens with the same call carrying `{"status":"Active"}`:

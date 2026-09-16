@@ -195,7 +195,7 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); unknown or malformed id → `404` |
 | `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Unknown or malformed id → `404` |
-| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency | `accounts.read` | Unknown or malformed id → `404` |
+| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Unknown id → `404` |
@@ -258,11 +258,14 @@ condition. Full contract, including the exact error cases:
 
 #### Which routes are generated, and which are hand-written
 
-Most of this contract is now emitted by `DKNet.SlimBus.Generators` from `[CrudCreate]`/`[CrudUpdate]`
-attributes on the aggregates, mapped through `DKNet.AspCore.Extensions`' generic
-`MapGetList`/`MapGetById`/`MapPutById`. **This changes nothing a caller can see** beyond what the
-table above states — it is recorded here because it tells you which routes move as a group when the
-generator is upgraded, and which carry service-specific logic that has to be read.
+Most of this contract is now emitted by `DKNet.SlimBus.Generators` from `[CrudCreate]`, `[CrudUpdate]`
+and `[CrudAction]` attributes on the aggregates, published either through `DKNet.AspCore.Extensions`'
+generic `MapGetList`/`MapGetById`/`MapPutById` or — for account groups — through one composite
+registration that also carries create and delete. The table below says which is which, and where only
+the request and handler are generated while the route stays hand-written. **This changes nothing a
+caller can see** beyond what the table above states — it is recorded here because it tells you which
+routes move as a group when the generator is upgraded, and which carry service-specific logic that has
+to be read.
 
 A generated registration covers every operation the generator can express; a route sits outside it only
 when the generator cannot carry that route's shape — a business refusal the handler cannot reach, a lock,
