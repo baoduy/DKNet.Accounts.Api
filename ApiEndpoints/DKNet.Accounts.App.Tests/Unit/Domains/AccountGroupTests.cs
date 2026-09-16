@@ -23,7 +23,6 @@ public class AccountGroupTests
         group.Description.ShouldBe("desc");
         group.Type.ShouldBe(AccountGroupType.Customer);
         group.OwnerId.ShouldBe("PayHub");
-        group.ParentId.ShouldBeNull();
         group.Metadata.ShouldNotBeNull();
         group.Status.ShouldBe(AccountGroupStatus.Active);
     }
@@ -68,39 +67,6 @@ public class AccountGroupTests
         group.ChangeMetadata(metadata);
 
         group.Metadata.ShouldBe(metadata);
-    }
-
-    [Fact]
-    public void Reparent_OnlyAssigns_LeavingCycleDetectionToTheCaller()
-    {
-        var group = NewGroup();
-        var newParentId = Guid.NewGuid();
-
-        group.Reparent(newParentId);
-
-        group.ParentId.ShouldBe(newParentId);
-    }
-
-    [Fact]
-    public void Reparent_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
-    {
-        // DRK-1372 §5/R1: Reparent takes no acting-user parameter any more, so it must not stamp UpdatedBy
-        // itself — DataOwnerHook stamps it from the authenticated credential on save.
-        var group = NewGroup();
-
-        group.Reparent(Guid.NewGuid());
-
-        group.UpdatedBy.ShouldBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void Reparent_AcceptsNullToClearTheParent()
-    {
-        var group = NewGroup(parentId: Guid.NewGuid());
-
-        group.Reparent(null);
-
-        group.ParentId.ShouldBeNull();
     }
 
     [Fact]

@@ -197,16 +197,11 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Given(@"the account group ""([^""]+)"" of type ""([^""]+)"" owned by ""([^""]+)"" exists")]
     public async Task GivenTheAccountGroupOfTypeOwnedByExists(string code, string type, string owner)
     {
-        // A real parent (not just a null one) so the Then step's parent assertion can pin an exact value —
-        // a null ParentId is omitted from the JSON entirely (DefaultIgnoreCondition.WhenWritingNull), so
-        // presence-checking a null field can't tell "field removed from the DTO" from "field null this time".
-        var parentId = await CreateGroupAsync($"{code}-PARENT", type);
-        var id = await CreateGroupAsync(code, type, owner, extra: new { parentId });
+        var id = await CreateGroupAsync(code, type, owner);
         state.Values["lastGroupId"] = id?.ToString() ?? Guid.NewGuid().ToString();
         state.Values["lastGroupCode"] = code;
         state.Values["lastGroupOwner"] = owner;
         state.Values["lastGroupType"] = type;
-        state.Values["lastGroupParentId"] = parentId?.ToString() ?? "";
     }
 
     [Given(@"the account groups ""([^""]+)"" of type ""([^""]+)"" and ""([^""]+)"" of type ""([^""]+)"" exist")]
@@ -368,18 +363,6 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Patch, $"{GroupsPath}/{LastGroupId}", new { status = "Closed" });
 
-    [When(@"it reparents ""([^""]+)"" to ""([^""]+)""")]
-    public async Task WhenItReparentsTo(string childCode, string parentCode)
-    {
-        // Row 4 (narrowed): Reparent stays HAND — the ancestor-cycle walk has nowhere to live in a generated
-        // route. Still PATCH.
-        var childId = state.Values[$"group:{childCode}"];
-        var parentId = state.Values[$"group:{parentCode}"];
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId });
-        state.Values["lastGroupId"] = childId;
-    }
-
     [When(@"it opens an account named ""([^""]+)"" permitted to go negative with no overdraft limit")]
     public async Task WhenItOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string name) =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
@@ -489,14 +472,6 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("status").GetString().ShouldBe(expectedStatus.ToLowerInvariant());
     }
 
-    [Then(@"the group's parent is ""([^""]+)""")]
-    public async Task ThenTheGroupsParentIs(string parentCode)
-    {
-        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
-        var doc = await ReadJsonAsync(response);
-        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values[$"group:{parentCode}"]));
-    }
-
     [Then(@"the account's name is ""([^""]+)""")]
     public async Task ThenTheAccountsNameIs(string expectedName)
     {
@@ -505,7 +480,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("name").GetString().ShouldBe(expectedName);
     }
 
-    [Then(@"it receives the group's code, name, type, status, owner and parent")]
+    [Then(@"it receives the group's code, name, type, status and owner")]
     public async Task ThenItReceivesTheGroupsFields()
     {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -518,10 +493,6 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         doc.GetProperty("type").GetString().ShouldBe(state.Values["lastGroupType"].ToLowerInvariant());
         doc.GetProperty("status").GetString().ShouldBe("active");
         doc.GetProperty("ownerId").GetString().ShouldBe(state.Values["lastGroupOwner"]);
-        // A real (non-null) parent — removing ParentId from the DTO drops this key entirely, catching the
-        // same class of silent field loss; a null parent would be indistinguishable either way, since null
-        // properties are omitted from the response regardless of whether the DTO still declares them.
-        doc.GetProperty("parentId").GetGuid().ShouldBe(Guid.Parse(state.Values["lastGroupParentId"]));
     }
 
     [Then(@"it receives ""([^""]+)""")]

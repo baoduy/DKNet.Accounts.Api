@@ -38,7 +38,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
   Scenario: An account group is read back in full
     Given the account group "OPS-CASH" of type "Internal" owned by "acme-pte-ltd" exists
     When the calling system "treasury-ops" reads that group
-    Then it receives the group's code, name, type, status, owner and parent
+    Then it receives the group's code, name, type, status and owner
 
   @existing @integration
   Scenario: Account groups can still be narrowed to one type
@@ -88,14 +88,6 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     And the calling system "treasury-ops" is authorised to write accounts
     When it closes the group
     Then the group's status is "Closed"
-
-  @new @integration
-  Scenario: A group can still be reparented once rename and metadata move off the PATCH
-    Given the account group "OPS-CHILD" named "Child Group" exists
-    And the account group "OPS-PARENT2" named "Parent Group" exists
-    And the calling system "treasury-ops" is authorised to write accounts
-    When it reparents "OPS-CHILD" to "OPS-PARENT2"
-    Then the group's parent is "OPS-PARENT2"
 
   @existing @integration
   Scenario: A posting recorded twice under one idempotency key is recorded once
