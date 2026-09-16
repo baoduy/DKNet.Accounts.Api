@@ -413,10 +413,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     [When(@"it closes the group")]
     public async Task WhenItClosesTheGroup() =>
-        // Row 4 (narrowed): ChangeStatus/Close stays HAND — the held-balance refusal (GROUP_HOLDS_BALANCE →
-        // 422) has nowhere to live in a generated route. Still PATCH.
+        // DRK-1418 §3 row 1/row 8: Close is now [CrudAction]-generated onto its own POST {id}/close route;
+        // the GROUP_HOLDS_BALANCE refusal moved into CloseAccountGroupRequestValidator.
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Patch, $"{GroupsPath}/{LastGroupId}", new { status = "Closed" });
+            state, HttpMethod.Post, $"{GroupsPath}/{LastGroupId}/close");
 
     [When(@"it opens an account named ""([^""]+)"" permitted to go negative with no overdraft limit")]
     public async Task WhenItOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string name) =>

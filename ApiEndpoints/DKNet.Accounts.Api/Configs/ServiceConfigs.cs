@@ -1,6 +1,4 @@
-using DKNet.AspCore.Extensions.Responses;
 using DKNet.EfCore.Extensions.Serialization;
-using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Infra.Contexts;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
@@ -33,25 +31,11 @@ internal static class ServiceConfigs
             //Service Bus
             .AddServiceBus(configuration, typeof(AppSetup).Assembly, features);
 
-        // R5: global for every FluentValidation refusal — StatusCode returns null (keep today's status/body)
-        // for every code but GROUP_NOT_EMPTY (DRK-1421 §3 row 3).
-        services.AddErrorResponses(o =>
-        {
-            o.StatusCode = ctx => ctx.Errors.Any(e => e.Code == LedgerErrors.GroupNotEmpty)
-                ? StatusCodes.Status422UnprocessableEntity
-                : null;
-            o.Customize = (problem, ctx) =>
-            {
-                // Only the stable LedgerErrors code, never FluentValidation's own default ErrorCode (e.g.
-                // "NotEmptyValidator", set on every rule with no explicit WithErrorCode) — that default would
-                // otherwise widen today's 400 body for every OTHER validator refusal (row 7).
-                var code = ctx.Errors.FirstOrDefault(e => e.Code == LedgerErrors.GroupNotEmpty)?.Code;
-                if (code is not null)
-                {
-                    problem.Extensions[LedgerErrors.CodeKey] = code;
-                }
-            };
-        });
+        // GROUP_NOT_EMPTY's 422+code mapping (DRK-1421 §3 row 3) is registered once, alongside every other
+        // stable LedgerErrors code, via AddFluentValidationConfig's AddErrorResponses call
+        // (FluentValidationConfig.cs, LedgerErrorResponseOptions) — AddErrorResponses may only be called
+        // once (it registers a single ErrorResponseOptions instance); a second call here would silently
+        // discard whichever call runs first (DRK-1423 merge finding).
 
         return services;
     }

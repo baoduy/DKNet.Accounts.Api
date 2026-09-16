@@ -105,15 +105,23 @@ public sealed class AccountGroup : AggregateRoot
         Metadata = metadata;
     }
 
+    /// <summary>
+    /// Reactivates a closed group (DRK-1418 §3 row 1) — generated into <c>ActivateAccountGroupRequest</c> on
+    /// its own <c>{id}/activate</c> route. No acting-user parameter (DRK-1277 C3).
+    /// </summary>
+    [CrudAction]
     public void Activate()
     {
         Status = AccountGroupStatus.Active;
     }
 
     /// <summary>
-    /// Closes the group. Refusing this while any account it holds still carries a balance is a cross-aggregate
-    /// check the caller must perform first — this method only assigns the terminal status.
+    /// Closes the group (DRK-1418 §3 row 1) — generated into <c>CloseAccountGroupRequest</c> on its own
+    /// <c>{id}/close</c> route. Refusing this while any account it holds still carries a balance is a
+    /// cross-aggregate check enforced by that request's own validator before this method ever runs — this
+    /// method only assigns the terminal status. No acting-user parameter (DRK-1277 C3).
     /// </summary>
+    [CrudAction]
     public void Close()
     {
         Status = AccountGroupStatus.Closed;
