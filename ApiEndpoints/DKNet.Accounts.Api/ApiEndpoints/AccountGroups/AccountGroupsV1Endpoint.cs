@@ -79,9 +79,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
                 {
-                    var failure = validation.Errors[0];
-                    return Result.Fail<AccountGroupDto>(LedgerErrors.Error(failure.ErrorCode, failure.ErrorMessage))
-                        .ToLedgerResponse();
+                    return CloseValidationFailureResponse(validation);
                 }
 
                 var result = await bus.Send(request, cancellationToken: ct);
@@ -124,5 +122,23 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             })
             .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read a group's total balances, one line per currency — never combined.");
+    }
+
+    /// <summary>
+    /// Only a failure whose <c>ErrorCode</c> is one of <see cref="LedgerErrorResponseOptions"/>' known stable
+    /// codes is promoted to the ledger 422+code shape — correct even if <c>CloseAccountGroupRequestValidator</c>
+    /// grows a second, uncoded rule later; anything else falls through to today's plain 400 validation-problem
+    /// body. Internal (not a lambda) so it's directly testable without a real HTTP round trip.
+    /// </summary>
+    internal static IResult CloseValidationFailureResponse(FluentValidation.Results.ValidationResult validation)
+    {
+        var stableFailure = validation.Errors.FirstOrDefault(e => LedgerErrorResponseOptions.IsKnownCode(e.ErrorCode));
+        if (stableFailure is not null)
+        {
+            return Result.Fail<AccountGroupDto>(LedgerErrors.Error(stableFailure.ErrorCode, stableFailure.ErrorMessage))
+                .ToLedgerResponse();
+        }
+
+        return Results.ValidationProblem(validation.ToDictionary());
     }
 }

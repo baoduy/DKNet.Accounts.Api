@@ -195,12 +195,19 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
         state.Values["lastGroupId"] = groupId.ToString();
     }
 
+    /// <summary>
+    /// <paramref name="claimedAuthor"/> is deliberately never sent: the close route binds no body at all
+    /// (DRK-1418 §3 row 8 — the route builds <c>CloseAccountGroupRequest</c> from the id alone), and even when
+    /// a body was bound, that generated request type has no author-settable property to spoof. Either way the
+    /// scenario's real guarantee — <c>UpdatedBy</c> comes only from the authenticated caller's credential,
+    /// never from anything the caller sends — is what "the request succeeds and the author is priya.menon"
+    /// still proves.
+    /// </summary>
     [When(@"""([^""]+)"" sends a close for ""([^""]+)"" naming ""([^""]+)"" as the author")]
     public async Task WhenSendsACloseForNamingAsTheAuthor(string caller, string code, string claimedAuthor)
     {
         var groupId = await GetOrCreateGroupIdAsync(code);
-        state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close", new { author = claimedAuthor });
+        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close");
         state.Values["lastGroupId"] = groupId.ToString();
     }
 

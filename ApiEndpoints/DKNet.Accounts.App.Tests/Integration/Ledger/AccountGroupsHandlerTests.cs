@@ -227,10 +227,11 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     }
 
     /// <summary>
-    /// DRK-1421 §3 row 7: <c>AddErrorResponses</c> is wired globally (row 3) for the GROUP_NOT_EMPTY refusal
-    /// alone. Proves every OTHER validator refusal — one whose FluentValidation rule carries no
-    /// <c>WithErrorCode</c> — still gets today's plain 400 validation-problem body, widened to 422 for none of
-    /// them.
+    /// DRK-1421 §3 row 7: <c>AddErrorResponses</c> is wired globally (row 3) for every stable
+    /// <see cref="LedgerErrors"/> code (DUPLICATE_GROUP_CODE, GROUP_HOLDS_BALANCE, GROUP_NOT_EMPTY, and every
+    /// other slice's code), not GROUP_NOT_EMPTY alone. Proves every OTHER validator refusal — one whose
+    /// FluentValidation rule carries no <c>WithErrorCode</c> — still gets today's plain 400 validation-problem
+    /// body, widened to 422 for none of them.
     /// </summary>
     [Fact]
     public async Task CreatingAGroupWithInvalidInput_StillAnswers400WithTodaysBody()
