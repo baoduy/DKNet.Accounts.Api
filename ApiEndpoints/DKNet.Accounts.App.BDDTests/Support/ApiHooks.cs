@@ -51,15 +51,39 @@ public sealed class ApiHooks(IObjectContainer objectContainer)
         var db = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
         db.Database.MigrateAsync().GetAwaiter().GetResult();
 
+        var entityType = db.Model.FindEntityType(typeof(AccountGroup))!;
+        var schema = entityType.GetSchema() ?? "public";
+        var tableName = entityType.GetTableName()!;
+
+        // Proves RemoveAccountGroupNesting.Up() actually ran — not just that the app tolerates a stray
+        // physical column (see the compatibility re-add below). A migration whose Up() body were emptied
+        // would leave one of these counts at 1, failing every test in the run right here at bootstrap.
+        var columnCount = db.Database
+            .SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int AS \"Value\" FROM information_schema.columns " +
+                "WHERE table_schema = {0} AND table_name = {1} AND column_name = 'ParentId'",
+                schema, tableName)
+            .SingleAsync().GetAwaiter().GetResult();
+        columnCount.ShouldBe(0,
+            "RemoveAccountGroupNesting migration should have dropped AccountGroups.ParentId");
+
+        var indexCount = db.Database
+            .SqlQueryRaw<int>(
+                "SELECT COUNT(*)::int AS \"Value\" FROM pg_indexes " +
+                "WHERE schemaname = {0} AND tablename = {1} AND indexname = 'IX_AccountGroups_ParentId'",
+                schema, tableName)
+            .SingleAsync().GetAwaiter().GetResult();
+        indexCount.ShouldBe(0,
+            "RemoveAccountGroupNesting migration should have dropped IX_AccountGroups_ParentId");
+
         // DRK-1394 §5's legacy-nesting scenario seeds a row shaped like it looked before the
         // RemoveAccountGroupNesting migration by writing the old "ParentId" column directly
         // (FlatAccountGroupsSteps.SetLegacyParentAsync) — the migration above already dropped it for
-        // real, proving the DDL itself applies cleanly. Restore it here as a plain, unmapped column so
-        // that raw SQL still has somewhere to write; AccountGroup's model never references it again, and
-        // every other scenario is driven by the API/DTO shape, not the physical schema, so this has no
-        // other effect.
-        var entityType = db.Model.FindEntityType(typeof(AccountGroup))!;
-        var table = $"\"{entityType.GetSchema() ?? "public"}\".\"{entityType.GetTableName()}\"";
+        // real, proving the DDL itself applies cleanly (asserted above). Restore it here as a plain,
+        // unmapped column so that raw SQL still has somewhere to write; AccountGroup's model never
+        // references it again, and every other scenario is driven by the API/DTO shape, not the physical
+        // schema, so this has no other effect.
+        var table = $"\"{schema}\".\"{tableName}\"";
         db.Database.ExecuteSqlRawAsync(
                 $"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS \"ParentId\" uuid NULL")
             .GetAwaiter().GetResult();
