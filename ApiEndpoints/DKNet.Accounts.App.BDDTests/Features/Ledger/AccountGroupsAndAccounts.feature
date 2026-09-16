@@ -27,12 +27,6 @@ Feature: Account groups and accounts
     Then the request is refused and the group remains open
 
   @integration
-  Scenario: A group cannot become its own ancestor
-    Given the group "CUST-000200" is a child of the group "CUST-000123"
-    When PayHub asks to make "CUST-000123" a child of "CUST-000200"
-    Then the request is refused and both groups keep their present parents
-
-  @integration
   Scenario: Group balances are reported one line per currency
     Given the group "CUST-000123" holds an account with 100.00 SGD and an account with 80.00 USD
     When PayHub reads the balances of "CUST-000123"

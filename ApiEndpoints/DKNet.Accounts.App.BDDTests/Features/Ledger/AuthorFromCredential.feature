@@ -9,10 +9,9 @@ Feature: The author of a change comes from the caller's credential
     And the account group's updated-by is "priya.menon"
 
     Examples:
-      | request                      |
-      | a rename to "SG Retail"      |
-      | a close                      |
-      | a move under group "SG-ROOT" |
+      | request                 |
+      | a rename to "SG Retail" |
+      | a close                 |
 
   @new @integration
   Scenario: An author named in the request body is ignored

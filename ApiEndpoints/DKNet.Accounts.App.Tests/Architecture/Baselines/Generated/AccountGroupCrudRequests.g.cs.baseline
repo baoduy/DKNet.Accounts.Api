@@ -20,9 +20,6 @@ public sealed partial record CreateAccountGroupRequest : global::DKNet.SlimBus.E
     /// <summary>Maps to constructor parameter 'ownerId'.</summary>
     public required string OwnerId { get; init; }
 
-    /// <summary>Maps to constructor parameter 'parentId'.</summary>
-    public global::System.Guid? ParentId { get; init; }
-
     /// <summary>Maps to constructor parameter 'metadata'.</summary>
     public global::System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get; init; }
 }

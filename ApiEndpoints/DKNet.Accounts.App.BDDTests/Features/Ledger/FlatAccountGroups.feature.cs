@@ -18,18 +18,18 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     [global::NUnit.Framework.TestFixtureAttribute()]
-    [global::NUnit.Framework.DescriptionAttribute("The author of a change comes from the caller\'s credential")]
+    [global::NUnit.Framework.DescriptionAttribute("Account groups are flat")]
     [global::NUnit.Framework.FixtureLifeCycleAttribute(global::NUnit.Framework.LifeCycle.InstancePerTestCase)]
-    public partial class TheAuthorOfAChangeComesFromTheCallersCredentialFeature
+    public partial class AccountGroupsAreFlatFeature
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/Ledger", "The author of a change comes from the caller\'s credential", null, global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features/Ledger", "Account groups are flat", null, global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
-#line 1 "AuthorFromCredential.feature"
+#line 1 "FlatAccountGroups.feature"
 #line hidden
         
         [global::NUnit.Framework.OneTimeSetUpAttribute()]
@@ -105,29 +105,21 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AuthorFromCredential.feature.ndjson", 11);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/FlatAccountGroups.feature.ndjson", 10);
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("The person who calls is recorded as the author of a change")]
+        [global::NUnit.Framework.DescriptionAttribute("A new group is top-level")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("a rename to \"SG Retail\"", "0", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a close", "1", null)]
-        public async global::System.Threading.Tasks.Task ThePersonWhoCallsIsRecordedAsTheAuthorOfAChange(string request, string @__pickleIndex, string[] exampleTags)
+        public async global::System.Threading.Tasks.Task ANewGroupIsTop_Level()
         {
-            string[] @__tags = new string[] {
+            string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
-            if ((exampleTags != null))
-            {
-                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
-            }
-            string[] tagsOfScenario = @__tags;
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            argumentsOfScenario.Add("request", request);
-            string pickleIndex = @__pickleIndex;
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The person who calls is recorded as the author of a change", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string pickleIndex = "0";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A new group is top-level", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 4
@@ -141,36 +133,71 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 5
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST-000300\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 6
-    await testRunner.AndAsync("an active, empty account group \"SG-RETAIL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 7
-    await testRunner.WhenAsync(string.Format("\"priya.menon\" sends {0} for \"SG-RETAIL\"", request), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 8
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 9
-    await testRunner.AndAsync("the account group\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line 7
+    await testRunner.AndAsync("\"CUST-000300\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("An author named in the request body is ignored")]
+        [global::NUnit.Framework.DescriptionAttribute("A create request that still names a parent creates a top-level group")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task AnAuthorNamedInTheRequestBodyIsIgnored()
+        public async global::System.Threading.Tasks.Task ACreateRequestThatStillNamesAParentCreatesATop_LevelGroup()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "new",
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "1";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A create request that still names a parent creates a top-level group", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 10
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 11
+    await testRunner.GivenAsync("the account group \"CUST-000400\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 12
+    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST-000700\" and names \"CUST-000400\" as i" +
+                        "ts parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 13
+    await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 14
+    await testRunner.AndAsync("\"CUST-000700\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A change request that still names a parent leaves the group where it is")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task AChangeRequestThatStillNamesAParentLeavesTheGroupWhereItIs()
         {
             string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "2";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An author named in the request body is ignored", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A change request that still names a parent leaves the group where it is", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 17
@@ -184,113 +211,78 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 18
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account groups \"CUST-000200\" and \"CUST-000400\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 19
-    await testRunner.AndAsync("an active, empty account group \"SG-RETAIL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.WhenAsync("treasury-ops changes \"CUST-000200\" and names \"CUST-000400\" as its parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 20
-    await testRunner.WhenAsync("\"priya.menon\" sends a close for \"SG-RETAIL\" naming \"audit-bot\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 21
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 22
-    await testRunner.AndAsync("the account group\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line 21
+    await testRunner.AndAsync("\"CUST-000200\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A new account group records the caller as its author")]
+        [global::NUnit.Framework.DescriptionAttribute("The group list cannot be read by parent")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task ANewAccountGroupRecordsTheCallerAsItsAuthor()
+        [global::NUnit.Framework.TestCaseAttribute("filtered by", "3", null)]
+        [global::NUnit.Framework.TestCaseAttribute("sorted by", "4", null)]
+        public async global::System.Threading.Tasks.Task TheGroupListCannotBeReadByParent(string usage, string @__pickleIndex, string[] exampleTags)
         {
-            string[] tagsOfScenario = new string[] {
+            string[] @__tags = new string[] {
                     "new",
                     "integration"};
+            if ((exampleTags != null))
+            {
+                @__tags = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(@__tags, exampleTags));
+            }
+            string[] tagsOfScenario = @__tags;
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A new account group records the caller as its author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            argumentsOfScenario.Add("usage", usage);
+            string pickleIndex = @__pickleIndex;
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The group list cannot be read by parent", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
+#line 24
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
 #line 25
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+    await testRunner.WhenAsync(string.Format("treasury-ops lists account groups {0} parent", usage), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
 #line 26
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 27
-    await testRunner.WhenAsync("\"priya.menon\" creates account group \"SG-WHOLESALE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 28
-    await testRunner.ThenAsync("the account group\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("the request is refused with status 400", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A new account records the caller as its author")]
+        [global::NUnit.Framework.DescriptionAttribute("A group stored under another group becomes top-level and keeps its accounts")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task ANewAccountRecordsTheCallerAsItsAuthor()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "new",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A new account records the caller as its author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 31
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 32
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 33
-    await testRunner.WhenAsync("\"priya.menon\" opens account \"SGD-0001\" in group \"SG-RETAIL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 34
-    await testRunner.ThenAsync("the account\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("Changing an account limit records the caller as the last editor")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task ChangingAnAccountLimitRecordsTheCallerAsTheLastEditor()
+        public async global::System.Threading.Tasks.Task AGroupStoredUnderAnotherGroupBecomesTop_LevelAndKeepsItsAccounts()
         {
             string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "5";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Changing an account limit records the caller as the last editor", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A group stored under another group becomes top-level and keeps its accounts", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 37
+#line 34
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -300,37 +292,45 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
+#line 35
+    await testRunner.GivenAsync("the accounts service holds \"CUST-000200\" under \"CUST-000123\" from before this cha" +
+                        "nge", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 36
+    await testRunner.AndAsync("\"CUST-000200\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 37
+    await testRunner.AndAsync("this change has been released", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
 #line 38
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.WhenAsync("treasury-ops reads \"CUST-000200\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 39
-    await testRunner.AndAsync("an active account \"SGD-0001\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.ThenAsync("\"CUST-000200\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 40
-    await testRunner.WhenAsync("\"priya.menon\" sets the overdraft limit of \"SGD-0001\" to 500.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 41
-    await testRunner.ThenAsync("the account\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.AndAsync("\"CUST-000200\" still holds that account with a balance of 25.00 SGD, and keeps its" +
+                        " code, name and status", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A posting by a person records the person and keeps the calling system")]
+        [global::NUnit.Framework.DescriptionAttribute("A group is still closed through the change request")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task APostingByAPersonRecordsThePersonAndKeepsTheCallingSystem()
+        public async global::System.Threading.Tasks.Task AGroupIsStillClosedThroughTheChangeRequest()
         {
             string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "6";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting by a person records the person and keeps the calling system", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A group is still closed through the change request", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 44
+#line 43
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -340,97 +340,51 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
+#line 44
+    await testRunner.GivenAsync("the account group \"CUST-000600\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
 #line 45
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.WhenAsync("treasury-ops closes \"CUST-000600\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 46
-    await testRunner.WhenAsync("\"priya.menon\" records a credit of 100.00 SGD to account \"SGD-0001\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 47
-    await testRunner.ThenAsync("the posting\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 48
-    await testRunner.AndAsync("the posting\'s calling system is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.ThenAsync("the request succeeds and \"CUST-000600\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A posting by a system with no person records the system as the author")]
+        [global::NUnit.Framework.DescriptionAttribute("Closing a group whose accounts still hold money is still refused")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task APostingByASystemWithNoPersonRecordsTheSystemAsTheAuthor()
+        public async global::System.Threading.Tasks.Task ClosingAGroupWhoseAccountsStillHoldMoneyIsStillRefused()
         {
             string[] tagsOfScenario = new string[] {
                     "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "7";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting by a system with no person records the system as the author", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Closing a group whose accounts still hold money is still refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
+#line 49
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 50
+    await testRunner.GivenAsync("the account group \"CUST-000123\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
 #line 51
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+    await testRunner.WhenAsync("treasury-ops closes \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
 #line 52
-    await testRunner.GivenAsync("\"treasury-ops\" is an authenticated calling system that identifies no person", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 53
-    await testRunner.WhenAsync("\"treasury-ops\" records a credit of 50.00 SGD to account \"SGD-0001\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 54
-    await testRunner.ThenAsync("the posting\'s created-by is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 55
-    await testRunner.AndAsync("the posting\'s calling system is \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("Reversing a posting records the caller as the last editor")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task ReversingAPostingRecordsTheCallerAsTheLastEditor()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "new",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Reversing a posting records the caller as the last editor", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 58
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 59
-    await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 60
-    await testRunner.AndAsync("a posted credit of 100.00 SGD on account \"SGD-0001\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 61
-    await testRunner.WhenAsync("\"priya.menon\" reverses that posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 62
-    await testRunner.ThenAsync("the original posting\'s updated-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("the request is refused with status 422 and the code \"GROUP_HOLDS_BALANCE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

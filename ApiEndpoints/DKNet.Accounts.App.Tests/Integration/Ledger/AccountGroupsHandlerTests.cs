@@ -10,10 +10,10 @@ using DKNet.Accounts.Infra.Contexts;
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
 /// <summary>
-/// Covers AccountGroups Create/Update handler branches the BDD acceptance scenarios don't reach: successful
-/// re-parenting, duplicate group code, get-by-id (found and not-found), and closing a group whose account
-/// genuinely holds a balance (set directly on the tracked entity — postings are the next stage, so there is
-/// no API path to a non-zero balance yet; see <see cref="Account"/> tests for the entity-level guard).
+/// Covers AccountGroups Create/Update handler branches the BDD acceptance scenarios don't reach: duplicate
+/// group code, get-by-id (found and not-found), and closing a group whose account genuinely holds a balance
+/// (set directly on the tracked entity — postings are the next stage, so there is no API path to a non-zero
+/// balance yet; see <see cref="Account"/> tests for the entity-level guard).
 /// </summary>
 public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClassFixture<LedgerApiFixture>
 {
@@ -34,15 +34,14 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         return request;
     }
 
-    private async Task<Guid> CreateGroupAsync(string code, string? parentId = null)
+    private async Task<Guid> CreateGroupAsync(string code)
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
         {
             code,
             name = code,
             type = "Customer",
-            ownerId = "PayHub",
-            parentId
+            ownerId = "PayHub"
         }));
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -83,20 +82,6 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("metadata").GetProperty("region").GetString().ShouldBe("SG");
-    }
-
-    [Fact]
-    public async Task ReparentingToAnUnrelatedExistingGroup_Succeeds()
-    {
-        var parentId = await CreateGroupAsync($"PAR-{Guid.NewGuid():N}");
-        var childId = await CreateGroupAsync($"CHI-{Guid.NewGuid():N}");
-
-        var response = await Client.SendAsync(
-            AsPayHub(HttpMethod.Patch, $"{GroupsPath}/{childId}", new { parentId }));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("parentId").GetGuid().ShouldBe(parentId);
     }
 
     [Fact]
@@ -175,8 +160,8 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
 
     /// <summary>Nit 3: closes the remaining <c>UpdateAccountGroupCommandHandler</c> coverage gaps — a
     /// successful (no-balance) close and reactivation — plus the generated Rename/ChangeDescription routes
-    /// (DRK-1277 §11/§12) — none reachable from the existing reparent/duplicate-code/close-with-balance tests
-    /// or the BDD acceptance scenarios.</summary>
+    /// (DRK-1277 §11/§12) — none reachable from the existing duplicate-code/close-with-balance tests or the
+    /// BDD acceptance scenarios.</summary>
     [Fact]
     public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
     {

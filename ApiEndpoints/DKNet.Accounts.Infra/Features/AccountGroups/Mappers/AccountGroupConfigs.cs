@@ -21,8 +21,6 @@ internal sealed class AccountGroupConfigs : DefaultEntityTypeConfiguration<Accou
         builder.Property(g => g.Type).HasConversion<string>();
         builder.Property(g => g.Status).HasConversion<string>();
 
-        builder.HasIndex(g => g.ParentId);
-
         builder.Property(g => g.Metadata)
             .HasConversion(MetadataConversion.Converter)
             .Metadata.SetValueComparer(MetadataConversion.Comparer);

@@ -71,7 +71,6 @@ curl -X POST "$BASE/v1/account-groups" \
   -d '{
         "code": "CUST-000123",
         "name": "Acme Pte Ltd",
-        "description": "Acme customer bucket",
         "type": "Customer",
         "ownerId": "acme-holdings",
         "metadata": { "region": "SG" }
@@ -87,7 +86,6 @@ HTTP/1.1 201 Created
   "id": "b85813c0-3053-4d35-a0ef-3f2863f83fa9",
   "code": "CUST-000123",
   "name": "Acme Pte Ltd",
-  "description": "Acme customer bucket",
   "type": "customer",
   "status": "active",
   "ownerId": "acme-holdings",
@@ -99,8 +97,8 @@ Two things to note, and they hold for every response on this page:
 
 - **Enum values come back camelCase** (`"customer"`, `"active"`) even though requests are written
   PascalCase. Compare case-insensitively.
-- **Null fields are omitted.** This group has no parent, so there is no `parentId` key at all rather
-  than a `null` one.
+- **Null fields are omitted.** This group was created without a `description`, so there is no
+  `description` key at all rather than a `null` one.
 
 Re-using a `code` is refused:
 

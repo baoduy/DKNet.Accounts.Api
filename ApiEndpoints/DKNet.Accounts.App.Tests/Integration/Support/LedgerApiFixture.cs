@@ -7,7 +7,7 @@ namespace DKNet.Accounts.App.Tests.Integration.Support;
 /// forced on and <see cref="LedgerCallerAuthHandler" /> standing in for the real JWT bearer scheme, so a
 /// request can carry <c>client_id</c>/scopes via its <c>X-Test-Client-Id</c>/<c>X-Test-Scopes</c> headers. Used
 /// for xUnit-level coverage of AccountGroup/Account handler branches the BDD acceptance scenarios don't reach
-/// (e.g. reparent success, group-by-id, duplicate group code) without duplicating the whole Reqnroll harness.
+/// (e.g. group-by-id, duplicate group code) without duplicating the whole Reqnroll harness.
 /// </summary>
 public sealed class LedgerApiFixture : TestApiFactoryBase, IAsyncLifetime
 {
