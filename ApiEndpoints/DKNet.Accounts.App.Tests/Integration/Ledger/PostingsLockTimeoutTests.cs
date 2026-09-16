@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.App.Tests.Integration.Support;
@@ -50,15 +52,22 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
     }
 
     /// <summary>Seeds a posting directly (Record itself needs the lock this fixture always denies), so
-    /// Reverse's own lock-timeout path can be reached independently of Record's.</summary>
+    /// Reverse's own lock-timeout path can be reached independently of Record's. CreatedBy is left for
+    /// DataOwnerHook to stamp on save (DRK-1372 §5), so this scope needs its own authenticated HttpContext —
+    /// there is no real request here to supply one — carrying the same "client_id" claim the endpoint calls
+    /// authenticate with.</summary>
     private async Task<Guid> SeedPostingAsync(Guid accountId)
     {
         using var scope = fixture.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("client_id", "PayHub")], "Test"))
+        };
         var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
         var posting = new Posting(
             accountId, "PST0000000001", 1, PostingDirection.Credit, 50m, "SGD", 50m, 50m,
             DateOnly.FromDateTime(DateTime.UtcNow), DateTimeOffset.UtcNow, PostingCategory.Transfer,
-            null, null, null, "PayHub", null, null, null, null, null, "PayHub");
+            null, null, null, "PayHub", null, null, null, null, null);
         dbContext.Set<Posting>().Add(posting);
         await dbContext.SaveChangesAsync();
         return posting.Id;

@@ -24,8 +24,7 @@ public class PostingTests
         idempotencySignature: null,
         externalReference: null,
         description: null,
-        metadata: null,
-        byUser: "PayHub");
+        metadata: null);
 
     [Fact]
     public void NewPosting_IsPostedAndUnlinked()
@@ -38,15 +37,35 @@ public class PostingTests
     }
 
     [Fact]
+    public void NewPosting_LeavesCreatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        // DRK-1372 §5/R1: the constructor takes no acting-user parameter any more. CreatedBy is left unset
+        // here and stamped on save by DataOwnerHook/PrincipalProvider instead — never assigned in-process.
+        var posting = NewPosting();
+
+        posting.CreatedBy.ShouldBeNullOrEmpty();
+    }
+
+    [Fact]
     public void MarkReversedBy_TransitionsToReversedAndLinksTheReversal()
     {
         var posting = NewPosting();
         var reversalId = Guid.NewGuid();
 
-        posting.MarkReversedBy(reversalId, "PayHub");
+        posting.MarkReversedBy(reversalId);
 
         posting.Status.ShouldBe(PostingStatus.Reversed);
         posting.ReversedByPostingId.ShouldBe(reversalId);
+    }
+
+    [Fact]
+    public void MarkReversedBy_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var posting = NewPosting();
+
+        posting.MarkReversedBy(Guid.NewGuid());
+
+        posting.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -56,9 +75,9 @@ public class PostingTests
         // repeat surfaces as a business refusal, not this exception — this proves the one-way transition can
         // never silently apply twice even if that check were ever bypassed.
         var posting = NewPosting();
-        posting.MarkReversedBy(Guid.NewGuid(), "PayHub");
+        posting.MarkReversedBy(Guid.NewGuid());
 
-        Should.Throw<InvalidOperationException>(() => posting.MarkReversedBy(Guid.NewGuid(), "PayHub"));
+        Should.Throw<InvalidOperationException>(() => posting.MarkReversedBy(Guid.NewGuid()));
     }
 
     [Fact]

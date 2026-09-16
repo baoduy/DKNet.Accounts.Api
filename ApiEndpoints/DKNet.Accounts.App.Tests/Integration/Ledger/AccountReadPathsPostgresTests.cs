@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using SlimMessageBus.Host;
 using SlimMessageBus.Host.Memory;
 using SlimMessageBus.Host.Serialization.SystemTextJson;
+using DKNet.EfCore.DataAuthorization;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices;
@@ -29,6 +30,16 @@ namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 /// </summary>
 public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
 {
+    /// <summary>CreatedBy is left for DataOwnerHook to stamp on save (DRK-1372 §5); this bare
+    /// <c>ServiceCollection</c> is not the ASP.NET host, so there is no <c>IPrincipalProvider</c>/HTTP
+    /// credential to resolve it from — a fixed ownership key stands in for one.</summary>
+    private sealed class FixedDataOwnerProvider : IDataOwnerProvider
+    {
+        public IEnumerable<string> GetAccessibleKeys() => ["PayHub"];
+
+        public string? GetOwnershipKey() => "PayHub";
+    }
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
     private ServiceProvider _services = null!;
 
@@ -49,6 +60,7 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
             .AddSingleton<IConfiguration>(config)
             .AddAppServices()
             .AddInfraServices()
+            .AddDataOwnerProvider<CoreDbContext, FixedDataOwnerProvider>()
             .AddSlimMessageBus(mbb => mbb.AddJsonSerializer().AddMemoryBus(typeof(InfraSetup).Assembly))
             .AddLogging()
             .BuildServiceProvider();
@@ -78,8 +90,7 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
             overdraftLimit: null,
             minimumBalance: null,
             externalReference: null,
-            metadata: null,
-            byUser: "PayHub");
+            metadata: null);
         db.Add(account);
         await db.SaveChangesAsync();
         return account.Id;

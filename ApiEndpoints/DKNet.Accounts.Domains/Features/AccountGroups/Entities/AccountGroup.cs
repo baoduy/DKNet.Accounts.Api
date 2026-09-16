@@ -114,26 +114,23 @@ public sealed class AccountGroup : AggregateRoot
     /// Re-parents this group to <paramref name="parentId"/> (or clears it). Ancestor-cycle detection (R7)
     /// needs the full chain from the repository and is the caller's responsibility — this method only assigns.
     /// </summary>
-    public void Reparent(Guid? parentId, string userId)
+    public void Reparent(Guid? parentId)
     {
         ParentId = parentId;
-        SetUpdatedBy(userId);
     }
 
-    public void Activate(string userId)
+    public void Activate()
     {
         Status = AccountGroupStatus.Active;
-        SetUpdatedBy(userId);
     }
 
     /// <summary>
     /// Closes the group. Refusing this while any account it holds still carries a balance is a cross-aggregate
     /// check the caller must perform first — this method only assigns the terminal status.
     /// </summary>
-    public void Close(string userId)
+    public void Close()
     {
         Status = AccountGroupStatus.Closed;
-        SetUpdatedBy(userId);
     }
 
     #endregion

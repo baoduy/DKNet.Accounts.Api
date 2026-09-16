@@ -17,8 +17,7 @@ public class AccountTests
         overdraftLimit: overdraftLimit,
         minimumBalance: minimumBalance,
         externalReference: "ext-1",
-        metadata: new Dictionary<string, string> { ["k"] = "v" },
-        byUser: "PayHub");
+        metadata: new Dictionary<string, string> { ["k"] = "v" });
 
     [Fact]
     public void NewAccount_IsActiveWithAZeroBalance()
@@ -32,6 +31,16 @@ public class AccountTests
         account.StreamPosition.ShouldBe(0);
         account.ClosedOn.ShouldBeNull();
         account.OpenedOn.ShouldBe(account.CreatedOn);
+    }
+
+    [Fact]
+    public void NewAccount_LeavesCreatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        // DRK-1372 §5/R1: the constructor takes no acting-user parameter any more. CreatedBy is left unset
+        // here and stamped on save by DataOwnerHook/PrincipalProvider instead — never assigned in-process.
+        var account = NewAccount();
+
+        account.CreatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -68,7 +77,7 @@ public class AccountTests
     {
         var account = NewAccount();
 
-        account.ChangeStatus(status, "PayHub");
+        account.ChangeStatus(status);
 
         account.Status.ShouldBe(status);
         account.ClosedOn.ShouldBeNull();
@@ -79,10 +88,20 @@ public class AccountTests
     {
         var account = NewAccount();
 
-        account.ChangeStatus(AccountStatus.Closed, "PayHub");
+        account.ChangeStatus(AccountStatus.Closed);
 
         account.Status.ShouldBe(AccountStatus.Closed);
         account.ClosedOn.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void ChangeStatus_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount();
+
+        account.ChangeStatus(AccountStatus.Closed);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -90,9 +109,9 @@ public class AccountTests
     {
         // R9: Closed -> Active (reopening) is permitted.
         var account = NewAccount();
-        account.ChangeStatus(AccountStatus.Closed, "PayHub");
+        account.ChangeStatus(AccountStatus.Closed);
 
-        account.ChangeStatus(AccountStatus.Active, "PayHub");
+        account.ChangeStatus(AccountStatus.Active);
 
         account.Status.ShouldBe(AccountStatus.Active);
         account.ClosedOn.ShouldBeNull();
@@ -103,9 +122,19 @@ public class AccountTests
     {
         var account = NewAccount(permittedToGoNegative: true, overdraftLimit: 20m);
 
-        account.ChangeOverdraftLimit(50m, "PayHub");
+        account.ChangeOverdraftLimit(50m);
 
         account.OverdraftLimit.ShouldBe(50m);
+    }
+
+    [Fact]
+    public void ChangeOverdraftLimit_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount(permittedToGoNegative: true, overdraftLimit: 20m);
+
+        account.ChangeOverdraftLimit(50m);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -113,9 +142,19 @@ public class AccountTests
     {
         var account = NewAccount();
 
-        account.ChangeMinimumBalance(10m, "PayHub");
+        account.ChangeMinimumBalance(10m);
 
         account.MinimumBalance.ShouldBe(10m);
+    }
+
+    [Fact]
+    public void ChangeMinimumBalance_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount();
+
+        account.ChangeMinimumBalance(10m);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -191,7 +230,7 @@ public class AccountTests
     public void TryApplyPosting_ClosedOrFrozen_RefusesEvenAReversal(AccountStatus status, PostingRefusalReason expected)
     {
         var account = NewAccount();
-        account.ChangeStatus(status, "PayHub");
+        account.ChangeStatus(status);
 
         var result = account.TryApplyPosting(isDebit: false, amount: 10m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
 
@@ -204,7 +243,7 @@ public class AccountTests
     public void TryApplyPosting_DormantAccount_RefusesADebitButAllowsAReversalCredit()
     {
         var account = NewAccount();
-        account.ChangeStatus(AccountStatus.Dormant, "PayHub");
+        account.ChangeStatus(AccountStatus.Dormant);
 
         var debit = account.TryApplyPosting(isDebit: true, amount: 10m, postedAt: DateTimeOffset.UtcNow);
         debit.Success.ShouldBeFalse();

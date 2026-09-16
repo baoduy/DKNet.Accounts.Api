@@ -15,15 +15,12 @@ namespace DKNet.Accounts.App.TestSupport;
 /// refuses it, exercising the "no credential" scenarios without a real token.
 /// </summary>
 /// <remarks>
-/// Also carries a <see cref="ClaimTypes.NameIdentifier"/> subject claim (§11 — dev-leader, DRK-1279): once Build
-/// drops the explicit <c>StampCreatedBy</c>/<c>AggregateRoot(Guid)</c> path and relies on
-/// <c>DataOwnerHook</c>/<c>PrincipalProvider</c> alone, <c>CreatedBy</c> is stamped from
+/// Also carries a <see cref="ClaimTypes.NameIdentifier"/> subject claim when <see cref="SubjectHeaderName"/> is
+/// set (DRK-1372 §5): <c>DataOwnerHook</c> stamps <c>CreatedBy</c>/<c>UpdatedBy</c> from
 /// <c>IDataOwnerProvider.GetOwnershipKey()</c> — which <c>PrincipalProvider.Initialize</c> resolves from a
-/// subject claim (<c>oid</c>/<c>ClaimTypes.NameIdentifier</c>/<c>sub</c>), not from <c>Identity.Name</c>. Set to
-/// the same client-id value as the name claim so the acceptance scenarios' "author is X"
-/// assertions keep reading the calling system's own identity, in production a machine-to-machine credential
-/// carries no such subject claim at all — this mock is a test-side stand-in only, and <c>CreatedBy</c> stays
-/// unset on the real service until that token work lands.
+/// subject claim (<c>oid</c>/<c>ClaimTypes.NameIdentifier</c>/<c>sub</c>) first, falling back to <c>client_id</c>
+/// only when no subject claim is present. Without <see cref="SubjectHeaderName"/>, no subject claim is emitted
+/// at all, so a scenario can drive that real fallback instead of always resolving to the calling system.
 /// </remarks>
 public sealed class LedgerCallerAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -39,6 +36,11 @@ public sealed class LedgerCallerAuthHandler(
     /// <summary>Space-separated scopes — maps to one <c>scope</c> claim.</summary>
     public const string ScopesHeaderName = "X-Test-Scopes";
 
+    /// <summary>The person named in the credential, alongside the calling system. Maps to both
+    /// <see cref="ClaimTypes.Name"/> and <see cref="ClaimTypes.NameIdentifier"/>. Omitted entirely when this
+    /// header is absent, so the credential names only a calling system — no person at all.</summary>
+    public const string SubjectHeaderName = "X-Test-Subject";
+
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (!Request.Headers.TryGetValue(ClientIdHeaderName, out var clientId) || string.IsNullOrEmpty(clientId))
@@ -46,12 +48,17 @@ public sealed class LedgerCallerAuthHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var claims = new List<Claim>
+        var claims = new List<Claim> { new("client_id", clientId!) };
+
+        if (Request.Headers.TryGetValue(SubjectHeaderName, out var subject) && !string.IsNullOrEmpty(subject))
         {
-            new("client_id", clientId!),
-            new(ClaimTypes.Name, clientId!),
-            new(ClaimTypes.NameIdentifier, clientId!)
-        };
+            claims.Add(new Claim(ClaimTypes.Name, subject!));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, subject!));
+        }
+        else
+        {
+            claims.Add(new Claim(ClaimTypes.Name, clientId!));
+        }
 
         if (Request.Headers.TryGetValue(ScopesHeaderName, out var scopes) && !string.IsNullOrEmpty(scopes))
         {

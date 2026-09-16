@@ -20,32 +20,31 @@ Every aggregate in this template ultimately derives from `AuditedEntity<TKey>`
 `DKNet.Accounts.Domains/Share/AggregateRoot.cs` extends `DomainEntity` and is the base every feature
 aggregate in this service (`AccountGroup`, `Account`, `Posting`) uses.
 
-Both expose two constructor shapes, and **which one an aggregate uses decides who stamps its
-`CreatedBy`**:
+Both expose a single constructor shape, and **no aggregate stamps its own `CreatedBy`**:
 
 | Constructor | Who stamps `CreatedBy` |
 |---|---|
-| `DomainEntity(Guid id, string createdBy, …)` / `AggregateRoot(string createdBy, …)` (`AggregateRoot.cs:7`) | The aggregate itself, in the constructor |
-| `DomainEntity()` / `AggregateRoot()` — parameterless, assigns a fresh id only (`DomainEntity.cs:20`) | `DataOwnerHook`, on save |
+| `DomainEntity()` / `AggregateRoot()` — parameterless, assigns a fresh id only | `DataOwnerHook`, on save |
 
-The parameterless pair exists because a `[CrudCreate]` constructor must not take an acting-user
-parameter: the generated create request's shape is that constructor's parameter list, so a trailing
-`createdBy` would become a caller-settable body field. `AccountGroup` takes the parameterless route for
-exactly that reason (`ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs:40`).
+There is no constructor overload that accepts an author. The reason started with `[CrudCreate]`: the
+generated create request's shape *is* the attributed constructor's parameter list, so a trailing
+`createdBy` would become a caller-settable body field. That reason now holds for every aggregate
+rather than only the generated ones — `AccountGroup`
+(`ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs:40`), `Account`
+and `Posting` are all constructed without an author, and the parameterless base is the only route
+they have.
 
 ## Who is allowed to set them
 
 **Invariant: audit and ownership values come from the authenticated principal at save time, never
-from a request property.** A generated create request deliberately carries no acting-user
-parameter.
+from a request property.** No request in this service — generated or hand-written — carries an
+acting-user parameter.
 
-In this service one mechanism does it for every aggregate: **`DKNet.EfCore.DataAuthorization`'s
-`DataOwnerHook`, stamping on `SaveChanges`** from `IDataOwnerProvider.GetOwnershipKey()`. No aggregate
-stamps its own `CreatedBy`/`UpdatedBy` from a request field, and no create or update request in this
-service carries an acting-user property for a caller to set. Some hand-written domain methods do call
-`SetUpdatedBy` — `Account.ChangeStatus` (`Account.cs:147`) among them — but the value they pass comes
-from `ICallingSystemAccessor`, resolved from the credential; the hook then leaves that stamp alone
-(step 2 below).
+In this service one mechanism does it, and it is the only one: **`DKNet.EfCore.DataAuthorization`'s
+`DataOwnerHook`, stamping on `SaveChanges`** from `IDataOwnerProvider.GetOwnershipKey()`. That covers
+both `CreatedBy` and `UpdatedBy`, on every aggregate and every write path — hand-written and generated
+alike. No constructor or domain method takes an acting user, none calls `SetUpdatedBy`, and no create
+or update request in this service carries an acting-user property for a caller to set.
 
 > The template this service was scaffolded from also demonstrates a second shape — `[FromClaim]`
 > populating a request property that the aggregate then stamps itself, shown there on the fictional
@@ -82,18 +81,27 @@ and nothing else, and it is what handlers pass into domain methods and record on
 `callingSystem`. The two answer different questions — who acted, versus which machine called — and a
 handler that reached for the wrong one would misattribute a ledger entry.
 
+Concretely: the **author** stamped into `CreatedBy`/`UpdatedBy` is the credential's subject whenever the
+credential names a person, and falls back to `client_id` only when it names nothing but a calling system
+(the two steps above). A posting's **`CallingSystem`** is a separate value, always read from `client_id`.
+For a machine-to-machine caller the two coincide; for a person calling through a client application they
+differ — the posting records the person as its author and the application as its calling system.
+`ApiEndpoints/DKNet.Accounts.App.BDDTests/Features/Ledger/AuthorFromCredential.feature` pins both halves,
+in *"A posting by a person records the person and keeps the calling system"* and *"A posting by a system
+with no person records the system as the author"*.
+
 ### What the hook does on save
 
 1. Stamps `CreatedBy`/ownership on every newly-added entity, from `IDataOwnerProvider.GetOwnershipKey()`.
-2. On a modified entity, stamps `UpdatedBy`/`UpdatedOn` from the same ownership key. The hook first
-   checks whether a domain method already called `SetUpdatedBy` explicitly for this change set, by
-   comparing the property's current value against its EF Core `OriginalValue`. If a domain method
-   already set it, the hook leaves both fields untouched rather than overwriting them.
+2. On a modified entity, stamps `UpdatedBy`/`UpdatedOn` from the same ownership key. The hook does
+   defer to an explicit in-process `SetUpdatedBy` when it finds one — it compares the property's
+   current value against its EF Core `OriginalValue` — but no code in this service takes that route,
+   so in practice the hook is what stamps every update.
 3. Guards `IOwnedBy.OwnedBy` on a modified entity against reassignment to a key the current context
    doesn't hold, preventing cross-tenant transfer.
 
-Because no create or update payload has an acting-user field, there is nothing for a caller to smuggle
-in. Three acceptance scenarios in
+Because no create or update payload has an acting-user field — and no constructor or domain method
+behind one takes an acting user either — there is nothing for a caller to smuggle in. Three acceptance scenarios in
 `ApiEndpoints/DKNet.Accounts.App.BDDTests/Features/Ledger/AttributeCrudMigration.feature` pin this end
 to end: *"A new account group records the calling system as its author"*, *"An author named in the
 request payload is ignored"* (which sends an `author` field and asserts it is not what is stored), and

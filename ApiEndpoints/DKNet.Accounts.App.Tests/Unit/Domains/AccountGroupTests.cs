@@ -76,9 +76,21 @@ public class AccountGroupTests
         var group = NewGroup();
         var newParentId = Guid.NewGuid();
 
-        group.Reparent(newParentId, "PayHub");
+        group.Reparent(newParentId);
 
         group.ParentId.ShouldBe(newParentId);
+    }
+
+    [Fact]
+    public void Reparent_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        // DRK-1372 §5/R1: Reparent takes no acting-user parameter any more, so it must not stamp UpdatedBy
+        // itself — DataOwnerHook stamps it from the authenticated credential on save.
+        var group = NewGroup();
+
+        group.Reparent(Guid.NewGuid());
+
+        group.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
@@ -86,7 +98,7 @@ public class AccountGroupTests
     {
         var group = NewGroup(parentId: Guid.NewGuid());
 
-        group.Reparent(null, "PayHub");
+        group.Reparent(null);
 
         group.ParentId.ShouldBeNull();
     }
@@ -96,19 +108,40 @@ public class AccountGroupTests
     {
         var group = NewGroup();
 
-        group.Close("PayHub");
+        group.Close();
 
         group.Status.ShouldBe(AccountGroupStatus.Closed);
+    }
+
+    [Fact]
+    public void Close_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var group = NewGroup();
+
+        group.Close();
+
+        group.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
     public void Activate_ReopensAClosedGroup()
     {
         var group = NewGroup();
-        group.Close("PayHub");
+        group.Close();
 
-        group.Activate("PayHub");
+        group.Activate();
 
         group.Status.ShouldBe(AccountGroupStatus.Active);
+    }
+
+    [Fact]
+    public void Activate_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var group = NewGroup();
+        group.Close();
+
+        group.Activate();
+
+        group.UpdatedBy.ShouldBeNullOrEmpty();
     }
 }

@@ -38,8 +38,8 @@ internal sealed class CreateAccountGroupCommandHandler(
         CreateAccountGroupRequest request,
         CancellationToken cancellationToken)
     {
-        var byUser = callingSystem.CallingSystem;
-        if (string.IsNullOrEmpty(byUser))
+        var callingSystemId = callingSystem.CallingSystem;
+        if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<AccountGroupDto>("The caller is not authenticated.");
         }
