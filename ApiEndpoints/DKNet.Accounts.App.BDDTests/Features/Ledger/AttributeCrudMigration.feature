@@ -172,3 +172,61 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
       | GET  /v1/accounts/{id}                 | accounts.read       |
       | GET  /v1/accounts/{id}/statement      | postings.read       |
       | POST /v1/postings/{id}/reverse        | postings.reverse    |
+
+  # DRK-1438 §5: the seven account-group routes register through one generated call instead of one
+  # hand-written call each. Four of them (read, rename, change-description, change-metadata) also stop
+  # restricting the identifier's shape in the route pattern, so a malformed identifier becomes a 400
+  # instead of a 404 route miss.
+
+  @new @integration
+  Scenario: A caller with write permission creates a group through the generated route
+    Given the calling system "treasury-ops" is authorised to write accounts
+    When it creates the account group "TREASURY-SG" named "Treasury Singapore"
+    Then the group is created
+    And the created group is readable at its own address
+
+  @new @integration
+  Scenario: A caller with read permission reads a group through the generated route
+    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    When the calling system "treasury-ops" reads that group
+    Then the response is 200
+    And the response carries the code "TREASURY-SG"
+
+  @new @integration
+  Scenario Outline: A caller without write permission is refused on every generated write route
+    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    And the calling system "report-reader" is authorised only to read accounts
+    When "report-reader" sends <operation> for that group
+    Then the response is 403
+
+    Examples:
+      | operation             |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |
+      | a delete              |
+
+  @new @integration
+  Scenario Outline: A badly formed identifier is answered as a bad request on every generated route
+    When "treasury-ops" sends <operation> for the identifier "not-a-guid"
+    Then the response is 400
+
+    Examples:
+      | operation             |
+      | a read                |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |
+
+  @new @integration
+  Scenario Outline: A well-formed identifier of a group that does not exist is still answered as not found on every generated route
+    Given no account group has the identifier "3f7c1b28-0d4a-4e19-9a5b-7c2e10d4f6ab"
+    When "treasury-ops" sends <operation> for that identifier
+    Then the response is 404
+
+    Examples:
+      | operation             |
+      | a read                |
+      | a rename              |
+      | a description change  |
+      | a metadata change     |

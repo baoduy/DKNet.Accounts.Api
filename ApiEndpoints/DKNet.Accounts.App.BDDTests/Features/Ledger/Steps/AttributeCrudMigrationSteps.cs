@@ -348,6 +348,29 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     #endregion
 
+    #region DRK-1438 §5 shared helpers
+
+    /// <summary>Dispatches one of the four generated-route operations §5's outlines name, against
+    /// whatever identifier the scenario supplies — a real group id, a well-formed but unknown one, or a
+    /// malformed string. Request bodies carry field names only; none of these calls is expected to reach
+    /// body validation (route/model binding or authorization refuses first in every outline this backs).</summary>
+    private Task<HttpResponseMessage> DispatchGeneratedRouteOperationAsync(string operation, string identifier) =>
+        operation switch
+        {
+            "a read" => client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{identifier}"),
+            "a rename" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}", new { name = "Ignored" }),
+            "a description change" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-description", new { description = "Ignored" }),
+            "a metadata change" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-metadata",
+                new { metadata = new Dictionary<string, string>() }),
+            "a delete" => client.SendAsCallerAsync(state, HttpMethod.Delete, $"{GroupsPath}/{identifier}"),
+            _ => throw new NotSupportedException($"Unknown operation '{operation}'.")
+        };
+
+    #endregion
+
     #region When
 
     [When(@"it creates the account group ""([^""]+)"" named ""([^""]+)""")]
@@ -508,6 +531,26 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     public async Task WhenReportingBotDeletesTheAccountGroup(string code) =>
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Delete, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
+
+    [When(@"""[^""]+"" sends (a rename|a description change|a metadata change|a delete) for that group$")]
+    public async Task WhenSendsOperationForThatGroup(string operation) =>
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, LastGroupId.ToString());
+
+    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for the identifier ""([^""]+)""")]
+    public async Task WhenSendsOperationForTheIdentifier(string operation, string identifier)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, identifier);
+    }
+
+    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for that identifier$")]
+    public async Task WhenSendsOperationForThatIdentifier(string operation)
+    {
+        state.CallerClientId = "treasury-ops";
+        state.CallerScopes = [ScopeNames.AccountsRead, ScopeNames.AccountsWrite];
+        state.Response = await DispatchGeneratedRouteOperationAsync(operation, state.Values["lastIdentifier"]);
+    }
 
     [When(@"the account-group routes are listed")]
     public void WhenTheAccountGroupRoutesAreListed()
@@ -724,6 +767,17 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Scope(Scenario = "A read-only caller cannot delete a group")]
     public void ThenTheRequestIsRefusedWith403() =>
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+    [Then(@"the response is (\d+)")]
+    public void ThenTheResponseIs(int statusCode) =>
+        state.Response!.StatusCode.ShouldBe((HttpStatusCode)statusCode);
+
+    [Then(@"the created group is readable at its own address")]
+    public async Task ThenTheCreatedGroupIsReadableAtItsOwnAddress()
+    {
+        var response = await client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{LastGroupId}");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
 
     [Then(@"the delete route requires the accounts write permission")]
     public void ThenTheDeleteRouteRequiresTheAccountsWritePermission()
