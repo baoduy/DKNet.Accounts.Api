@@ -34,6 +34,16 @@ public class AccountTests
     }
 
     [Fact]
+    public void NewAccount_LeavesCreatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        // DRK-1372 §5/R1: the constructor takes no acting-user parameter any more. CreatedBy is left unset
+        // here and stamped on save by DataOwnerHook/PrincipalProvider instead — never assigned in-process.
+        var account = NewAccount();
+
+        account.CreatedBy.ShouldBeNullOrEmpty();
+    }
+
+    [Fact]
     public void Constructor_Throws_WhenPermittedNegativeWithNoOverdraftLimit()
     {
         // R3: this is the last line of defence, not the primary refusal path — the AppServices handler
@@ -85,6 +95,16 @@ public class AccountTests
     }
 
     [Fact]
+    public void ChangeStatus_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount();
+
+        account.ChangeStatus(AccountStatus.Closed);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
+    }
+
+    [Fact]
     public void ChangeStatus_ReopeningFromClosed_ClearsClosedOn()
     {
         // R9: Closed -> Active (reopening) is permitted.
@@ -108,6 +128,16 @@ public class AccountTests
     }
 
     [Fact]
+    public void ChangeOverdraftLimit_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount(permittedToGoNegative: true, overdraftLimit: 20m);
+
+        account.ChangeOverdraftLimit(50m);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
+    }
+
+    [Fact]
     public void ChangeMinimumBalance_ReplacesTheValue()
     {
         var account = NewAccount();
@@ -115,6 +145,16 @@ public class AccountTests
         account.ChangeMinimumBalance(10m);
 
         account.MinimumBalance.ShouldBe(10m);
+    }
+
+    [Fact]
+    public void ChangeMinimumBalance_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var account = NewAccount();
+
+        account.ChangeMinimumBalance(10m);
+
+        account.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]

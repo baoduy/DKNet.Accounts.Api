@@ -37,6 +37,16 @@ public class PostingTests
     }
 
     [Fact]
+    public void NewPosting_LeavesCreatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        // DRK-1372 §5/R1: the constructor takes no acting-user parameter any more. CreatedBy is left unset
+        // here and stamped on save by DataOwnerHook/PrincipalProvider instead — never assigned in-process.
+        var posting = NewPosting();
+
+        posting.CreatedBy.ShouldBeNullOrEmpty();
+    }
+
+    [Fact]
     public void MarkReversedBy_TransitionsToReversedAndLinksTheReversal()
     {
         var posting = NewPosting();
@@ -46,6 +56,16 @@ public class PostingTests
 
         posting.Status.ShouldBe(PostingStatus.Reversed);
         posting.ReversedByPostingId.ShouldBe(reversalId);
+    }
+
+    [Fact]
+    public void MarkReversedBy_LeavesUpdatedByUnset_ForDataOwnerHookToStampOnSave()
+    {
+        var posting = NewPosting();
+
+        posting.MarkReversedBy(Guid.NewGuid());
+
+        posting.UpdatedBy.ShouldBeNullOrEmpty();
     }
 
     [Fact]
