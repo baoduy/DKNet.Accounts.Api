@@ -17,50 +17,27 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
-        // Create (GEN, DRK-1418 §3 row 8): CreateAccountGroupRequest is generated from AccountGroup's
-        // [CrudCreate] constructor; the duplicate-code refusal now lives in
-        // CreateAccountGroupCommandValidator (FluentValidation), so the route can use the package's own
-        // MapPost — its failure path answers through LedgerErrorResponseOptions (AddErrorResponses,
-        // FluentValidationConfig), which gives DUPLICATE_GROUP_CODE the same 422+code shape
-        // LedgerResultResponseExtensions gives every hand-mapped route.
-        group.MapPost<CreateAccountGroupRequest, AccountGroupDto>("/")
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription("Create an account group.");
-
-        // List (GEN, DRK-1277 §11/§12): a list is not a mutation, but the owner's widened mandate takes the
-        // generated list syntax/envelope wherever a caller can still ask everything the old shape let it ask
-        // (R4) — plain generic entity mapper, no SlimBus handler, R3 doesn't apply.
-        group.MapGetList<AccountGroup, Guid, AccountGroupDto>()
-            .RequireScope(group, ScopeNames.AccountsRead)
-            .WithDescription("List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer.");
-
-        // Get-by-id (GEN, DRK-1277 §3 row 9): plain generic entity mapper — no SlimBus handler or [CrudCreate]
-        // /[CrudUpdate]/[CrudAction] involved, so none of the Map{Entity}Crud caveats above apply. The
-        // explicit "{id:guid}" endpoint keeps the same route pattern this used before (the mapper's own
-        // default is the looser "{id}").
-        group.MapGetById<AccountGroup, Guid, AccountGroupDto>("{id:guid}")
-            .RequireScope(group, ScopeNames.AccountsRead)
-            .WithDescription("Read one account group.");
-
-        // Rename (GEN, DRK-1277 §11/§12): [CrudUpdate] on AccountGroup.Rename — the first such member on the
-        // type, so the generator lands it on the plain "{id}" route. Generated request AND handler; only the
-        // route registration is a direct call instead of going through Map{Entity}Crud (whose composite
-        // discards the RouteHandlerBuilder it needs to chain .RequireScope onto) — MapPutById itself returns
-        // a chainable builder, so no hand-written plumbing is added. Rename's only failure mode is 404
-        // (NotFoundError, mapped by the default .Response()), so R3 does not block this one.
-        group.MapPutById<RenameAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}")
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription("Rename an account group.");
-
-        // ChangeDescription/ChangeMetadata (GEN, DRK-1277 §11/§12): same reasoning as Rename — each additional
-        // [CrudUpdate] member lands on "{id}/{kebab-case-method-name}".
-        group.MapPutById<ChangeDescriptionAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}/change-description")
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription("Change an account group's description.");
-
-        group.MapPutById<ChangeMetadataAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}/change-metadata")
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription("Change an account group's metadata.");
+        // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
+        // ChangeMetadata) all now register through one generated composite (DRK-1440 §3 rows 1-3). Close and
+        // activate stay excluded BY NAME (R1): each is a [CrudAction] whose generated composite route binds
+        // its command from the JSON body and requires one, but every call sends none (the id comes entirely
+        // from the route) — DKNet gap DRK-1436, so both stay hand-mapped below (§3 row 5). Rename must stay the
+        // first [CrudUpdate] declared on AccountGroup or it loses its plain "{id}" PUT route.
+        group.MapAccountGroupCrud(o => o
+                .Exclude("Close", "Activate")
+                .Configure(CrudOp.GetById, b => b.RequireScope(group, ScopeNames.AccountsRead))
+                .Configure(CrudOp.GetList, b => b.RequireScope(group, ScopeNames.AccountsRead))
+                .Configure(CrudOp.Create, b => b.RequireScope(group, ScopeNames.AccountsWrite))
+                .Configure(CrudOp.Update, b => b.RequireScope(group, ScopeNames.AccountsWrite))
+                .Configure(CrudOp.Delete, b => b.RequireScope(group, ScopeNames.AccountsWrite))
+                .Configure("Create", b => b.WithDescription("Create an account group."))
+                .Configure("GetList", b => b.WithDescription(
+                    "List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer."))
+                .Configure("GetById", b => b.WithDescription("Read one account group."))
+                .Configure("Rename", b => b.WithDescription("Rename an account group."))
+                .Configure("ChangeDescription", b => b.WithDescription("Change an account group's description."))
+                .Configure("ChangeMetadata", b => b.WithDescription("Change an account group's metadata."))
+                .Configure("Delete", b => b.WithDescription("Delete an account group. Refused while the group still holds any account.")));
 
         // Close (request/handler GEN from [CrudAction] on AccountGroup.Close, DRK-1418 §3 row 1; route HAND,
         // §3 row 8 deviation): the generated composite's MapActionById binds its command from the JSON body
@@ -103,14 +80,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>()
             .WithDescription("Reactivate a closed account group.");
-
-        // Delete (GEN, DRK-1421 §3 row 4): the generated MapDeleteById<TEntity,TKey,TRequest> overload — no
-        // hand-written route, handler or delete operation (R2). "{id}", NOT "{id:guid}" (R1, the spec gate's
-        // deliberate decision): unconstrained, a malformed identifier is a route-binding 400, not a 404 route
-        // miss. The refusal itself lives on DeleteAccountGroupRequestValidator (Actions/Delete.cs).
-        group.MapDeleteById<AccountGroup, Guid, DeleteAccountGroupRequest>("{id}")
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .WithDescription("Delete an account group. Refused while the group still holds any account.");
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,
