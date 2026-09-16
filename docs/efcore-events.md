@@ -32,7 +32,7 @@ gets raised.
 by hand, inside the constructor, right where the aggregate becomes valid:
 
 ```csharp
-public PurchaseOrder(string customerName, decimal amount, string byUser) : base(byUser)
+public PurchaseOrder(string customerName, decimal amount)
 {
     CustomerName = customerName;
     Amount = amount;
