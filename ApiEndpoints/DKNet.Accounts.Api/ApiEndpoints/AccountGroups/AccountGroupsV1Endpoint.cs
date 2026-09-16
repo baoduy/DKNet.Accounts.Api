@@ -85,6 +85,14 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .WithDescription(
                 "Change a group's status. {\"status\":\"Closed\"} closes the group.");
 
+        // Delete (GEN, DRK-1421 §3 row 4): the generated MapDeleteById<TEntity,TKey,TRequest> overload — no
+        // hand-written route, handler or delete operation (R2). "{id}", NOT "{id:guid}" (R1, the spec gate's
+        // deliberate decision): unconstrained, a malformed identifier is a route-binding 400, not a 404 route
+        // miss. The refusal itself lives on DeleteAccountGroupRequestValidator (Actions/Delete.cs).
+        group.MapDeleteById<AccountGroup, Guid, DeleteAccountGroupRequest>("{id}")
+            .RequireScope(group, ScopeNames.AccountsWrite)
+            .WithDescription("Delete an account group. Refused while the group still holds any account.");
+
         group.MapGet("{id:guid}/balances", async (
                 Guid id,
                 IMessageBus bus,

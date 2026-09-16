@@ -211,6 +211,29 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// DRK-1421 §3 row 7: <c>AddErrorResponses</c> is wired globally (row 3) for the GROUP_NOT_EMPTY refusal
+    /// alone. Proves every OTHER validator refusal — one whose FluentValidation rule carries no
+    /// <c>WithErrorCode</c> — still gets today's plain 400 validation-problem body, widened to 422 for none of
+    /// them.
+    /// </summary>
+    [Fact]
+    public async Task CreatingAGroupWithInvalidInput_StillAnswers400WithTodaysBody()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
+        {
+            code = "",
+            name = "Missing code",
+            type = "Customer",
+            ownerId = "PayHub"
+        }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty(LedgerErrors.CodeKey, out _).ShouldBeFalse();
+        body.GetProperty("errors").GetProperty("Code")[0].GetString().ShouldBe("'Code' must not be empty.");
+    }
+
     [Fact]
     public async Task ClosingAGroupWhoseAccountReallyHoldsABalance_IsRefused()
     {
