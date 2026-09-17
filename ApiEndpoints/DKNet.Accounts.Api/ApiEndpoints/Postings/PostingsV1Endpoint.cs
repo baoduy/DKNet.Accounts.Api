@@ -16,11 +16,9 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
     {
         group.MapPost("/", async (
                 RecordPostingRequest req,
-                HttpRequest http,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
                 return result.Response(isCreated: !result.IsReplayed());
             })
@@ -32,11 +30,9 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
 
         group.MapPost("batch", async (
                 RecordPostingBatchRequest req,
-                HttpRequest http,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
                 return result.Response(isCreated: !result.IsReplayed());
             })

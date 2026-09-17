@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
@@ -77,6 +78,14 @@ public class LedgerErrorResponseOptionsTests
         Exception = exception
     };
 
+    // No ambient HttpContext: exercises LedgerErrorResponseOptions.UnhandledError's own body-shaping directly,
+    // same as every test below did before row 6 added logging. LedgerErrorResponseOptionsLoggingTests covers
+    // the logging behaviour itself, through a real HttpContext.
+    private static readonly IHttpContextAccessor NoHttpContext = new HttpContextAccessor();
+
+    private static ProblemDetails UnhandledError(Exception exception, bool isDevelopment) =>
+        LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(exception), isDevelopment, NoHttpContext);
+
     /// <summary>
     /// Reproduced directly, not exercised over HTTP: ASP.NET Core's own <c>UseDeveloperExceptionPage()</c>
     /// (auto-added ahead of anything an <c>IStartupFilter</c> contributes whenever the environment reports
@@ -89,7 +98,7 @@ public class LedgerErrorResponseOptionsTests
     {
         var exception = new InvalidOperationException("boom");
 
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(exception), isDevelopment: true);
+        var problem = UnhandledError(exception, true);
 
         ((ErrorItem[])problem.Extensions["errors"]!)[0].Message.ShouldBe("boom");
         problem.Type.ShouldBe(nameof(InvalidOperationException));
@@ -101,7 +110,7 @@ public class LedgerErrorResponseOptionsTests
         var inner = new Exception("inner secret data");
         var outer = new InvalidOperationException("outer boom", inner);
 
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(outer), isDevelopment: true);
+        var problem = UnhandledError(outer, true);
 
         ((ErrorItem[])problem.Extensions["errors"]!)[0].Message.ShouldBe("outer boom");
     }
@@ -111,7 +120,7 @@ public class LedgerErrorResponseOptionsTests
     {
         var exception = new InvalidOperationException("boom");
 
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(exception), isDevelopment: false);
+        var problem = UnhandledError(exception, false);
 
         ((ErrorItem[])problem.Extensions["errors"]!)[0].Message.ShouldNotBe("boom");
         problem.Type.ShouldBeNull();
@@ -125,8 +134,7 @@ public class LedgerErrorResponseOptionsTests
     [Fact]
     public void UnhandledError_InDevelopment_ExposesTypeForANamedExceptionBranchToo()
     {
-        var problem = LedgerErrorResponseOptions.UnhandledError(
-            UnhandledContextFor(new OwnershipRequiredException()), isDevelopment: true);
+        var problem = UnhandledError(new OwnershipRequiredException(), true);
 
         problem.Type.ShouldBe(nameof(OwnershipRequiredException));
     }
@@ -142,7 +150,7 @@ public class LedgerErrorResponseOptionsTests
     [MemberData(nameof(NamedExceptionBranches))]
     public void UnhandledError_ForANamedExceptionBranch_TitleIsRequestRefused(Exception exception)
     {
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(exception), isDevelopment: false);
+        var problem = UnhandledError(exception, false);
 
         problem.Title.ShouldBe("Request refused.");
     }
@@ -150,7 +158,7 @@ public class LedgerErrorResponseOptionsTests
     [Fact]
     public void UnhandledError_Generic_TitleIsSomethingWentWrong()
     {
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(new Exception("boom")), isDevelopment: false);
+        var problem = UnhandledError(new Exception("boom"), false);
 
         problem.Title.ShouldBe("Something went wrong!.");
     }
@@ -163,7 +171,7 @@ public class LedgerErrorResponseOptionsTests
         var inner = new Exception("unique constraint violation on IX_Accounts_AccountNumber");
         var outer = new DbUpdateException("Saving changes failed.", inner);
 
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(outer), isDevelopment: false);
+        var problem = UnhandledError(outer, false);
 
         problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
     }
@@ -174,7 +182,7 @@ public class LedgerErrorResponseOptionsTests
         var inner = new Exception("duplicate row rejected");
         var outer = new DbUpdateException("Saving changes failed.", inner);
 
-        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(outer), isDevelopment: false);
+        var problem = UnhandledError(outer, false);
 
         problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
     }

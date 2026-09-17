@@ -140,10 +140,12 @@ public sealed class GlobalExceptionHandlerHttpTests
         builder.WebHost.UseTestServer();
         builder.Services.AddRouting();
 
+        var httpContextAccessor = new HttpContextAccessor();
         builder.Services.AddErrorResponses(options =>
         {
             options.StatusCode = LedgerErrorResponseOptions.StatusCode;
-            options.UnhandledError = context => LedgerErrorResponseOptions.UnhandledError(context, isDevelopment: false);
+            options.UnhandledError = context =>
+                LedgerErrorResponseOptions.UnhandledError(context, isDevelopment: false, httpContextAccessor);
         });
 
         var app = builder.Build();

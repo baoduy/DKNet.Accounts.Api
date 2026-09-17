@@ -1,4 +1,8 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Infra.Contexts;
 
@@ -65,11 +69,16 @@ internal static class LedgerErrorResponseOptions
     /// a unique-index violation is a conflict, not a server fault. Every other exception falls to a fixed,
     /// non-disclosing message outside Development — <paramref name="isDevelopment"/> is captured once at
     /// startup (<c>FluentValidationConfig</c>) since <see cref="ErrorResponseContext"/> carries no
-    /// <c>HttpContext</c> to resolve it from.
+    /// <c>HttpContext</c> to resolve it from. Also records one error-severity log entry under the same trace
+    /// id the response body carries (DRK-1522 §3 row 6) — record-only, never changes the response — using
+    /// <paramref name="httpContextAccessor"/> (also captured once at startup, for the same reason) to reach the
+    /// current request's logger and trace identifier.
     /// </summary>
-    public static ProblemDetails UnhandledError(ErrorResponseContext context, bool isDevelopment)
+    public static ProblemDetails UnhandledError(
+        ErrorResponseContext context, bool isDevelopment, IHttpContextAccessor httpContextAccessor)
     {
         var exception = context.Exception!;
+        LogUnhandledError(httpContextAccessor, exception);
         return exception switch
         {
             OwnershipRequiredException => Problem(
@@ -91,6 +100,26 @@ internal static class LedgerErrorResponseOptions
                 (int)HttpStatusCode.InternalServerError, "Something went wrong!.",
                 isDevelopment ? exception.Message : GenericUnhandledMessage, exception, isDevelopment)
         };
+    }
+
+    /// <summary>
+    /// One error-severity record per unhandled exception, under the same trace id
+    /// <see cref="DKNet.AspCore.Extensions.Responses.ErrorProblemFactory"/> stamps on the response body
+    /// (<c>Activity.Current?.Id ?? HttpContext.TraceIdentifier</c>) — never invented separately, so a report
+    /// naming the response's trace id finds the matching record. No ambient <see cref="HttpContext"/> (e.g. a
+    /// direct unit-test call) skips logging rather than throwing: there is no request to log against.
+    /// </summary>
+    private static void LogUnhandledError(IHttpContextAccessor httpContextAccessor, Exception exception)
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        if (httpContext is null)
+        {
+            return;
+        }
+
+        var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+        var logger = httpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(LedgerErrorResponseOptions).FullName!);
+        logger?.LogError(exception, "Unhandled error. TraceId: {TraceId}", traceId);
     }
 
     private static ProblemDetails Problem(int status, string title, string message, Exception exception, bool isDevelopment)

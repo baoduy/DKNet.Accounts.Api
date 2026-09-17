@@ -1,3 +1,4 @@
+using DKNet.AspCore.Extensions.ModelBinding;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
@@ -49,6 +50,9 @@ public sealed record RecordPostingBatchRequest : Fluents.Requests.IWitResponse<I
 
     public string? RecordedBy { get; set; }
 
+    /// <summary>Populated from the <c>Idempotency-Key</c> request header via <see cref="FromRequestHeaderAttribute"/>
+    /// — a caller-supplied value in the request body is always overwritten (R3).</summary>
+    [FromRequestHeader("Idempotency-Key")]
     public string? IdempotencyKey { get; set; }
 }
 
