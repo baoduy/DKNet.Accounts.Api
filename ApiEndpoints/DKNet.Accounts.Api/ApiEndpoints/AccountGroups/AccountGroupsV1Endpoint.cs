@@ -17,21 +17,23 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Group-level scope declaration (DRK-1498 §3 rows 1-2, 5): every route this group registers for GET
+        // needs accounts.read, and for POST/PUT/DELETE needs accounts.write, unless the route names its own
+        // scope (none here do) or is anonymous.
+        group.DeclareGroupScope(ScopeNames.AccountsRead, "GET")
+            .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "DELETE");
+
         // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
         // ChangeMetadata) all now register through one generated composite (DRK-1440 §3 rows 1-3). Close stays
         // excluded BY NAME (R1): it is a [CrudAction] whose refusal rule (still holds a balance) runs where a
         // generated route cannot reach it, so it stays hand-mapped below. Activate has no such rule and, on
         // DKNet 10.1.29, the generator now maps a parameterless [CrudAction] with MapParameterlessActionById
         // (DRK-1436 fixed), so it rides the generated composite instead of the hand-mapped route this endpoint
-        // used before. Rename must stay the first [CrudUpdate] declared on AccountGroup or it loses its plain
-        // "{id}" PUT route.
+        // used before — same as every other route here, it names no scope of its own and inherits the group's
+        // POST -> accounts.write declaration above (DRK-1498). Rename must stay the first [CrudUpdate] declared
+        // on AccountGroup or it loses its plain "{id}" PUT route.
         group.MapAccountGroupCrud(o => o
                 .Exclude("Close")
-                .Configure(CrudOp.GetById, b => b.RequireScope(group, ScopeNames.AccountsRead))
-                .Configure(CrudOp.GetList, b => b.RequireScope(group, ScopeNames.AccountsRead))
-                .Configure(CrudOp.Create, b => b.RequireScope(group, ScopeNames.AccountsWrite))
-                .Configure(CrudOp.Update, b => b.RequireScope(group, ScopeNames.AccountsWrite))
-                .Configure(CrudOp.Delete, b => b.RequireScope(group, ScopeNames.AccountsWrite))
                 .Configure("Create", b => b.WithDescription("Create an account group."))
                 .Configure("GetList", b => b.WithDescription(
                     "List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer."))
@@ -40,7 +42,7 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 .Configure("ChangeDescription", b => b.WithDescription("Change an account group's description."))
                 .Configure("ChangeMetadata", b => b.WithDescription("Change an account group's metadata."))
                 .Configure("Delete", b => b.WithDescription("Delete an account group. Refused while the group still holds any account."))
-                .Configure("Activate", b => b.RequireScope(group, ScopeNames.AccountsWrite).WithDescription("Reactivate a closed account group.")));
+                .Configure("Activate", b => b.WithDescription("Reactivate a closed account group.")));
 
         // Close (request/handler GEN from [CrudAction] on AccountGroup.Close, DRK-1418 §3 row 1; route HAND,
         // §3 row 8 deviation): the generated composite's MapActionById binds its command from the JSON body
@@ -65,7 +67,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(request, cancellationToken: ct);
                 return result.ToLedgerResponse();
             })
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>()
             .WithDescription("Close an account group. Refused while any account it holds still carries a balance.");
 
@@ -77,7 +78,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var balances = await bus.Send(new GetAccountGroupBalancesQuery { Id = id }, cancellationToken: ct);
                 return Results.Ok(balances);
             })
-            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read a group's total balances, one line per currency — never combined.");
     }
 
