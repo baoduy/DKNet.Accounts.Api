@@ -431,8 +431,8 @@ which is an outage rather than a rate limit. Treat the shipped numbers as a plac
 
 One registered setting covers every way a request can fail. `DKNet.Accounts.Api/Configs/FluentValidationConfig.cs`
 calls `AddErrorResponses(...)` once, passing `DKNet.Accounts.Api/Configs/GlobalExceptions/LedgerErrorResponseOptions.cs`'s
-two callbacks, and that one registration shapes all three failure kinds: a command handler returning a
-failed `Result`, refused request input, and an unhandled exception.
+two callbacks — `StatusCode` and `UnhandledError` — and that one registration shapes all three failure
+kinds: a command handler returning a failed `Result`, refused request input, and an unhandled exception.
 
 **The host writes no exception-handling code of its own.** `AddErrorResponses` registers the
 `IExceptionHandler` *and* the startup filter that adds the `UseExceptionHandler()` step, so there is no
@@ -440,17 +440,26 @@ failed `Result`, refused request input, and an unhandled exception.
 `AddProblemDetails()` line in `Program.cs`. It may be called only once — a second call is a no-op and
 the first call's configuration wins — which is why every stable code is registered in that single place.
 
-Every one of the three answers with the same body — `title`, `status`, `type` (the final status' own
-name, never an exception's type name), `traceId`, and an `errors` list of
-`{ message, code, field }` entries. There is no `detail` member on any of them. The two callbacks decide
-only the status and what is added to that body:
+Every one of the three answers with the same body — `title`, `status`, `type`, `traceId`, and an
+`errors` list of `{ message, code, field }` entries. There is no `detail` member on any of them. On the
+two refusal kinds `type` is the final status' own name, never an exception's; on an unhandled error it
+is the exception's type name inside a `Development` run and absent outside one
+(`LedgerErrorResponseOptions.cs:133`).
+
+Nothing in this service puts the stable code on the body: the package places it on each `errors[].code`
+entry itself, so this service registers no callback of its own to add it
+(`LedgerErrorResponseOptions.cs:17`). The two callbacks it does pass decide the status and the shape of
+an unhandled error:
 
 - `LedgerErrorResponseOptions.StatusCode` answers `422` when the failure carries one of the service's
-  stable `LedgerErrors` codes, and `null` — keep the status the failure would have had anyway — for
-  everything else, so a shape rule still refuses input with `400` and a missing record still answers
-  `404`.
-- `LedgerErrorResponseOptions.Customize` puts the matched stable code on the body. It runs for all
-  three failure kinds, so anything added there appears on every error response the service returns.
+  stable `LedgerErrors` codes — `409` for `IDEMPOTENCY_KEY_CONFLICT` — and `null` — keep the status the
+  failure would have had anyway — for everything else, so a shape rule still refuses input with `400`
+  and a missing record still answers `404`.
+- `LedgerErrorResponseOptions.UnhandledError` shapes the exception path and writes its one error-severity
+  log record, under the same trace id the response body carries. Most exceptions become `500`; an
+  ownership refusal becomes `403`, a transport-level refusal keeps the status Kestrel gave it (a body
+  over `MaxRequestBodySize` stays `413`), and a unique-constraint violation surfacing from the
+  post-handler save becomes `409`.
 
 **An unhandled exception discloses nothing.** Outside a `Development` run its `errors` entry carries one
 fixed message and nothing the exception itself carried — no message of its own, no type name, no stack

@@ -331,8 +331,8 @@ page with `200`, never an error.
 ### Refusals and error codes
 
 A business-rule refusal is `422 Unprocessable Entity` with an RFC 7807 `application/problem+json` body.
-The body carries `title`, `status`, `type` — the final status' own name, never an exception's — a
-`traceId`, and an `errors` list. Each entry in `errors` carries a human-readable `message`, the stable
+The body carries `title`, `status`, `type` — for a refusal, the final status' own name, never an
+exception's — a `traceId`, and an `errors` list. Each entry in `errors` carries a human-readable `message`, the stable
 machine-readable `code` you branch on, and `field`, which names the refused request member when there
 is one. `errors[].code` is where the code lives: there is no top-level `code` member and no free-text
 member beside the list. `401` and `403` have empty bodies.
@@ -340,7 +340,8 @@ member beside the list. `401` and `403` have empty bodies.
 A refused *request body* — malformed, or missing a required member — answers `400` in this same shape:
 its entries carry a `field` and no `code`, since the codes below are business-rule refusals only. An
 unhandled error answers `500` in this same shape as well, with one fixed `message` that discloses
-nothing about what failed. Quote `traceId` when you report either.
+nothing about what failed, and no `type` at all — only a service running in `Development` fills that
+member on an unhandled error, with the exception's type name. Quote `traceId` when you report either.
 
 | HTTP | `code` | Condition |
 |---|---|---|
@@ -377,7 +378,7 @@ One refusal in full — a group close refused because an account it holds still 
   "traceId": "00-8b1f2c4d5e6a7b8c9d0e1f2a3b4c5d6e-1a2b3c4d5e6f7a8b-01",
   "errors": [
     {
-      "message": "The account group still holds an account carrying a balance.",
+      "message": "Cannot close a group while any account it holds still carries a balance.",
       "code": "GROUP_HOLDS_BALANCE",
       "field": null
     }
