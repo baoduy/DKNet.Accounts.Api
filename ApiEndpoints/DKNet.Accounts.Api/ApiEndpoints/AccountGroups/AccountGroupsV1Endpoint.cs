@@ -17,6 +17,12 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Group-level scope declaration (DRK-1498 §3 rows 1-2, 5): every route this group registers for GET
+        // needs accounts.read, and for POST/PUT/DELETE needs accounts.write, unless the route names its own
+        // scope (none here do) or is anonymous.
+        group.DeclareGroupScope(ScopeNames.AccountsRead, "GET")
+            .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "DELETE");
+
         // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
         // ChangeMetadata) all now register through one generated composite (DRK-1440 §3 rows 1-3). Close and
         // activate stay excluded BY NAME (R1): each is a [CrudAction] whose generated composite route binds
@@ -25,11 +31,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
         // first [CrudUpdate] declared on AccountGroup or it loses its plain "{id}" PUT route.
         group.MapAccountGroupCrud(o => o
                 .Exclude("Close", "Activate")
-                .Configure(CrudOp.GetById, b => b.RequireScope(group, ScopeNames.AccountsRead))
-                .Configure(CrudOp.GetList, b => b.RequireScope(group, ScopeNames.AccountsRead))
-                .Configure(CrudOp.Create, b => b.RequireScope(group, ScopeNames.AccountsWrite))
-                .Configure(CrudOp.Update, b => b.RequireScope(group, ScopeNames.AccountsWrite))
-                .Configure(CrudOp.Delete, b => b.RequireScope(group, ScopeNames.AccountsWrite))
                 .Configure("Create", b => b.WithDescription("Create an account group."))
                 .Configure("GetList", b => b.WithDescription(
                     "List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer."))
@@ -62,7 +63,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(request, cancellationToken: ct);
                 return result.ToLedgerResponse();
             })
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>()
             .WithDescription("Close an account group. Refused while any account it holds still carries a balance.");
 
@@ -77,7 +77,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(new ActivateAccountGroupRequest { Id = id }, cancellationToken: ct);
                 return result.ToLedgerResponse();
             })
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>()
             .WithDescription("Reactivate a closed account group.");
 
@@ -89,7 +88,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 var balances = await bus.Send(new GetAccountGroupBalancesQuery { Id = id }, cancellationToken: ct);
                 return Results.Ok(balances);
             })
-            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read a group's total balances, one line per currency — never combined.");
     }
 

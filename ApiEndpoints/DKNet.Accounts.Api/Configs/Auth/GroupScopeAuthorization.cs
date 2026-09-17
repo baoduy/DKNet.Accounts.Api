@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Authorization;
+
 namespace DKNet.Accounts.Api.Configs.Auth;
 
 /// <summary>
@@ -5,10 +8,17 @@ namespace DKNet.Accounts.Api.Configs.Auth;
 /// declares its own scope (<see cref="ConditionalScopeAuthorization.RequireScope{TBuilder}"/>) or is
 /// anonymous. Several declarations may be added to one group: one per method, or one shared across several
 /// (DRK-1498 §3 rows 1-2). Mirrors <see cref="ConditionalScopeAuthorization"/> — a no-op, declarations and
-/// coverage check alike, when the host has <see cref="FeatureOptions.RequireAuthorization"/> off (R3).
+/// coverage check alike, whenever this host never wires up authorization at all (R3; in the shipped host that
+/// happens exactly when <see cref="FeatureOptions.RequireAuthorization"/> is off).
 /// </summary>
 internal static class GroupScopeAuthorization
 {
+    // Keyed by the group instance itself: every DeclareGroupScope call for the same group accumulates into
+    // the same method->scope map, and the group.Finally callback registered on the FIRST call reads it —
+    // Finally runs once per endpoint, after every other convention (including a route's own RequireScope or
+    // AllowAnonymous), so it always sees the final per-route metadata state before deciding (R1).
+    private static readonly ConditionalWeakTable<RouteGroupBuilder, Dictionary<string, string>> Declarations = new();
+
     /// <summary>
     /// Declares that every route this group registers for one of <paramref name="httpMethods"/> requires
     /// <paramref name="scope"/>, unless that route names its own scope or is anonymous (R1). Chainable, and
@@ -17,8 +27,70 @@ internal static class GroupScopeAuthorization
     /// <param name="group">The group returned by <c>EndpointConfigExtensions.UseEndpointConfigs</c>.</param>
     /// <param name="scope">The scope every covered method requires.</param>
     /// <param name="httpMethods">The HTTP methods this declaration covers (e.g. <c>"GET"</c>, <c>"PUT"</c>).</param>
-    public static RouteGroupBuilder DeclareGroupScope(this RouteGroupBuilder group, string scope, params string[] httpMethods) =>
-        throw new NotImplementedException();
+    public static RouteGroupBuilder DeclareGroupScope(this RouteGroupBuilder group, string scope, params string[] httpMethods)
+    {
+        // Mirrors ConditionalScopeAuthorization's own reasoning (R3), but keys off whether authorization is
+        // actually wired into this host rather than FeatureOptions.RequireAuthorization directly:
+        // EndpointConfigExtensions.UseEndpointConfigs only registers authorization services/policies (and the
+        // shipped host's AuthConfig.AddAuthConfig only runs) when the feature is on, so IAuthorizationPolicyProvider
+        // is present if and only if a request through this host can actually be authorized. Reading the flag
+        // itself would misfire in a host that wires authorization by hand without ever binding FeatureOptions
+        // (as GroupScopeCoverageTests' test-only hosts do) — IOptions<FeatureOptions> resolves to a silent
+        // all-defaults instance there instead of throwing, defaulting RequireAuthorization to false.
+        var active = ((IEndpointRouteBuilder)group).ServiceProvider.GetService<IAuthorizationPolicyProvider>() is not null;
+        if (!active)
+        {
+            // R3: the whole mechanism is inert with authorization off — no declaration recorded, no Finally
+            // convention registered, so EnsureGroupScopeCoverage never sees this group as declaring anything.
+            return group;
+        }
+
+        if (!Declarations.TryGetValue(group, out var methodScopes))
+        {
+            methodScopes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Declarations.Add(group, methodScopes);
+            ((IEndpointConventionBuilder)group).Finally(endpoint => ApplyGroupScope(endpoint, methodScopes));
+        }
+
+        foreach (var method in httpMethods)
+        {
+            methodScopes[method] = scope;
+        }
+
+        return group;
+    }
+
+    private static void ApplyGroupScope(EndpointBuilder endpoint, IReadOnlyDictionary<string, string> methodScopes)
+    {
+        // A per-route scope always carries a policy name (the scope itself, via ConditionalScopeAuthorization's
+        // .RequireAuthorization(scope)) — unlike the blanket, no-policy Authorize metadata that
+        // EndpointConfigExtensions.UseEndpointConfigs' own RequireAuthorization option already stamps on every
+        // route in every group regardless of this mechanism. Only a NAMED policy, or AllowAnonymous, wins over
+        // the group declaration (R1); the blanket entry must not be mistaken for one.
+        if (endpoint.Metadata.OfType<IAuthorizeData>().Any(a => !string.IsNullOrEmpty(a.Policy)) ||
+            endpoint.Metadata.OfType<IAllowAnonymous>().Any())
+        {
+            return;
+        }
+
+        var methods = endpoint.Metadata.OfType<IHttpMethodMetadata>().SelectMany(m => m.HttpMethods).ToArray();
+        foreach (var method in methods)
+        {
+            if (methodScopes.TryGetValue(method, out var scope))
+            {
+                endpoint.Metadata.Add(new AuthorizeAttribute(scope));
+                return;
+            }
+        }
+
+        // Nothing covers this method: no group declaration, no per-route scope, no AllowAnonymous. Tag it so
+        // EnsureGroupScopeCoverage can find it later without re-deriving the same lookup against a raw
+        // Endpoint (which no longer knows which RouteGroupBuilder it came from). Every endpoint a
+        // RouteGroupBuilder's Map* methods produce is a RouteEndpointBuilder carrying exactly one HTTP method
+        // (that's what the earlier IHttpMethodMetadata lookup just read), so both are always present here.
+        var routeName = ((RouteEndpointBuilder)endpoint).RoutePattern.RawText!;
+        endpoint.Metadata.Add(new UncoveredGroupScopeMethod(routeName, methods[0]));
+    }
 
     /// <summary>
     /// Walks <paramref name="endpoints"/> and, for every group that declared at least one
@@ -30,28 +102,56 @@ internal static class GroupScopeAuthorization
     /// <exception cref="InvalidOperationException">
     /// A declaring group serves a method with no coverage. The message names the group and the method (R5).
     /// </exception>
-    public static void EnsureGroupScopeCoverage(IEnumerable<Endpoint> endpoints) =>
-        throw new NotImplementedException();
+    public static void EnsureGroupScopeCoverage(IEnumerable<Endpoint> endpoints)
+    {
+        foreach (var endpoint in endpoints)
+        {
+            var uncovered = endpoint.Metadata.GetMetadata<UncoveredGroupScopeMethod>();
+            if (uncovered is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Endpoint group '{uncovered.GroupName}' serves HTTP {uncovered.Method} with no declared " +
+                    "group scope, per-route scope, or AllowAnonymous.");
+            }
+        }
+    }
+
+    private sealed record UncoveredGroupScopeMethod(string GroupName, string Method);
 }
 
 /// <summary>
 /// Runs <see cref="GroupScopeAuthorization.EnsureGroupScopeCoverage"/> once, during host startup, against the
 /// app's own live <see cref="EndpointDataSource"/> (DRK-1498 §3 rows 3-4) — registered via
 /// <see cref="GroupScopeCoverageStartupCheckExtensions.AddGroupScopeCoverageCheck"/> so a declaring group left
-/// with an uncovered method aborts startup instead of shipping silently. An <see cref="IHostedService"/>'s
-/// <c>StartAsync</c> exception propagates through <c>IHost.StartAsync</c> and fails the host build — the same
-/// entry point a real run and a test alike start through, so "the check throws" and "startup fails" are the
-/// same event, not two separate assertions.
+/// with an uncovered method aborts startup instead of shipping silently. Runs from <c>StartedAsync</c>, not
+/// plain <c>StartAsync</c>: minimal-hosting endpoint mapping (<c>Program.cs</c>'s top-level <c>UseEndpointConfigs</c>
+/// call) happens before the host starts, but a classic <c>IHostBuilder</c>/<c>Configure</c> host (as
+/// <c>GroupScopeCoverageTests.BuildTestHostAsync</c> uses) only maps its routes when the framework's own
+/// <c>GenericWebHostService</c> — itself an ordinary hosted service — runs its <c>StartAsync</c>. Hosted
+/// services registered ahead of it in the container (which this one is, since <c>ConfigureServices</c> callbacks
+/// queued from user code apply before the framework appends its own) would see zero endpoints from plain
+/// <c>StartAsync</c>. <see cref="IHostedLifecycleService.StartedAsync"/> runs one phase later, strictly after
+/// EVERY hosted service's own <c>StartAsync</c> (routing included) has completed, while still executing inside
+/// the same <c>IHost.StartAsync</c> call — so its exception still fails host startup exactly like a plain
+/// <c>IHostedService.StartAsync</c> exception would, just correctly ordered against route mapping.
 /// </summary>
-internal sealed class GroupScopeCoverageHostedService(EndpointDataSource endpointDataSource) : IHostedService
+internal sealed class GroupScopeCoverageHostedService(EndpointDataSource endpointDataSource) : IHostedLifecycleService
 {
-    public Task StartAsync(CancellationToken cancellationToken)
+    public Task StartingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StartedAsync(CancellationToken cancellationToken)
     {
         GroupScopeAuthorization.EnsureGroupScopeCoverage(endpointDataSource.Endpoints);
         return Task.CompletedTask;
     }
 
+    public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>Registers <see cref="GroupScopeCoverageHostedService"/>. Call once, alongside <c>UseEndpointConfigs</c>
