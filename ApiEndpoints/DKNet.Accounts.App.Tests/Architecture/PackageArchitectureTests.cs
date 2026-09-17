@@ -146,9 +146,8 @@ public class PackageArchitectureTests
     }
 
     /// <summary>
-    /// DRK-1467 §5 scenario outline, "DKNet.Accounts.Api" row: "A repository names release 10.1.29 everywhere
-    /// it names the pinned release" — the pin half only; the documentation half belongs to the sibling Docs
-    /// sub-task.
+    /// DRK-1522 §5, "Every DKNet package resolves to release 11.0.0" — the pin half only; the documentation
+    /// half belongs to the sibling Docs sub-task.
     /// </summary>
     [Fact]
     public void AllDKNetPackageReferences_ShouldResolveToRelease10129()
@@ -162,7 +161,7 @@ public class PackageArchitectureTests
         var doc = XDocument.Load(directoryPackagesPath);
         var distinctVersions = PackagePinGuard.DistinctDkNetVersions(doc);
 
-        distinctVersions.ShouldBe(["10.1.29"]);
+        distinctVersions.ShouldBe(["11.0.0"]);
     }
 
     [Fact]

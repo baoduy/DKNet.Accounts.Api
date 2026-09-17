@@ -142,14 +142,17 @@ public sealed class AccountGroupValidationRefusalsSteps(HttpClient client, Scena
     // "the account group "X" holds no account" is already bound in FlatAccountGroupsSteps — same shape
     // (CreateGroupAsync only), so scenario 6 reuses that binding rather than redefining it here.
 
-    /// <summary>Closes through the still-live PATCH (today's only working close path) so this precondition does
-    /// not depend on the very route this slice is red on.</summary>
+    /// <summary>Closes through <c>POST {id}/close</c> — the status-only PATCH this originally used is no
+    /// longer offered on account groups (DRK-1418 §5 "The status-only partial update is no longer offered"
+    /// shipped since this helper was written; a PATCH here now answers 405 and leaves the group active, a
+    /// precondition bug this fixes rather than works around).</summary>
     [Given(@"the account group ""([^""]+)"" is closed")]
     public async Task GivenTheAccountGroupIsClosed(string code)
     {
         var groupId = (await CreateGroupAsync(code, code))!.Value;
         state.CallerClientId = "treasury-ops";
-        await client.SendAsCallerAsync(state, HttpMethod.Patch, $"{GroupsPath}/{groupId}", new { status = "Closed" });
+        state.CallerScopes = [.. ScopeNames.All];
+        await client.SendAsCallerAsync(state, HttpMethod.Post, $"{GroupsPath}/{groupId}/close");
     }
 
     [Given(@"the account group ""([^""]+)"" is active")]
