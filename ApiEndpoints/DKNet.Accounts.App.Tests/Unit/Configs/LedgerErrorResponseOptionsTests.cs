@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Share;
@@ -31,13 +33,41 @@ public class LedgerErrorResponseOptionsTests
     [Fact]
     public void StatusCode_ForIdempotencyKeyConflict_Is409NotThe422EveryOtherKnownCodeGets()
     {
+        // A second, unrelated error alongside the conflict one: only Any (not All) of the errors carrying
+        // the idempotency code should decide the status.
         var context = new ErrorResponseContext
         {
             Source = ErrorSource.Command,
-            Errors = [new ErrorItem("conflict", LedgerErrors.IdempotencyKeyConflict)]
+            Errors = [new ErrorItem("unrelated", null), new ErrorItem("conflict", LedgerErrors.IdempotencyKeyConflict)]
         };
 
         LedgerErrorResponseOptions.StatusCode(context).ShouldBe((int)HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public void StatusCode_WhenOnlySomeErrorsCarryAKnownCode_IsStill422()
+    {
+        // Any (not All) of the errors carrying a known code should decide 422 — a mixed list must still
+        // trip the 422 branch.
+        var context = new ErrorResponseContext
+        {
+            Source = ErrorSource.Command,
+            Errors = [new ErrorItem("unrelated", null), new ErrorItem("known", LedgerErrors.DuplicateGroupCode)]
+        };
+
+        LedgerErrorResponseOptions.StatusCode(context).ShouldBe((int)HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public void StatusCode_WhenNoErrorCarriesAKnownCode_IsNull()
+    {
+        var context = new ErrorResponseContext
+        {
+            Source = ErrorSource.Command,
+            Errors = [new ErrorItem("unrelated", null)]
+        };
+
+        LedgerErrorResponseOptions.StatusCode(context).ShouldBeNull();
     }
 
     private static ErrorResponseContext UnhandledContextFor(Exception exception) => new()
@@ -99,5 +129,53 @@ public class LedgerErrorResponseOptionsTests
             UnhandledContextFor(new OwnershipRequiredException()), isDevelopment: true);
 
         problem.Type.ShouldBe(nameof(OwnershipRequiredException));
+    }
+
+    public static IEnumerable<object[]> NamedExceptionBranches()
+    {
+        yield return [new OwnershipRequiredException()];
+        yield return [new BadHttpRequestException("bad request", 400)];
+        yield return [new DbUpdateException("Saving changes failed.", new Exception("duplicate key value violates unique constraint"))];
+    }
+
+    [Theory]
+    [MemberData(nameof(NamedExceptionBranches))]
+    public void UnhandledError_ForANamedExceptionBranch_TitleIsRequestRefused(Exception exception)
+    {
+        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(exception), isDevelopment: false);
+
+        problem.Title.ShouldBe("Request refused.");
+    }
+
+    [Fact]
+    public void UnhandledError_Generic_TitleIsSomethingWentWrong()
+    {
+        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(new Exception("boom")), isDevelopment: false);
+
+        problem.Title.ShouldBe("Something went wrong!.");
+    }
+
+    [Fact]
+    public void UnhandledError_DbUpdateException_WithOnlyUniqueNamedNotDuplicate_Returns409()
+    {
+        // Isolates the branch's guard from an "and" rather than an "or": a message naming "unique" alone
+        // (never "duplicate") must still trip the conflict branch.
+        var inner = new Exception("unique constraint violation on IX_Accounts_AccountNumber");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(outer), isDevelopment: false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public void UnhandledError_DbUpdateException_WithOnlyDuplicateNamedNotUnique_Returns409()
+    {
+        var inner = new Exception("duplicate row rejected");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = LedgerErrorResponseOptions.UnhandledError(UnhandledContextFor(outer), isDevelopment: false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
     }
 }
