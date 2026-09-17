@@ -123,8 +123,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.UnsupportedCurrency);
-
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.UnsupportedCurrency)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.UnsupportedCurrency}, got: {body}");
         (await SnapshotAsync(account1)).ShouldBe(before1);
         (await SnapshotAsync(account2)).ShouldBe(before2);
     }
@@ -144,7 +145,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.InvalidPostingAmount);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.InvalidPostingAmount)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.InvalidPostingAmount}, got: {body}");
     }
 
     [Fact]
@@ -166,7 +169,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.EffectiveDateInFuture);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.EffectiveDateInFuture)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.EffectiveDateInFuture}, got: {body}");
     }
 
     [Fact]
@@ -198,7 +203,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.CurrencyMismatch);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.CurrencyMismatch)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.CurrencyMismatch}, got: {body}");
     }
 
     [Fact]
@@ -249,8 +256,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.InsufficientFunds);
-
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.InsufficientFunds)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.InsufficientFunds}, got: {body}");
         // All-or-nothing: neither leg landed, including the first one that would have succeeded alone.
         var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));
         var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -311,7 +319,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var body = await conflict.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.IdempotencyKeyConflict);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.IdempotencyKeyConflict)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.IdempotencyKeyConflict}, got: {body}");
     }
 
     /// <summary>
@@ -361,8 +371,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         // request (different endpoint/shape), a clean 409 — not a crash, not a false-positive replay.
         batchResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var batchBody = await batchResponse.Content.ReadFromJsonAsync<JsonElement>();
-        batchBody.GetProperty("code").GetString().ShouldBe(LedgerErrors.IdempotencyKeyConflict);
-
+        batchBody.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.IdempotencyKeyConflict)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.IdempotencyKeyConflict}, got: {batchBody}");
         // Nothing new recorded: the account's balance still reflects exactly the one 30 SGD credit.
         var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));
         var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -380,7 +391,9 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.AccountFrozen);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.AccountFrozen)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.AccountFrozen}, got: {body}");
     }
 
     [Fact]

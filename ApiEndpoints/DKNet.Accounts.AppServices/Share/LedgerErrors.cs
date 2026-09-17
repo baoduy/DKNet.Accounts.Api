@@ -2,13 +2,16 @@ namespace DKNet.Accounts.AppServices.Share;
 
 /// <summary>
 /// Stable machine-readable codes (§3 row 11) for the business-rule refusals this stage can produce. Attached
-/// to a <see cref="FluentResults.Error"/> via <c>.WithMetadata(LedgerErrors.CodeKey, ...)</c> so the API layer's
-/// response mapping can surface a stable <c>code</c> extension on the problem+json body.
+/// to a <see cref="FluentResults.Error"/> via <c>.WithMetadata(LedgerErrors.CodeKey, ...)</c> so DKNet
+/// 11.0.0's own error-response mapping reads it as a command failure's stable code (DRK-1522 §3 row 3) and
+/// surfaces it inside the response body's <c>errors[].code</c> entry.
 /// </summary>
 public static class LedgerErrors
 {
-    /// <summary>The <see cref="FluentResults.Error.Metadata"/> key carrying the stable code.</summary>
-    public const string CodeKey = "code";
+    /// <summary>The <see cref="FluentResults.Error.Metadata"/> key carrying the stable code — must match
+    /// "Code" exactly (capital C): DKNet 11.0.0 reads a command failure's code from that ordinal metadata
+    /// entry (DRK-1522 §3 row 3).</summary>
+    public const string CodeKey = "Code";
 
     public const string OverdraftLimitRequired = "OVERDRAFT_LIMIT_REQUIRED";
     public const string AccountHoldsBalance = "ACCOUNT_HOLDS_BALANCE";

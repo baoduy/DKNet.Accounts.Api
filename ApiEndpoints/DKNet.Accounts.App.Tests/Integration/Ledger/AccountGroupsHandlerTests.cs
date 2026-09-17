@@ -64,7 +64,9 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.DuplicateGroupCode);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.DuplicateGroupCode)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.DuplicateGroupCode}, got: {body}");
     }
 
     [Fact]
@@ -247,7 +249,10 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.TryGetProperty(LedgerErrors.CodeKey, out _).ShouldBeFalse();
-        body.GetProperty("errors").GetProperty("Code")[0].GetString().ShouldBe("'Code' must not be empty.");
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.GetProperty("field").GetString() == "Code" &&
+                      e.GetProperty("message").GetString() == "'Code' must not be empty.")
+            .ShouldBeTrue($"expected a 'Code' field error, got: {body}");
     }
 
     [Fact]
@@ -280,6 +285,22 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.GroupHoldsBalance);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.GroupHoldsBalance)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.GroupHoldsBalance}, got: {body}");
+    }
+
+    /// <summary>
+    /// Close is served by the generated composite's own default pattern "{id}" (spec revision 13 §3, frozen —
+    /// pr-reviewer round 1 finding 7's attempt to restore "{id:guid}" by excluding it was reverted in round
+    /// 2). The route still matches a malformed id; binding it to the handler's Guid parameter is what fails,
+    /// so the answer is 400, not a 404 route miss.
+    /// </summary>
+    [Fact]
+    public async Task ClosingWithAMalformedId_StillMatchesTheRoute_AndIsAnsweredAsABadRequest()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/not-a-guid/close"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 }

@@ -104,19 +104,25 @@ Re-using a `code` is refused:
 
 ```json
 {
-  "type": "UnprocessableEntity",
   "title": "Error",
   "status": 422,
-  "detail": "A group with code 'CUST-000123' already exists.",
-  "instance": "POST /v1/account-groups",
-  "errors": ["A group with code 'CUST-000123' already exists."],
-  "code": "DUPLICATE_GROUP_CODE",
-  "traceId": "0HNOI4SE9O6LP:00000001"
+  "type": "UnprocessableEntity",
+  "traceId": "00-8b1f2c4d5e6a7b8c9d0e1f2a3b4c5d6e-1a2b3c4d5e6f7a8b-01",
+  "errors": [
+    {
+      "message": "A group with code 'CUST-000123' already exists.",
+      "code": "DUPLICATE_GROUP_CODE",
+      "field": null
+    }
+  ]
 }
 ```
 
-Every business-rule refusal has this shape: `422`, `application/problem+json`, and a stable `code` you
-can branch on. Branch on `code`, never on `detail`.
+Every business-rule refusal has this shape: `422`, `application/problem+json`, and an `errors` list
+whose entry carries a stable `code`. Branch on `errors[].code` — never on `message`, which is written
+for a human and is free to change. There is no top-level `code` member to read, and the body carries no
+free-text member beside the list. The examples below shorten the body to `status` and `errors`; the
+other three members are always there.
 
 ## 3. Open an account
 
@@ -172,8 +178,12 @@ left without a determinate floor:
 ```json
 {
   "status": 422,
-  "detail": "An account permitted to go negative must state its overdraft limit.",
-  "code": "OVERDRAFT_LIMIT_REQUIRED"
+  "errors": [
+    {
+      "message": "An account permitted to go negative must state its overdraft limit.",
+      "code": "OVERDRAFT_LIMIT_REQUIRED"
+    }
+  ]
 }
 ```
 
@@ -275,8 +285,12 @@ Re-use the same key with *different* content and it is refused rather than guess
 ```json
 {
   "status": 409,
-  "detail": "The idempotency key 'pay-77af' was already used with different content.",
-  "code": "IDEMPOTENCY_KEY_CONFLICT"
+  "errors": [
+    {
+      "message": "The idempotency key 'pay-77af' was already used with different content.",
+      "code": "IDEMPOTENCY_KEY_CONFLICT"
+    }
+  ]
 }
 ```
 
@@ -309,8 +323,12 @@ the balance does not move**:
 ```json
 {
   "status": 422,
-  "detail": "The debit would take the account past its floor.",
-  "code": "INSUFFICIENT_FUNDS"
+  "errors": [
+    {
+      "message": "The debit would take the account past its floor.",
+      "code": "INSUFFICIENT_FUNDS"
+    }
+  ]
 }
 ```
 
@@ -322,7 +340,7 @@ Other refusals you will meet here, each with `nothing recorded`:
 
 | `code` | When |
 |---|---|
-| `INVALID_POSTING_AMOUNT` | `0.00` or a negative amount — direction, not sign, carries the meaning — **or** an amount finer than the currency, e.g. `10.555` against a 2-decimal currency. One code, both conditions; `detail` tells you which |
+| `INVALID_POSTING_AMOUNT` | `0.00` or a negative amount — direction, not sign, carries the meaning — **or** an amount finer than the currency, e.g. `10.555` against a 2-decimal currency. One code, both conditions, and one message — the response does not tell you which of the two you hit |
 | `CURRENCY_MISMATCH` | Posting USD against an SGD account |
 | `ACCOUNT_FROZEN` | The account is frozen — it accepts nothing in either direction |
 | `ACCOUNT_DORMANT_DEBIT_REFUSED` | The account is dormant — it accepts credits only |
