@@ -1,5 +1,5 @@
+using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
-using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
@@ -16,13 +16,11 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
     {
         group.MapPost("/", async (
                 RecordPostingRequest req,
-                HttpRequest http,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.ToLedgerResponse(isCreated: true);
+                return result.Response(isCreated: !result.IsReplayed());
             })
             .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<PostingDto>(StatusCodes.Status201Created)
@@ -32,13 +30,11 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
 
         group.MapPost("batch", async (
                 RecordPostingBatchRequest req,
-                HttpRequest http,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                req = req with { IdempotencyKey = http.Headers["Idempotency-Key"] };
                 var result = await bus.Send(req, cancellationToken: ct);
-                return result.ToLedgerResponse(isCreated: true);
+                return result.Response(isCreated: !result.IsReplayed());
             })
             .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<IReadOnlyCollection<PostingDto>>(StatusCodes.Status201Created)
@@ -56,15 +52,15 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
         // silently rebind this request onto the generated handler instead of ReversePostingCommandHandler,
         // turning every reversal into an unhandled call to a throwing stub. Also: the generated composite's
         // MapActionById hardcodes the package's default FluentResults->IResult conversion (400 on any
-        // failure), which cannot express this service's LedgerErrors->422 mapping (R3,
-        // LedgerResultResponseExtensions.ToLedgerResponse) — so the route stays hand-mapped either way.
+        // failure), which cannot express this service's LedgerErrors->422 mapping (R3) — so the route stays
+        // hand-mapped either way.
         group.MapPost("{id:guid}/reverse", async (
                 Guid id,
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
                 var result = await bus.Send(new ReversePostingRequest { Id = id }, cancellationToken: ct);
-                return result.ToLedgerResponse();
+                return result.Response();
             })
             .RequireScope(group, ScopeNames.PostingsReverse)
             .Produces<PostingDto>()

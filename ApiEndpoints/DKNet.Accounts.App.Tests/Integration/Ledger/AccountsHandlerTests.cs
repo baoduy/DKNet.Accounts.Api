@@ -149,7 +149,9 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.AccountHoldsBalance);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.AccountHoldsBalance)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.AccountHoldsBalance}, got: {body}");
     }
 
     [Fact]
@@ -166,6 +168,29 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.UnsupportedCurrency);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.UnsupportedCurrency)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.UnsupportedCurrency}, got: {body}");
+    }
+
+    /// <summary>
+    /// GetById, Rename and ChangeMetadata are served by the generated composite's own default pattern
+    /// "{id}" (spec revision 13 §3, frozen — pr-reviewer round 1 finding 7's attempt to restore "{id:guid}"
+    /// by excluding these routes was reverted in round 2). The route still matches a malformed id; binding it
+    /// to the handler's Guid parameter is what fails, so the answer is 400, not a 404 route miss.
+    /// </summary>
+    [Theory]
+    [InlineData("GET", null, "")]
+    [InlineData("PUT", "Ignored", "")]
+    [InlineData("PUT", "Ignored", "/change-metadata")]
+    public async Task AMalformedId_StillMatchesTheRoute_AndIsAnsweredAsABadRequest(
+        string method, string? name, string suffix)
+    {
+        object? body = name is null ? null : new { name };
+        var request = AsPayHub(new HttpMethod(method), $"{AccountsPath}/not-a-guid{suffix}", body);
+
+        var response = await Client.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 }

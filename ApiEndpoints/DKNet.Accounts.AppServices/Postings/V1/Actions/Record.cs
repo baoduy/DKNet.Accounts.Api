@@ -1,3 +1,4 @@
+using DKNet.AspCore.Extensions.ModelBinding;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
@@ -9,10 +10,12 @@ using DKNet.Accounts.Domains.Share;
 namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
 /// <summary>
-/// Records a single credit or debit. <see cref="IdempotencyKey"/> is threaded in by the endpoint from the
-/// <c>Idempotency-Key</c> request header, scoped to the calling system. <see cref="RecordedBy"/> mirrors
-/// the contract's <c>recordedBy</c> body field — model-bound but never read: the calling system is always
-/// taken from the credential's <c>client_id</c> claim (§5), never from the request body.
+/// Records a single credit or debit. <see cref="IdempotencyKey"/> is populated from the <c>Idempotency-Key</c>
+/// request header via <see cref="FromRequestHeaderAttribute"/> — before validation and before the handler runs
+/// — scoped to the calling system. A caller-supplied value for this property is always overwritten, so it can
+/// never be forged through the request body (R3). <see cref="RecordedBy"/> mirrors the contract's
+/// <c>recordedBy</c> body field — model-bound but never read: the calling system is always taken from the
+/// credential's <c>client_id</c> claim (§5), never from the request body.
 /// </summary>
 public sealed record RecordPostingRequest : Fluents.Requests.IWitResponse<PostingDto>
 {
@@ -42,6 +45,7 @@ public sealed record RecordPostingRequest : Fluents.Requests.IWitResponse<Postin
 
     public string? RecordedBy { get; set; }
 
+    [FromRequestHeader("Idempotency-Key")]
     public string? IdempotencyKey { get; set; }
 }
 

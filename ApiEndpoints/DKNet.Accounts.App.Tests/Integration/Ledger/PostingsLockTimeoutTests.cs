@@ -87,7 +87,9 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.LockTimeout);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.LockTimeout)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.LockTimeout}, got: {body}");
     }
 
     [Fact]
@@ -103,7 +105,9 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.LockTimeout);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.LockTimeout)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.LockTimeout}, got: {body}");
     }
 
     [Fact]
@@ -116,6 +120,8 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.LockTimeout);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.LockTimeout)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.LockTimeout}, got: {body}");
     }
 }
