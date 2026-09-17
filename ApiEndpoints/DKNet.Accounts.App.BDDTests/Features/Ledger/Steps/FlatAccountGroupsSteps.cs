@@ -227,7 +227,9 @@ public sealed class FlatAccountGroupsSteps(HttpClient client, ScenarioState stat
     {
         ((int)state.Response!.StatusCode).ShouldBe(422);
         var doc = await ReadJsonAsync(state.Response!);
-        doc.GetProperty("code").GetString().ShouldBe(code);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == code)
+            .ShouldBeTrue($"expected an error carrying code {code}, got: {doc}");
     }
 
     [Then(@"""([^""]+)"" still holds that account with a balance of ([\d.]+) (\w+), and keeps its code, name and status")]

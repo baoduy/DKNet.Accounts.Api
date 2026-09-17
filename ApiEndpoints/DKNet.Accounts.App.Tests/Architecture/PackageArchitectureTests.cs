@@ -150,7 +150,7 @@ public class PackageArchitectureTests
     /// half belongs to the sibling Docs sub-task.
     /// </summary>
     [Fact]
-    public void AllDKNetPackageReferences_ShouldResolveToRelease10129()
+    public void AllDKNetPackageReferences_ShouldResolveToRelease1100()
     {
         var srcDir = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "../../../../.."));

@@ -437,7 +437,8 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [When(@"it closes the group")]
     public async Task WhenItClosesTheGroup() =>
         // DRK-1418 §3 row 1/row 8: Close is now [CrudAction]-generated onto its own POST {id}/close route;
-        // the GROUP_HOLDS_BALANCE refusal moved into CloseAccountGroupRequestValidator.
+        // the GROUP_HOLDS_BALANCE refusal now lives in the hand-written CloseAccountGroupHandler (DRK-1522
+        // §3 row 9).
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Post, $"{GroupsPath}/{LastGroupId}/close");
 
@@ -667,7 +668,9 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     public async Task ThenTheRefusalCarriesTheCode(string expectedCode)
     {
         var doc = await ReadJsonAsync(state.Response!);
-        doc.GetProperty("code").GetString().ShouldBe(expectedCode);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == expectedCode)
+            .ShouldBeTrue($"expected an error carrying code {expectedCode}, got: {doc}");
     }
 
     [Then(@"it receives the original posting")]
@@ -721,7 +724,9 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var doc = await ReadJsonAsync(state.Response!);
-        doc.GetProperty(LedgerErrors.CodeKey).GetString().ShouldBe(expectedCode);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == expectedCode)
+            .ShouldBeTrue($"expected an error carrying code {expectedCode}, got: {doc}");
     }
 
     [Then(@"the account group ""([^""]+)"" still exists")]

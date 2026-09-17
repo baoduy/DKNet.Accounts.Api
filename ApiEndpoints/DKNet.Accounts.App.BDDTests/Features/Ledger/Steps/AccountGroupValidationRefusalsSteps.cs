@@ -276,7 +276,9 @@ public sealed class AccountGroupValidationRefusalsSteps(HttpClient client, Scena
         var other = _firstRaceResponse!.StatusCode == HttpStatusCode.Created ? _secondRaceResponse! : _firstRaceResponse!;
         other.IsSuccessStatusCode.ShouldBeFalse($"expected the other request to be refused, got {(int)other.StatusCode}");
         var doc = await ReadJsonAsync(other);
-        doc.GetProperty("code").GetString().ShouldBe(expectedCode);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == expectedCode)
+            .ShouldBeTrue($"expected an error carrying code {expectedCode}, got: {doc}");
     }
 
     [Then(@"exactly one account group holds the code ""([^""]+)""")]

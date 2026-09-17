@@ -102,22 +102,3 @@ internal sealed class ActivateAccountGroupHandler(
     }
 }
 
-/// <summary>Generated action handler for AccountGroup.Close. Write a class implementing the same IHandler to replace it.</summary>
-internal sealed class CloseAccountGroupHandler(
-    global::DKNet.EfCore.Specifications.Repositories.IRepositorySpec repository,
-    global::MapsterMapper.IMapper mapper)
-    : global::DKNet.SlimBus.Extensions.Fluents.Requests.IHandler<CloseAccountGroupRequest, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>
-{
-    /// <inheritdoc />
-    public async global::System.Threading.Tasks.Task<global::FluentResults.IResult<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>> OnHandle(
-        CloseAccountGroupRequest request, global::System.Threading.CancellationToken cancellationToken)
-    {
-        var entity = await repository.FirstOrDefaultAsync(new AccountGroupByIdCrudSpec(request.Id), cancellationToken);
-        if (entity is null)
-            return global::FluentResults.Result.Fail<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(
-                new global::DKNet.SlimBus.Extensions.NotFoundError($"AccountGroup '{request.Id}' was not found."));
-        entity.Close();
-        return global::DKNet.SlimBus.Extensions.LazyMapper.LazyMapExtensions.ResultOf<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(mapper, entity);
-    }
-}
-

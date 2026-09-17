@@ -149,7 +149,9 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.AccountHoldsBalance);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.AccountHoldsBalance)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.AccountHoldsBalance}, got: {body}");
     }
 
     [Fact]
@@ -166,6 +168,8 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe(LedgerErrors.UnsupportedCurrency);
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.UnsupportedCurrency)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.UnsupportedCurrency}, got: {body}");
     }
 }
