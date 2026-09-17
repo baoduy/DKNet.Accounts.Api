@@ -193,14 +193,14 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
 | `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
 | `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
-| `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); unknown or malformed id → `404` |
-| `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Unknown or malformed id → `404` |
+| `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
+| `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
 | `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
-| `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}` | Rename an account. Body: `name`. Returns `200` + the account | `accounts.write` | Unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}/change-metadata` | Change an account's metadata. Body: `metadata` | `accounts.write` | Unknown id → `404` |
+| `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}` | Rename an account. Body: `name`. Returns `200` + the account | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}/change-metadata` | Change an account's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
 | `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
