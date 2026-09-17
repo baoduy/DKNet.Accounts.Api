@@ -45,12 +45,10 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 .Configure("Activate", b => b.WithDescription("Reactivate a closed account group.")));
 
         // Close (request/handler GEN from [CrudAction] on AccountGroup.Close, DRK-1418 §3 row 1; route HAND,
-        // §3 row 8 deviation): the generated composite's MapActionById binds its command from the JSON body
-        // only and requires one — every close call sends none, since the id comes entirely from the route —
-        // so the route is hand-mapped instead, constructing the request from the route id and running
-        // CloseAccountGroupRequestValidator explicitly before dispatch (FluentValidation's endpoint
-        // auto-validation only inspects arguments already bound to the delegate, so it would never see a
-        // request built after binding completes either way).
+        // §3 row 8 deviation): stays hand-mapped so CloseAccountGroupRequestValidator's GROUP_HOLDS_BALANCE
+        // refusal runs explicitly before dispatch — a generated route has nowhere to run it (FluentValidation's
+        // endpoint auto-validation only inspects arguments already bound to the delegate, so it would never see
+        // a request built after binding completes either way).
         group.MapPost("{id:guid}/close", async (
                 Guid id,
                 IMessageBus bus,

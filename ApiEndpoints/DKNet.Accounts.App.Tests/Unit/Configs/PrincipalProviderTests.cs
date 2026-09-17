@@ -92,6 +92,7 @@ public sealed class PrincipalProviderTests
     [Fact]
     public void GetCurrentUser_ShouldReturnNull_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
     {
+        // R3 — deny-closed, never a shared placeholder.
         var provider = CreateProvider(AuthenticatedContext());
 
         provider.GetCurrentUser().ShouldBeNull();
@@ -124,15 +125,6 @@ public sealed class PrincipalProviderTests
         var provider = CreateProvider(AuthenticatedContext(new Claim("client_id", "   ")));
 
         provider.GetCurrentUser().ShouldBeNull();
-    }
-
-    [Fact]
-    public void GetCurrentUser_ShouldBeNullOrEmpty_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
-    {
-        // R3 — deny-closed, never a shared placeholder.
-        var provider = CreateProvider(AuthenticatedContext());
-
-        provider.GetCurrentUser().ShouldBeNullOrEmpty();
     }
 
     [Fact]
