@@ -27,8 +27,8 @@ repeats it. The account-groups endpoint declares the same way, over its own four
 (`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs:23-24`).
 
 A declaration applies to **every** route the group registers for that method, including routes the
-CRUD generator produces — `MapAccountGroupCrud` registers seven routes and none of them names a
-scope.
+CRUD generator produces — `MapAccountGroupCrud` registers the account group's whole route set, and no
+route in it names a scope of its own. `MapAccountCrud` does the same for accounts.
 
 The declaration is applied through a `Finally` convention on the group, which runs after every other
 convention on each endpoint (`GroupScopeAuthorization.cs:52`). That is what lets a single route

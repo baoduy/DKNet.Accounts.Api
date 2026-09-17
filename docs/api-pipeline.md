@@ -349,11 +349,16 @@ Two consequences worth planning for in this template:
 
 ## FluentValidation auto-validation
 
-`DKNet.Accounts.Api/Configs/FluentValidationConfig.cs` registers `AddFluentValidationAutoValidation()` and
-scans the `AppServices` assembly for `AbstractValidator<T>` implementations — for example
-`CreatePurchaseOrderCommandValidator` next to `CreatePurchaseOrderRequest`. A request failing
-validation never reaches a handler. It short-circuits to a `400` with FluentValidation's
-problem-details shape, with no handler code involved.
+`DKNet.Accounts.Api/Configs/FluentValidationConfig.cs` scans the `AppServices` assembly for
+`AbstractValidator<T>` implementations — for example `CreateAccountGroupCommandValidator` next to
+`CreateAccountGroupRequest` — and registers every one it finds, internal types included. A request
+whose body fails validation never reaches a handler: the endpoint filter the package's mappers add
+short-circuits it before dispatch, with no handler code involved.
+
+What that short-circuit answers *with* is not a shape of its own. Refused input is one of the three
+failure kinds the same file's single `AddErrorResponses(...)` call shapes — see
+[Global exception handling](#global-exception-handling) for the body and the status rules, which are
+the same ones a refused command and an unhandled error answer through.
 
 ## Idempotency on POST
 
@@ -412,24 +417,34 @@ which is an outage rather than a rate limit. Treat the shipped numbers as a plac
 
 ## Global exception handling
 
-`DKNet.Accounts.Api/Configs/GlobalExceptions/GlobalExceptionHandler.cs` is registered as the app's
-`IExceptionHandler`. Any unhandled exception from a handler becomes a `ProblemDetails` response:
+One registered setting covers every way a request can fail. `DKNet.Accounts.Api/Configs/FluentValidationConfig.cs`
+calls `AddErrorResponses(...)` once, passing `DKNet.Accounts.Api/Configs/GlobalExceptions/LedgerErrorResponseOptions.cs`'s
+two callbacks, and that one registration shapes all three failure kinds: a command handler returning a
+failed `Result`, refused request input, and an unhandled exception.
 
-- `Status` = `500`
-- `Title` = `"Something went wrong!."`
-- `Detail` and `Type` depend on the hosting environment:
-  - in `Development` — `Detail` is the exception's message and `Type` is the exception's type name;
-  - outside `Development` (Staging, Production) — `Detail` is the fixed generic string
-    `"An unexpected error occurred. Quote the trace-id when reporting this."` and the response
-    carries no `type` member at all.
-- a `trace-id` extension (the request's `TraceIdentifier`)
-- `Instance` = `"{Method} {Path}"`
+**The host writes no exception-handling code of its own.** `AddErrorResponses` registers the
+`IExceptionHandler` *and* the startup filter that adds the `UseExceptionHandler()` step, so there is no
+`IExceptionHandler` implementation in this repository and no `UseExceptionHandler()` or
+`AddProblemDetails()` line in `Program.cs`. It may be called only once — a second call is a no-op and
+the first call's configuration wins — which is why every stable code is registered in that single place.
 
-The `trace-id` and `Instance` values are added by
-`DKNet.Accounts.Api/Configs/GlobalExceptions/GlobalExceptionConfigs.cs`'s `CustomizeProblemDetails`. Once
-the detail is generic, that `trace-id` is the correlation handle a caller quotes when reporting the
-error — it is the only way to tie the response back to the logged exception. A client never sees a
-raw stack trace.
+Every one of the three answers with the same body — `title`, `status`, `type` (the final status' own
+name, never an exception's type name), `traceId`, and an `errors` list of
+`{ message, code, field }` entries. There is no `detail` member on any of them. The two callbacks decide
+only the status and what is added to that body:
+
+- `LedgerErrorResponseOptions.StatusCode` answers `422` when the failure carries one of the service's
+  stable `LedgerErrors` codes, and `null` — keep the status the failure would have had anyway — for
+  everything else, so a shape rule still refuses input with `400` and a missing record still answers
+  `404`.
+- `LedgerErrorResponseOptions.Customize` puts the matched stable code on the body. It runs for all
+  three failure kinds, so anything added there appears on every error response the service returns.
+
+**An unhandled exception discloses nothing.** Outside a `Development` run its `errors` entry carries one
+fixed message and nothing the exception itself carried — no message of its own, no type name, no stack
+trace; inside `Development` that entry carries the exception's own message. The body's `traceId` is the
+correlation handle a caller quotes when reporting one: it is the only way to tie the response the caller
+saw back to the logged exception.
 
 ## Health checks and OpenAPI/Scalar
 
