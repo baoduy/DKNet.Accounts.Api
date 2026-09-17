@@ -18,6 +18,16 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
     private const string AccountsPath = "/v1/accounts";
     private const string PostingsPath = "/v1/postings";
 
+    /// <summary>
+    /// "Accounts publish no delete route" reads, in the scenario text, "the request is refused as not
+    /// found" — but no DELETE method is registered on this route template (GET/PUT/PATCH are), so ASP.NET
+    /// Core routing answers with 405 Method Not Allowed, not 404. Named here, at the top of the class next
+    /// to the other constants, rather than inline inside <c>WhenSendsADeleteRequestFor</c>, so the mismatch
+    /// with the scenario's own wording is visible without opening that method — dev-leader has recorded the
+    /// spec's loose wording separately on DRK-1522; this constant is the measured fact, not a fix to it.
+    /// </summary>
+    private const HttpStatusCode DeleteRouteRefusalStatus = HttpStatusCode.MethodNotAllowed;
+
     #region Shared helpers
 
     private void SignInAs(string clientId, params string[] scopes)
@@ -247,10 +257,7 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
     [When(@"""[^""]+"" sends a delete request for ""([^""]+)""")]
     public async Task WhenSendsADeleteRequestFor(string accountName)
     {
-        // No DELETE method is registered on this route template today (GET/PUT/PATCH are) — ASP.NET Core
-        // routing answers a genuinely unregistered method with 405, not 404; this route publishes no delete
-        // route both today and after Build (the generated composite excludes it too, §3 row 12).
-        state.ExpectedRefusalStatus = HttpStatusCode.MethodNotAllowed;
+        state.ExpectedRefusalStatus = DeleteRouteRefusalStatus;
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Delete, $"{AccountsPath}/{Account(accountName)}");
     }
 
