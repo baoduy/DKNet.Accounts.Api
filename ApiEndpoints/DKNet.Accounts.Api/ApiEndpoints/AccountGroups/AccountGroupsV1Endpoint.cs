@@ -18,13 +18,15 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
     public void Map(RouteGroupBuilder group)
     {
         // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
-        // ChangeMetadata) all now register through one generated composite (DRK-1440 §3 rows 1-3). Close and
-        // activate stay excluded BY NAME (R1): each is a [CrudAction] whose generated composite route binds
-        // its command from the JSON body and requires one, but every call sends none (the id comes entirely
-        // from the route) — DKNet gap DRK-1436, so both stay hand-mapped below (§3 row 5). Rename must stay the
-        // first [CrudUpdate] declared on AccountGroup or it loses its plain "{id}" PUT route.
+        // ChangeMetadata) all now register through one generated composite (DRK-1440 §3 rows 1-3). Close stays
+        // excluded BY NAME (R1): it is a [CrudAction] whose refusal rule (still holds a balance) runs where a
+        // generated route cannot reach it, so it stays hand-mapped below. Activate has no such rule and, on
+        // DKNet 10.1.29, the generator now maps a parameterless [CrudAction] with MapParameterlessActionById
+        // (DRK-1436 fixed), so it rides the generated composite instead of the hand-mapped route this endpoint
+        // used before. Rename must stay the first [CrudUpdate] declared on AccountGroup or it loses its plain
+        // "{id}" PUT route.
         group.MapAccountGroupCrud(o => o
-                .Exclude("Close", "Activate")
+                .Exclude("Close")
                 .Configure(CrudOp.GetById, b => b.RequireScope(group, ScopeNames.AccountsRead))
                 .Configure(CrudOp.GetList, b => b.RequireScope(group, ScopeNames.AccountsRead))
                 .Configure(CrudOp.Create, b => b.RequireScope(group, ScopeNames.AccountsWrite))
@@ -37,7 +39,8 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 .Configure("Rename", b => b.WithDescription("Rename an account group."))
                 .Configure("ChangeDescription", b => b.WithDescription("Change an account group's description."))
                 .Configure("ChangeMetadata", b => b.WithDescription("Change an account group's metadata."))
-                .Configure("Delete", b => b.WithDescription("Delete an account group. Refused while the group still holds any account.")));
+                .Configure("Delete", b => b.WithDescription("Delete an account group. Refused while the group still holds any account."))
+                .Configure("Activate", b => b.RequireScope(group, ScopeNames.AccountsWrite).WithDescription("Reactivate a closed account group.")));
 
         // Close (request/handler GEN from [CrudAction] on AccountGroup.Close, DRK-1418 §3 row 1; route HAND,
         // §3 row 8 deviation): the generated composite's MapActionById binds its command from the JSON body
@@ -65,21 +68,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountGroupDto>()
             .WithDescription("Close an account group. Refused while any account it holds still carries a balance.");
-
-        // Activate (request/handler GEN from [CrudAction] on AccountGroup.Activate, DRK-1418 §3 row 1; route
-        // HAND for the same reason as Close — no other properties to bind from an empty body). No business
-        // refusal, so no validator to run.
-        group.MapPost("{id:guid}/activate", async (
-                Guid id,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var result = await bus.Send(new ActivateAccountGroupRequest { Id = id }, cancellationToken: ct);
-                return result.ToLedgerResponse();
-            })
-            .RequireScope(group, ScopeNames.AccountsWrite)
-            .Produces<AccountGroupDto>()
-            .WithDescription("Reactivate a closed account group.");
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,
