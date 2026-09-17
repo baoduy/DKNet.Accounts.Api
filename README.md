@@ -204,8 +204,8 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
 | `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
-| `POST` | `/v1/postings` | Record one credit or debit. `Idempotency-Key` header. Returns `201` + the posting | `postings.write` | Every posting refusal below |
-| `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. `Idempotency-Key` header | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
+| `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
+| `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
 | `POST` | `/v1/postings/{id}/reverse` | Reverse a posting | `postings.reverse` | Already reversed (`POSTING_ALREADY_REVERSED`); the account's status does not accept a movement in the reversal's own direction |
 
@@ -309,10 +309,14 @@ the `scp` or `scope` claim (space-separated) and are per operation class:
 
 Read never implies write, and posting never implies reversing.
 
-**Idempotency.** `POST /v1/postings` and `POST /v1/postings/batch` take an `Idempotency-Key` request
-header. The key is scoped to `(calling system, key)`, so two systems may reuse the same key
-independently. Same key with the same content returns the original outcome with `200` and records
-nothing new; same key with different content is refused `409 IDEMPOTENCY_KEY_CONFLICT`.
+**Idempotency.** `POST /v1/postings` and `POST /v1/postings/batch` both declare `Idempotency-Key` as a
+header parameter on the operation itself — it is part of each operation's published contract, listed as a
+header parameter in the OpenAPI document, not a value the route digs out of the request by hand. A key
+placed in the request body instead is ignored: the declared header source overwrites that member before
+validation, so two body-only requests carrying the same key record two separate postings rather than
+replaying. The key's meaning is unchanged. It is scoped to `(calling system, key)`, so two systems may
+reuse the same key independently. Same key with the same content returns the original outcome with `200`
+and records nothing new; same key with different content is refused `409 IDEMPOTENCY_KEY_CONFLICT`.
 
 A key is also effectively scoped to the endpoint that first used it. The two routes compute their
 content signatures differently by construction, so a key used first on `POST /v1/postings` and then on

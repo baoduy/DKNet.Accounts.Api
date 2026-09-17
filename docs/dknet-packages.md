@@ -14,7 +14,7 @@ wires up. Follow a package's link for its full API surface.
 ## Wired by this template
 
 This table is verified against the `.csproj` files under `ApiEndpoints/`. Every DKNet package is pinned at
-**11.0.0** in `Directory.Packages.props`, and
+**12.0.0** in `Directory.Packages.props`, and
 `DKNet.Accounts.App.Tests/Architecture/PackageArchitectureTests.cs` fails the build if those pins ever
 straddle two releases — it asserts that every `DKNet.*` pin resolves to the *same* release, whichever
 release that is, so moving them all together needs no test edit while a partial bump fails. Two
