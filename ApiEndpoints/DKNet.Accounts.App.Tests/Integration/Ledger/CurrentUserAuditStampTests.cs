@@ -14,7 +14,9 @@ namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 /// feature in place" and "…records the signed-in user as the last editor of a change". R1: a test that passes
 /// only because both the old ownership-key path and the new signed-in-user path read the same claim does not
 /// satisfy either scenario — <see cref="NoTenantOwnershipApiFixture"/> removes <c>IDataOwnerProvider</c> and
-/// its hook entirely, so today (before <c>PrincipalProvider</c>/<c>ServiceConfigs</c> migrate onto
+/// its hook entirely (matched by service-type name, since this test project carries no compile-time
+/// reference to <c>DKNet.EfCore.DataAuthorization</c>), so today (before <c>PrincipalProvider</c>/
+/// <c>ServiceConfigs</c> migrate onto
 /// <c>ICurrentUserProvider</c>) nothing stamps <c>CreatedBy</c>/<c>UpdatedBy</c> at all — both tests below are
 /// RED on that plain, nameable assertion failure.
 /// </summary>
