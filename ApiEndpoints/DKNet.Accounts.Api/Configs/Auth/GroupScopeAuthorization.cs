@@ -73,23 +73,33 @@ internal static class GroupScopeAuthorization
             return;
         }
 
+        // Every endpoint a RouteGroupBuilder's Map* methods produce is a RouteEndpointBuilder; a route mapped
+        // through .Map (no verb restriction) carries no IHttpMethodMetadata at all, since it serves every verb.
+        var routePattern = ((RouteEndpointBuilder)endpoint).RoutePattern.RawText!;
         var methods = endpoint.Metadata.OfType<IHttpMethodMetadata>().SelectMany(m => m.HttpMethods).ToArray();
-        foreach (var method in methods)
+        if (methods.Length == 0)
         {
-            if (methodScopes.TryGetValue(method, out var scope))
-            {
-                endpoint.Metadata.Add(new AuthorizeAttribute(scope));
-                return;
-            }
+            // A verb-less route serves every HTTP method, so no per-method declaration can ever cover it (R5's
+            // "*" case) — refuse rather than silently letting it slip through as GET-shaped coverage.
+            endpoint.Metadata.Add(new UncoveredGroupScopeRoute(routePattern, "*"));
+            return;
         }
 
-        // Nothing covers this method: no group declaration, no per-route scope, no AllowAnonymous. Tag it so
-        // EnsureGroupScopeCoverage can find it later without re-deriving the same lookup against a raw
-        // Endpoint (which no longer knows which RouteGroupBuilder it came from). Every endpoint a
-        // RouteGroupBuilder's Map* methods produce is a RouteEndpointBuilder carrying exactly one HTTP method
-        // (that's what the earlier IHttpMethodMetadata lookup just read), so both are always present here.
-        var routeName = ((RouteEndpointBuilder)endpoint).RoutePattern.RawText!;
-        endpoint.Metadata.Add(new UncoveredGroupScopeMethod(routeName, methods[0]));
+        // Refuse on ANY served method the group never declared — a route serving several methods (e.g.
+        // MapMethods(["GET", "POST"])) is only covered when every one of them is, not merely the first match.
+        var uncoveredMethod = methods.FirstOrDefault(method => !methodScopes.ContainsKey(method));
+        if (uncoveredMethod is not null)
+        {
+            // Tag it so EnsureGroupScopeCoverage can find it later without re-deriving the same lookup against
+            // a raw Endpoint (which no longer knows which RouteGroupBuilder it came from).
+            endpoint.Metadata.Add(new UncoveredGroupScopeRoute(routePattern, uncoveredMethod));
+            return;
+        }
+
+        foreach (var scope in methods.Select(method => methodScopes[method]).Distinct(StringComparer.Ordinal))
+        {
+            endpoint.Metadata.Add(new AuthorizeAttribute(scope));
+        }
     }
 
     /// <summary>
@@ -100,23 +110,24 @@ internal static class GroupScopeAuthorization
     /// violating group and call this directly, without registering it into <c>Program.cs</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// A declaring group serves a method with no coverage. The message names the group and the method (R5).
+    /// A declaring group serves a method with no coverage. The message names the route pattern and the method,
+    /// `*` for a verb-less route that serves every method (R5).
     /// </exception>
     public static void EnsureGroupScopeCoverage(IEnumerable<Endpoint> endpoints)
     {
         foreach (var endpoint in endpoints)
         {
-            var uncovered = endpoint.Metadata.GetMetadata<UncoveredGroupScopeMethod>();
+            var uncovered = endpoint.Metadata.GetMetadata<UncoveredGroupScopeRoute>();
             if (uncovered is not null)
             {
                 throw new InvalidOperationException(
-                    $"Endpoint group '{uncovered.GroupName}' serves HTTP {uncovered.Method} with no declared " +
-                    "group scope, per-route scope, or AllowAnonymous.");
+                    $"Route '{uncovered.RoutePattern}' serves HTTP {uncovered.Method} with no declared group " +
+                    "scope, per-route scope, or AllowAnonymous.");
             }
         }
     }
 
-    private sealed record UncoveredGroupScopeMethod(string GroupName, string Method);
+    private sealed record UncoveredGroupScopeRoute(string RoutePattern, string Method);
 }
 
 /// <summary>
