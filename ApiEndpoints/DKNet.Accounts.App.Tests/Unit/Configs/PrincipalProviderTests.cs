@@ -8,29 +8,28 @@ using Moq;
 namespace DKNet.Accounts.App.Tests.Unit.Configs;
 
 /// <summary>
-/// Unit-level coverage of <see cref="PrincipalProvider"/>'s claim resolution — the row-level authorization
-/// boundary <c>DataOwnerHook</c>/<c>DataOwnerAuthQuery</c> stamp and filter on. Exercised directly against a
+/// Unit-level coverage of <see cref="PrincipalProvider"/>'s claim resolution — the signed-in user
+/// <c>EfCoreAuditHook</c> stamps <c>CreatedBy</c>/<c>UpdatedBy</c> from. Exercised directly against a
 /// fake <see cref="IHttpContextAccessor"/> so every claim shape (present/absent/empty, GUID/non-GUID,
-/// precedence order) is reachable without booting a host. Isolation-under-real-query-filtering and the
-/// deny-closed read path belong at the integration level, alongside whatever feature next owns
-/// data — this class proves the key the filter is fed, not the filter itself.
+/// precedence order) is reachable without booting a host — this class proves the value the stamp is fed,
+/// not the stamp itself.
 /// </summary>
 public sealed class PrincipalProviderTests
 {
     #region Methods
 
     [Fact]
-    public void GetOwnershipKey_ShouldReturnRawGuidSubject_WhenNameIdentifierIsAGuid()
+    public void GetCurrentUser_ShouldReturnRawGuidSubject_WhenNameIdentifierIsAGuid()
     {
         var provider = CreateProvider(AuthenticatedContext(
             new Claim(ClaimTypes.NameIdentifier, "11111111-2222-3333-4444-555555555555")));
 
-        provider.GetOwnershipKey().ShouldBe("11111111-2222-3333-4444-555555555555");
+        provider.GetCurrentUser().ShouldBe("11111111-2222-3333-4444-555555555555");
         provider.ProfileId.ShouldBe(Guid.Parse("11111111-2222-3333-4444-555555555555"));
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldReturnDistinctKeys_ForTwoCallersWithDifferentNonGuidSubjects()
+    public void GetCurrentUser_ShouldReturnDistinctKeys_ForTwoCallersWithDifferentNonGuidSubjects()
     {
         // The regression this cycle exists to prevent: a collapse makes every caller resolve to the SAME
         // value, so the assertion must compare two independently-resolved instances against each other, not
@@ -40,8 +39,8 @@ public sealed class PrincipalProviderTests
         var providerB = CreateProvider(AuthenticatedContext(
             new Claim(ClaimTypes.NameIdentifier, "opaque-subject-b")));
 
-        var keyA = providerA.GetOwnershipKey();
-        var keyB = providerB.GetOwnershipKey();
+        var keyA = providerA.GetCurrentUser();
+        var keyB = providerB.GetCurrentUser();
 
         keyA.ShouldBe("opaque-subject-a");
         keyB.ShouldBe("opaque-subject-b");
@@ -51,7 +50,7 @@ public sealed class PrincipalProviderTests
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldPreferObjectIdentifier_OverNameIdentifier()
+    public void GetCurrentUser_ShouldPreferObjectIdentifier_OverNameIdentifier()
     {
         // The Entra v2.0 shape that motivated the finding: oid is a GUID, NameIdentifier (sub) is opaque.
         var provider = CreateProvider(AuthenticatedContext(
@@ -59,83 +58,73 @@ public sealed class PrincipalProviderTests
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             new Claim(ClaimTypes.NameIdentifier, "opaque-pairwise-sub")));
 
-        provider.GetOwnershipKey().ShouldBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        provider.GetCurrentUser().ShouldBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldFallBackToOid_WhenObjectIdentifierClaimIsAbsent()
+    public void GetCurrentUser_ShouldFallBackToOid_WhenObjectIdentifierClaimIsAbsent()
     {
         var provider = CreateProvider(AuthenticatedContext(
             new Claim("oid", "bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
             new Claim(ClaimTypes.NameIdentifier, "opaque-pairwise-sub")));
 
-        provider.GetOwnershipKey().ShouldBe("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+        provider.GetCurrentUser().ShouldBe("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldFallBackToSub_WhenNoOtherSubjectClaimResolves()
+    public void GetCurrentUser_ShouldFallBackToSub_WhenNoOtherSubjectClaimResolves()
     {
         var provider = CreateProvider(AuthenticatedContext(new Claim("sub", "opaque-sub-only")));
 
-        provider.GetOwnershipKey().ShouldBe("opaque-sub-only");
+        provider.GetCurrentUser().ShouldBe("opaque-sub-only");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldSkipEmptyClaimValue_AndFallThroughToNextInPrecedence()
+    public void GetCurrentUser_ShouldSkipEmptyClaimValue_AndFallThroughToNextInPrecedence()
     {
         var provider = CreateProvider(AuthenticatedContext(
             new Claim("oid", "   "),
             new Claim(ClaimTypes.NameIdentifier, "opaque-pairwise-sub")));
 
-        provider.GetOwnershipKey().ShouldBe("opaque-pairwise-sub");
+        provider.GetCurrentUser().ShouldBe("opaque-pairwise-sub");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldReturnNull_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
+    public void GetCurrentUser_ShouldReturnNull_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
     {
+        // R3 — deny-closed, never a shared placeholder.
         var provider = CreateProvider(AuthenticatedContext());
 
-        provider.GetOwnershipKey().ShouldBeNull();
+        provider.GetCurrentUser().ShouldBeNull();
     }
 
     /// <summary>DRK-1277 §11/§12: the fallback that lets a real machine-to-machine credential (no subject
     /// claim at all) still resolve an ownership key, the same "client_id" claim
     /// <see cref="DKNet.Accounts.Api.Configs.Handlers.CallingSystemAccessor"/> reads.</summary>
     [Fact]
-    public void GetOwnershipKey_ShouldFallBackToClientId_WhenNoSubjectClaimIsPresent()
+    public void GetCurrentUser_ShouldFallBackToClientId_WhenNoSubjectClaimIsPresent()
     {
         var provider = CreateProvider(AuthenticatedContext(new Claim("client_id", "PayHub")));
 
-        provider.GetOwnershipKey().ShouldBe("PayHub");
+        provider.GetCurrentUser().ShouldBe("PayHub");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldPreferSubjectClaim_OverClientId_WhenBothArePresent()
+    public void GetCurrentUser_ShouldPreferSubjectClaim_OverClientId_WhenBothArePresent()
     {
         var provider = CreateProvider(AuthenticatedContext(
             new Claim(ClaimTypes.NameIdentifier, "opaque-pairwise-sub"),
             new Claim("client_id", "PayHub")));
 
-        provider.GetOwnershipKey().ShouldBe("opaque-pairwise-sub");
+        provider.GetCurrentUser().ShouldBe("opaque-pairwise-sub");
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldReturnNull_WhenClientIdClaimValueIsEmpty()
+    public void GetCurrentUser_ShouldReturnNull_WhenClientIdClaimValueIsEmpty()
     {
         var provider = CreateProvider(AuthenticatedContext(new Claim("client_id", "   ")));
 
-        provider.GetOwnershipKey().ShouldBeNull();
-    }
-
-    [Fact]
-    public void GetAccessibleKeys_ShouldBeEmpty_WhenAuthenticatedCallerHasNoResolvableSubjectClaim()
-    {
-        // R3 — deny-closed, never a shared placeholder. Assert emptiness of the collection itself, not just
-        // that the key is null: an equality check on the key alone would not catch a default implementation
-        // that still wraps a null/blank key into a non-empty collection.
-        var provider = CreateProvider(AuthenticatedContext());
-
-        provider.GetAccessibleKeys().ShouldBeEmpty();
+        provider.GetCurrentUser().ShouldBeNull();
     }
 
     [Fact]
@@ -147,27 +136,26 @@ public sealed class PrincipalProviderTests
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldBeSystemAccount_WhenCallerIsUnauthenticated()
+    public void GetCurrentUser_ShouldBeSystemAccount_WhenCallerIsUnauthenticated()
     {
         var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) };
         var provider = CreateProvider(context);
 
-        provider.GetOwnershipKey().ShouldBe(SharedConsts.SystemAccount);
+        provider.GetCurrentUser().ShouldBe(SharedConsts.SystemAccount);
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldBeNull_WhenNoHttpContextIsAvailable()
+    public void GetCurrentUser_ShouldBeNull_WhenNoHttpContextIsAvailable()
     {
         var accessor = new Mock<IHttpContextAccessor>();
         accessor.Setup(a => a.HttpContext).Returns((HttpContext?)null);
         IPrincipalProvider provider = new PrincipalProvider(accessor.Object);
 
-        provider.GetOwnershipKey().ShouldBeNull();
-        provider.GetAccessibleKeys().ShouldBeEmpty();
+        provider.GetCurrentUser().ShouldBeNull();
     }
 
     [Fact]
-    public void GetOwnershipKey_ShouldResolveOnce_AndNotReactToClaimsChangedAfterFirstRead()
+    public void GetCurrentUser_ShouldResolveOnce_AndNotReactToClaimsChangedAfterFirstRead()
     {
         // Memoisation guard: a scoped instance resolves identity once per HttpContext, not on every property
         // read — otherwise an unresolved principal would re-run resolution (and any future logging/telemetry
@@ -175,10 +163,10 @@ public sealed class PrincipalProviderTests
         var context = AuthenticatedContext(new Claim(ClaimTypes.NameIdentifier, "first-subject"));
         var provider = CreateProvider(context);
 
-        var first = provider.GetOwnershipKey();
+        var first = provider.GetCurrentUser();
 
         context.User = BuildPrincipal(new Claim(ClaimTypes.NameIdentifier, "second-subject"));
-        var second = provider.GetOwnershipKey();
+        var second = provider.GetCurrentUser();
 
         first.ShouldBe("first-subject");
         second.ShouldBe("first-subject");

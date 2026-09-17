@@ -31,7 +31,7 @@ of the same output.
 | Mode | Exemplar | Shape |
 |---|---|---|
 | `manual` | `ManualSample` / `PurchaseOrder` | Every request, validator, handler, spec, DTO, and route is a file you write. Enforced validation, `.RequiredIdempotentKey()` on create, `[FromClaim]` acting user. |
-| `auto` | `AutomatedSample` / `Product` | `[RaisesEvent]` / `[CrudCreate]` / `[CrudUpdate]` / `[CrudAction]` on the entity plus a one-line `[GenerateDto]`. Requests, handlers, and routes are generated. No idempotency, **validation not enforced**, acting user via `DataOwnerHook`. |
+| `auto` | `AutomatedSample` / `Product` | `[RaisesEvent]` / `[CrudCreate]` / `[CrudUpdate]` / `[CrudAction]` on the entity plus a one-line `[GenerateDto]`. Requests, handlers, and routes are generated. No idempotency, **validation not enforced**, acting user via the `DKNet.EfCore.AuditLogs` audit hook. |
 
 If `mode=` was not supplied, apply §1 of the lifecycle skill, **recommend one with a reason**, and ask
 the user to confirm. Default to `manual` whenever the request mentions a business rule, state

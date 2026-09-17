@@ -63,5 +63,5 @@ both — never hand-edit the SVG.
   HTTP method, overriding one route, and the startup refusal.
 - [SlimMessageBus Messaging](slimbus-messaging.md) — the command/query/event bus wiring.
 - [EF Core Domain Events](efcore-events.md) — how domain events are collected and published.
-- [Auditing and Data Ownership](auditing-and-data-ownership.md) — how audit fields get populated
+- [Auditing and Acting-User Attribution](auditing-and-data-ownership.md) — how audit fields get populated
   and can't be forged.

@@ -1,19 +1,12 @@
 using DKNet.EfCore.Abstractions.Entities;
-using DKNet.EfCore.DataAuthorization;
+using DKNet.EfCore.AuditLogs;
 
 namespace DKNet.Accounts.Infra.Contexts;
 
-internal class CoreDbContext(DbContextOptions options, IEnumerable<IDataOwnerProvider>? dataKeyProviders = null)
-    : DbContext(options), IDataOwnerDbContext
+internal class CoreDbContext(DbContextOptions options, IEnumerable<ICurrentUserProvider>? currentUserProviders = null)
+    : DbContext(options)
 {
-    #region Properties
-
-    public IEnumerable<string> AccessibleKeys =>
-        _dataKeyProvider is not null ? _dataKeyProvider.GetAccessibleKeys() : [];
-
-    #endregion
-
-    private readonly IDataOwnerProvider? _dataKeyProvider = dataKeyProviders?.FirstOrDefault();
+    private readonly ICurrentUserProvider? _currentUserProvider = currentUserProviders?.FirstOrDefault();
 
     #region Methods
 
@@ -45,8 +38,8 @@ internal class CoreDbContext(DbContextOptions options, IEnumerable<IDataOwnerPro
     /// </summary>
     private void EnsureOwnershipResolvable()
     {
-        if (_dataKeyProvider is null) return;
-        if (!string.IsNullOrEmpty(_dataKeyProvider.GetOwnershipKey())) return;
+        if (_currentUserProvider is null) return;
+        if (!string.IsNullOrEmpty(_currentUserProvider.GetCurrentUser())) return;
 
         var hasUnattributableInsert = ChangeTracker.Entries()
             .Any(e => e.State == EntityState.Added

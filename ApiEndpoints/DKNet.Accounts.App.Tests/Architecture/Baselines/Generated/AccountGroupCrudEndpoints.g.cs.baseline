@@ -51,12 +51,12 @@ public static class AccountGroupCrudEndpointExtensions
         }
         if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action) && !options.IsExcluded("Activate"))
         {
-            var routeBuilder = group.MapActionById<ActivateAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/activate", "POST");
+            var routeBuilder = group.MapParameterlessActionById<ActivateAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/activate", "POST");
             options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action, "Activate", routeBuilder);
         }
         if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action) && !options.IsExcluded("Close"))
         {
-            var routeBuilder = group.MapActionById<CloseAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/close", "POST");
+            var routeBuilder = group.MapParameterlessActionById<CloseAccountGroupRequest, global::System.Guid, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>("{id}/close", "POST");
             options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Action, "Close", routeBuilder);
         }
         return group;

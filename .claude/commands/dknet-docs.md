@@ -21,7 +21,7 @@ You are producing authoritative feature documentation for a vertical slice that 
    - whether the create route is idempotent (`X-Idempotency-Key`),
    - whether validation is enforced (it is **not** on generated routes — say so plainly rather than
      listing a `[Range]` as if it returns `400`),
-   - how the acting user is attributed (`[FromClaim]` vs `DataOwnerHook`).
+   - how the acting user is attributed (`[FromClaim]` vs the `DKNet.EfCore.AuditLogs` audit hook).
    For automated slices, read event names off the compiled assembly, not off a guess at the
    composition rule.
 2. Render the four required artifacts under `docs/features/<feature>/` (or `docs/<feature>/` if the slice is template-internal):

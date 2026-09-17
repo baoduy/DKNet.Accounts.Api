@@ -379,11 +379,11 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="317.1" y="340" class="t-dim" font-size="7">AddSlimBusEfCoreInterceptor&lt;CoreDbContext&gt; owns the save; EnsureOwnershipResolvable runs first and refuses an unattributable insert.</text>
         </g>
 
-        <g data-edge-from="db" data-edge-to="aggregate" data-edge-label="DataOwnerHook stamps CreatedBy / UpdatedBy" data-edge-key="5" data-edge-id="stamp">
+        <g data-edge-from="db" data-edge-to="aggregate" data-edge-label="audit hook stamps CreatedBy / UpdatedBy" data-edge-key="5" data-edge-id="stamp">
           <path data-composition-edge-from="db" data-composition-edge-to="aggregate" data-composition-edge-id="stamp" data-composition-points="796.9,375;642.3,375" d="M 796.9 375 L 642.3 375" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <g>
           <rect x="604.3999999999999" y="355" width="230.4" height="16" rx="3" class="c-mask"/>
-          <text x="719.5999999999999" y="365" class="t-messagebus" font-size="9" text-anchor="middle">DataOwnerHook stamps CreatedBy / UpdatedBy</text>
+          <text x="719.5999999999999" y="365" class="t-messagebus" font-size="9" text-anchor="middle">audit hook stamps CreatedBy / UpdatedBy</text>
         </g>
         </g>
 

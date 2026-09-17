@@ -116,6 +116,55 @@ public class PackageArchitectureTests
             "DKNet packages must all resolve to the same release, found: " + string.Join(", ", distinctVersions));
     }
 
+    /// <summary>
+    /// DRK-1467 §5: "The accounts service no longer carries the tenant-ownership package" — once
+    /// <c>PrincipalProvider</c>/<c>ServiceConfigs</c>/<c>CoreDbContext</c> migrate onto the DKNet 10.1.29
+    /// signed-in-user audit stamp, nothing in this repo needs <c>DKNet.EfCore.DataAuthorization</c> at all.
+    /// </summary>
+    [Fact]
+    public void NoProject_ShouldReferenceTheTenantOwnershipPackage()
+    {
+        var srcDir = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+
+        var directoryPackagesPath = Path.Combine(srcDir, "Directory.Packages.props");
+        File.Exists(directoryPackagesPath).ShouldBeTrue();
+        XDocument.Load(directoryPackagesPath).Descendants("PackageVersion")
+            .Any(e => e.Attribute("Include")?.Value == "DKNet.EfCore.DataAuthorization")
+            .ShouldBeFalse("Directory.Packages.props should no longer pin DKNet.EfCore.DataAuthorization.");
+
+        var csprojFiles = Directory.GetFiles(srcDir, "*.csproj", SearchOption.AllDirectories);
+        var referencingProjects = csprojFiles
+            .Where(file => XDocument.Load(file).Descendants("PackageReference")
+                .Any(e => e.Attribute("Include")?.Value == "DKNet.EfCore.DataAuthorization"))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        referencingProjects.ShouldBeEmpty(
+            "The following projects still reference DKNet.EfCore.DataAuthorization: " +
+            string.Join(", ", referencingProjects));
+    }
+
+    /// <summary>
+    /// DRK-1467 §5 scenario outline, "DKNet.Accounts.Api" row: "A repository names release 10.1.29 everywhere
+    /// it names the pinned release" — the pin half only; the documentation half belongs to the sibling Docs
+    /// sub-task.
+    /// </summary>
+    [Fact]
+    public void AllDKNetPackageReferences_ShouldResolveToRelease10129()
+    {
+        var srcDir = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+
+        var directoryPackagesPath = Path.Combine(srcDir, "Directory.Packages.props");
+        File.Exists(directoryPackagesPath).ShouldBeTrue();
+
+        var doc = XDocument.Load(directoryPackagesPath);
+        var distinctVersions = PackagePinGuard.DistinctDkNetVersions(doc);
+
+        distinctVersions.ShouldBe(["10.1.29"]);
+    }
+
     [Fact]
     public void AppConfig_ShouldWireIdempotencyToRedisOnlyWhenAConnectionStringIsConfigured()
     {

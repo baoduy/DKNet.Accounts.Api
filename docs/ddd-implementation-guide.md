@@ -96,7 +96,8 @@ Rules that matter:
 - `AggregateRoot` → `DomainEntity` → `AuditedEntity<Guid>` (from `DKNet.EfCore.Abstractions`)
   supplies `Id`, `CreatedBy`, `CreatedOn`, `UpdatedBy`, `UpdatedOn` — don't redeclare them. Never give
   a constructor or a method an acting-user parameter: there is no base overload that takes one, and
-  `DataOwnerHook` stamps `CreatedBy`/`UpdatedBy` on save from the caller's credential. See
+  `DKNet.EfCore.AuditLogs`' audit hook stamps `CreatedBy`/`UpdatedBy` on save from the caller's
+  credential. See
   [`auditing-and-data-ownership.md`](auditing-and-data-ownership.md).
 - Every property setter is `private`. All mutation goes through entity methods (`ChangeAmount`,
   `Cancel`) — never expose a public setter and never mutate from a handler.
@@ -112,9 +113,9 @@ entity carries three class-level `[RaisesEvent]` declarations — `Created` with
 and `Updated` narrowed to `Price` and to `IsDiscontinued` — instead of an `AddEvent` call, a
 `[CrudCreate]` constructor instead of a plain one, a `[CrudUpdate]` method instead of a loose
 `ChangeAmount`-style method, and `[CrudAction]` methods for its two named domain operations. It
-also implements `IOwnedBy`, so `DataOwnerHook` stamps `OwnedBy` on insert and DKNet's global read
-filter isolates rows per owner. No hand-written event record, no `AddEvent` call anywhere in that
-sample — `DKNet.Templates`' `docs/samples/manual-vs-automated.md` covers exactly what those
+also implements `IOwnedBy` — a tenant-ownership marker from `DKNet.EfCore.DataAuthorization`, which
+this service does not reference, so that half of the sample has no effect here. No hand-written event
+record, no `AddEvent` call anywhere in that sample — `DKNet.Templates`' `docs/samples/manual-vs-automated.md` covers exactly what those
 attributes generate and what they cost.
 
 ## 3. EF Core mapping — `DKNet.Accounts.Infra/Features/<Feature>/Mappers/`

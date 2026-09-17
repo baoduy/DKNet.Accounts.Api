@@ -1,10 +1,14 @@
-# Auditing and Data Ownership
+# Auditing and Acting-User Attribution
 
 How `CreatedBy`/`CreatedOn`/`UpdatedBy`/`UpdatedOn` get populated, and why a caller can never forge
 them. Full API surface for the two packages behind this: `DKNet.EfCore.Abstractions`
 ([docs/EfCore/DKNet.EfCore.Abstractions.md](https://github.com/baoduy/DKNet.Accounts.Api/blob/dev/docs/EfCore/DKNet.EfCore.Abstractions.md))
-and `DKNet.EfCore.DataAuthorization`
-([docs/EfCore/DKNet.EfCore.DataAuthorization.md](https://github.com/baoduy/DKNet.Accounts.Api/blob/dev/docs/EfCore/DKNet.EfCore.DataAuthorization.md)).
+and `DKNet.EfCore.AuditLogs`
+([docs/EfCore/DKNet.EfCore.AuditLogs.md](https://github.com/baoduy/DKNet.Accounts.Api/blob/dev/docs/EfCore/DKNet.EfCore.AuditLogs.md)).
+
+This service carries **no tenant-ownership feature**: `DKNet.EfCore.DataAuthorization` is not
+referenced by any project here, there is no `IOwnedBy` entity, and no global read filter runs. The
+four audit fields are the whole story.
 
 ## The audit fields
 
@@ -24,7 +28,7 @@ Both expose a single constructor shape, and **no aggregate stamps its own `Creat
 
 | Constructor | Who stamps `CreatedBy` |
 |---|---|
-| `DomainEntity()` / `AggregateRoot()` — parameterless, assigns a fresh id only | `DataOwnerHook`, on save |
+| `DomainEntity()` / `AggregateRoot()` — parameterless, assigns a fresh id only | the audit hook, on save |
 
 There is no constructor overload that accepts an author. The reason started with `[CrudCreate]`: the
 generated create request's shape *is* the attributed constructor's parameter list, so a trailing
@@ -36,13 +40,13 @@ they have.
 
 ## Who is allowed to set them
 
-**Invariant: audit and ownership values come from the authenticated principal at save time, never
+**Invariant: audit values come from the authenticated principal at save time, never
 from a request property.** No request in this service — generated or hand-written — carries an
 acting-user parameter.
 
-In this service one mechanism does it, and it is the only one: **`DKNet.EfCore.DataAuthorization`'s
-`DataOwnerHook`, stamping on `SaveChanges`** from `IDataOwnerProvider.GetOwnershipKey()`. That covers
-both `CreatedBy` and `UpdatedBy`, on every aggregate and every write path — hand-written and generated
+In this service one mechanism does it, and it is the only one: **`DKNet.EfCore.AuditLogs`' audit
+hook, stamping on `SaveChanges`** from `ICurrentUserProvider.GetCurrentUser()`. That covers both
+`CreatedBy` and `UpdatedBy`, on every aggregate and every write path — hand-written and generated
 alike. No constructor or domain method takes an acting user, none calls `SetUpdatedBy`, and no create
 or update request in this service carries an acting-user property for a caller to set.
 
@@ -57,7 +61,7 @@ or update request in this service carries an acting-user property for a caller t
 ### How the acting identity is resolved
 
 `DKNet.Accounts.Api/Configs/Handlers/PrincipalProvider.cs` implements `IPrincipalProvider` (which
-extends `IDataOwnerProvider`, adding `ProfileId`/`Email`/`UserName`). `GetOwnershipKey()` returns, in
+extends `ICurrentUserProvider`, adding `ProfileId`/`Email`/`UserName`). `GetCurrentUser()` returns, in
 order:
 
 1. The caller's **subject claim** — the first non-empty of
@@ -70,11 +74,13 @@ order:
    rather than attributed.
 3. For an unauthenticated caller, `SharedConsts.SystemAccount` (`PrincipalProvider.cs:68`).
 
-`ProfileId` on the same class exposes that key parsed as a `Guid`, or `Guid.Empty` when it does not
-parse — a convenience for domain code, not what the hook stamps.
+`ProfileId` on the same class exposes that subject parsed as a `Guid`, or `Guid.Empty` when it does
+not parse — a convenience for domain code, not what the hook stamps.
 
-`DKNet.Accounts.Api/Configs/ServiceConfigs.cs`: `.AddDataOwnerProvider<CoreDbContext, PrincipalProvider>()`
-registers the provider and wires `DataOwnerHook` onto `CoreDbContext`.
+`DKNet.Accounts.Api/Configs/ServiceConfigs.cs`: `.AddCurrentUserProvider<CoreDbContext, PrincipalProvider>()`
+registers the provider application-wide and attaches the audit hook to `CoreDbContext`. The same call
+would also feed `DKNet.EfCore.AuditLogs`' structured change log, but this service registers no
+`IAuditLogPublisher`, so nothing is published — the hook stamps regardless.
 
 **`ICallingSystemAccessor` is deliberately separate.** `CallingSystemAccessor.cs:12` reads `client_id`
 and nothing else, and it is what handlers pass into domain methods and record on a posting's
@@ -92,13 +98,13 @@ with no person records the system as the author"*.
 
 ### What the hook does on save
 
-1. Stamps `CreatedBy`/ownership on every newly-added entity, from `IDataOwnerProvider.GetOwnershipKey()`.
-2. On a modified entity, stamps `UpdatedBy`/`UpdatedOn` from the same ownership key. The hook does
-   defer to an explicit in-process `SetUpdatedBy` when it finds one — it compares the property's
-   current value against its EF Core `OriginalValue` — but no code in this service takes that route,
-   so in practice the hook is what stamps every update.
-3. Guards `IOwnedBy.OwnedBy` on a modified entity against reassignment to a key the current context
-   doesn't hold, preventing cross-tenant transfer.
+1. Stamps `CreatedBy`/`CreatedOn` on every newly-added entity, from `ICurrentUserProvider.GetCurrentUser()`.
+2. On a modified entity, stamps `UpdatedBy`/`UpdatedOn` from the same signed-in user. The hook does
+   defer to an explicit in-process `SetUpdatedBy` when it finds one — it compares `UpdatedBy`/`UpdatedOn`
+   against their EF Core original values — but no code in this service takes that route, so in
+   practice the hook is what stamps every update.
+3. Does nothing at all when `GetCurrentUser()` returns null or empty. Nothing is stamped, and the save
+   proceeds — which is why this service guards that case itself, below.
 
 Because no create or update payload has an acting-user field — and no constructor or domain method
 behind one takes an acting user either — there is nothing for a caller to smuggle in. Three acceptance scenarios in
@@ -117,18 +123,10 @@ machine-to-machine credential shape — and asserts `CreatedBy` comes back as th
 fallback and that create turns into a `403` rather than a `201`, because
 `EnsureOwnershipResolvable` refuses a row it cannot attribute.
 
-## Row-level ownership filtering
-
-`DKNet.Accounts.Infra/Contexts/CoreDbContext.cs` implements `IDataOwnerDbContext` directly, exposing
-`AccessibleKeys` from the same `IDataOwnerProvider` used for stamping. `DKNet.EfCore.DataAuthorization`
-uses this to apply a global query filter on any entity implementing `IOwnedBy`, so a caller only
-ever sees rows whose ownership key matches their own. Filtering happens at the query level, not in
-application code.
-
 ## Where in the save pipeline this runs
 
-`DataOwnerHook` runs as part of EF Core's `SaveChanges`/`SaveChangesAsync` pipeline. It's a
-`BeforeSaveAsync` hook, registered via `.AddDataOwnerProvider<CoreDbContext, PrincipalProvider>()`.
+The audit hook runs as part of EF Core's `SaveChanges`/`SaveChangesAsync` pipeline. It's a
+`BeforeSaveAsync` hook, attached by `.AddCurrentUserProvider<CoreDbContext, PrincipalProvider>()`.
 It runs after change tracking has determined which entities are added or modified, and before the
 `UPDATE`/`INSERT` statements are sent — so the stamped values are always part of the same
 transaction as the data change itself.
@@ -136,7 +134,7 @@ transaction as the data change itself.
 ## When the caller cannot be attributed
 
 `CoreDbContext` overrides every `SaveChanges`/`SaveChangesAsync` entry point with
-`EnsureOwnershipResolvable`. Before EF Core writes anything, it checks whether the ownership key is
+`EnsureOwnershipResolvable`. Before EF Core writes anything, it checks whether the signed-in user is
 empty while the change set contains a newly-added `IAuditedProperties` entity whose `CreatedBy`
 column is non-nullable and still unset. If so it throws `OwnershipRequiredException` — a fail-closed
 refusal rather than a row attributed to nobody.

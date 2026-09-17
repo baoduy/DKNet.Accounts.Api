@@ -124,7 +124,7 @@
       "from": "db",
       "to": "aggregate",
       "y": 375,
-      "label": "DataOwnerHook stamps CreatedBy / UpdatedBy",
+      "label": "audit hook stamps CreatedBy / UpdatedBy",
       "variant": "dashed"
     },
     {

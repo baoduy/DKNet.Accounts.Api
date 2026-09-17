@@ -275,9 +275,8 @@ entity.
 | Route | Source | The orchestration that keeps it hand-written |
 |---|---|---|
 | `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
-| Create, list, read, rename, change-description, change-metadata and delete on `/v1/account-groups` | **generated** — all seven from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
-| `POST /v1/account-groups/{id}/close` | **request and handler generated**, route hand-written | The generated action route binds its command from the JSON body and demands one, and every close call sends none — the id comes entirely from the address. The hand-written route builds the request from the route id and runs the close validator before dispatch (`GROUP_HOLDS_BALANCE`) |
-| `POST /v1/account-groups/{id}/activate` | **request and handler generated**, route hand-written | The same empty-body binding gap as close; no business refusal, so no validator to run |
+| Create, list, read, rename, change-description, change-metadata, delete and activate on `/v1/account-groups` | **generated** — all eight from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
+| `POST /v1/account-groups/{id}/close` | **request and handler generated**, route hand-written | The route has to run `CloseAccountGroupRequestValidator` before dispatch to raise `GROUP_HOLDS_BALANCE` — a business refusal the generated action route cannot reach. It builds the request from the route id instead of a body |
 | `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
 | `POST /v1/accounts` | hand-written | Allocates the account number server-side, resolves the currency against the reference set (`UNSUPPORTED_CURRENCY`) and enforces a determinate floor (`OVERDRAFT_LIMIT_REQUIRED`). A generated request would expose the account number as a caller-settable field |
 | `GET /v1/accounts` | **generated** | — |
@@ -293,7 +292,7 @@ entity.
 | `POST /v1/postings/{id}/reverse` | hand-written | Writes the opposing posting and flips the original's status in one step, with its own `422` refusals |
 
 Route registration is in `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/` — one `*V1Endpoint.cs` per
-resource. Account groups now carry one commented generated registration covering all seven routes at
+resource. Account groups now carry one commented generated registration covering all eight routes at
 once; elsewhere each generated route is still commented individually.
 `ApiEndpoints/DKNet.Accounts.App.Tests/Architecture/RouteScopeCoverageTests.cs` enumerates the live
 routes and fails the build if any one loses the scope this table names, however it was registered.
