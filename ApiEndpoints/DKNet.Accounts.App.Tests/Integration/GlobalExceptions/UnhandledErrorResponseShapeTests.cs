@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs;
+using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.Tests.Integration.GlobalExceptions;
 
@@ -126,6 +127,35 @@ public sealed class UnhandledErrorResponseShapeTests
 
         commandResponse.StatusCode.ShouldNotBe(HttpStatusCode.InternalServerError);
         inputResponse.StatusCode.ShouldNotBe(HttpStatusCode.InternalServerError);
+        sink.EntriesAt(LogLevel.Error).ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// pr-reviewer round 1, finding 8: <see cref="LedgerErrorResponseOptions.UnhandledError"/>'s three named
+    /// branches (<see cref="OwnershipRequiredException"/> 403, <see cref="BadHttpRequestException"/> 413, a
+    /// unique-constraint <see cref="DbUpdateException"/> 409) are controlled refusals, not faults, and must
+    /// leave no error-severity record — only the generic (500) branch may log.
+    /// </summary>
+    [Fact]
+    public async Task AControlledRefusalRaisedAsAnException_LeavesNoErrorSeverityRecord()
+    {
+        var sink = new FakeLoggerSink();
+        var builder = WebApplication.CreateBuilder(
+            new WebApplicationOptions { EnvironmentName = "Production" });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddRouting();
+        builder.Logging.ClearProviders().AddProvider(sink);
+        builder.AddFluentValidationConfig();
+
+        await using var app = builder.Build();
+        app.UseRouting();
+        app.MapGet("/throw-ownership", (Func<IResult>)(() => throw new OwnershipRequiredException()));
+        await app.StartAsync();
+
+        using var client = app.GetTestClient();
+        var response = await client.GetAsync("/throw-ownership");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         sink.EntriesAt(LogLevel.Error).ShouldBeEmpty();
     }
 

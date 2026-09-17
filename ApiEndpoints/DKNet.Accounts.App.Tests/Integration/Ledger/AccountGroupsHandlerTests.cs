@@ -289,4 +289,17 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
             .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.GroupHoldsBalance)
             .ShouldBeTrue($"expected an error carrying code {LedgerErrors.GroupHoldsBalance}, got: {body}");
     }
+
+    /// <summary>
+    /// pr-reviewer round 1 finding 7: Close was hand-mapped with an explicit "{id:guid}" pattern again (the
+    /// generated composite's own default is the looser "{id}") so a malformed id misses the route entirely —
+    /// 404, not the 400 a bound-but-unparsable id would answer.
+    /// </summary>
+    [Fact]
+    public async Task ClosingWithAMalformedId_MissesTheGuidConstrainedRoute_AndIsAnsweredNotFound()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/not-a-guid/close"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
 }

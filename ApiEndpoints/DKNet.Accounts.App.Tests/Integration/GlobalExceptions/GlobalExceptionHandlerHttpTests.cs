@@ -32,14 +32,14 @@ namespace DKNet.Accounts.App.Tests.Integration.GlobalExceptions;
 /// Development-specific message-disclosure branch itself is covered without HTTP, directly against
 /// <see cref="LedgerErrorResponseOptions.UnhandledError"/>, in <c>LedgerErrorResponseOptionsTests</c>.
 ///
-/// Unhandled-exception logging is no longer covered here either: <c>ErrorResponseExceptionHandler</c> (DKNet
-/// 11.0.0's own <see cref="IExceptionHandler"/>) reports itself as having handled the exception, which
-/// suppresses ASP.NET Core's own <c>ExceptionHandlerMiddleware</c> diagnostic log for it — and this cycle
-/// intentionally registers no second <see cref="IExceptionHandler"/> to log from instead (that is exactly the
-/// hand-written conversion DRK-1522 removes; <c>NoHandWrittenFailureConversionTests</c> enforces it staying
-/// gone). An unhandled exception this service converts to a response is therefore no longer logged
-/// server-side by anything in this codebase — flagged to dev-leader as a monitoring gap worth its own
-/// follow-up, not silently patched back in with another hand-written handler.
+/// Unhandled-exception logging is not covered here: <c>ErrorResponseExceptionHandler</c> (DKNet 11.0.0's own
+/// <see cref="IExceptionHandler"/>) reports itself as having handled the exception, which suppresses ASP.NET
+/// Core's own <c>ExceptionHandlerMiddleware</c> diagnostic log for it. DRK-1535 §3 row 6 closed that gap
+/// instead — <c>LedgerErrorResponseOptions.LogUnhandledError</c> writes one error-severity record per
+/// unhandled exception, under the same trace id the response body carries — covered by
+/// <c>UnhandledErrorResponseShapeTests.AnUnhandledError_IsRecordedOnTheServerUnderTheSameTraceIdTheCallerWasGiven</c>
+/// and <c>UnhandledErrorResponseShapeTests.ARefusedCommandAndARefusedInput_LeaveNoErrorSeverityRecord</c>, not
+/// this class.
 /// </remarks>
 public sealed class GlobalExceptionHandlerHttpTests
 {

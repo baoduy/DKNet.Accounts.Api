@@ -69,16 +69,18 @@ internal static class LedgerErrorResponseOptions
     /// a unique-index violation is a conflict, not a server fault. Every other exception falls to a fixed,
     /// non-disclosing message outside Development — <paramref name="isDevelopment"/> is captured once at
     /// startup (<c>FluentValidationConfig</c>) since <see cref="ErrorResponseContext"/> carries no
-    /// <c>HttpContext</c> to resolve it from. Also records one error-severity log entry under the same trace
-    /// id the response body carries (DRK-1522 §3 row 6) — record-only, never changes the response — using
+    /// <c>HttpContext</c> to resolve it from. The generic branch alone also records one error-severity log
+    /// entry under the same trace id the response body carries (DRK-1522 §3 row 6; narrowed there per
+    /// pr-reviewer round 1 finding 8) — record-only, never changes the response — using
     /// <paramref name="httpContextAccessor"/> (also captured once at startup, for the same reason) to reach the
-    /// current request's logger and trace identifier.
+    /// current request's logger and trace identifier. The three named branches above are controlled refusals,
+    /// not faults, so none of them logs: a refusal leaves no error-severity record (product-owner's
+    /// requirement), which this method now satisfies structurally, not just because nothing else calls it.
     /// </summary>
     public static ProblemDetails UnhandledError(
         ErrorResponseContext context, bool isDevelopment, IHttpContextAccessor httpContextAccessor)
     {
         var exception = context.Exception!;
-        LogUnhandledError(httpContextAccessor, exception);
         return exception switch
         {
             OwnershipRequiredException => Problem(
@@ -96,10 +98,16 @@ internal static class LedgerErrorResponseOptions
                 (int)HttpStatusCode.Conflict, "Request refused.",
                 "The request conflicts with an existing record.", exception, isDevelopment),
 
-            _ => Problem(
-                (int)HttpStatusCode.InternalServerError, "Something went wrong!.",
-                isDevelopment ? exception.Message : GenericUnhandledMessage, exception, isDevelopment)
+            _ => LogAndBuild(httpContextAccessor, exception, isDevelopment)
         };
+    }
+
+    private static ProblemDetails LogAndBuild(IHttpContextAccessor httpContextAccessor, Exception exception, bool isDevelopment)
+    {
+        LogUnhandledError(httpContextAccessor, exception);
+        return Problem(
+            (int)HttpStatusCode.InternalServerError, "Something went wrong!.",
+            isDevelopment ? exception.Message : GenericUnhandledMessage, exception, isDevelopment);
     }
 
     /// <summary>

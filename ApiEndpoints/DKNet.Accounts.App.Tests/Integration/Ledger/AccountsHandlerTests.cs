@@ -172,4 +172,24 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.UnsupportedCurrency)
             .ShouldBeTrue($"expected an error carrying code {LedgerErrors.UnsupportedCurrency}, got: {body}");
     }
+
+    /// <summary>
+    /// pr-reviewer round 1 finding 7: GetById, Rename and ChangeMetadata were hand-mapped with an explicit
+    /// "{id:guid}" pattern again (the generated composite's own default is the looser "{id}") so a malformed
+    /// id misses the route entirely — 404, not the 400 a bound-but-unparsable id would answer.
+    /// </summary>
+    [Theory]
+    [InlineData("GET", null, "")]
+    [InlineData("PUT", "Ignored", "")]
+    [InlineData("PUT", "Ignored", "/change-metadata")]
+    public async Task AMalformedId_MissesTheGuidConstrainedRoute_AndIsAnsweredNotFound(
+        string method, string? name, string suffix)
+    {
+        object? body = name is null ? null : new { name };
+        var request = AsPayHub(new HttpMethod(method), $"{AccountsPath}/not-a-guid{suffix}", body);
+
+        var response = await Client.SendAsync(request);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
 }
