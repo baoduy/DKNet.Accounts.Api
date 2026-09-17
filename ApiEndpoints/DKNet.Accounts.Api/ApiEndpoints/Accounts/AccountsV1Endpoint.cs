@@ -5,7 +5,6 @@ using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1;
-using DKNet.Accounts.Domains.Features.Accounts.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
@@ -34,26 +33,20 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             .Produces<AccountDto>(StatusCodes.Status201Created)
             .WithDescription("Open an account inside a group, in one currency, with an accounting classification.");
 
-        // GetList now registers through one generated composite (DRK-1522 §3 row 12), same as account groups.
-        // Accounts publish no delete route (R1: never reachable today) — the generated composite's Delete
-        // stays excluded by name. GetById/Rename/ChangeMetadata are excluded too and hand-mapped below with an
-        // explicit "{id:guid}" pattern (pr-reviewer round 1, finding 7): the generated composite's own default
-        // is the looser "{id}", which answers a malformed id 400 instead of the 404 this service has always
-        // answered and the README still documents — the same reason PostingsV1Endpoint.MapGetById below keeps
-        // its own explicit "{id:guid}" against that same default.
+        // GetById/GetList/Rename/ChangeMetadata now register through one generated composite (DRK-1522 §3
+        // row 12), same as account groups. Accounts publish no delete route (R1: never reachable today) — the
+        // generated composite's Delete stays excluded by name. Every one of these routes answers a malformed
+        // id with 400, not 404 — the generated composite's own default pattern is the looser "{id}" (spec
+        // revision 13 §3, frozen: accounts are served by the generated route set for every operation it
+        // covers, and publish no delete route; pr-reviewer round 1 finding 7's attempt to restore "{id:guid}"
+        // by excluding these routes reversed that frozen requirement and was reverted in round 2).
         group.MapAccountCrud(o => o
-                .Exclude("Delete", "GetById", "Rename", "ChangeMetadata")
+                .Exclude("Delete")
                 .Configure("GetList", b => b.WithDescription(
-                    "List accounts. Filter as 'field:operation:value', e.g. filter=GroupId:Equal:{id}.")));
-
-        group.MapGetById<Account, Guid, AccountDto>("{id:guid}")
-            .WithDescription("Read one account.");
-
-        group.MapPutById<RenameAccountRequest, Guid, AccountDto>("{id:guid}")
-            .WithDescription("Rename an account.");
-
-        group.MapPutById<ChangeMetadataAccountRequest, Guid, AccountDto>("{id:guid}/change-metadata")
-            .WithDescription("Change an account's metadata.");
+                    "List accounts. Filter as 'field:operation:value', e.g. filter=GroupId:Equal:{id}."))
+                .Configure("GetById", b => b.WithDescription("Read one account."))
+                .Configure("Rename", b => b.WithDescription("Rename an account."))
+                .Configure("ChangeMetadata", b => b.WithDescription("Change an account's metadata.")));
 
         group.MapGet("{id:guid}/balance", async (
                 Guid id,

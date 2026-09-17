@@ -7,14 +7,16 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 /// route names <see cref="DKNet.Accounts.Api.ApiEndpoints.AccountGroups.AccountGroupsV1Endpoint"/> excludes
 /// from the generated <c>MapAccountGroupCrud</c> composite. "Activate" must never be excluded by name.
 ///
-/// DRK-1522 §3 row 13 moved "Close" into the generated composite's own action set (its refusal rule moved
-/// into a hand-written <c>IHandler</c> instead of a hand-mapped route). pr-reviewer round 1 finding 7 excluded
-/// it again by name so it could be hand-mapped with an explicit <c>"{id:guid}"</c> pattern (see
-/// <see cref="DKNet.Accounts.Api.ApiEndpoints.AccountGroups.AccountGroupsV1Endpoint"/>'s own remarks) — the
-/// generated composite's default <c>"{id}"</c> answers a malformed id 400 instead of the 404 this service has
-/// always answered. <see cref="DKNet.Accounts.Api.ApiEndpoints.Accounts.AccountsV1Endpoint"/> excludes
-/// "Delete" (accounts publish no delete route) plus, for the same reason as Close,
-/// "GetById"/"Rename"/"ChangeMetadata".
+/// DRK-1522 §3 row 13: "Close" moved into the generated composite too (its refusal rule moved into a
+/// hand-written <c>IHandler</c> instead of a hand-mapped route), so the account-group side excludes nothing
+/// by name; <see cref="DKNet.Accounts.Api.ApiEndpoints.Accounts.AccountsV1Endpoint"/> excludes only "Delete"
+/// (accounts publish no delete route). This is spec revision 13 §3, frozen: both entities are served by the
+/// generated route set for every route/operation it can serve. pr-reviewer round 1 finding 7 briefly excluded
+/// "Close" (account groups) and "GetById"/"Rename"/"ChangeMetadata" (accounts) by name to force an explicit
+/// <c>"{id:guid}"</c> pattern each of those routes had before DRK-1522 — that reversed the frozen requirement
+/// and was reverted in round 2. Every one of these routes answers a malformed id with 400, not 404 — the
+/// generated composite's own default pattern is the looser <c>"{id}"</c> — and that is the accepted, documented
+/// behaviour, not a gap.
 /// </summary>
 public sealed class AccountGroupExcludedRoutesTests
 {
@@ -43,20 +45,15 @@ public sealed class AccountGroupExcludedRoutesTests
         ExcludedRouteNames(EndpointSourcePath).ShouldNotContain("Activate");
     }
 
-    /// <summary>pr-reviewer round 1 finding 7: Close is excluded again (and hand-mapped with an explicit
-    /// "{id:guid}" pattern) rather than left to the generated composite's looser "{id}" default.</summary>
     [Fact]
-    public void ExcludedRouteNames_IncludeClose()
+    public void ExcludedRouteNames_NoLongerIncludeClose()
     {
-        ExcludedRouteNames(EndpointSourcePath).ShouldContain("Close");
+        ExcludedRouteNames(EndpointSourcePath).ShouldNotContain("Close");
     }
 
-    /// <summary>pr-reviewer round 1 finding 7: GetById/Rename/ChangeMetadata join Delete in the exclusion list
-    /// so all three can be hand-mapped with an explicit "{id:guid}" pattern.</summary>
     [Fact]
-    public void AccountsEndpoint_ExcludedRouteNames_AreExactlyDeleteGetByIdRenameChangeMetadata()
+    public void AccountsEndpoint_ExcludedRouteNames_AreExactlyDelete()
     {
-        ExcludedRouteNames(AccountsEndpointSourcePath).ShouldBe(
-            ["Delete", "GetById", "Rename", "ChangeMetadata"], ignoreOrder: true);
+        ExcludedRouteNames(AccountsEndpointSourcePath).ShouldBe(["Delete"]);
     }
 }

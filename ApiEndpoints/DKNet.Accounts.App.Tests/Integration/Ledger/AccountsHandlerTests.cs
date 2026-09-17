@@ -174,15 +174,16 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     }
 
     /// <summary>
-    /// pr-reviewer round 1 finding 7: GetById, Rename and ChangeMetadata were hand-mapped with an explicit
-    /// "{id:guid}" pattern again (the generated composite's own default is the looser "{id}") so a malformed
-    /// id misses the route entirely — 404, not the 400 a bound-but-unparsable id would answer.
+    /// GetById, Rename and ChangeMetadata are served by the generated composite's own default pattern
+    /// "{id}" (spec revision 13 §3, frozen — pr-reviewer round 1 finding 7's attempt to restore "{id:guid}"
+    /// by excluding these routes was reverted in round 2). The route still matches a malformed id; binding it
+    /// to the handler's Guid parameter is what fails, so the answer is 400, not a 404 route miss.
     /// </summary>
     [Theory]
     [InlineData("GET", null, "")]
     [InlineData("PUT", "Ignored", "")]
     [InlineData("PUT", "Ignored", "/change-metadata")]
-    public async Task AMalformedId_MissesTheGuidConstrainedRoute_AndIsAnsweredNotFound(
+    public async Task AMalformedId_StillMatchesTheRoute_AndIsAnsweredAsABadRequest(
         string method, string? name, string suffix)
     {
         object? body = name is null ? null : new { name };
@@ -190,6 +191,6 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         var response = await Client.SendAsync(request);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 }

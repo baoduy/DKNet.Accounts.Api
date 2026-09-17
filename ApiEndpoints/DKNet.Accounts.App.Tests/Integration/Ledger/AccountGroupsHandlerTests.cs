@@ -291,15 +291,16 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     }
 
     /// <summary>
-    /// pr-reviewer round 1 finding 7: Close was hand-mapped with an explicit "{id:guid}" pattern again (the
-    /// generated composite's own default is the looser "{id}") so a malformed id misses the route entirely —
-    /// 404, not the 400 a bound-but-unparsable id would answer.
+    /// Close is served by the generated composite's own default pattern "{id}" (spec revision 13 §3, frozen —
+    /// pr-reviewer round 1 finding 7's attempt to restore "{id:guid}" by excluding it was reverted in round
+    /// 2). The route still matches a malformed id; binding it to the handler's Guid parameter is what fails,
+    /// so the answer is 400, not a 404 route miss.
     /// </summary>
     [Fact]
-    public async Task ClosingWithAMalformedId_MissesTheGuidConstrainedRoute_AndIsAnsweredNotFound()
+    public async Task ClosingWithAMalformedId_StillMatchesTheRoute_AndIsAnsweredAsABadRequest()
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/not-a-guid/close"));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 }

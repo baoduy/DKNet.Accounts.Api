@@ -1,5 +1,4 @@
 using DKNet.Accounts.Api.Configs.Auth;
-using DKNet.Accounts.AppServices.AccountGroups.V1;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 
@@ -20,17 +19,17 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "DELETE");
 
         // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
-        // ChangeMetadata) and Activate register through one generated composite (DRK-1440 §3 rows 1-3;
-        // DRK-1522 §3 row 11: Close's GROUP_HOLDS_BALANCE refusal now runs as a command failure inside
-        // CloseAccountGroupHandler, not a validator failure, so a generated route can reach it). Rename must
-        // stay the first [CrudUpdate] declared on AccountGroup or it loses its plain "{id}" PUT route. Close
-        // itself is excluded here and hand-mapped below with an explicit "{id:guid}" pattern (pr-reviewer
-        // round 1, finding 7): the generated composite's own default is the looser "{id}", which answers a
-        // malformed id 400 instead of the 404 this service has always answered and the README still
-        // documents — the same reason PostingsV1Endpoint.MapGetById keeps its own explicit "{id:guid}"
-        // against that same default.
+        // ChangeMetadata), Activate and Close all now register through one generated composite (DRK-1440 §3
+        // rows 1-3; DRK-1522 §3 row 11: Close moves in too — its GROUP_HOLDS_BALANCE refusal now runs as a
+        // command failure inside CloseAccountGroupHandler, not a validator failure, so a generated route can
+        // reach it and nothing stays excluded by name here). Rename must stay the first [CrudUpdate] declared
+        // on AccountGroup or it loses its plain "{id}" PUT route. Every one of these routes answers a
+        // malformed id with 400, not 404 — the generated composite's own default pattern is the looser "{id}"
+        // (spec revision 13 §3, frozen: account groups are served by the generated route set for every route
+        // it can serve, including "close"; pr-reviewer round 1 finding 7's attempt to restore "{id:guid}" by
+        // excluding these routes reversed that frozen requirement and was reverted in round 2).
         group.MapAccountGroupCrud(o => o
-                .Exclude("Close")
+                .Exclude(Array.Empty<string>())
                 .Configure("Create", b => b.WithDescription("Create an account group."))
                 .Configure("GetList", b => b.WithDescription(
                     "List account groups. Filter as 'field:operation:value', e.g. filter=Type:Equal:Customer."))
@@ -39,10 +38,8 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
                 .Configure("ChangeDescription", b => b.WithDescription("Change an account group's description."))
                 .Configure("ChangeMetadata", b => b.WithDescription("Change an account group's metadata."))
                 .Configure("Delete", b => b.WithDescription("Delete an account group. Refused while the group still holds any account."))
-                .Configure("Activate", b => b.WithDescription("Reactivate a closed account group.")));
-
-        group.MapParameterlessActionById<CloseAccountGroupRequest, Guid, AccountGroupDto>("{id:guid}/close", "POST")
-            .WithDescription("Close an account group. Refused while any account it holds still carries a balance.");
+                .Configure("Activate", b => b.WithDescription("Reactivate a closed account group."))
+                .Configure("Close", b => b.WithDescription("Close an account group. Refused while any account it holds still carries a balance.")));
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,
