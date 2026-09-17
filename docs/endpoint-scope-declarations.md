@@ -73,14 +73,14 @@ public health probes at `/healthz` and `/`, and they sit outside any endpoint gr
 
 ## Which rule wins
 
-For each route, in this order (`GroupScopeAuthorization.cs:70-83`):
+For each route, in this order (`GroupScopeAuthorization.cs:70-101`):
 
 | # | On the route | Result |
 |---|---|---|
 | 1 | `.AllowAnonymous()` | No scope, no token required |
 | 2 | `.RequireScope(group, …)` — a named policy | That scope, group declaration ignored |
-| 3 | The group declares this route's HTTP method | The declared scope |
-| 4 | None of the above, in a group that declares something | Startup refusal — see below |
+| 3 | The group declares every method this route serves | The declared scope for each of them |
+| 4 | The group declares some but not all of them | Startup refusal — see below |
 | 5 | None of the above, in a group that declares nothing | Unchanged: authenticated caller, no scope check |
 
 Row 2 means a *named* policy specifically. `UseEndpointConfigs`' own `RequireAuthorization` option
@@ -89,31 +89,36 @@ an override, and the declaration still applies over it (`GroupScopeAuthorization
 
 ## When the API refuses to start
 
-A group that declares at least one method must cover every method it serves. Leave one uncovered and
-the host aborts during startup with an `InvalidOperationException` built here
-(`GroupScopeAuthorization.cs:112-114`):
+A group that declares at least one method must cover **every** method each of its routes serves. Leave
+one uncovered and the host aborts during startup with an `InvalidOperationException` built here
+(`GroupScopeAuthorization.cs:123-125`):
 
 ```csharp
 throw new InvalidOperationException(
-    $"Endpoint group '{uncovered.GroupName}' serves HTTP {uncovered.Method} with no declared " +
-    "group scope, per-route scope, or AllowAnonymous.");
+    $"Route '{uncovered.RoutePattern}' serves HTTP {uncovered.Method} with no declared group " +
+    "scope, per-route scope, or AllowAnonymous.");
 ```
 
-Which reads, for a group declaring `GET` and `PUT` that also maps a `DELETE /{id:guid}`:
+Which reads, for the accounts group — declaring `GET`, `POST`, `PUT` and `PATCH` — if it also mapped a
+`DELETE {id:guid}`:
 
 ```
-Endpoint group '/v1/accounts/{id:guid}' serves HTTP DELETE with no declared group scope, per-route scope, or AllowAnonymous.
+Route '/v{version:apiVersion}/accounts/{id:guid}' serves HTTP DELETE with no declared group scope, per-route scope, or AllowAnonymous.
 ```
 
 The check runs once, from `GroupScopeCoverageHostedService.StartedAsync`
-(`GroupScopeAuthorization.cs:144-148`), registered in `Program.cs:27` via `AddGroupScopeCoverageCheck()`.
+(`GroupScopeAuthorization.cs:155-158`), registered in `Program.cs:27` via `AddGroupScopeCoverageCheck()`.
 It runs after every route is mapped and inside `IHost.StartAsync`, so the failure is a failed startup,
 not a later error on the first request.
 
-**Reading the message.** The quoted value is the offending **route's** full pattern, not the group's
-display name (`GroupScopeAuthorization.cs:91`). The message names the one route and the one HTTP
-method that is uncovered; if several are uncovered, the first one found stops startup and the rest
-appear only after you fix it.
+**Reading the message.** The route pattern is the raw one, so it still carries the unresolved version
+token — `/v{version:apiVersion}/accounts/{id:guid}`, not `/v1/accounts/{id:guid}`. The method is the
+first served method the group never declared; if several routes are uncovered, the first one found
+stops startup and the rest appear only after you fix it.
+
+A method of `*` means the route was mapped verb-less (`.Map(...)` rather than `.MapGet(...)`), so it
+serves every verb and no per-method declaration can cover it (`GroupScopeAuthorization.cs:80-85`).
+Give that route its own `.RequireScope(...)` or map it to the verbs it actually serves.
 
 **Fixing it.** Pick the row from the table above that you meant:
 
@@ -163,9 +168,10 @@ locally or under the test fixtures — it fails in a deployed host, where the fl
   (`GroupScopeAuthorization.cs:55-58`); there is no way to require two scopes on one method.
 - **The check is per route, not per group name.** Two groups mapped under the same prefix are two
   independent declaration sets.
-- **Only the methods a route registers are considered** (`GroupScopeAuthorization.cs:76`), and a
-  route is matched against the first of its methods that the group declares
-  (`GroupScopeAuthorization.cs:77-84`).
+- **A multi-method route needs every one of its methods declared.** `MapMethods(["GET", "POST"])` is
+  covered only when the group declares both (`GroupScopeAuthorization.cs:90`), and the route then
+  requires both scopes, not either one (`GroupScopeAuthorization.cs:99-101`). Declaring only `GET`
+  refuses startup on `POST`.
 
 ## Related pages
 
