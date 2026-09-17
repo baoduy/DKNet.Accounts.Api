@@ -53,7 +53,7 @@ wrapper. `POST /v1/products` with a negative price returns `201`, not `400`.
 
 **Acting-user attribution differs by flow.** `manual` uses `[FromClaim(ClaimTypes.Name)]` on the
 request. `auto` cannot — the generator forwards only `System.ComponentModel.DataAnnotations`
-attributes — so it relies on `DKNet.EfCore.DataAuthorization`'s `DataOwnerHook`, wired once in
+attributes — so it relies on `DKNet.EfCore.AuditLogs`' audit hook, wired once in
 `ServiceConfigs.AddAllAppServices` and applying to every entity on `CoreDbContext`.
 
 A mixed aggregate is a smell, but dropping **one** operation out of `auto` to a hand-written route is

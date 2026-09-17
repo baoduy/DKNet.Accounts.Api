@@ -193,6 +193,9 @@ policy nor declares itself anonymous still requires an authenticated caller — 
 outside a configured group is not anonymous by accident. The public health probes at `/healthz` and
 `/` are the declared exception (`.AllowAnonymous()`).
 
+Which scope each route requires is declared per endpoint group — see
+[Endpoint Scope Declarations](endpoint-scope-declarations.md).
+
 When it is `false` no authentication middleware is added at all — this is not a permissive policy
 but the absence of any identity, which is why the base file must never ship it off.
 

@@ -18,6 +18,12 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Group-level scope declaration (DRK-1498 §3 rows 1-2, 6): GET needs accounts.read, POST/PUT/PATCH
+        // need accounts.write — every route below is one of those four methods except the statement route,
+        // which keeps its own postings.read override (R1).
+        group.DeclareGroupScope(ScopeNames.AccountsRead, "GET")
+            .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "PATCH");
+
         group.MapPost("/", async (
                 OpenAccountRequest req,
                 IMessageBus bus,
@@ -26,29 +32,24 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(req, cancellationToken: ct);
                 return result.ToLedgerResponse(isCreated: true);
             })
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .Produces<AccountDto>(StatusCodes.Status201Created)
             .WithDescription("Open an account inside a group, in one currency, with an accounting classification.");
 
         // List (GEN, DRK-1277 §11/§12): same reasoning as account groups — generated list syntax/envelope.
         group.MapGetList<Account, Guid, AccountDto>()
-            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("List accounts. Filter as 'field:operation:value', e.g. filter=GroupId:Equal:{id}.");
 
         // Get-by-id (GEN, DRK-1277 §11/§12): plain generic entity mapper — no SlimBus handler involved.
         group.MapGetById<Account, Guid, AccountDto>("{id:guid}")
-            .RequireScope(group, ScopeNames.AccountsRead)
             .WithDescription("Read one account.");
 
         // Rename (GEN, DRK-1277 §11/§12): [CrudUpdate] on Account.Rename — the first such member on the type,
         // so it lands on the plain "{id}" route. Same reasoning as AccountGroup.Rename: 404 is its only
         // failure mode, so R3 doesn't block it, and MapPutById returns its own chainable builder.
         group.MapPutById<RenameAccountRequest, Guid, AccountDto>("{id:guid}")
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription("Rename an account.");
 
         group.MapPutById<ChangeMetadataAccountRequest, Guid, AccountDto>("{id:guid}/change-metadata")
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription("Change an account's metadata.");
 
         group.MapGet("{id:guid}/balance", async (
@@ -59,7 +60,6 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var balance = await bus.Send(new GetAccountBalanceQuery { Id = id }, cancellationToken: ct);
                 return balance is null ? Results.NotFound() : Results.Ok(balance);
             })
-            .RequireScope(group, ScopeNames.AccountsRead)
             .Produces<AccountBalanceDto>()
             .Produces(StatusCodes.Status404NotFound)
             .WithDescription("Read an account's balance.");
@@ -77,7 +77,6 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var result = await bus.Send(req with { Id = id }, cancellationToken: ct);
                 return result.ToLedgerResponse();
             })
-            .RequireScope(group, ScopeNames.AccountsWrite)
             .WithDescription(
                 "Change an account's status, overdraft limit and minimum balance. " +
                 "{\"status\":\"Closed\"} closes the account.");

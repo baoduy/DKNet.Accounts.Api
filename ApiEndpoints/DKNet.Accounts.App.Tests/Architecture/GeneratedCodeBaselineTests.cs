@@ -3,11 +3,11 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 /// <summary>
 /// DRK-1380 row 2 (DRK-1373 §5 "The generated code changes only in the … expected ways"): pins the
 /// <c>DKNet.SlimBus.Generators</c> CRUD composite output for <c>AccountGroup</c> and <c>Account</c> — the two
-/// entities DRK-1373 §3/§6 R3's four expected 10.1.26 differences live in — so an unreviewed change in
-/// generated code cannot land silently when the pin moves. Narrowed to these two entities' CrudGenerator
-/// output (DRK-1373 Q1 default): the full generator surface, every <c>DtoGenerator</c> and
-/// <c>CrudGenerator</c> emission across every entity, is too large and churny to commit whole, and the four
-/// expected differences do not touch it.
+/// entities DRK-1467 §8's one expected 10.1.29 difference lives in — so an unreviewed change in generated
+/// code cannot land silently when the pin moves. Narrowed to these two entities' CrudGenerator output
+/// (DRK-1373 Q1 default): the full generator surface, every <c>DtoGenerator</c> and <c>CrudGenerator</c>
+/// emission across every entity, is too large and churny to commit whole, and the expected difference does
+/// not touch it.
 /// </summary>
 public sealed class GeneratedCodeBaselineTests
 {
@@ -45,11 +45,10 @@ public sealed class GeneratedCodeBaselineTests
         var expected = File.ReadAllText(Path.Combine(BaselineDir, $"{fileName}.baseline"));
 
         actual.ShouldBe(expected,
-            $"'{fileName}' no longer matches the committed DKNet 10.1.24 baseline. Classify the diff against " +
-            "DRK-1373 §6 R3's four expected 10.1.26 differences before accepting it: (a) a new delete request " +
-            "type for AccountGroup/Account, (b) one new per-entity route-name-check line in the CRUD composite, " +
-            "(c) each composite route wrapped so a caller can exclude or configure it, (d) the delete map call's " +
-            "type-argument count (two-argument at 10.1.24, three at 10.1.26). Anything else is a finding to " +
-            "resolve before the pin bump lands.");
+            $"'{fileName}' no longer matches the committed DKNet 10.1.26 baseline. Classify the diff against " +
+            "DRK-1467 §8's one expected 10.1.29 difference before accepting it: a parameterless [CrudAction] " +
+            "(AccountGroup.Activate, AccountGroup.Close) now maps through MapParameterlessActionById instead " +
+            "of MapActionById (DKNet gap DRK-1436 fixed at 10.1.29 — the generated route no longer requires a " +
+            "JSON body). Anything else is a finding to resolve before the pin bump lands.");
     }
 }

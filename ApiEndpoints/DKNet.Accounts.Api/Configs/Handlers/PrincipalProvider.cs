@@ -44,7 +44,7 @@ internal sealed class PrincipalProvider(IHttpContextAccessor accessor) : IPrinci
 
     #region Methods
 
-    public string? GetOwnershipKey()
+    public string? GetCurrentUser()
     {
         Initialize();
         return _ownershipKey;

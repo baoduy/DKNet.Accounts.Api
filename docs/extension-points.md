@@ -130,11 +130,12 @@ registered but applied to no shipped route — attach it with
 from an endpoint's `AuthPolicy`.
 
 **The acting user.** `IPrincipalProvider` (`DKNet.Accounts.AppServices/Share/IPrincipalProvider.cs`)
-extends DKNet's `IDataOwnerProvider` with `ProfileId`, `Email` and `UserName`. The implementation,
-`DKNet.Accounts.Api/Configs/Handlers/PrincipalProvider.cs`, resolves the ownership key from the first
-non-empty of `http://schemas.microsoft.com/identity/claims/objectidentifier`, `oid`,
-`ClaimTypes.NameIdentifier`, `sub`. Replace the implementation to change how identity is read;
-`.AddDataOwnerProvider<CoreDbContext, PrincipalProvider>()` in `ServiceConfigs.cs` is the single
+extends DKNet's `ICurrentUserProvider` (`DKNet.EfCore.AuditLogs`) with `ProfileId`, `Email` and
+`UserName`. The implementation, `DKNet.Accounts.Api/Configs/Handlers/PrincipalProvider.cs`, resolves
+the signed-in user from the first non-empty of
+`http://schemas.microsoft.com/identity/claims/objectidentifier`, `oid`, `ClaimTypes.NameIdentifier`,
+`sub`. Replace the implementation to change how identity is read;
+`.AddCurrentUserProvider<CoreDbContext, PrincipalProvider>()` in `ServiceConfigs.cs` is the single
 registration point. Full behaviour:
 [`auditing-and-data-ownership.md`](auditing-and-data-ownership.md).
 

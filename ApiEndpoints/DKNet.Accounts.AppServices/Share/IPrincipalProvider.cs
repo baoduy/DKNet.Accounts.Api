@@ -1,8 +1,8 @@
-﻿using DKNet.EfCore.DataAuthorization;
+﻿using DKNet.EfCore.AuditLogs;
 
 namespace DKNet.Accounts.AppServices.Share;
 
-public interface IPrincipalProvider : IDataOwnerProvider
+public interface IPrincipalProvider : ICurrentUserProvider
 {
     #region Properties
 
@@ -11,7 +11,7 @@ public interface IPrincipalProvider : IDataOwnerProvider
     /// </summary>
     /// <remarks>
     ///     Is <see cref="Guid.Empty" /> when the caller's subject claim is not a GUID (e.g. an Entra v2.0
-    ///     pairwise <c>sub</c>). <see cref="IDataOwnerProvider.GetOwnershipKey" /> — not this property — is the
+    ///     pairwise <c>sub</c>). <see cref="ICurrentUserProvider.GetCurrentUser" /> — not this property — is the
     ///     authorization boundary.
     /// </remarks>
     Guid ProfileId { get; }

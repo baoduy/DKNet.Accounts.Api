@@ -19,7 +19,7 @@ global using DKNet.Accounts.Share.Options;
 global using DKNet.Accounts.Api.Configs.Antiforgery;
 global using DKNet.Accounts.Api.Configs.Healthz;
 global using SlimMessageBus;
-global using DKNet.EfCore.DataAuthorization;
+global using DKNet.EfCore.AuditLogs;
 global using DKNet.SlimBus.Extensions;
 global using Microsoft.Extensions.Options;
 global using Microsoft.AspNetCore.HttpsPolicy;
