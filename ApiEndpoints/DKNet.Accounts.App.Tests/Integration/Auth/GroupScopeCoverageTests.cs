@@ -28,7 +28,14 @@ public sealed class GroupScopeCoverageTests
 {
     private const string TestGroupName = "test-only-group";
 
-    private static async Task<IHost> BuildTestHostAsync(Action<IEndpointRouteBuilder> configureEndpoints)
+    /// <param name="configureEndpoints">Maps the test-only group(s) onto the host's endpoint route builder.</param>
+    /// <param name="enforceGroupScopeCoverageOnStartup">
+    /// Wires <see cref="GroupScopeCoverageStartupCheckExtensions.AddGroupScopeCoverageCheck"/> — the same
+    /// entry point <c>Program.cs</c> (§3 row 4) registers the check through — so a violating group aborts
+    /// this call's own <c>StartAsync</c> instead of only failing a later, separate assertion.
+    /// </param>
+    private static async Task<IHost> BuildTestHostAsync(
+        Action<IEndpointRouteBuilder> configureEndpoints, bool enforceGroupScopeCoverageOnStartup = false)
     {
         var hostBuilder = new HostBuilder()
             .ConfigureWebHost(webHost =>
@@ -47,6 +54,10 @@ public sealed class GroupScopeCoverageTests
                         }
                     });
                     services.AddSingleton<IAuthorizationHandler, HasScopeHandler>();
+                    if (enforceGroupScopeCoverageOnStartup)
+                    {
+                        services.AddGroupScopeCoverageCheck();
+                    }
                 });
                 webHost.Configure(app =>
                 {
@@ -81,24 +92,24 @@ public sealed class GroupScopeCoverageTests
     [Fact]
     public async Task MethodWithNoDeclaredScope_StopsTheApiAtStartup()
     {
-        IReadOnlyList<Endpoint>? endpoints = null;
+        // Building and starting the host IS the "API starts" step — the coverage check runs from inside
+        // that same call (enforceGroupScopeCoverageOnStartup wires GroupScopeCoverageHostedService, the
+        // entry point Program.cs §3 row 4 uses), so a violating group must make THIS call throw, not a
+        // later, separate call to the checker after a successful start.
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() => BuildTestHostAsync(
+            routeBuilder =>
+            {
+                var group = routeBuilder.MapGroup($"/{TestGroupName}").WithDisplayName(TestGroupName);
+                group.DeclareGroupScope(ScopeNames.AccountsRead, "GET");
+                group.DeclareGroupScope(ScopeNames.AccountsWrite, "PUT");
+                group.MapGet("/{id:guid}", (Guid id) => Results.Ok());
+                group.MapPut("/{id:guid}", (Guid id) => Results.Ok());
+                // DELETE serves this group but no declaration, no per-route scope and no AllowAnonymous
+                // covers it — this is the uncovered method the coverage check must name (R5).
+                group.MapDelete("/{id:guid}", (Guid id) => Results.Ok());
+            },
+            enforceGroupScopeCoverageOnStartup: true));
 
-        using (var host = await BuildTestHostAsync(routeBuilder =>
-               {
-                   var group = routeBuilder.MapGroup($"/{TestGroupName}").WithDisplayName(TestGroupName);
-                   group.DeclareGroupScope(ScopeNames.AccountsRead, "GET");
-                   group.DeclareGroupScope(ScopeNames.AccountsWrite, "PUT");
-                   group.MapGet("/{id:guid}", (Guid id) => Results.Ok());
-                   group.MapPut("/{id:guid}", (Guid id) => Results.Ok());
-                   // DELETE serves this group but no declaration, no per-route scope and no AllowAnonymous
-                   // covers it — this is the uncovered method the coverage check must name (R5).
-                   group.MapDelete("/{id:guid}", (Guid id) => Results.Ok());
-               }))
-        {
-            endpoints = [.. host.Services.GetRequiredService<EndpointDataSource>().Endpoints];
-        }
-
-        var exception = Should.Throw<InvalidOperationException>(() => GroupScopeAuthorization.EnsureGroupScopeCoverage(endpoints));
         exception.Message.ShouldContain(TestGroupName);
         exception.Message.ShouldContain("DELETE");
     }

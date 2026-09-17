@@ -33,3 +33,31 @@ internal static class GroupScopeAuthorization
     public static void EnsureGroupScopeCoverage(IEnumerable<Endpoint> endpoints) =>
         throw new NotImplementedException();
 }
+
+/// <summary>
+/// Runs <see cref="GroupScopeAuthorization.EnsureGroupScopeCoverage"/> once, during host startup, against the
+/// app's own live <see cref="EndpointDataSource"/> (DRK-1498 §3 rows 3-4) — registered via
+/// <see cref="GroupScopeCoverageStartupCheckExtensions.AddGroupScopeCoverageCheck"/> so a declaring group left
+/// with an uncovered method aborts startup instead of shipping silently. An <see cref="IHostedService"/>'s
+/// <c>StartAsync</c> exception propagates through <c>IHost.StartAsync</c> and fails the host build — the same
+/// entry point a real run and a test alike start through, so "the check throws" and "startup fails" are the
+/// same event, not two separate assertions.
+/// </summary>
+internal sealed class GroupScopeCoverageHostedService(EndpointDataSource endpointDataSource) : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        GroupScopeAuthorization.EnsureGroupScopeCoverage(endpointDataSource.Endpoints);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+/// <summary>Registers <see cref="GroupScopeCoverageHostedService"/>. Call once, alongside <c>UseEndpointConfigs</c>
+/// (DRK-1498 §3 row 4).</summary>
+internal static class GroupScopeCoverageStartupCheckExtensions
+{
+    public static IServiceCollection AddGroupScopeCoverageCheck(this IServiceCollection services) =>
+        services.AddHostedService<GroupScopeCoverageHostedService>();
+}
