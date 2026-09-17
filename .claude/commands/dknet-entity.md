@@ -38,12 +38,11 @@ because the generator has nothing to read. If the mode was not supplied, apply
      - class-level `[RaisesEvent(EventOperations.Created, Include = [...])]`, plus a
        `[RaisesEvent(EventOperations.Updated, nameof(Prop))]` per property whose change matters;
      - `[CrudCreate]` on the constructor with DataAnnotations on its parameters — and **no**
-       acting-user parameter, which would make the acting user caller-settable (`DataOwnerHook`
+       acting-user parameter, which would make the acting user caller-settable (the audit hook
        stamps it instead);
      - `[CrudUpdate]` on each mutation method;
      - `[CrudAction("segment")]` / `[CrudAction(Verb = CrudActionVerb.Put)]` for domain actions that
-       mutate and return the DTO with no pre-condition to reject;
-     - `IOwnedBy` if the aggregate needs row-level ownership isolation.
+       mutate and return the DTO with no pre-condition to reject.
 
 2. Run `dotnet build -c Release` and stop on first error.
 3. **`auto` only** — confirm the composed event-record names against the compiled assembly; they have

@@ -110,7 +110,7 @@ generates a consumer.
 
 ## The whole path, end to end
 
-![Sequence diagram: an API endpoint sends a request over IMessageBus to an AppServices handler, the handler constructs or calls a domain method on the aggregate, which either queues an AddEvent or has a RaisesEvent declaration; the SlimBus EF Core interceptor then calls SaveChangesAsync on CoreDbContext, DataOwnerHook stamps CreatedBy and UpdatedBy, and only after the write succeeds does EventPublisher drain the queue and publish each event to its handler, optionally also producing to the product-tp Azure topic, before the result is mapped back to the DTO.](diagrams/templates-domain-event-path.svg)
+![Sequence diagram: an API endpoint sends a request over IMessageBus to an AppServices handler, the handler constructs or calls a domain method on the aggregate, which either queues an AddEvent or has a RaisesEvent declaration; the SlimBus EF Core interceptor then calls SaveChangesAsync on CoreDbContext, the audit hook stamps CreatedBy and UpdatedBy, and only after the write succeeds does EventPublisher drain the queue and publish each event to its handler, optionally also producing to the product-tp Azure topic, before the result is mapped back to the DTO.](diagrams/templates-domain-event-path.svg)
 
 ## Ordering and transaction guarantee
 

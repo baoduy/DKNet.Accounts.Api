@@ -54,8 +54,8 @@ public class Product : AggregateRoot, IOwnedBy
     [SensitiveData("pricing")] public decimal? SupplierCostPrice { get; private set; }
     [SensitiveData] public string? SupplierReferenceCode { get; private set; }
 
-    // Stamped by DataOwnerHook from the same ownership key as CreatedBy; makes the row subject to
-    // DataOwnerAuthQuery's global read filter.
+    // A tenant-ownership marker from DKNet.EfCore.DataAuthorization — a package this service does not
+    // reference, so nothing stamps or filters on it here. Shown because the DTO excludes it, below.
     public string OwnedBy { get; private set; } = string.Empty;
 
     [CrudUpdate]

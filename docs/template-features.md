@@ -136,10 +136,9 @@ demonstration row carrying
 both role-gated `[SensitiveData]` properties, so response filtering is visible on a host you just
 started — it counts toward the 10 000 rather than adding to it. They are attributed to
 `SharedConsts.SystemAccount` (`"System"`), the same
-account the three reference purchase orders carry; for `Product`, which implements `IOwnedBy`, that
-is also the `OwnedBy` value, which is what lets the
-[row-level ownership filter](auditing-and-data-ownership.md#row-level-ownership-filtering) show the
-generated rows to your own local (unauthenticated) requests. The three reference orders are
+account the three reference purchase orders carry, and the value the
+[audit hook](auditing-and-data-ownership.md) stamps for an unauthenticated local request. The three
+reference orders are
 untouched — generated data is additive — and no domain event is published for a generated record,
 so the logs and the dashboard stay readable.
 
