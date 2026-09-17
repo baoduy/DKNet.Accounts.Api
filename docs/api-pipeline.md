@@ -220,13 +220,16 @@ convenience: whatever the caller put in the body or query string for that member
 discarded.
 
 A request member declared `[FromRequestHeader(...)]` is populated the same way, from the named request
-header rather than from a claim: that is how `IdempotencyKey` reaches the two posting requests, so
-`POST /v1/postings` and `POST /v1/postings/batch` no longer read `Idempotency-Key` out of
-`HttpRequest.Headers` in the route delegate, and a key sent in the body is discarded exactly as a
-`[FromClaim]` member's body value is. The attribute contributes nothing to OpenAPI on its own — each of
-the two routes declares the `Idempotency-Key` header parameter explicitly, and
+header rather than from a claim — `IdempotencyKey` on `Postings/V1/Actions/Record.cs` and
+`RecordBatch.cs` — so `POST /v1/postings` and `POST /v1/postings/batch` no longer read
+`Idempotency-Key` out of `HttpRequest.Headers` in the route delegate, and a key sent in the body is
+discarded exactly as a `[FromClaim]` member's body value is. The declaration is also what publishes the
+parameter: the same `AddContextualRequestPopulation` registration installs
+`ContextualSourceOperationTransformer`, which advertises every `[FromRequestHeader]` member as an
+`in: header` parameter on its operation, so neither route declares one by hand — a hand-written
+declaration would publish it twice.
 `DKNet.Accounts.App.Tests/Integration/Ledger/PostingsIdempotencyHeaderContractTests.cs` reads the
-published document to prove both still do.
+published document to prove both operations carry it.
 
 `SystemAccountFallback` only substitutes a value when `RequireAuthorization` is `false` *and* the
 claim resolver couldn't resolve a value — with the shipped defaults that means local Development and
