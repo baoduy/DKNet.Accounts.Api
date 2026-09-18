@@ -73,4 +73,4 @@ catch (AccountApiException ex)
 ```
 
 Full route coverage, list-query arguments and the idempotency contract:
-[docs/accounts-client.md](../../docs/accounts-client.md).
+[docs/accounts-client.md](https://github.com/baoduy/DKNet.Accounts.Api/blob/dev/docs/accounts-client.md).
