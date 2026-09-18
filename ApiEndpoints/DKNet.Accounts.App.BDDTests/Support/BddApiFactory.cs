@@ -1,12 +1,9 @@
 using DKNet.AspCore.Idempotency;
 using DKNet.AspCore.Idempotency.RedisStore;
 using DKNet.AspCore.Idempotency.Store;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
-using DKNet.Accounts.App.TestSupport;
-using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
 
@@ -48,6 +45,10 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
             await dbContext.Database.ExecuteSqlRawAsync(
                 $"TRUNCATE TABLE {string.Join(", ", tables)} RESTART IDENTITY CASCADE");
         }
+
+        // The truncate above wipes out the AddCurrencies migration's seed rows along with every other
+        // table's data — reseed them the same way TestApiFactoryBase's own InMemory reset does (R2).
+        await SeedCurrenciesAsync();
 
         LogCapture.Clear();
     }

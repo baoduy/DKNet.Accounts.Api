@@ -5,7 +5,7 @@ namespace DKNet.Accounts.App.Tests.Unit.Domains;
 public class AccountGroupTests
 {
     private static AccountGroup NewGroup() => new(
-        code: "CUST-000123",
+        code: "CUST1",
         name: "Acme",
         description: "desc",
         type: AccountGroupType.Customer,
@@ -17,7 +17,7 @@ public class AccountGroupTests
     {
         var group = NewGroup();
 
-        group.Code.ShouldBe("CUST-000123");
+        group.Code.ShouldBe("CUST1");
         group.Name.ShouldBe("Acme");
         group.Description.ShouldBe("desc");
         group.Type.ShouldBe(AccountGroupType.Customer);

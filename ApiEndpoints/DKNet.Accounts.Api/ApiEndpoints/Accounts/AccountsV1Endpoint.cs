@@ -1,4 +1,3 @@
-using DKNet.AspCore.Extensions.Endpoints;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.AppServices.Accounts.V1;

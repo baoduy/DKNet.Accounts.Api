@@ -1,6 +1,5 @@
 using DKNet.EfCore.Specifications.Definitions;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
-using LinqKit;
 
 namespace DKNet.Accounts.AppServices.Postings.V1.Specs;
 

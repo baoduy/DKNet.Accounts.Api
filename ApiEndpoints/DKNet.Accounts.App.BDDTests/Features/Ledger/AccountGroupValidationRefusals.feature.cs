@@ -133,17 +133,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 5
-    await testRunner.GivenAsync("no account group holds the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("no account group holds the code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 6
-    await testRunner.WhenAsync("treasury-ops creates a group with code \"TREASURY-OPS\" and name \"Treasury Operatio" +
-                        "ns\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops creates a group with code \"TROPS\" and name \"Treasury Operations\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 7
     await testRunner.ThenAsync("the group is created", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 8
-    await testRunner.AndAsync("the response carries the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the response carries the code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -174,10 +173,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 12
-    await testRunner.GivenAsync("an account group holds the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("an account group holds the code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 13
-    await testRunner.WhenAsync("treasury-ops creates another group with code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops creates another group with code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 14
     await testRunner.ThenAsync("the request is refused with 422", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -214,10 +213,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 19
-    await testRunner.GivenAsync("no account group holds the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("no account group holds the code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 20
-    await testRunner.WhenAsync("two requests create a group with code \"TREASURY-OPS\" at the same moment", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("two requests create a group with code \"TROPS\" at the same moment", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 21
     await testRunner.ThenAsync("one request creates the group", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -226,7 +225,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.AndAsync("the other is refused and the refusal carries the code \"DUPLICATE_GROUP_CODE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 23
-    await testRunner.AndAsync("exactly one account group holds the code \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("exactly one account group holds the code \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -266,11 +265,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 27
-    await testRunner.GivenAsync(string.Format("the account group \"TREASURY-OPS\" holds an account with a balance of {0} SGD and a" +
-                            " held amount of {1} SGD", balance, held), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync(string.Format("the account group \"TROPS\" holds an account with a balance of {0} SGD and a held a" +
+                            "mount of {1} SGD", balance, held), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 28
-    await testRunner.WhenAsync("treasury-ops closes the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops closes the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 29
     await testRunner.ThenAsync("the request is refused with 422", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -307,17 +306,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 39
-    await testRunner.GivenAsync("the account group \"TREASURY-OPS\" holds one account with a balance of 0.00 SGD and" +
-                        " a held amount of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROPS\" holds one account with a balance of 0.00 SGD and a held" +
+                        " amount of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 40
-    await testRunner.WhenAsync("treasury-ops closes the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops closes the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 41
     await testRunner.ThenAsync("the group is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 42
-    await testRunner.AndAsync("the response carries the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the response carries the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -348,10 +347,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 46
-    await testRunner.GivenAsync("the account group \"TREASURY-OPS\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROPS\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 47
-    await testRunner.WhenAsync("treasury-ops closes the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops closes the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 48
     await testRunner.ThenAsync("the group is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -385,16 +384,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 52
-    await testRunner.GivenAsync("the account group \"TREASURY-OPS\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROPS\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 53
-    await testRunner.WhenAsync("treasury-ops reopens the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops reopens the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 54
     await testRunner.ThenAsync("the group is active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 55
-    await testRunner.AndAsync("the response carries the group \"TREASURY-OPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the response carries the group \"TROPS\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -433,19 +432,19 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 59
-    await testRunner.GivenAsync("the account group \"TREASURY-OPS\" is active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROPS\" is active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 60
     await testRunner.AndAsync("auditor-ops holds the account-group read permission and not the write permission", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 61
-    await testRunner.WhenAsync(string.Format("auditor-ops {0} the group \"TREASURY-OPS\"", action), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync(string.Format("auditor-ops {0} the group \"TROPS\"", action), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 62
     await testRunner.ThenAsync("the request is refused with 403", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 63
-    await testRunner.AndAsync("the group \"TREASURY-OPS\" is still active", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the group \"TROPS\" is still active", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -476,17 +475,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 72
-    await testRunner.GivenAsync("the account group \"TREASURY-OPS\" is active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROPS\" is active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 73
-    await testRunner.WhenAsync("treasury-ops sends a partial update of the group \"TREASURY-OPS\" carrying only the" +
-                        " status \"Closed\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops sends a partial update of the group \"TROPS\" carrying only the status" +
+                        " \"Closed\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 74
     await testRunner.ThenAsync("the request answers 405", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 75
-    await testRunner.AndAsync("the group \"TREASURY-OPS\" is still active", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the group \"TROPS\" is still active", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

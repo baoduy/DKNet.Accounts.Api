@@ -362,7 +362,8 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
 | `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
-| `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set |
+| `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
+| `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |
 | `422` | `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing was recorded — retry, reusing the same `Idempotency-Key` |
 
 Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that

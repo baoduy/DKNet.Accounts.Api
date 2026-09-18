@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.App.Tests.Integration.Support;
 using DKNet.Accounts.App.TestSupport;
-using DKNet.Accounts.AppServices.Share;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -34,11 +33,36 @@ public sealed class AccountStatementTests(LedgerApiFixture fixture) : IClassFixt
         return request;
     }
 
+
+    private Guid? _fixtureGroupId;
+
+    /// <summary>A real group to open accounts into. Opening reads its group now — an account number is
+    /// {group code}-{suffix} — so a fabricated group id is refused.</summary>
+    private async Task<Guid> FixtureGroupIdAsync()
+    {
+        if (_fixtureGroupId is not null)
+        {
+            return _fixtureGroupId.Value;
+        }
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/account-groups", new
+        {
+            code = $"G{Guid.NewGuid():N}"[..5].ToUpperInvariant(),
+            name = "Fixture Group",
+            type = "Customer",
+            ownerId = "PayHub"
+        }));
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+        _fixtureGroupId = created.GetProperty("id").GetGuid();
+        return _fixtureGroupId.Value;
+    }
+
     private async Task<Guid> OpenAccountAsync()
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
         {
-            groupId = Guid.NewGuid(),
+            groupId = await FixtureGroupIdAsync(),
             name = "Operating",
             currency = "SGD",
             classification = "Liability",

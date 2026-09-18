@@ -1,6 +1,5 @@
 using Microsoft.OpenApi;
 using DKNet.Accounts.Api.Configs.Auth;
-using DKNet.Accounts.Api.Configs.Healthz;
 
 namespace DKNet.Accounts.Api.Configs.Swagger;
 

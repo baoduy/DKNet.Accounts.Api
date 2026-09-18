@@ -1,8 +1,4 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Infra.Contexts;
 
@@ -36,6 +32,7 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.GroupHoldsBalance,
         LedgerErrors.GroupNotEmpty,
         LedgerErrors.DuplicateGroupCode,
+        LedgerErrors.DuplicateCurrencyCode,
         LedgerErrors.UnsupportedCurrency,
         LedgerErrors.InvalidPostingAmount,
         LedgerErrors.CurrencyMismatch,
@@ -53,13 +50,14 @@ internal static class LedgerErrorResponseOptions
 
     /// <summary>
     /// The DB unique index a lost race trips, mapped to the same stable code its pre-check answers with (R1)
-    /// — only the two business indexes named in §5; a service-issued value colliding (account number, posting
+    /// — only the business indexes named in §5; a service-issued value colliding (account number, posting
     /// number) stays unmapped and falls through to the generic code-less 409 (R2).
     /// </summary>
     private static readonly IReadOnlyDictionary<string, string> UniqueIndexCodes =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["IX_AccountGroups_Code"] = LedgerErrors.DuplicateGroupCode,
+            ["IX_Currencies_Code"] = LedgerErrors.DuplicateCurrencyCode,
             ["IX_Postings_CallingSystem_IdempotencyKey"] = LedgerErrors.IdempotencyKeyConflict
         };
 

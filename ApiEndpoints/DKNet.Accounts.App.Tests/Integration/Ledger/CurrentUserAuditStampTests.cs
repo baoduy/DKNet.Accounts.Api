@@ -59,7 +59,7 @@ public sealed class CurrentUserAuditStampTests(NoTenantOwnershipApiFixture fixtu
     [Fact]
     public async Task OpeningAnAccount_WithNoTenantOwnershipFeatureRegistered_RecordsTheSignedInUserAsCreator()
     {
-        var groupId = await SeedGroupAsync($"TRE-{Guid.NewGuid():N}"[..12]);
+        var groupId = await SeedGroupAsync($"T{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
         var response = await Client.SendAsync(AsTreasuryOps(HttpMethod.Post, "/v1/accounts", new
         {
@@ -85,7 +85,7 @@ public sealed class CurrentUserAuditStampTests(NoTenantOwnershipApiFixture fixtu
     [Fact]
     public async Task RenamingAnAccountGroup_WithNoTenantOwnershipFeatureRegistered_RecordsTheSignedInUserAsLastEditor()
     {
-        var groupId = await SeedGroupAsync($"TRE-{Guid.NewGuid():N}"[..12]);
+        var groupId = await SeedGroupAsync($"T{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
         await Client.SendAsync(AsTreasuryOps(HttpMethod.Put, $"/v1/account-groups/{groupId}", new
         {

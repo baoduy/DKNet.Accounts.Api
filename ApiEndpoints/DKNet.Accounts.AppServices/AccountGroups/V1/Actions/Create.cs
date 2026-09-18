@@ -17,12 +17,14 @@ internal sealed class CreateAccountGroupCommandValidator : AbstractValidator<Cre
     public CreateAccountGroupCommandValidator(IRepositorySpec repository)
     {
         // Cascade(Stop): the duplicate-code lookup only runs once the shape rules on Code pass (R2) — an
-        // empty or over-length code never touches the database.
+        // empty or wrong-length code never touches the database. 3-5 chars: the code is the literal prefix
+        // of every account number opened in this group ({Code}-{suffix}), so it has to stay short.
         RuleFor(r => r.Code)
             .Cascade(CascadeMode.Stop)
             .NotEmpty()
-            .MaximumLength(50)
-            .MustAsync(async (code, ct) => !await repository.AnyAsync(new SpecGetAccountGroup(byCode: code), ct))
+            .Length(3, 5)
+            .MustAsync(async (code, ct) => !await repository.AnyAsync(
+                new SpecGetAccountGroup(byCode: code.ToUpperInvariant()), ct))
             .WithErrorCode(LedgerErrors.DuplicateGroupCode)
             .WithMessage(r => $"A group with code '{r.Code}' already exists.");
         RuleFor(r => r.Name).NotEmpty().MaximumLength(200);

@@ -42,7 +42,7 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
         // (e.g. "group-for-Operating SGD"), and a group code with a space in it is refused by validation.
         var response = await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
         {
-            code = $"grp-{Guid.NewGuid():N}", name, type = "Customer", ownerId = state.CallerClientId
+            code = $"g{Guid.NewGuid():N}"[..5].ToUpperInvariant(), name, type = "Customer", ownerId = state.CallerClientId
         });
         var id = (await TryReadIdAsync(response))!.Value;
         state.Values[$"group:{name}"] = id.ToString();
@@ -251,7 +251,7 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
     public async Task WhenSendsACreateRequestForAnAccountGroupWithNoName() =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, GroupsPath, new
         {
-            code = $"NO-NAME-{Guid.NewGuid():N}", name = "", type = "Customer", ownerId = "treasury-ops"
+            code = $"N{Guid.NewGuid():N}"[..5].ToUpperInvariant(), name = "", type = "Customer", ownerId = "treasury-ops"
         });
 
     [When(@"""[^""]+"" sends a delete request for ""([^""]+)""")]
@@ -305,10 +305,10 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
     public async Task WhenSendsToTheAddressPublishedToday(string request) =>
         state.Response = request switch
         {
-            "the request to open a third account in \"Treasury\"" =>
+            "the request to open a third account in \"TRSY\"" =>
                 await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
                 {
-                    groupId = Group("Treasury"), name = "Third Account", currency = "SGD", classification = "Liability"
+                    groupId = Group("TRSY"), name = "Third Account", currency = "SGD", classification = "Liability"
                 }),
             "the request to close \"Spare SGD\"" =>
                 await client.SendAsCallerAsync(

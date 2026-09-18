@@ -2,9 +2,9 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
 
   @new @integration
   Scenario: A business-rule refusal carries its code inside the error list
-    Given the account group "Treasury" holds an account with a balance of 100.00 SGD
+    Given the account group "TRSY" holds an account with a balance of 100.00 SGD
     And "treasury-ops" is signed in and holds the accounts-write permission
-    When "treasury-ops" sends the close request for "Treasury"
+    When "treasury-ops" sends the close request for "TRSY"
     Then the response status is 422
     And one error in the response carries the code "GROUP_HOLDS_BALANCE"
     And the response carries no "detail" member
@@ -36,8 +36,8 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
 
   @integration @guard
   Scenario Outline: The hand-written account routes keep working at their current addresses
-    Given the account "Operating SGD" is open in the group "Treasury" with a balance of 100.00 SGD
-    And the account "Spare SGD" is open in the group "Treasury" with a balance of 0.00 SGD
+    Given the account "Operating SGD" is open in the group "TRSY" with a balance of 100.00 SGD
+    And the account "Spare SGD" is open in the group "TRSY" with a balance of 0.00 SGD
     And "treasury-ops" is signed in and holds every accounts permission and the postings-read permission
     When "treasury-ops" sends <request> to the address published today
     Then the request succeeds
@@ -45,7 +45,7 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
 
     Examples:
       | request                                                   | result                                                |
-      | the request to open a third account in "Treasury"         | the third account is open with a balance of 0.00 SGD  |
+      | the request to open a third account in "TRSY"         | the third account is open with a balance of 0.00 SGD  |
       | the request to close "Spare SGD"                           | "Spare SGD" is closed                                 |
       | the request to set an overdraft limit on "Operating SGD"   | "Operating SGD" carries that overdraft limit           |
       | the request to read the balance of "Operating SGD"         | the balance read is 100.00 SGD                        |
@@ -62,9 +62,9 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
 
   @integration @guard
   Scenario: Reading a group's totals per currency keeps working at its current address
-    Given the account group "Treasury" holds two SGD accounts with balances of 40.00 and 60.00
+    Given the account group "TRSY" holds two SGD accounts with balances of 40.00 and 60.00
     And "treasury-ops" is signed in and holds the accounts-read permission
-    When "treasury-ops" reads the totals of "Treasury"
+    When "treasury-ops" reads the totals of "TRSY"
     Then one line is returned for SGD with a total of 100.00
 
   @integration @guard
@@ -102,9 +102,9 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
 
   @integration @guard
   Scenario: A caller without the write permission is still refused
-    Given the account group "Treasury" is closed
+    Given the account group "TRSY" is closed
     And "treasury-ops" is signed in and holds only the accounts-read permission
-    When "treasury-ops" sends the activate request for "Treasury"
+    When "treasury-ops" sends the activate request for "TRSY"
     Then the request is refused as not permitted
     And the response carries no body
-    And the account group "Treasury" stays closed
+    And the account group "TRSY" stays closed

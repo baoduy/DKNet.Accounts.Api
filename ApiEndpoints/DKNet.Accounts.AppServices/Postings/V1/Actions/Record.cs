@@ -1,9 +1,8 @@
-using DKNet.AspCore.Extensions.ModelBinding;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.AppServices.Currencies.V1.Specs;
 using DKNet.Accounts.AppServices.Postings.V1.Specs;
-using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using DKNet.Accounts.Domains.Share;
 
@@ -77,14 +76,21 @@ internal sealed class RecordPostingCommandHandler(
             return Result.Fail<PostingDto>("The caller is not authenticated.");
         }
 
-        var currency = Currency.All.FirstOrDefault(c => c.Code == request.Currency);
+        var currencyCode = request.Currency.ToUpperInvariant();
+        var currency = await repository.FirstOrDefaultAsync(new SpecGetCurrency(byCode: currencyCode), cancellationToken);
         if (currency is null)
         {
             return Result.Fail<PostingDto>(LedgerErrors.Error(
                 LedgerErrors.UnsupportedCurrency, $"'{request.Currency}' is not a supported currency."));
         }
 
-        if (PostingAmount.Validate(request.Amount, currency) != PostingAmountValidation.Valid)
+        if (!currency.IsActive)
+        {
+            return Result.Fail<PostingDto>(LedgerErrors.Error(
+                LedgerErrors.UnsupportedCurrency, $"'{request.Currency}' is not currently offered."));
+        }
+
+        if (PostingAmount.Validate(request.Amount, currency.DecimalPlaces) != PostingAmountValidation.Valid)
         {
             return Result.Fail<PostingDto>(LedgerErrors.Error(
                 LedgerErrors.InvalidPostingAmount, "The amount must be positive and match the currency's precision."));

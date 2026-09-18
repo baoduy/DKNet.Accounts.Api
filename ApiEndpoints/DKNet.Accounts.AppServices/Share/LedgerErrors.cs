@@ -18,6 +18,7 @@ public static class LedgerErrors
     public const string GroupHoldsBalance = "GROUP_HOLDS_BALANCE";
     public const string GroupNotEmpty = "GROUP_NOT_EMPTY";
     public const string DuplicateGroupCode = "DUPLICATE_GROUP_CODE";
+    public const string DuplicateCurrencyCode = "DUPLICATE_CURRENCY_CODE";
     public const string UnsupportedCurrency = "UNSUPPORTED_CURRENCY";
 
     public const string InvalidPostingAmount = "INVALID_POSTING_AMOUNT";

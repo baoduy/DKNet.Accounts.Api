@@ -33,12 +33,37 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         return request;
     }
 
+
+    private Guid? _fixtureGroupId;
+
+    /// <summary>A real group to open accounts into. Opening reads its group now — an account number is
+    /// {group code}-{suffix} — so a fabricated group id is refused.</summary>
+    private async Task<Guid> FixtureGroupIdAsync()
+    {
+        if (_fixtureGroupId is not null)
+        {
+            return _fixtureGroupId.Value;
+        }
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/account-groups", new
+        {
+            code = $"G{Guid.NewGuid():N}"[..5].ToUpperInvariant(),
+            name = "Fixture Group",
+            type = "Customer",
+            ownerId = "PayHub"
+        }));
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+        _fixtureGroupId = created.GetProperty("id").GetGuid();
+        return _fixtureGroupId.Value;
+    }
+
     private async Task<Guid> OpenAccountAsync(
         bool permittedToGoNegative = false, decimal? overdraftLimit = null, decimal? minimumBalance = null)
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
         {
-            groupId = Guid.NewGuid(),
+            groupId = await FixtureGroupIdAsync(),
             name = "Operating",
             currency = "SGD",
             classification = "Asset",
@@ -159,7 +184,7 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
         {
-            groupId = Guid.NewGuid(),
+            groupId = await FixtureGroupIdAsync(),
             name = "Operating",
             currency = "XXX",
             classification = "Asset",
@@ -192,5 +217,88 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var response = await Client.SendAsync(request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// An account number is always {group code}-{suffix}: the caller may choose the suffix (3-10 chars) but
+    /// never the prefix, so a number can never claim a group the account was not opened into.
+    /// </summary>
+    private async Task<(HttpStatusCode Status, string? Number)> OpenWithNumberAsync(string? accountNumber)
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
+        {
+            groupId = await FixtureGroupIdAsync(),
+            accountNumber,
+            name = "Operating",
+            currency = "SGD",
+            classification = "Asset"
+        }));
+        if (!response.IsSuccessStatusCode)
+        {
+            return (response.StatusCode, null);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return (response.StatusCode, body.GetProperty("accountNumber").GetString());
+    }
+
+    private async Task<string> FixtureGroupCodeAsync()
+    {
+        var id = await FixtureGroupIdAsync();
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"/v1/account-groups/{id}"));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()!;
+    }
+
+    [Fact]
+    public async Task OpeningWithNoAccountNumber_GeneratesTenDigitsBehindTheGroupCode()
+    {
+        var expectedPrefix = await FixtureGroupCodeAsync();
+
+        var (status, number) = await OpenWithNumberAsync(null);
+
+        status.ShouldBe(HttpStatusCode.Created);
+        number.ShouldStartWith($"{expectedPrefix}-");
+
+        // The sequence's own value is not asserted — only its shape, so the test does not depend on how many
+        // accounts earlier tests opened.
+        var suffix = number![(expectedPrefix.Length + 1)..];
+        suffix.Length.ShouldBe(10);
+        suffix.ShouldAllBe(c => char.IsDigit(c));
+    }
+
+    [Fact]
+    public async Task OpeningWithACallerSuppliedNumber_KeepsItBehindTheGroupCode_Uppercased()
+    {
+        var expectedPrefix = await FixtureGroupCodeAsync();
+
+        var (status, number) = await OpenWithNumberAsync("ops01");
+
+        status.ShouldBe(HttpStatusCode.Created);
+        number.ShouldBe($"{expectedPrefix}-OPS01");
+    }
+
+    [Theory]
+    [InlineData("ab")]
+    [InlineData("abcdefghijk")]
+    public async Task OpeningWithANumberOutsideThreeToTenCharacters_IsRefused(string accountNumber)
+    {
+        var (status, _) = await OpenWithNumberAsync(accountNumber);
+
+        status.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task OpeningIntoAGroupThatDoesNotExist_IsRefusedAsNotFound()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
+        {
+            groupId = Guid.NewGuid(),
+            name = "Operating",
+            currency = "SGD",
+            classification = "Asset"
+        }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 }

@@ -1,7 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Reqnroll.BoDi;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
-using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
 

@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
@@ -54,12 +53,37 @@ public sealed class GroupScopeDeclarationAdoptionTests(LedgerApiFixture fixture)
         return request;
     }
 
+    private Guid? _fixtureGroupId;
+
+    /// <summary>A real group to open accounts into. Opening reads its group now — an account number is
+    /// {group code}-{suffix} — so a fabricated group id is refused.</summary>
+    private async Task<Guid> FixtureGroupIdAsync()
+    {
+        if (_fixtureGroupId is not null)
+        {
+            return _fixtureGroupId.Value;
+        }
+
+        var response = await Client.SendAsync(AsCaller(HttpMethod.Post, "/v1/account-groups", "fixture-setup",
+            string.Join(' ', ScopeNames.All), new
+            {
+                code = $"G{Guid.NewGuid():N}"[..5].ToUpperInvariant(),
+                name = "Fixture Group",
+                type = "Customer",
+                ownerId = "fixture-setup"
+            }));
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+        _fixtureGroupId = created.GetProperty("id").GetGuid();
+        return _fixtureGroupId.Value;
+    }
+
     private async Task<Guid> OpenAccountAsync(string classification = "Asset")
     {
         var response = await Client.SendAsync(AsCaller(HttpMethod.Post, "/v1/accounts", "fixture-setup",
             string.Join(' ', ScopeNames.All), new
             {
-                groupId = Guid.NewGuid(),
+                groupId = await FixtureGroupIdAsync(),
                 name = "Operating",
                 currency = "SGD",
                 classification,
@@ -254,7 +278,7 @@ public sealed class GroupScopeDeclarationStandaloneTests
 
         var createResponse = await client.PostAsJsonAsync("/v1/account-groups", new
         {
-            code = $"GRP-{Guid.NewGuid():N}",
+            code = $"P{Guid.NewGuid():N}"[..5].ToUpperInvariant(),
             name = "Auth-off test group",
             type = "Customer",
             ownerId = "treasury-ops"

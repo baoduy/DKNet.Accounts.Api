@@ -1,4 +1,3 @@
-using DKNet.Accounts.Api.Configs;
 using DKNet.Accounts.Api.Configs.AzureAppConfig;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 

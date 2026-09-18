@@ -1,6 +1,5 @@
 using DKNet.EfCore.Specifications.Definitions;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
-using LinqKit;
 
 namespace DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 

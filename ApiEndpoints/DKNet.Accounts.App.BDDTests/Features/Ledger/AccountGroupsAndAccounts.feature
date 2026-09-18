@@ -3,15 +3,15 @@ Feature: Account groups and accounts
 
   @integration
   Scenario: PayHub opens an account inside a group
-    Given PayHub has created the account group "CUST-000123" of type "Customer"
-    When PayHub opens an account named "Acme Pte Ltd Operating" in "CUST-000123" in SGD as a Liability account
+    Given PayHub has created the account group "CUST1" of type "Customer"
+    When PayHub opens an account named "Acme Pte Ltd Operating" in "CUST1" in SGD as a Liability account
     Then the account is returned with a unique account number and a balance of 0.00 SGD
-    And the account appears when PayHub lists the accounts of "CUST-000123"
+    And the account appears when PayHub lists the accounts of "CUST1"
 
   @integration
   Scenario: An account permitted to go negative must state how far
-    Given PayHub has created the account group "CUST-000123" of type "Customer"
-    When PayHub opens an account in "CUST-000123" permitted to go negative but states no overdraft limit
+    Given PayHub has created the account group "CUST1" of type "Customer"
+    When PayHub opens an account in "CUST1" permitted to go negative but states no overdraft limit
     Then the request is refused and no account is opened
 
   @integration
@@ -22,14 +22,14 @@ Feature: Account groups and accounts
 
   @integration
   Scenario: Closing a group whose accounts still hold money is refused
-    Given the group "CUST-000123" holds an account with a balance of 25.00 SGD
-    When PayHub asks to close "CUST-000123"
+    Given the group "CUST1" holds an account with a balance of 25.00 SGD
+    When PayHub asks to close "CUST1"
     Then the request is refused and the group remains open
 
   @integration
   Scenario: Group balances are reported one line per currency
-    Given the group "CUST-000123" holds an account with 100.00 SGD and an account with 80.00 USD
-    When PayHub reads the balances of "CUST-000123"
+    Given the group "CUST1" holds an account with 100.00 SGD and an account with 80.00 USD
+    When PayHub reads the balances of "CUST1"
     Then the balances show 100.00 SGD and 80.00 USD as separate lines
     And no combined total across the two currencies is reported
 
@@ -47,6 +47,6 @@ Feature: Account groups and accounts
 
   @integration
   Scenario: Accounts can be listed filtered by status
-    Given the group "CUST-000123" holds two active accounts and one closed account
-    When PayHub lists the active accounts of "CUST-000123"
+    Given the group "CUST1" holds two active accounts and one closed account
+    When PayHub lists the active accounts of "CUST1"
     Then only the two active accounts are returned

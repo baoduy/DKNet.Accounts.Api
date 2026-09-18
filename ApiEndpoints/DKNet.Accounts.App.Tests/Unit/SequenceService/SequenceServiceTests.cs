@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Services;
 
