@@ -7,6 +7,11 @@
         <IsPackable>true</IsPackable>
         <PackageId>DKNet.Accounts.Client</PackageId>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <!-- Directory.Packages.props sets a repo-wide PackageIcon pointing at a NugetLogo.png that does not
+             exist anywhere in the repo (every other project sets IsPackable=false, so packing it was never
+             exercised before this project). Overridden empty here rather than fixing the shared default,
+             which is out of this ticket's scope. -->
+        <PackageIcon></PackageIcon>
         <PackageDescription>
             Typed .NET client for the DKNet Accounts service. Requires a GitHub personal access token with
             read:packages scope to restore: add a NuGet.Config source authenticated with that token (e.g. via
