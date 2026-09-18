@@ -70,6 +70,10 @@ internal static class LedgerErrorResponseOptions
 
     public static int? StatusCode(ErrorResponseContext context)
     {
+        // Precedence, not a tautology: IdempotencyKeyConflict outranks any other known code present in the
+        // same error list, so it must be checked before the generic FirstOrDefault below — which finds
+        // whichever known code appears first in the list and cannot express "this one wins regardless of
+        // position".
         if (context.Errors.Any(e => e.Code == LedgerErrors.IdempotencyKeyConflict))
         {
             return StatusForCode(LedgerErrors.IdempotencyKeyConflict);
@@ -169,11 +173,10 @@ internal static class LedgerErrorResponseOptions
     /// </summary>
     private static ProblemDetails UniqueViolationProblem(DbUpdateException dbUpdate, Exception exception, bool isDevelopment)
     {
-        var innermost = dbUpdate.InnerException?.Message ?? dbUpdate.Message;
-        var mapped = UniqueIndexCodes.FirstOrDefault(kv => innermost.Contains(kv.Key, StringComparison.OrdinalIgnoreCase));
-        var code = mapped.Value;
+        var innermost = Innermost(dbUpdate);
 
-        return code is null
+        return UniqueIndexCodes.FirstOrDefault(kv => innermost.Contains(kv.Key, StringComparison.OrdinalIgnoreCase)).Value
+            is not { } code
             ? Problem(
                 (int)HttpStatusCode.Conflict, "Request refused.",
                 "The request conflicts with an existing record.", exception, isDevelopment)
@@ -195,8 +198,16 @@ internal static class LedgerErrorResponseOptions
     /// </summary>
     private static bool IsUniqueConstraintViolation(DbUpdateException exception)
     {
-        var innermost = exception.InnerException?.Message ?? exception.Message;
+        var innermost = Innermost(exception);
         return innermost.Contains("unique", StringComparison.OrdinalIgnoreCase) ||
                innermost.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// One computation shared by <see cref="IsUniqueConstraintViolation"/> (is this a unique violation at
+    /// all) and <see cref="UniqueViolationProblem"/> (which index) — reading the same text twice risked the
+    /// two decisions drifting apart and silently degrading a mapped index back to the code-less 409.
+    /// </summary>
+    private static string Innermost(DbUpdateException exception) =>
+        exception.InnerException?.Message ?? exception.Message;
 }
