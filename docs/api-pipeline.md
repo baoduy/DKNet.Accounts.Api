@@ -162,8 +162,8 @@ covers every endpoint including the CORS preflight `OPTIONS` request.
 ## Routing and endpoint registration
 
 Every route group is an `IEndpointConfig` (`DKNet.AspCore.Extensions`) — for example
-`DKNet.Accounts.Api/ApiEndpoints/ManualSample/PurchaseOrderV1Endpoint.cs` and
-`DKNet.Accounts.Api/ApiEndpoints/AutomatedSample/ProductV1Endpoint.cs`. `DKNet.Accounts.Api/Program.cs` calls
+`DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs` and
+`DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs`. `DKNet.Accounts.Api/Program.cs` calls
 `UseEndpointConfigs(...)`, which discovers every non-abstract `IEndpointConfig` in the app assembly.
 For each one it builds a versioned route group and calls its `Map(RouteGroupBuilder)`.
 
@@ -198,9 +198,6 @@ Which scope each route requires is declared per endpoint group — see
 
 When it is `false` no authentication middleware is added at all — this is not a permissive policy
 but the absence of any identity, which is why the base file must never ship it off.
-
-`DKNet.Accounts.App.Tests/Integration/EndpointConfig/PurchaseOrderStampingAndVersioningTests.cs` pins the
-authorization-off behavior explicitly (see below).
 
 `Program.cs` binds `FeatureOptions` from `builder.Configuration` in its first lines, before a
 `WebApplicationFactory`'s `ConfigureAppConfiguration` overrides are merged in. A test fixture
@@ -365,14 +362,12 @@ the same ones a refused command and an unhandled error answer through.
 
 ## Idempotency on POST
 
-Idempotency is opt-in per route, not automatic for every POST.
-`DKNet.Accounts.Api/ApiEndpoints/ManualSample/PurchaseOrderV1Endpoint.cs`'s create route chains
+Idempotency is opt-in per route, not automatic for every POST. A hand-mapped create route can chain
 `.RequiredIdempotentKey()`, which enforces the idempotency key header (default
-`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. The
-automated sample's generated create route
-(`DKNet.Accounts.Api/ApiEndpoints/AutomatedSample/ProductV1Endpoint.cs`'s `MapProductCrud()`) makes no such
-call; a replayed request there is processed as a brand-new create, not deduplicated. Add
-`.RequiredIdempotentKey()` yourself on any route where duplicate submissions matter.
+`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. A
+route built from the generated CRUD composite (`Map<Entity>Crud()`, e.g. `AccountGroupsV1Endpoint`'s
+`MapAccountGroupCrud()`) makes no such call. Add `.RequiredIdempotentKey()` yourself on any
+hand-mapped route where duplicate submissions matter.
 
 Store selection happens once in `DKNet.Accounts.Api/Configs/AppConfig.cs`, based on whether
 `ConnectionStrings:Redis` is configured:
