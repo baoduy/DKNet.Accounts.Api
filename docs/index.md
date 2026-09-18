@@ -60,7 +60,7 @@ both — never hand-edit the SVG.
 
 - [API Request Pipeline](api-pipeline.md) — what happens to a request before it reaches a handler.
 - [Endpoint Scope Declarations](endpoint-scope-declarations.md) — declaring a group's scopes once per
-  HTTP method, overriding one route, and the startup refusal.
+  HTTP method, overriding one route, and what happens when a method is left uncovered.
 - [SlimMessageBus Messaging](slimbus-messaging.md) — the command/query/event bus wiring.
 - [EF Core Domain Events](efcore-events.md) — how domain events are collected and published.
 - [Auditing and Acting-User Attribution](auditing-and-data-ownership.md) — how audit fields get populated
