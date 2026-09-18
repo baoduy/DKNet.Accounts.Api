@@ -45,6 +45,7 @@
         <ProjectReference Include="..\DKNet.Accounts.Api\DKNet.Accounts.Api.csproj" />
         <ProjectReference Include="..\DKNet.Accounts.App.TestSupport\DKNet.Accounts.App.TestSupport.csproj" />
         <ProjectReference Include="..\DKNet.Accounts.AppHost\DKNet.Accounts.AppHost.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.Client\DKNet.Accounts.Client.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>true</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>true</IsPackable>
+        <PackageId>DKNet.Accounts.Client</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <!-- Directory.Packages.props sets a repo-wide PackageIcon pointing at a NugetLogo.png that does not
+             exist anywhere in the repo (every other project sets IsPackable=false, so packing it was never
+             exercised before this project). Overridden empty here rather than fixing the shared default,
+             which is out of this ticket's scope. -->
+        <PackageIcon></PackageIcon>
+        <PackageDescription>
+            Typed .NET client for the DKNet Accounts service. Requires a GitHub personal access token with
+            read:packages scope to restore: add a NuGet.Config source authenticated with that token (e.g. via
+            the NUGET_GITHUB_TOKEN/GH_TOKEN environment variable), never committing the token itself.
+        </PackageDescription>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Http"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"/>
+    </ItemGroup>
+</Project>
