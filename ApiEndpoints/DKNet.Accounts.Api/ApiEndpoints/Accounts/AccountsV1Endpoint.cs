@@ -1,3 +1,4 @@
+using DKNet.AspCore.Extensions.Endpoints;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.AppServices.Accounts.V1;
@@ -8,6 +9,11 @@ using DKNet.Accounts.AppServices.Postings.V1;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
+// Group-level scope declaration (DRK-1556 §3 rows 2): GET needs accounts.read, POST/PUT/PATCH need
+// accounts.write — every route below is one of those four methods except the statement route, which keeps
+// its own postings.read override (R1).
+[EndpointGroupScope(ScopeNames.AccountsRead, EndpointHttpMethods.Get)]
+[EndpointGroupScope(ScopeNames.AccountsWrite, EndpointHttpMethods.Post, EndpointHttpMethods.Put, EndpointHttpMethods.Patch)]
 internal sealed class AccountsV1Endpoint : IEndpointConfig
 {
     public int Version => 1;
@@ -16,12 +22,6 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
-        // Group-level scope declaration (DRK-1498 §3 rows 1-2, 6): GET needs accounts.read, POST/PUT/PATCH
-        // need accounts.write — every route below is one of those four methods except the statement route,
-        // which keeps its own postings.read override (R1).
-        group.DeclareGroupScope(ScopeNames.AccountsRead, "GET")
-            .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "PATCH");
-
         group.MapPost("/", async (
                 OpenAccountRequest req,
                 IMessageBus bus,

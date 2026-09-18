@@ -21,10 +21,7 @@ builder.Services
     .AddAppConfig(feature, builder.Configuration)
     // Populates [FromClaim] members (e.g. ByUser) before validation and before the handler; the fallback below
     // only applies when RequireAuthorization is off, never per-caller.
-    .AddContextualRequestPopulation(o => o.SystemAccountFallback = SharedConsts.SystemAccount)
-    // Runs once at startup, after UseEndpointConfigs below has mapped every route, and aborts the host when a
-    // declaring group left an HTTP method with no scope, per-route or otherwise (DRK-1498 §3 row 4).
-    .AddGroupScopeCoverageCheck();
+    .AddContextualRequestPopulation(o => o.SystemAccountFallback = SharedConsts.SystemAccount);
 
 await builder.Build()
     .UseAppConfig(a => a.UseEndpointConfigs(o =>
