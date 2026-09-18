@@ -1,9 +1,15 @@
+using DKNet.AspCore.Extensions.Endpoints;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.AccountGroups;
 
+// Group-level scope declaration (DRK-1556 §3 row 3): every route this group registers for GET needs
+// accounts.read, and for POST/PUT/DELETE needs accounts.write, unless the route names its own scope (none
+// here do) or is anonymous.
+[EndpointGroupScope(ScopeNames.AccountsRead, EndpointHttpMethods.Get)]
+[EndpointGroupScope(ScopeNames.AccountsWrite, EndpointHttpMethods.Post, EndpointHttpMethods.Put, EndpointHttpMethods.Delete)]
 internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 {
     public int Version => 1;
@@ -12,12 +18,6 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
-        // Group-level scope declaration (DRK-1498 §3 rows 1-2, 5): every route this group registers for GET
-        // needs accounts.read, and for POST/PUT/DELETE needs accounts.write, unless the route names its own
-        // scope (none here do) or is anonymous.
-        group.DeclareGroupScope(ScopeNames.AccountsRead, "GET")
-            .DeclareGroupScope(ScopeNames.AccountsWrite, "POST", "PUT", "DELETE");
-
         // Create/List/GetById/Delete plus the three [CrudUpdate] members (Rename, ChangeDescription,
         // ChangeMetadata), Activate and Close all now register through one generated composite (DRK-1440 §3
         // rows 1-3; DRK-1522 §3 row 11: Close moves in too — its GROUP_HOLDS_BALANCE refusal now runs as a
