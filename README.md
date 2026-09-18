@@ -595,6 +595,8 @@ people who read `direction` as the sign.
 
 - [Integration guide](docs/integration-guide.md) — the end-to-end walkthrough, with real payloads.
   Reach for this first if you are integrating.
+- [Accounts client (.NET)](docs/accounts-client.md) — the `DKNet.Accounts.Client` NuGet package: a
+  typed C# client for calling this service, route coverage by area.
 - [docs/index.md](docs/index.md) — the reference docs inherited from the DKNet solution template
   (pipeline, configuration, EF Core events, messaging). Reach for these when you are changing this
   service, not when you are calling it.
