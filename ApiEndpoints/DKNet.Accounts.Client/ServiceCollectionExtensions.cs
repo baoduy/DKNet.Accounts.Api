@@ -11,15 +11,26 @@ public static class ServiceCollectionExtensions
     /// no credential of its own (spec "The client attaches no credential of its own").</summary>
     /// <param name="services">The application's service collection.</param>
     /// <param name="baseAddress">The accounts service's base address.</param>
-    public static IServiceCollection AddAccountClient(this IServiceCollection services, Uri baseAddress) =>
-        throw new NotImplementedException();
+    public static IServiceCollection AddAccountClient(this IServiceCollection services, Uri baseAddress)
+    {
+        services.AddHttpClient<IAccountClient, AccountClient>(c => c.BaseAddress = baseAddress);
+        return services;
+    }
 
     /// <summary>Registers <see cref="IAccountClient"/> and chains <paramref name="messageHandlerType"/> onto
     /// every request it sends, so the application can attach its own credential.</summary>
     /// <param name="services">The application's service collection.</param>
     /// <param name="baseAddress">The accounts service's base address.</param>
     /// <param name="messageHandlerType">A <see cref="DelegatingHandler"/> registered in
-    /// <paramref name="services"/> — resolved per request the same way any typed-client message handler is.</param>
-    public static IServiceCollection AddAccountClient(this IServiceCollection services, Uri baseAddress, Type messageHandlerType) =>
-        throw new NotImplementedException();
+    /// <paramref name="services"/> — resolved per request the same way any typed-client message handler is.
+    /// Wired in as the client's primary transport (rather than via <c>AddHttpMessageHandler</c>) so a handler
+    /// that already wraps its own inner transport — the normal shape for a consumer that also wants to stub
+    /// the network in a test — is not rejected by <c>HttpMessageHandlerBuilder</c>'s "InnerHandler must be
+    /// null" rule for chained handlers.</param>
+    public static IServiceCollection AddAccountClient(this IServiceCollection services, Uri baseAddress, Type messageHandlerType)
+    {
+        services.AddHttpClient<IAccountClient, AccountClient>(c => c.BaseAddress = baseAddress)
+            .ConfigurePrimaryHttpMessageHandler(sp => (HttpMessageHandler)sp.GetRequiredService(messageHandlerType));
+        return services;
+    }
 }
