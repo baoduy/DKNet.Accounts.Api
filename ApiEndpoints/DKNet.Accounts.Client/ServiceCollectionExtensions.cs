@@ -23,14 +23,13 @@ public static class ServiceCollectionExtensions
     /// <param name="baseAddress">The accounts service's base address.</param>
     /// <param name="messageHandlerType">A <see cref="DelegatingHandler"/> registered in
     /// <paramref name="services"/> — resolved per request the same way any typed-client message handler is.
-    /// Wired in as the client's primary transport (rather than via <c>AddHttpMessageHandler</c>) so a handler
-    /// that already wraps its own inner transport — the normal shape for a consumer that also wants to stub
-    /// the network in a test — is not rejected by <c>HttpMessageHandlerBuilder</c>'s "InnerHandler must be
-    /// null" rule for chained handlers.</param>
+    /// Leave its <see cref="DelegatingHandler.InnerHandler"/> null: <c>AddHttpMessageHandler</c> assigns it,
+    /// and a handler that pre-wires its own inner transport is rejected by <c>HttpMessageHandlerBuilder</c>'s
+    /// "InnerHandler must be null" rule.</param>
     public static IServiceCollection AddAccountClient(this IServiceCollection services, Uri baseAddress, Type messageHandlerType)
     {
         services.AddHttpClient<IAccountClient, AccountClient>(c => c.BaseAddress = baseAddress)
-            .ConfigurePrimaryHttpMessageHandler(sp => (HttpMessageHandler)sp.GetRequiredService(messageHandlerType));
+            .AddHttpMessageHandler(sp => (DelegatingHandler)sp.GetRequiredService(messageHandlerType));
         return services;
     }
 }
