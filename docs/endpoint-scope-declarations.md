@@ -1,7 +1,7 @@
 # Endpoint Scope Declarations
 
-How an endpoint group declares, once per HTTP method, the scope every route in it requires — and what
-happens when a declaring group leaves a method uncovered.
+How an endpoint group declares, once per HTTP method, the scope every route in it requires — and why the
+API refuses to start when a declaring group leaves a method uncovered.
 
 Read this before you add a route to an endpoint group, and before you add a group of your own.
 
@@ -46,7 +46,7 @@ every route did before group declarations existed
 (`DKNet.Accounts.Api/Configs/Auth/ConditionalScopeAuthorization.cs:21`):
 
 ```csharp
-// ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs:111
+// ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs:107
 group.MapGet("{id:guid}/statement", async (/* … */) => { /* … */ })
     .RequireScope(group, ScopeNames.PostingsRead)
 ```
@@ -55,8 +55,8 @@ group.MapGet("{id:guid}/statement", async (/* … */) => { /* … */ })
 declares `accounts.read` for `GET`. It is a read over postings, not over the account record, so it is
 priced as one.
 
-An override also satisfies the coverage check for that route — a route with its own scope is covered
-whether or not the group declares its method.
+An override also satisfies the startup coverage check for that route — a route with its own scope is
+covered whether or not the group declares its method.
 
 ## Opening one route to anonymous callers
 
@@ -90,18 +90,20 @@ For each route, in this order:
 | 1 | `.AllowAnonymous()` | No scope, no token required |
 | 2 | `.RequireScope(group, …)` — a named policy | That scope, group declaration ignored |
 | 3 | The group declares every method this route serves | The declared scope for each of them |
-| 4 | The group declares some but not all of them | Refused when the group's endpoints are built — see below |
+| 4 | The group declares some but not all of them | Startup refusal — see below |
 | 5 | None of the above, in a group that declares nothing | Unchanged: authenticated caller, no scope check |
 
 Row 2 means a *named* policy specifically. `UseEndpointConfigs`' own `RequireAuthorization` option already
 stamps blanket, policy-less authorization metadata on every route in every group; that is not an override,
 and the declaration still applies over it.
 
-## When a group leaves a method uncovered
+## When the API refuses to start
 
 A group that declares at least one method must cover **every** method each of its routes serves. Leave one
-uncovered and the package's own coverage check refuses it — lazily, when the group's endpoints are built;
-this API adds nothing to force that check any earlier — with an `InvalidOperationException`:
+uncovered and the host aborts during startup with an `InvalidOperationException`. The package stamps
+`RequireAuthorization()` on every route a declaring group covers, and ASP.NET Core's own startup check for
+endpoints requiring authorization builds the group's endpoints to verify them — which runs the package's
+coverage check before the host finishes starting:
 
 ```
 Route '<pattern>' serves HTTP method '<method>' with no scope declared by an EndpointGroupScopeAttribute above its group.
@@ -127,8 +129,8 @@ a non-declaring group and re-opens the gap the check exists to close.
 ## Groups that declare nothing
 
 A group with no `[EndpointGroupScope]` attribute above it keeps today's behaviour exactly: its routes keep
-their own per-route `RequireScope` declarations, and **the coverage check does not look at it at all**. It
-is not deprecated, and adding a route to it is not an error.
+their own per-route `RequireScope` declarations, and **the startup coverage check does not look at it at
+all**. It is not deprecated, and adding a route to it is not an error.
 
 The postings group is that group today — all four of its routes still declare per-route, because
 `postings.write`, `postings.read` and `postings.reverse` do not line up one-per-HTTP-method
@@ -146,10 +148,11 @@ The whole mechanism is inert when the host wires no authorization — in this se
 
 The package turns `[EndpointGroupScope]` into authorization policies only when
 `EndpointRegistrationOptions.RequireAuthorization` is `true` — the same flag `UseEndpointConfigs` passes
-through from `FeatureManagement:RequireAuthorization`. With it off, the coverage check sees no declaring
-groups and every route answers without a token. An uncovered method in a declaring group therefore
-**cannot** fail locally or under the test fixtures — it fails in a deployed host, where the flag is on. Run
-with `FeatureManagement__RequireAuthorization=true` if you want to see the refusal before you push.
+through from `FeatureManagement:RequireAuthorization`. With it off, the startup coverage check sees no
+declaring groups and every route answers without a token. An uncovered method in a declaring group
+therefore **cannot** fail startup locally or under the test fixtures — it fails a deployed host's startup,
+where the flag is on. Run with `FeatureManagement__RequireAuthorization=true` if you want to see the
+refusal before you push.
 
 ## Gotchas and limits
 
