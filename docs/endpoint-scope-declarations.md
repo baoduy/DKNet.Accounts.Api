@@ -134,7 +134,7 @@ all**. It is not deprecated, and adding a route to it is not an error.
 
 The postings group is that group today — all four of its routes still declare per-route, because
 `postings.write`, `postings.read` and `postings.reverse` do not line up one-per-HTTP-method
-(`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs:27,43,50,69`: two different
+(`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs:25,39,46,65`: two different
 scopes on `POST` alone). So is the single-route currencies group
 (`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Currencies/CurrenciesV1Endpoint.cs:21`).
 
