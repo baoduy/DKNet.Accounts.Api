@@ -25,9 +25,6 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
-    /// <summary>The underlying <see cref="HttpClient"/> every request is sent through.</summary>
-    public HttpClient HttpClient { get; } = httpClient;
-
     // ---- Account groups (10) ----
 
     public Task<AccountGroupDto> CreateAccountGroupAsync(CreateAccountGroupRequest request, CancellationToken ct = default) =>
@@ -168,7 +165,7 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
 #pragma warning disable CA2000 // ownership transfers to the caller of SendCoreAsync; see CreateRequest's remark
         var request = CreateRequest(method, path, body, idempotencyKey);
 #pragma warning restore CA2000
-        var response = await HttpClient.SendAsync(request, ct).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
             return response;
