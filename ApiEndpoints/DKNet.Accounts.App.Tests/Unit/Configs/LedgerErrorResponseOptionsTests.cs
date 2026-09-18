@@ -222,4 +222,23 @@ public class LedgerErrorResponseOptionsTests
         problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
         ((ErrorItem[])problem.Extensions["errors"]!)[0].Code.ShouldBe(LedgerErrors.IdempotencyKeyConflict);
     }
+
+    /// <summary>
+    /// §5 row 3 / R2: a unique violation on a service-issued value (the account number) is a fault, not a
+    /// business refusal — it stays the generic code-less 409 every unmapped violation already gets. Regression
+    /// guard, not a driver: today's <see cref="LedgerErrorResponseOptions.Problem"/> overload cannot attach a
+    /// code to any exception-originated response, so this assertion already holds before row 1/3 exist —
+    /// it only turns red if a future change starts attaching a code to an unmapped index too.
+    /// </summary>
+    [Fact]
+    public void UnhandledError_DbUpdateException_NamingAnUnmappedIndex_Returns409WithNoCode()
+    {
+        var inner = new Exception("duplicate key value violates unique constraint \"IX_Accounts_AccountNumber\"");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = UnhandledError(outer, false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
+        ((ErrorItem[])problem.Extensions["errors"]!)[0].Code.ShouldBeNull();
+    }
 }
