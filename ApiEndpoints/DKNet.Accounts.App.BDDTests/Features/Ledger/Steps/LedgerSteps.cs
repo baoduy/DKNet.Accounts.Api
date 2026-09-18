@@ -20,6 +20,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     private const string PostingsPath = "/v1/postings";
     private const string CurrenciesPath = "/v1/currencies";
 
+    private HttpResponseMessage? _firstIdempotencyRaceResponse;
+    private HttpResponseMessage? _secondIdempotencyRaceResponse;
+
     #region Shared helpers
 
     private async Task<Guid> CreateGroupAsync(string code, string type)
@@ -692,6 +695,29 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task WhenPayHubReadsTheSupportedCurrencies() =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, CurrenciesPath);
 
+    // §7 @new: the lost-race counterpart of "Reusing an idempotency key for different content is refused"
+    // above — same key, different content, but both requests arrive before either's pre-check read can see
+    // the other (Record.cs:107-112's accepted race window). One is created 201; the DB's unique
+    // (CallingSystem, IdempotencyKey) index refuses the other via DbUpdateException, which
+    // LedgerErrorResponseOptions.UnhandledError must map to the same 409 + IDEMPOTENCY_KEY_CONFLICT the
+    // pre-check path answers (R1).
+    [When(@"two requests record a credit under the idempotency key ""([^""]+)"" with different amounts at the same moment")]
+    public async Task WhenTwoRequestsRecordACreditUnderTheIdempotencyKeyWithDifferentAmountsAtTheSameMoment(
+        string idempotencyKey)
+    {
+        var accountId = Account();
+        Task<HttpResponseMessage> Send(decimal amount) => client.SendAsCallerAsync(
+            state, HttpMethod.Post, PostingsPath,
+            new { accountId, direction = "Credit", amount, currency = "SGD", category = "Transfer" },
+            idempotencyKey);
+
+        var first = Send(10.00m);
+        var second = Send(20.00m);
+        await Task.WhenAll(first, second);
+        _firstIdempotencyRaceResponse = await first;
+        _secondIdempotencyRaceResponse = await second;
+    }
+
     #endregion
 
     #region Then
@@ -971,6 +997,33 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     {
         var text = await state.Response!.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<JsonElement>(text);
+    }
+
+    private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
+    {
+        var text = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<JsonElement>(text);
+    }
+
+    [Then(@"one request records the posting")]
+    public void ThenOneRequestRecordsThePosting() =>
+        (_firstIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created ||
+         _secondIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created).ShouldBeTrue(
+            $"expected one 201, got {(int)_firstIdempotencyRaceResponse!.StatusCode} and " +
+            $"{(int)_secondIdempotencyRaceResponse!.StatusCode}");
+
+    [Then(@"the other is refused with 409 and the refusal carries the code ""([^""]+)""")]
+    public async Task ThenTheOtherIsRefusedWith409AndTheRefusalCarriesTheCode(string expectedCode)
+    {
+        var other = _firstIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created
+            ? _secondIdempotencyRaceResponse!
+            : _firstIdempotencyRaceResponse!;
+        var doc = await ReadJsonAsync(other);
+        other.StatusCode.ShouldBe(
+            HttpStatusCode.Conflict, $"expected 409, got {(int)other.StatusCode}: {doc}");
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == expectedCode)
+            .ShouldBeTrue($"expected an error carrying code {expectedCode}, got: {doc}");
     }
 
     #endregion

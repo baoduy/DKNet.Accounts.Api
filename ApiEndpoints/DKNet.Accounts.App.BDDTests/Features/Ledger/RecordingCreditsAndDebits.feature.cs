@@ -107,7 +107,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/RecordingCreditsAndDebits.feature.ndjson", 13);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/RecordingCreditsAndDebits.feature.ndjson", 14);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -223,15 +223,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("Two systems may use the same idempotency key independently")]
+        [global::NUnit.Framework.DescriptionAttribute("Two simultaneous postings racing on one idempotency key leave one recorded")]
+        [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task TwoSystemsMayUseTheSameIdempotencyKeyIndependently()
+        public async global::System.Threading.Tasks.Task TwoSimultaneousPostingsRacingOnOneIdempotencyKeyLeaveOneRecorded()
         {
             string[] tagsOfScenario = new string[] {
+                    "new",
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Two systems may use the same idempotency key independently", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Two simultaneous postings racing on one idempotency key leave one recorded", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 25
@@ -245,12 +247,52 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 26
-    await testRunner.GivenAsync("PayHub has recorded a credit of 100.00 SGD under its idempotency key \"batch-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("PayHub holds an active account with a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 27
-    await testRunner.WhenAsync("LedgerSync records a credit of 40.00 SGD under its own key \"batch-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("two requests record a credit under the idempotency key \"race-key-1\" with differen" +
+                        "t amounts at the same moment", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 28
+    await testRunner.ThenAsync("one request records the posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 29
+    await testRunner.AndAsync("the other is refused with 409 and the refusal carries the code \"IDEMPOTENCY_KEY_C" +
+                        "ONFLICT\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("Two systems may use the same idempotency key independently")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task TwoSystemsMayUseTheSameIdempotencyKeyIndependently()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "4";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Two systems may use the same idempotency key independently", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 32
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 33
+    await testRunner.GivenAsync("PayHub has recorded a credit of 100.00 SGD under its idempotency key \"batch-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 34
+    await testRunner.WhenAsync("LedgerSync records a credit of 40.00 SGD under its own key \"batch-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 35
     await testRunner.ThenAsync("both postings exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -265,11 +307,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
+            string pickleIndex = "5";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A debit beyond the overdraft limit is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 31
+#line 38
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -279,14 +321,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 32
+#line 39
     await testRunner.GivenAsync("PayHub holds an account with a balance of 50.00 SGD, no minimum balance and an ov" +
                         "erdraft limit of 20.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 33
+#line 40
     await testRunner.WhenAsync("PayHub records a debit of 90.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 34
+#line 41
     await testRunner.ThenAsync("the request is refused, no posting is recorded, and the balance remains 50.00 SGD" +
                         "", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
@@ -302,11 +344,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
+            string pickleIndex = "6";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A debit within the overdraft limit is accepted", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 37
+#line 44
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -316,14 +358,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 38
+#line 45
     await testRunner.GivenAsync("PayHub holds an account with a balance of 50.00 SGD, no minimum balance and an ov" +
                         "erdraft limit of 20.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 39
+#line 46
     await testRunner.WhenAsync("PayHub records a debit of 65.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 40
+#line 47
     await testRunner.ThenAsync("the account balance is -15.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -338,11 +380,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "6";
+            string pickleIndex = "7";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The minimum balance binds over a looser overdraft limit", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 43
+#line 50
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -352,14 +394,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 44
+#line 51
     await testRunner.GivenAsync("PayHub holds an account with a balance of 100.00 SGD, a minimum balance of 50.00 " +
                         "SGD and an overdraft limit of 20.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 45
+#line 52
     await testRunner.WhenAsync("PayHub records a debit of 60.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 46
+#line 53
     await testRunner.ThenAsync("the request is refused, no posting is recorded, and the balance remains 100.00 SG" +
                         "D", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
@@ -375,11 +417,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "7";
+            string pickleIndex = "8";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting in a currency other than the account\'s is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 49
+#line 56
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -389,13 +431,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 50
+#line 57
     await testRunner.GivenAsync("PayHub holds an SGD account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 51
+#line 58
     await testRunner.WhenAsync("PayHub records a credit of 100.00 USD against it", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 52
+#line 59
     await testRunner.ThenAsync("the request is refused and no posting is recorded", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -410,11 +452,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
+            string pickleIndex = "9";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A frozen account accepts nothing", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 55
+#line 62
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -424,13 +466,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 56
+#line 63
     await testRunner.GivenAsync("PayHub holds a frozen account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 57
+#line 64
     await testRunner.WhenAsync("PayHub records a credit of 10.00 SGD against it", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 58
+#line 65
     await testRunner.ThenAsync("the request is refused", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -445,11 +487,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "9";
+            string pickleIndex = "10";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A dormant account still accepts a credit", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 61
+#line 68
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -459,13 +501,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 62
+#line 69
     await testRunner.GivenAsync("PayHub holds a dormant account with a balance of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 63
+#line 70
     await testRunner.WhenAsync("PayHub records a credit of 10.00 SGD against it", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 64
+#line 71
     await testRunner.ThenAsync("the account balance is 110.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -480,11 +522,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "10";
+            string pickleIndex = "11";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A dormant account refuses a debit", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 67
+#line 74
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -494,13 +536,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 68
+#line 75
     await testRunner.GivenAsync("PayHub holds a dormant account with a balance of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 69
+#line 76
     await testRunner.WhenAsync("PayHub records a debit of 10.00 SGD against it", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 70
+#line 77
     await testRunner.ThenAsync("the request is refused and the balance remains 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }

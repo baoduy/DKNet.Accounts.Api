@@ -51,16 +51,36 @@ internal static class LedgerErrorResponseOptions
 
     internal static bool IsKnownCode(string? code) => code is not null && KnownCodes.Contains(code);
 
+    /// <summary>
+    /// The DB unique index a lost race trips, mapped to the same stable code its pre-check answers with (R1)
+    /// — only the two business indexes named in §5; a service-issued value colliding (account number, posting
+    /// number) stays unmapped and falls through to the generic code-less 409 (R2).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> UniqueIndexCodes =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["IX_AccountGroups_Code"] = LedgerErrors.DuplicateGroupCode,
+            ["IX_Postings_CallingSystem_IdempotencyKey"] = LedgerErrors.IdempotencyKeyConflict
+        };
+
+    /// <summary>Status is derived from a code in this one place (R3) — reused by both the result path
+    /// (<see cref="StatusCode"/>) and the lost-race exception path (<see cref="UnhandledError"/>).</summary>
+    private static int StatusForCode(string code) =>
+        code == LedgerErrors.IdempotencyKeyConflict ? (int)HttpStatusCode.Conflict : (int)HttpStatusCode.UnprocessableEntity;
+
     public static int? StatusCode(ErrorResponseContext context)
     {
+        // Precedence, not a tautology: IdempotencyKeyConflict outranks any other known code present in the
+        // same error list, so it must be checked before the generic FirstOrDefault below — which finds
+        // whichever known code appears first in the list and cannot express "this one wins regardless of
+        // position".
         if (context.Errors.Any(e => e.Code == LedgerErrors.IdempotencyKeyConflict))
         {
-            return (int)HttpStatusCode.Conflict;
+            return StatusForCode(LedgerErrors.IdempotencyKeyConflict);
         }
 
-        return context.Errors.Any(e => IsKnownCode(e.Code))
-            ? (int)HttpStatusCode.UnprocessableEntity
-            : null;
+        var knownCode = context.Errors.FirstOrDefault(e => IsKnownCode(e.Code))?.Code;
+        return knownCode is not null ? StatusForCode(knownCode) : null;
     }
 
     /// <summary>
@@ -93,10 +113,11 @@ internal static class LedgerErrorResponseOptions
 
             // A unique-index violation surfaces here because SaveChanges runs after the handler returns
             // (DKNet's SlimBus EF Core interceptor auto-saves) — a concurrent duplicate is a conflict, not a
-            // server fault.
-            DbUpdateException dbUpdate when IsUniqueConstraintViolation(dbUpdate) => Problem(
-                (int)HttpStatusCode.Conflict, "Request refused.",
-                "The request conflicts with an existing record.", exception, isDevelopment),
+            // server fault. A lost race on one of the two business indexes (§3 row 1) answers the same code
+            // and status as its pre-check (R1); any other index — a service-issued value colliding, R2 — keeps
+            // the generic code-less 409.
+            DbUpdateException dbUpdate when IsUniqueConstraintViolation(dbUpdate) =>
+                UniqueViolationProblem(dbUpdate, exception, isDevelopment),
 
             _ => LogAndBuild(httpContextAccessor, exception, isDevelopment)
         };
@@ -130,7 +151,8 @@ internal static class LedgerErrorResponseOptions
         logger?.LogError(exception, "Unhandled error. TraceId: {TraceId}", traceId);
     }
 
-    private static ProblemDetails Problem(int status, string title, string message, Exception exception, bool isDevelopment)
+    private static ProblemDetails Problem(
+        int status, string title, string message, Exception exception, bool isDevelopment, string? code = null)
     {
         var problem = new ProblemDetails
         {
@@ -140,9 +162,34 @@ internal static class LedgerErrorResponseOptions
             // the generic 500 one — preserved here the same way.
             Type = isDevelopment ? exception.GetType().Name : null
         };
-        problem.Extensions["errors"] = new[] { new ErrorItem(message) };
+        problem.Extensions["errors"] = new[] { new ErrorItem(message, code) };
         return problem;
     }
+
+    /// <summary>
+    /// §3 row 1/3: the offending value is never in reach here — the exception carries no request context (Q1)
+    /// — so the message is a fixed, per-code string; a caller must assert on <c>code</c> and status, never on
+    /// message text.
+    /// </summary>
+    private static ProblemDetails UniqueViolationProblem(DbUpdateException dbUpdate, Exception exception, bool isDevelopment)
+    {
+        var innermost = Innermost(dbUpdate);
+
+        return UniqueIndexCodes.FirstOrDefault(kv => innermost.Contains(kv.Key, StringComparison.OrdinalIgnoreCase)).Value
+            is not { } code
+            ? Problem(
+                (int)HttpStatusCode.Conflict, "Request refused.",
+                "The request conflicts with an existing record.", exception, isDevelopment)
+            : Problem(
+                StatusForCode(code), "Request refused.", UniqueViolationMessage(code), exception, isDevelopment, code);
+    }
+
+    private static string UniqueViolationMessage(string code) => code switch
+    {
+        LedgerErrors.DuplicateGroupCode => "A group with this code already exists.",
+        LedgerErrors.IdempotencyKeyConflict => "This idempotency key has already been used for a different request.",
+        _ => "The request conflicts with an existing record."
+    };
 
     /// <summary>
     /// Provider-agnostic heuristic (no provider-specific exception type referenced here — Npgsql in
@@ -151,8 +198,16 @@ internal static class LedgerErrorResponseOptions
     /// </summary>
     private static bool IsUniqueConstraintViolation(DbUpdateException exception)
     {
-        var innermost = exception.InnerException?.Message ?? exception.Message;
+        var innermost = Innermost(exception);
         return innermost.Contains("unique", StringComparison.OrdinalIgnoreCase) ||
                innermost.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// One computation shared by <see cref="IsUniqueConstraintViolation"/> (is this a unique violation at
+    /// all) and <see cref="UniqueViolationProblem"/> (which index) — reading the same text twice risked the
+    /// two decisions drifting apart and silently degrading a mapped index back to the code-less 409.
+    /// </summary>
+    private static string Innermost(DbUpdateException exception) =>
+        exception.InnerException?.Message ?? exception.Message;
 }

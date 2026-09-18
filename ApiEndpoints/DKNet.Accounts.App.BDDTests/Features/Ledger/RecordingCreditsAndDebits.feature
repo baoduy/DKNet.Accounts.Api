@@ -21,6 +21,13 @@ Feature: Recording credits and debits
     When PayHub records a credit of 250.00 SGD under the same key
     Then the request is refused and no second posting exists
 
+  @new @integration
+  Scenario: Two simultaneous postings racing on one idempotency key leave one recorded
+    Given PayHub holds an active account with a balance of 0.00 SGD
+    When two requests record a credit under the idempotency key "race-key-1" with different amounts at the same moment
+    Then one request records the posting
+    And the other is refused with 409 and the refusal carries the code "IDEMPOTENCY_KEY_CONFLICT"
+
   @integration
   Scenario: Two systems may use the same idempotency key independently
     Given PayHub has recorded a credit of 100.00 SGD under its idempotency key "batch-1"

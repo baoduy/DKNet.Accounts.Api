@@ -162,8 +162,8 @@ covers every endpoint including the CORS preflight `OPTIONS` request.
 ## Routing and endpoint registration
 
 Every route group is an `IEndpointConfig` (`DKNet.AspCore.Extensions`) — for example
-`DKNet.Accounts.Api/ApiEndpoints/ManualSample/PurchaseOrderV1Endpoint.cs` and
-`DKNet.Accounts.Api/ApiEndpoints/AutomatedSample/ProductV1Endpoint.cs`. `DKNet.Accounts.Api/Program.cs` calls
+`DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs` and
+`DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs`. `DKNet.Accounts.Api/Program.cs` calls
 `UseEndpointConfigs(...)`, which discovers every non-abstract `IEndpointConfig` in the app assembly.
 For each one it builds a versioned route group and calls its `Map(RouteGroupBuilder)`.
 
@@ -199,9 +199,6 @@ Which scope each route requires is declared per endpoint group — see
 When it is `false` no authentication middleware is added at all — this is not a permissive policy
 but the absence of any identity, which is why the base file must never ship it off.
 
-`DKNet.Accounts.App.Tests/Integration/EndpointConfig/PurchaseOrderStampingAndVersioningTests.cs` pins the
-authorization-off behavior explicitly (see below).
-
 `Program.cs` binds `FeatureOptions` from `builder.Configuration` in its first lines, before a
 `WebApplicationFactory`'s `ConfigureAppConfiguration` overrides are merged in. A test fixture
 therefore cannot flip this flag with an in-memory config entry — only an `appsettings.{Environment}.json`
@@ -210,14 +207,12 @@ remarks on `DKNet.Accounts.App.Tests/Integration/Support/AuthOnApiFixture.cs`.
 
 ## `[FromClaim]` population
 
-Registered once via
-`.AddContextualRequestPopulation(o => o.SystemAccountFallback = SharedConsts.SystemAccount)` in
-`DKNet.Accounts.Api/Program.cs`, and applied automatically by `UseEndpointConfigs` for every mapped
-endpoint. Any request property marked `[FromClaim(...)]` — for example `ByUser` on
-`DKNet.Accounts.AppServices/ManualSample/V1/Actions/Create.cs` — is **overwritten** from the caller's claim
-before validation and before the handler runs. This is a security property, not a model-binding
-convenience: whatever the caller put in the body or query string for that member is always
-discarded.
+Registered once via `.AddContextualRequestPopulation()` in `DKNet.Accounts.Api/Program.cs`, and
+applied automatically by `UseEndpointConfigs` for every mapped endpoint. Any request property marked
+`[FromClaim(...)]` is **overwritten** from the caller's claim before validation and before the
+handler runs. This is a security property, not a model-binding convenience: whatever the caller put
+in the body or query string for that member is always discarded. This service currently declares no
+`[FromClaim]` member — only `[FromRequestHeader]`, below.
 
 A request member declared `[FromRequestHeader(...)]` is populated the same way, from the named request
 header rather than from a claim — `IdempotencyKey` on `Postings/V1/Actions/Record.cs` and
@@ -231,14 +226,7 @@ declaration would publish it twice.
 `DKNet.Accounts.App.Tests/Integration/Ledger/PostingsIdempotencyHeaderContractTests.cs` reads the
 published document to prove both operations carry it.
 
-`SystemAccountFallback` only substitutes a value when `RequireAuthorization` is `false` *and* the
-claim resolver couldn't resolve a value — with the shipped defaults that means local Development and
-the test suites, never a deployed service running the base file. An authenticated caller with a
-genuinely missing claim never gets the fallback — the member holds its type's default instead, and the handler must reject
-it explicitly (see `CreatePurchaseOrderCommandHandler.OnHandle`'s `IsNullOrEmpty(request.ByUser)`
-check). Pinned by `AuthorizationOff_CreateIsAttributedToSystemAccount` and
-`AuthenticatedCallerWithNoNameClaim_CreateIsRefused_NeverAttributedToSystemAccount` in
-`DKNet.Accounts.App.Tests/Integration/EndpointConfig/PurchaseOrderStampingAndVersioningTests.cs`.
+The registration exists to run `[FromRequestHeader]` population and carries no fallback.
 
 ## Role-aware sensitive-property filtering
 
@@ -374,14 +362,12 @@ the same ones a refused command and an unhandled error answer through.
 
 ## Idempotency on POST
 
-Idempotency is opt-in per route, not automatic for every POST.
-`DKNet.Accounts.Api/ApiEndpoints/ManualSample/PurchaseOrderV1Endpoint.cs`'s create route chains
+Idempotency is opt-in per route, not automatic for every POST. A hand-mapped create route can chain
 `.RequiredIdempotentKey()`, which enforces the idempotency key header (default
-`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. The
-automated sample's generated create route
-(`DKNet.Accounts.Api/ApiEndpoints/AutomatedSample/ProductV1Endpoint.cs`'s `MapProductCrud()`) makes no such
-call; a replayed request there is processed as a brand-new create, not deduplicated. Add
-`.RequiredIdempotentKey()` yourself on any route where duplicate submissions matter.
+`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. A
+route built from the generated CRUD composite (`Map<Entity>Crud()`, e.g. `AccountGroupsV1Endpoint`'s
+`MapAccountGroupCrud()`) makes no such call. Add `.RequiredIdempotentKey()` yourself on any
+hand-mapped route where duplicate submissions matter.
 
 Store selection happens once in `DKNet.Accounts.Api/Configs/AppConfig.cs`, based on whether
 `ConnectionStrings:Redis` is configured:
@@ -446,8 +432,8 @@ two refusal kinds `type` is the final status' own name, never an exception's; on
 is the exception's type name inside a `Development` run and absent outside one
 (`LedgerErrorResponseOptions.cs:133`).
 
-Nothing in this service puts the stable code on the body: the package places it on each `errors[].code`
-entry itself, so this service registers no callback of its own to add it
+On the result path, nothing in this service puts the stable code on the body: the package places it
+on each `errors[].code` entry itself, so this service registers no callback of its own to add it
 (`LedgerErrorResponseOptions.cs:17`). The two callbacks it does pass decide the status and the shape of
 an unhandled error:
 
@@ -458,8 +444,12 @@ an unhandled error:
 - `LedgerErrorResponseOptions.UnhandledError` shapes the exception path and writes its one error-severity
   log record, under the same trace id the response body carries. Most exceptions become `500`; an
   ownership refusal becomes `403`, a transport-level refusal keeps the status Kestrel gave it (a body
-  over `MaxRequestBodySize` stays `413`), and a unique-constraint violation surfacing from the
-  post-handler save becomes `409`.
+  over `MaxRequestBodySize` stays `413`); a unique-constraint violation surfacing from the post-handler
+  save is mapped back to the business rule it broke — `IX_AccountGroups_Code` → `422`
+  `DUPLICATE_GROUP_CODE`, `IX_Postings_CallingSystem_IdempotencyKey` → `409`
+  `IDEMPOTENCY_KEY_CONFLICT`, the same code and status their pre-checks already answer with — and every
+  other unique violation stays a code-less `409`. This is the one place the exception path puts a
+  stable code on the body.
 
 **An unhandled exception discloses nothing.** Outside a `Development` run its `errors` entry carries one
 fixed message and nothing the exception itself carried — no message of its own, no type name, no stack

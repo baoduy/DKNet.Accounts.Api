@@ -186,4 +186,59 @@ public class LedgerErrorResponseOptionsTests
 
         problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
     }
+
+    /// <summary>
+    /// §3 row 1/3: a lost race on the group-code unique index (<c>IX_AccountGroups_Code</c>) must answer the
+    /// same code and status as <c>CreateAccountGroupCommandValidator</c>'s pre-check (R1) — 422 with
+    /// <see cref="LedgerErrors.DuplicateGroupCode"/> — not the generic code-less 409 every other unique
+    /// violation still gets.
+    /// </summary>
+    [Fact]
+    public void UnhandledError_DbUpdateException_NamingTheAccountGroupCodeIndex_Returns422WithDuplicateGroupCode()
+    {
+        var inner = new Exception("duplicate key value violates unique constraint \"IX_AccountGroups_Code\"");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = UnhandledError(outer, false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.UnprocessableEntity);
+        ((ErrorItem[])problem.Extensions["errors"]!)[0].Code.ShouldBe(LedgerErrors.DuplicateGroupCode);
+    }
+
+    /// <summary>
+    /// §3 row 1/3: a lost race on the posting idempotency unique index
+    /// (<c>IX_Postings_CallingSystem_IdempotencyKey</c>) must answer the same code and status as
+    /// <c>RecordPostingHandler</c>'s pre-check (R1) — 409 with <see cref="LedgerErrors.IdempotencyKeyConflict"/>.
+    /// </summary>
+    [Fact]
+    public void UnhandledError_DbUpdateException_NamingThePostingIdempotencyIndex_Returns409WithIdempotencyKeyConflict()
+    {
+        var inner = new Exception(
+            "duplicate key value violates unique constraint \"IX_Postings_CallingSystem_IdempotencyKey\"");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = UnhandledError(outer, false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
+        ((ErrorItem[])problem.Extensions["errors"]!)[0].Code.ShouldBe(LedgerErrors.IdempotencyKeyConflict);
+    }
+
+    /// <summary>
+    /// §5 row 3 / R2: a unique violation on a service-issued value (the account number) is a fault, not a
+    /// business refusal — it stays the generic code-less 409 every unmapped violation already gets. Regression
+    /// guard, not a driver: today's <see cref="LedgerErrorResponseOptions.Problem"/> overload cannot attach a
+    /// code to any exception-originated response, so this assertion already holds before row 1/3 exist —
+    /// it only turns red if a future change starts attaching a code to an unmapped index too.
+    /// </summary>
+    [Fact]
+    public void UnhandledError_DbUpdateException_NamingAnUnmappedIndex_Returns409WithNoCode()
+    {
+        var inner = new Exception("duplicate key value violates unique constraint \"IX_Accounts_AccountNumber\"");
+        var outer = new DbUpdateException("Saving changes failed.", inner);
+
+        var problem = UnhandledError(outer, false);
+
+        problem.Status.ShouldBe((int)HttpStatusCode.Conflict);
+        ((ErrorItem[])problem.Extensions["errors"]!)[0].Code.ShouldBeNull();
+    }
 }
