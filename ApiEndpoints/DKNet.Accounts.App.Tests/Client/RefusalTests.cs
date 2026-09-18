@@ -41,7 +41,7 @@ public sealed class RefusalTests(LedgerApiFixture fixture) : IClassFixture<Ledge
             GroupId = group.Id,
             Name = "Operating",
             Currency = "SGD",
-            Classification = AccountClassification.Asset
+            Classification = AccountClassification.Liability
         });
         await client.RecordPostingAsync(
             new RecordPostingRequest

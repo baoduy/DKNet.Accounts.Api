@@ -35,12 +35,17 @@ public sealed class RegistrationAndCredentialTests
         handler.LastRequest.ShouldNotBeNull("the supplied handler must see the request before it leaves the application");
     }
 
-    /// <summary>"An application that needs no message handler still registers."</summary>
+    /// <summary>"An application that needs no message handler still registers." No real socket: the
+    /// primary transport is overridden the same way <see cref="TheClientAttachesNoCredentialOfItsOwn"/>
+    /// does, without adding a message handler of its own — the thing under test (registration resolves
+    /// <see cref="IAccountClient"/> and its call reaches the wire) stays intact.</summary>
     [Fact]
     public async Task AnApplicationThatNeedsNoMessageHandlerStillRegisters()
     {
+        var handler = new RecordingHandler { ResponseBody = "{\"items\":[],\"pageCount\":0,\"pageNumber\":1,\"pageSize\":1000,\"totalItemCount\":0,\"hasNextPage\":false,\"hasPreviousPage\":false}" };
         var services = new ServiceCollection();
         services.AddAccountClient(ServiceAddress);
+        services.AddHttpClient<IAccountClient, AccountClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
 
         using var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IAccountClient>();
@@ -70,18 +75,23 @@ public sealed class RegistrationAndCredentialTests
         handler.LastRequest!.Headers.Authorization.ShouldBeNull();
     }
 
-    /// <summary>"The client writes no credential to a log."</summary>
+    /// <summary>"The client writes no credential to a log." <see cref="AttachTokenHandler"/> is the plain
+    /// shape every auth sample uses — no inner handler wired in its constructor — registered as a chained
+    /// handler via <see cref="ServiceCollectionExtensions.AddAccountClient(IServiceCollection, Uri, Type)"/>
+    /// (spec §3 row 8: chained via <c>AddHttpMessageHandler</c>); <see cref="RecordingHandler"/> stands in as
+    /// the primary transport underneath it, registered before <c>AddAccountClient</c> so it is not the
+    /// registration <c>AddAccountClient</c> itself still (pre-fix) assigns as primary.</summary>
     [Fact]
     public async Task TheClientWritesNoCredentialToALog()
     {
         const string token = "super-secret-token-value";
         var handler = new RecordingHandler { ResponseBody = "{\"items\":[],\"pageCount\":0,\"pageNumber\":1,\"pageSize\":1000,\"totalItemCount\":0,\"hasNextPage\":false,\"hasPreviousPage\":false}" };
-        var tokenHandler = new AttachTokenHandler(token, handler);
         var logCapture = new TestLogCapture();
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(logCapture));
-        services.AddSingleton<AttachTokenHandler>(_ => tokenHandler);
+        services.AddHttpClient<IAccountClient, AccountClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+        services.AddSingleton(_ => new AttachTokenHandler(token));
         services.AddAccountClient(ServiceAddress, typeof(AttachTokenHandler));
 
         using var provider = services.BuildServiceProvider();
@@ -94,8 +104,10 @@ public sealed class RegistrationAndCredentialTests
 
     /// <summary>The application's own message handler — attaches a credential the way a real consumer would,
     /// so <see cref="TheClientWritesNoCredentialToALog"/> can prove that credential never reaches a log line
-    /// the client itself writes.</summary>
-    private sealed class AttachTokenHandler(string token, RecordingHandler inner) : DelegatingHandler(inner)
+    /// the client itself writes. Takes no inner handler: a handler meant to be chained via
+    /// <c>AddHttpMessageHandler</c> must leave <see cref="DelegatingHandler.InnerHandler"/> null for the
+    /// framework to assign — the shape every real auth handler uses.</summary>
+    private sealed class AttachTokenHandler(string token) : DelegatingHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
