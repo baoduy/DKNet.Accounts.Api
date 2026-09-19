@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/Schema/stryker-config-schema.json",
+  "stryker-config": {
+    "project": "DKNet.Accounts.Api.csproj",
+    "test-projects": [
+      "DKNet.Accounts.App.Tests.csproj"
+    ],
+    "reporters": [
+      "html",
+      "progress"
+    ],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    },
+    "mutate": [
+      "!**/GlobalUsings.cs",
+      "!**/*.g.cs"
+    ]
+  }
+}

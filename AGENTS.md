@@ -73,6 +73,20 @@ The template carries two side-by-side vertical slices demonstrating opposite end
 - When adding repos/services in Infra, keep classes `sealed` and under `.Repos` or `.Services` namespaces so Scrutor scanning picks them up.
 - A generated CRUD request's DataAnnotations rules (e.g. `[Range]` on `Price`) are **not enforced** when the entity is mapped through the generated `MapProductCrud()`-style route, because .NET 10's automatic validation source generator can't see through `DKNet.AspCore.Extensions`'s generic `Map*<TRequest,TDto>` wrapper. Don't assume a `[Range]`/`[Required]` on a `[CrudCreate]` parameter is enforced without checking whether the entity's endpoint is hand-mapped (enforced) or generator-mapped (not enforced) — see the "Request validation" row in `docs/samples/manual-vs-automated.md`.
 
+## Mutation testing (Stryker)
+- `dotnet-stryker` is pinned as a local tool in `.config/dotnet-tools.json` (5.0.0 — the newest version on nuget.org; it has no net10.0-native release, but it runs fine against this SDK). Config lives at `ApiEndpoints/DKNet.Accounts.App.Tests/stryker-config.json` and targets `DKNet.Accounts.Api.csproj` mutated against `DKNet.Accounts.App.Tests.csproj` (the Api project is the smallest of the Tests project's four `ProjectReference`s that Stryker can resolve by name — running from the solution root or naming a project the Tests project doesn't directly reference yields "Scanning 0 possible targets").
+- Run:
+  ```
+  dotnet tool restore
+  cd ApiEndpoints/DKNet.Accounts.App.Tests
+  dotnet stryker
+  ```
+- If `dotnet stryker`/`dotnet-stryker` fails with `You must install .NET to run this application` (its native apphost doesn't inherit the `dotnet` launcher's `DOTNET_ROOT`), export it first from the runtime `dotnet` itself already resolves:
+  ```
+  export DOTNET_ROOT="$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App/ {print $3}' | tr -d '[]' | sed 's|/shared/Microsoft.NETCore.App||')"
+  ```
+- Reads the mutation score from the console (`The final mutation score is NN.NN %`) and the HTML report at `ApiEndpoints/DKNet.Accounts.App.Tests/StrykerOutput/<timestamp>/reports/mutation-report.html`. Baseline on `DKNet.Accounts.Api`: **79.51%** (97 killed / 8 survived / 105 tested, 533 skipped as no-coverage/excluded/compile-error). `stryker-config.json` sets `thresholds.break: 0` (non-blocking) since that baseline sits just under the default `high: 80` — the owner ratifies the Build-gate break value.
+
 ## Reference docs (link-first)
 - Comparison + worked samples: `docs/samples/manual-vs-automated.md`, `docs/samples/manual-purchase-orders/README.md`, `docs/samples/automated-products/README.md`
 - Skill catalog for guided implementation: `.github/skills/README.md`

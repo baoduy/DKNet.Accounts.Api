@@ -71,6 +71,9 @@ CoverageReports
 *.coveragexml
 *.testlog
 **/nupkgs/
+
+# Stryker mutation testing output
+StrykerOutput/
 **/worktrees
 **/settings.local.json
 *.suo
