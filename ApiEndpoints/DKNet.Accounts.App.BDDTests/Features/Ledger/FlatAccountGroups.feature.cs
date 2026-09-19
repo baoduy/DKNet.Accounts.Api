@@ -133,13 +133,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 5
-    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST-000300\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST3\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 6
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 7
-    await testRunner.AndAsync("\"CUST-000300\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"CUST3\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -170,17 +170,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 11
-    await testRunner.GivenAsync("the account group \"CUST-000400\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"CUST4\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 12
-    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST-000700\" and names \"CUST-000400\" as i" +
-                        "ts parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops creates the account group \"CUST7\" and names \"CUST4\" as its parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 13
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 14
-    await testRunner.AndAsync("\"CUST-000700\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"CUST7\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -211,16 +210,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 18
-    await testRunner.GivenAsync("the account groups \"CUST-000200\" and \"CUST-000400\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account groups \"CUST2\" and \"CUST4\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 19
-    await testRunner.WhenAsync("treasury-ops changes \"CUST-000200\" and names \"CUST-000400\" as its parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops changes \"CUST2\" and names \"CUST4\" as its parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 20
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 21
-    await testRunner.AndAsync("\"CUST-000200\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"CUST2\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -293,24 +292,23 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 35
-    await testRunner.GivenAsync("the accounts service holds \"CUST-000200\" under \"CUST-000123\" from before this cha" +
-                        "nge", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the accounts service holds \"CUST2\" under \"CUST1\" from before this change", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 36
-    await testRunner.AndAsync("\"CUST-000200\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"CUST2\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 37
     await testRunner.AndAsync("this change has been released", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 38
-    await testRunner.WhenAsync("treasury-ops reads \"CUST-000200\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops reads \"CUST2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 39
-    await testRunner.ThenAsync("\"CUST-000200\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("\"CUST2\" carries no parent", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 40
-    await testRunner.AndAsync("\"CUST-000200\" still holds that account with a balance of 25.00 SGD, and keeps its" +
-                        " code, name and status", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"CUST2\" still holds that account with a balance of 25.00 SGD, and keeps its code," +
+                        " name and status", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -341,13 +339,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 44
-    await testRunner.GivenAsync("the account group \"CUST-000600\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"CUST6\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 45
-    await testRunner.WhenAsync("treasury-ops closes \"CUST-000600\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops closes \"CUST6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 46
-    await testRunner.ThenAsync("the request succeeds and \"CUST-000600\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("the request succeeds and \"CUST6\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -378,10 +376,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 50
-    await testRunner.GivenAsync("the account group \"CUST-000123\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"CUST1\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 51
-    await testRunner.WhenAsync("treasury-ops closes \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops closes \"CUST1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 52
     await testRunner.ThenAsync("the request is refused with status 422 and the code \"GROUP_HOLDS_BALANCE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

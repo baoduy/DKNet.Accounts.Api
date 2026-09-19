@@ -1,7 +1,7 @@
 namespace DKNet.Accounts.Domains.Share;
 
 /// <summary>
-/// The outcome of checking a candidate posting amount against a <see cref="Currency"/>.
+/// The outcome of checking a candidate posting amount against a currency's decimal places.
 /// </summary>
 public enum PostingAmountValidation
 {
@@ -16,16 +16,14 @@ public enum PostingAmountValidation
 /// </summary>
 public static class PostingAmount
 {
-    public static PostingAmountValidation Validate(decimal amount, Currency currency)
+    public static PostingAmountValidation Validate(decimal amount, int decimalPlaces)
     {
-        ArgumentNullException.ThrowIfNull(currency);
-
         if (amount <= 0m)
         {
             return PostingAmountValidation.NotPositive;
         }
 
-        return decimal.Round(amount, currency.DecimalPlaces) != amount
+        return decimal.Round(amount, decimalPlaces) != amount
             ? PostingAmountValidation.PrecisionExceeded
             : PostingAmountValidation.Valid;
     }

@@ -20,6 +20,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     private const string PostingsPath = "/v1/postings";
     private const string CurrenciesPath = "/v1/currencies";
 
+    private HttpResponseMessage? _firstIdempotencyRaceResponse;
+    private HttpResponseMessage? _secondIdempotencyRaceResponse;
+
     #region Shared helpers
 
     private async Task<Guid> CreateGroupAsync(string code, string type)
@@ -37,6 +40,26 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         return id ?? Guid.Empty;
     }
 
+    /// <summary>The scenario's throwaway group, created once and reused — for steps that open an account
+    /// without naming a group.</summary>
+    private async Task<Guid> DefaultGroupAsync()
+    {
+        if (Guid.TryParse(state.Values.GetValueOrDefault("group:__default"), out var existing) && existing != Guid.Empty)
+        {
+            return existing;
+        }
+
+        var id = await CreateGroupAsync($"D{Guid.NewGuid():N}"[..5].ToUpperInvariant(), "Customer");
+        state.Values["group:__default"] = id.ToString();
+        return id;
+    }
+
+    /// <summary>The id of the group a scenario named, creating it if the scenario's Given never did.</summary>
+    private async Task<Guid> GroupIdForAsync(string groupCode) =>
+        Guid.TryParse(state.Values.GetValueOrDefault($"group:{groupCode}"), out var id) && id != Guid.Empty
+            ? id
+            : await CreateGroupAsync(groupCode, "Customer");
+
     private async Task<Guid> OpenAccountAsync(
         string currency,
         Guid? groupId = null,
@@ -53,9 +76,11 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         decimal? minimumBalance = null,
         string name = "Test Account")
     {
+        // Opening now reads the group (an account number is {group code}-{suffix}), so a fabricated group
+        // id is refused. Scenarios that never name a group get one real throwaway group instead.
         var response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
         {
-            groupId = groupId ?? Guid.NewGuid(),
+            groupId = groupId ?? await DefaultGroupAsync(),
             name,
             currency,
             classification,
@@ -152,9 +177,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Given(@"PayHub has created two groups of type ""([^""]+)"" and one of type ""([^""]+)""")]
     public async Task GivenPayHubHasCreatedTwoGroupsOfTypeAndOneOfType(string commonType, string distinctType)
     {
-        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", commonType);
-        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", commonType);
-        await CreateGroupAsync($"GRP-{Guid.NewGuid():N}", distinctType);
+        await CreateGroupAsync($"P{Guid.NewGuid():N}"[..5].ToUpperInvariant(), commonType);
+        await CreateGroupAsync($"P{Guid.NewGuid():N}"[..5].ToUpperInvariant(), commonType);
+        await CreateGroupAsync($"P{Guid.NewGuid():N}"[..5].ToUpperInvariant(), distinctType);
     }
 
     #endregion
@@ -442,7 +467,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub opens an account named ""([^""]+)"" in ""([^""]+)"" in (\w+) as an? (\w+) account")]
     public async Task WhenPayHubOpensAnAccountNamedInAs(string name, string groupCode, string currency, string classification)
     {
-        var groupId = Guid.TryParse(state.Values.GetValueOrDefault($"group:{groupCode}"), out var gid) ? gid : Guid.NewGuid();
+        var groupId = await GroupIdForAsync(groupCode);
         var accountId = await OpenAccountAsync(currency, groupId, classification, name: name);
         state.Values["account"] = accountId.ToString();
     }
@@ -450,7 +475,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub opens an account in ""([^""]+)"" permitted to go negative but states no overdraft limit")]
     public async Task WhenPayHubOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string groupCode)
     {
-        var groupId = Guid.TryParse(state.Values.GetValueOrDefault($"group:{groupCode}"), out var gid) ? gid : Guid.NewGuid();
+        var groupId = await GroupIdForAsync(groupCode);
         await OpenAccountAsync("SGD", groupId, permittedToGoNegative: true, overdraftLimit: null);
     }
 
@@ -691,6 +716,29 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub reads the supported currencies")]
     public async Task WhenPayHubReadsTheSupportedCurrencies() =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Get, CurrenciesPath);
+
+    // §7 @new: the lost-race counterpart of "Reusing an idempotency key for different content is refused"
+    // above — same key, different content, but both requests arrive before either's pre-check read can see
+    // the other (Record.cs:107-112's accepted race window). One is created 201; the DB's unique
+    // (CallingSystem, IdempotencyKey) index refuses the other via DbUpdateException, which
+    // LedgerErrorResponseOptions.UnhandledError must map to the same 409 + IDEMPOTENCY_KEY_CONFLICT the
+    // pre-check path answers (R1).
+    [When(@"two requests record a credit under the idempotency key ""([^""]+)"" with different amounts at the same moment")]
+    public async Task WhenTwoRequestsRecordACreditUnderTheIdempotencyKeyWithDifferentAmountsAtTheSameMoment(
+        string idempotencyKey)
+    {
+        var accountId = Account();
+        Task<HttpResponseMessage> Send(decimal amount) => client.SendAsCallerAsync(
+            state, HttpMethod.Post, PostingsPath,
+            new { accountId, direction = "Credit", amount, currency = "SGD", category = "Transfer" },
+            idempotencyKey);
+
+        var first = Send(10.00m);
+        var second = Send(20.00m);
+        await Task.WhenAll(first, second);
+        _firstIdempotencyRaceResponse = await first;
+        _secondIdempotencyRaceResponse = await second;
+    }
 
     #endregion
 
@@ -948,8 +996,11 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Then(@"SGD is listed as denominated to two decimal places")]
     public async Task ThenSgdIsListedAsDenominatedToTwoDecimalPlaces()
     {
+        // The generated paged list route wins over the deleted hand-written ListCurrenciesQuery — an
+        // accepted breaking API change (bare array -> {items:[...]}), same envelope every other generated
+        // GetList route already answers with.
         var currencies = await ReadResponseJsonAsync();
-        var sgd = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "SGD");
+        var sgd = currencies.GetProperty("items").EnumerateArray().First(c => c.GetProperty("code").GetString() == "SGD");
         sgd.GetProperty("decimalPlaces").GetInt32().ShouldBe(2);
     }
 
@@ -957,7 +1008,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task ThenJpyIsListedAsDenominatedToZeroDecimalPlaces()
     {
         var currencies = await ReadResponseJsonAsync();
-        var jpy = currencies.EnumerateArray().First(c => c.GetProperty("code").GetString() == "JPY");
+        var jpy = currencies.GetProperty("items").EnumerateArray().First(c => c.GetProperty("code").GetString() == "JPY");
         jpy.GetProperty("decimalPlaces").GetInt32().ShouldBe(0);
     }
 
@@ -971,6 +1022,33 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     {
         var text = await state.Response!.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<JsonElement>(text);
+    }
+
+    private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
+    {
+        var text = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<JsonElement>(text);
+    }
+
+    [Then(@"one request records the posting")]
+    public void ThenOneRequestRecordsThePosting() =>
+        (_firstIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created ||
+         _secondIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created).ShouldBeTrue(
+            $"expected one 201, got {(int)_firstIdempotencyRaceResponse!.StatusCode} and " +
+            $"{(int)_secondIdempotencyRaceResponse!.StatusCode}");
+
+    [Then(@"the other is refused with 409 and the refusal carries the code ""([^""]+)""")]
+    public async Task ThenTheOtherIsRefusedWith409AndTheRefusalCarriesTheCode(string expectedCode)
+    {
+        var other = _firstIdempotencyRaceResponse!.StatusCode == HttpStatusCode.Created
+            ? _secondIdempotencyRaceResponse!
+            : _firstIdempotencyRaceResponse!;
+        var doc = await ReadJsonAsync(other);
+        other.StatusCode.ShouldBe(
+            HttpStatusCode.Conflict, $"expected 409, got {(int)other.StatusCode}: {doc}");
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == expectedCode)
+            .ShouldBeTrue($"expected an error carrying code {expectedCode}, got: {doc}");
     }
 
     #endregion

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using DKNet.Accounts.App.TestSupport;
 
 namespace DKNet.Accounts.App.Tests.Integration.Support;

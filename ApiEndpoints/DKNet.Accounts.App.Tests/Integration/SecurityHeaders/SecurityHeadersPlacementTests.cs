@@ -55,20 +55,20 @@ public sealed class SecurityHeadersPlacementTests
         {
             var client = fixture.CreateClient();
 
-            // Opening an account is a write that needs no pre-existing data to validate against (unlike
-            // recording a posting, which — now that DRK-1242 stage 3 replaced the stub with real business
-            // logic — refuses a nonexistent account before ever reaching a write). Any endpoint that reaches
-            // SaveChanges works for this fixture's "every write fails" simulation; this one always does. A
-            // real caller identity is required too — every write handler refuses an unauthenticated caller
-            // (R5) before ever reaching a write.
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/accounts")
+            // Creating a group is the write that needs no pre-existing data to validate against. Opening an
+            // account no longer qualifies: an account number is {group code}-{suffix}, so Open reads its
+            // group and refuses a nonexistent one before ever reaching a write — and this fixture fails
+            // every write, so it could not seed that group either. Any endpoint that reaches SaveChanges
+            // works for the "every write fails" simulation; this one always does. A real caller identity is
+            // required too — every write handler refuses an unauthenticated caller (R5) before any write.
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/account-groups")
             {
                 Content = JsonContent.Create(new
                 {
-                    groupId = Guid.NewGuid(),
+                    code = $"G{Guid.NewGuid():N}"[..5].ToUpperInvariant(),
                     name = "Operating",
-                    currency = "SGD",
-                    classification = "Asset"
+                    type = "Customer",
+                    ownerId = "PayHub"
                 })
             };
             request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, "PayHub");

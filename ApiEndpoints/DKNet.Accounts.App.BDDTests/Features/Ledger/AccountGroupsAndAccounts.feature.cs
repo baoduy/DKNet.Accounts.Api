@@ -133,17 +133,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 6
-    await testRunner.GivenAsync("PayHub has created the account group \"CUST-000123\" of type \"Customer\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("PayHub has created the account group \"CUST1\" of type \"Customer\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 7
-    await testRunner.WhenAsync("PayHub opens an account named \"Acme Pte Ltd Operating\" in \"CUST-000123\" in SGD as" +
-                        " a Liability account", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub opens an account named \"Acme Pte Ltd Operating\" in \"CUST1\" in SGD as a Lia" +
+                        "bility account", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 8
     await testRunner.ThenAsync("the account is returned with a unique account number and a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 9
-    await testRunner.AndAsync("the account appears when PayHub lists the accounts of \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the account appears when PayHub lists the accounts of \"CUST1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -172,11 +172,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 13
-    await testRunner.GivenAsync("PayHub has created the account group \"CUST-000123\" of type \"Customer\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("PayHub has created the account group \"CUST1\" of type \"Customer\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 14
-    await testRunner.WhenAsync("PayHub opens an account in \"CUST-000123\" permitted to go negative but states no o" +
-                        "verdraft limit", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub opens an account in \"CUST1\" permitted to go negative but states no overdra" +
+                        "ft limit", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 15
     await testRunner.ThenAsync("the request is refused and no account is opened", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -243,10 +243,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 25
-    await testRunner.GivenAsync("the group \"CUST-000123\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the group \"CUST1\" holds an account with a balance of 25.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 26
-    await testRunner.WhenAsync("PayHub asks to close \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub asks to close \"CUST1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 27
     await testRunner.ThenAsync("the request is refused and the group remains open", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -278,11 +278,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 31
-    await testRunner.GivenAsync("the group \"CUST-000123\" holds an account with 100.00 SGD and an account with 80.0" +
-                        "0 USD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the group \"CUST1\" holds an account with 100.00 SGD and an account with 80.00 USD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 32
-    await testRunner.WhenAsync("PayHub reads the balances of \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub reads the balances of \"CUST1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 33
     await testRunner.ThenAsync("the balances show 100.00 SGD and 80.00 USD as separate lines", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -387,10 +386,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 50
-    await testRunner.GivenAsync("the group \"CUST-000123\" holds two active accounts and one closed account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the group \"CUST1\" holds two active accounts and one closed account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 51
-    await testRunner.WhenAsync("PayHub lists the active accounts of \"CUST-000123\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub lists the active accounts of \"CUST1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 52
     await testRunner.ThenAsync("only the two active accounts are returned", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

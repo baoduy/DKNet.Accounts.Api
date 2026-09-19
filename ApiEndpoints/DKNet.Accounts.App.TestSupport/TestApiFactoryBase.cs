@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DKNet.Accounts.Domains.Features.Currencies.Entities;
 using DKNet.Accounts.Domains.Services;
 using DKNet.Accounts.Domains.Share;
 using DKNet.Accounts.Infra.Contexts;
@@ -101,6 +102,44 @@ public abstract class TestApiFactoryBase(string? dbName = null) : WebApplication
         var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
+        await SeedCurrenciesAsync();
         LogCapture.Clear();
+    }
+
+    /// <summary>
+    /// The default InMemory reset (<see cref="ConfigureDatabase"/>) runs no migrations, so the
+    /// <c>AddCurrencies</c> migration's <c>InsertData</c> seed rows never apply — and a subclass that resets
+    /// a real, migrated database by truncating every table (see <c>BddApiFactory.ResetDatabaseAsync</c>) wipes
+    /// those same seed rows out on every scenario. Either way, every SGD/USD/JPY-dependent test or BDD
+    /// scenario would otherwise start refusing 422 UNSUPPORTED_CURRENCY the moment the static
+    /// <c>Currency.All</c> lookup is gone — <c>protected</c> so both reset paths can call this (takes no
+    /// <c>CoreDbContext</c> parameter and opens its own scope instead, since that type is internal to
+    /// <c>DKNet.Accounts.Infra</c> and a protected member's signature can't expose it across assemblies).
+    /// Same fixed ids/values as the migration, so test and production data agree. <see cref="Currency"/>'s
+    /// public constructor always assigns a fresh <c>Guid</c> and leaves <c>CreatedBy</c>/<c>CreatedOn</c>
+    /// unset (stamped on save by <c>DataOwnerHook</c>, which needs an <c>HttpContext</c> this setup path
+    /// doesn't have) — both are overwritten directly through the change tracker before saving, the same
+    /// mechanism EF itself uses to set a private-set property when materializing a row from the database.
+    /// </summary>
+    protected async Task SeedCurrenciesAsync()
+    {
+        using var scope = CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+        var seededOn = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        Seed(new Guid("c0de0001-0000-4000-8000-000000000702"), new Currency("SGD", "Singapore Dollar", 2));
+        Seed(new Guid("c0de0001-0000-4000-8000-000000000840"), new Currency("USD", "US Dollar", 2));
+        Seed(new Guid("c0de0001-0000-4000-8000-000000000392"), new Currency("JPY", "Japanese Yen", 0));
+
+        await dbContext.SaveChangesAsync();
+        return;
+
+        void Seed(Guid id, Currency currency)
+        {
+            var entry = dbContext.Add(currency);
+            entry.Property("Id").CurrentValue = id;
+            entry.Property("CreatedBy").CurrentValue = "system";
+            entry.Property("CreatedOn").CurrentValue = seededOn;
+        }
     }
 }

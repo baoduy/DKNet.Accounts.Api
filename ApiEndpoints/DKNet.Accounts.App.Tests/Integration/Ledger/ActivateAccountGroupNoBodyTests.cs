@@ -36,7 +36,7 @@ public sealed class ActivateAccountGroupNoBodyTests(LedgerApiFixture fixture) : 
     [Fact]
     public async Task ActivatingAClosedGroup_WithNoBodyAndNoContentType_SucceedsAndReturnsTheGroup()
     {
-        var code = $"ACT-{Guid.NewGuid():N}"[..12];
+        var code = $"A{Guid.NewGuid():N}"[..5].ToUpperInvariant();
         var created = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/account-groups", new
         {
             code, name = code, type = "Customer", ownerId = "PayHub"

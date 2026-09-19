@@ -51,7 +51,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     [Fact]
     public async Task CreatingAGroupWithADuplicateCode_IsRefused()
     {
-        var code = $"DUP-{Guid.NewGuid():N}";
+        var code = $"D{Guid.NewGuid():N}"[..5].ToUpperInvariant();
         await CreateGroupAsync(code);
 
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
@@ -74,7 +74,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     {
         // Regression: global Mapster NameMatchingStrategy.Flexible re-cased plain dictionary keys as if they
         // were member names ("region" -> "Region") — see the matching Account-level test for the root cause.
-        var id = await CreateGroupAsync($"MD-{Guid.NewGuid():N}");
+        var id = await CreateGroupAsync($"M{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{id}/change-metadata", new
         {
@@ -89,7 +89,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     [Fact]
     public async Task GetById_ReturnsTheGroup_WhenItExists()
     {
-        var code = $"GET-{Guid.NewGuid():N}";
+        var code = $"G{Guid.NewGuid():N}"[..5].ToUpperInvariant();
         var id = await CreateGroupAsync(code);
 
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{GroupsPath}/{id}"));
@@ -115,7 +115,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     [Fact]
     public async Task Balances_AGroupHoldingTwoCurrencies_ReturnsTwoSeparateLinesAndNoCombinedTotal()
     {
-        var groupId = await CreateGroupAsync($"BAL2-{Guid.NewGuid():N}");
+        var groupId = await CreateGroupAsync($"B{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
         var sgdAccount = await OpenAccountInGroupAsync(groupId, "SGD");
         var usdAccount = await OpenAccountInGroupAsync(groupId, "USD");
@@ -167,7 +167,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     [Fact]
     public async Task Updating_RenamesDescribesClosesAndReactivates_AllApply()
     {
-        var groupId = await CreateGroupAsync($"UPD-{Guid.NewGuid():N}");
+        var groupId = await CreateGroupAsync($"U{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
         var renamed = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}", new
         {
@@ -258,7 +258,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
     [Fact]
     public async Task ClosingAGroupWhoseAccountReallyHoldsABalance_IsRefused()
     {
-        var groupId = await CreateGroupAsync($"BAL-{Guid.NewGuid():N}");
+        var groupId = await CreateGroupAsync($"L{Guid.NewGuid():N}"[..5].ToUpperInvariant());
         var accountResponse = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/accounts", new
         {
             groupId,
@@ -302,5 +302,35 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/not-a-guid/close"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// The group code is the literal prefix of every account number opened in it, so it is held to 3-5
+    /// characters and stored uppercase regardless of how the caller spelled it.
+    /// </summary>
+    [Theory]
+    [InlineData("AB")]
+    [InlineData("ABCDEF")]
+    public async Task AGroupCodeOutsideThreeToFiveCharacters_IsRefused(string code)
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, GroupsPath, new
+        {
+            code, name = "Treasury", type = "Customer", ownerId = "PayHub"
+        }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ALowercaseGroupCode_IsStoredUppercase()
+    {
+        var code = $"l{Guid.NewGuid():N}"[..5].ToLowerInvariant();
+
+        var id = await CreateGroupAsync(code);
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{GroupsPath}/{id}"));
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().ShouldBe(code.ToUpperInvariant());
     }
 }

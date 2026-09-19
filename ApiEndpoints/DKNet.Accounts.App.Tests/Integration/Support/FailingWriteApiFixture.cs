@@ -22,6 +22,7 @@ public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
     private const string RequireAuthorizationEnvKey = "FeatureManagement__RequireAuthorization";
 
     private readonly string _dbName = $"failing-write-{Guid.NewGuid():N}";
+    private readonly ThrowingSaveChangesInterceptor _interceptor = new() { Enabled = false };
 
     // Same reason LedgerApiFixture sets this in its constructor: Program.cs binds FeatureOptions eagerly, so
     // an env var is the one input read early enough to actually turn RequireAuthorization on for this host.
@@ -40,7 +41,7 @@ public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
         services.AddDbContextWithHook<CoreDbContext>((_, options) => options
             .UseInMemoryDatabase(_dbName)
             .UseAutoConfigModel([typeof(CoreDbContext).Assembly])
-            .AddInterceptors(new ThrowingSaveChangesInterceptor()));
+            .AddInterceptors(_interceptor));
 
         services.RemoveAll<IMembershipService>();
         services.AddSingleton<IMembershipService, TestMembershipService>();
@@ -51,7 +52,11 @@ public sealed class FailingWriteApiFixture : TestApiFactoryBase, IAsyncLifetime
     public async Task InitializeAsync()
     {
         _ = CreateClient();
+        // Disabled during setup so currency seeding (a real write, via ResetDatabaseAsync) succeeds; the
+        // interceptor's whole purpose is to fail the write the test itself issues, not this fixture's own
+        // setup.
         await ResetDatabaseAsync();
+        _interceptor.Enabled = true;
     }
 
     Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;

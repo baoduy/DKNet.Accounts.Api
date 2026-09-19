@@ -3,26 +3,26 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
   @new @integration
   Scenario: A new account group records the calling system as its author
     Given the calling system "treasury-ops" is authorised to write accounts
-    When it creates the account group "OPS-CASH" named "Operations Cash"
+    When it creates the account group "OPSCH" named "Operations Cash"
     Then the group is created
     And its author is recorded as "treasury-ops"
 
   @new @integration
   Scenario: An author named in the request payload is ignored
     Given the calling system "treasury-ops" is authorised to write accounts
-    When it creates the account group "OPS-PETTY" naming "auditor-9" as the author
+    When it creates the account group "OPSPT" naming "auditor-9" as the author
     Then the group's author is recorded as "treasury-ops"
 
   @new @integration
   Scenario: An account group is renamed
-    Given the account group "OPS-CASH" named "Operations Cash" exists
+    Given the account group "OPSCH" named "Operations Cash" exists
     And the calling system "treasury-ops" is authorised to write accounts
     When it renames the group to "Operations Cash Pool"
     Then the group's name is "Operations Cash Pool"
 
   @new @integration
   Scenario: A rename through the generated route records the acting system as its modifier
-    Given the account group "OPS-CASH" named "Operations Cash" exists
+    Given the account group "OPSCH" named "Operations Cash" exists
     And the calling system "treasury-ops" is authorised to write accounts
     When it renames the group to "Operations Cash Pool"
     Then the group's modifier is recorded as "treasury-ops"
@@ -36,20 +36,20 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @new @integration
   Scenario: An account group is read back in full
-    Given the account group "OPS-CASH" of type "Internal" owned by "acme-pte-ltd" exists
+    Given the account group "OPSCH" of type "Internal" owned by "acme-pte-ltd" exists
     When the calling system "treasury-ops" reads that group
     Then it receives the group's code, name, type, status and owner
 
   @existing @integration
   Scenario: Account groups can still be narrowed to one type
-    Given the account groups "OPS-CASH" of type "Internal" and "OPS-FEES" of type "Settlement" exist
+    Given the account groups "OPSCH" of type "Internal" and "OPSFE" of type "Settlement" exist
     When the calling system "treasury-ops" lists the account groups of type "Internal"
-    Then it receives "OPS-CASH"
-    And it does not receive "OPS-FEES"
+    Then it receives "OPSCH"
+    And it does not receive "OPSFE"
 
   @new @integration
   Scenario: Reading an account group that does not exist is not-found
-    Given no account group "OPS-GHOST" exists
+    Given no account group "OPSGH" exists
     When the calling system "treasury-ops" reads that group
     Then the request is refused as not-found
 
@@ -63,7 +63,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
   @new @integration
   Scenario: A calling system without the write scope cannot create an account group
     Given the calling system "reporting-bot" is authorised only to read accounts
-    When it creates the account group "OPS-CASH" named "Operations Cash"
+    When it creates the account group "OPSCH" named "Operations Cash"
     Then the request is refused as forbidden
 
   @new @integration
@@ -76,7 +76,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @existing @integration
   Scenario: Closing a group that still holds a balance is refused
-    Given the account group "OPS-CASH" holds an account with a balance of 250.00 SGD
+    Given the account group "OPSCH" holds an account with a balance of 250.00 SGD
     And the calling system "treasury-ops" is authorised to write accounts
     When it closes the group
     Then the request is refused as unprocessable
@@ -84,7 +84,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @new @integration
   Scenario: A group's status can still be changed once rename and metadata move off the PATCH
-    Given the account group "OPS-ARCHIVE" named "Operations Archive" exists
+    Given the account group "OPSAR" named "Operations Archive" exists
     And the calling system "treasury-ops" is authorised to write accounts
     When it closes the group
     Then the group's status is "Closed"
@@ -112,17 +112,17 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @new @integration
   Scenario: An empty group is deleted
-    Given the account group "TREASURY-OLD" holds no account
-    When treasury-ops deletes the account group "TREASURY-OLD"
+    Given the account group "TROLD" holds no account
+    When treasury-ops deletes the account group "TROLD"
     Then the request succeeds with no content
-    And reading "TREASURY-OLD" reports that it does not exist
+    And reading "TROLD" reports that it does not exist
 
   @new @integration
   Scenario Outline: A group holding an account is refused
-    Given the account group "TREASURY-MAIN" holds one <account>
-    When treasury-ops deletes the account group "TREASURY-MAIN"
+    Given the account group "TRMN" holds one <account>
+    When treasury-ops deletes the account group "TRMN"
     Then the request is refused with 422 and the code "GROUP_NOT_EMPTY"
-    And the account group "TREASURY-MAIN" still exists
+    And the account group "TRMN" still exists
     And that account still holds the same group, status and balance
 
     Examples:
@@ -146,11 +146,11 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
   @new @integration
   Scenario: A read-only caller cannot delete a group
-    Given the account group "TREASURY-OLD" holds no account
+    Given the account group "TROLD" holds no account
     And reporting-bot holds the accounts read permission only
-    When reporting-bot deletes the account group "TREASURY-OLD"
+    When reporting-bot deletes the account group "TROLD"
     Then the request is refused with 403
-    And the account group "TREASURY-OLD" still exists
+    And the account group "TROLD" still exists
 
   @new @integration
   Scenario: The delete route carries the write permission
@@ -181,20 +181,20 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
   @new @integration
   Scenario: A caller with write permission creates a group through the generated route
     Given the calling system "treasury-ops" is authorised to write accounts
-    When it creates the account group "TREASURY-SG" named "Treasury Singapore"
+    When it creates the account group "TRSG" named "Treasury Singapore"
     Then the group is created
     And the created group is readable at its own address
 
   @new @integration
   Scenario: A caller with read permission reads a group through the generated route
-    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    Given the account group "TRSG" named "Treasury Singapore" exists
     When the calling system "treasury-ops" reads that group
     Then the response is 200
-    And the response carries the code "TREASURY-SG"
+    And the response carries the code "TRSG"
 
   @new @integration
   Scenario Outline: A caller without write permission is refused on every generated write route
-    Given the account group "TREASURY-SG" named "Treasury Singapore" exists
+    Given the account group "TRSG" named "Treasury Singapore" exists
     And the calling system "report-reader" is authorised only to read accounts
     When "report-reader" sends <operation> for that group
     Then the response is 403

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SlimMessageBus.Host;
-using SlimMessageBus.Host.Memory;
 using SlimMessageBus.Host.Serialization.SystemTextJson;
 using DKNet.EfCore.AuditLogs;
 using DKNet.EfCore.Specifications.Extensions;

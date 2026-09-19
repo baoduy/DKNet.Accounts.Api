@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using DKNet.Accounts.App.Tests.Architecture.Guards;
 
 namespace DKNet.Accounts.App.Tests.Architecture;
 

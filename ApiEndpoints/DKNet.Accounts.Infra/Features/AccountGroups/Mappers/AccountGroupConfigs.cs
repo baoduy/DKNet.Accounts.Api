@@ -11,7 +11,7 @@ internal sealed class AccountGroupConfigs : DefaultEntityTypeConfiguration<Accou
     {
         base.Configure(builder);
 
-        builder.Property(g => g.Code).HasMaxLength(50).IsRequired();
+        builder.Property(g => g.Code).HasMaxLength(5).IsRequired();
         builder.HasIndex(g => g.Code).IsUnique();
 
         builder.Property(g => g.Name).HasMaxLength(200).IsRequired();

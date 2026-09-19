@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using DKNet.EfCore.DtoGenerator;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 

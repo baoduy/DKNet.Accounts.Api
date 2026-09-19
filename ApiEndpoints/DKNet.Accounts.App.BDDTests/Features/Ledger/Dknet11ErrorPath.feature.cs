@@ -133,13 +133,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 5
-    await testRunner.GivenAsync("the account group \"Treasury\" holds an account with a balance of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TRSY\" holds an account with a balance of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 6
     await testRunner.AndAsync("\"treasury-ops\" is signed in and holds the accounts-write permission", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 7
-    await testRunner.WhenAsync("\"treasury-ops\" sends the close request for \"Treasury\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"treasury-ops\" sends the close request for \"TRSY\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 8
     await testRunner.ThenAsync("the response status is 422", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -290,7 +290,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.DescriptionAttribute("The hand-written account routes keep working at their current addresses")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
         [global::NUnit.Framework.CategoryAttribute("guard")]
-        [global::NUnit.Framework.TestCaseAttribute("the request to open a third account in \"Treasury\"", "the third account is open with a balance of 0.00 SGD", "4", null)]
+        [global::NUnit.Framework.TestCaseAttribute("the request to open a third account in \"TRSY\"", "the third account is open with a balance of 0.00 SGD", "4", null)]
         [global::NUnit.Framework.TestCaseAttribute("the request to close \"Spare SGD\"", "\"Spare SGD\" is closed", "5", null)]
         [global::NUnit.Framework.TestCaseAttribute("the request to set an overdraft limit on \"Operating SGD\"", "\"Operating SGD\" carries that overdraft limit", "6", null)]
         [global::NUnit.Framework.TestCaseAttribute("the request to read the balance of \"Operating SGD\"", "the balance read is 100.00 SGD", "7", null)]
@@ -323,12 +323,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 39
-    await testRunner.GivenAsync("the account \"Operating SGD\" is open in the group \"Treasury\" with a balance of 100" +
-                        ".00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account \"Operating SGD\" is open in the group \"TRSY\" with a balance of 100.00 " +
+                        "SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 40
-    await testRunner.AndAsync("the account \"Spare SGD\" is open in the group \"Treasury\" with a balance of 0.00 SG" +
-                        "D", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the account \"Spare SGD\" is open in the group \"TRSY\" with a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 41
     await testRunner.AndAsync("\"treasury-ops\" is signed in and holds every accounts permission and the postings-" +
@@ -418,14 +417,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 65
-    await testRunner.GivenAsync("the account group \"Treasury\" holds two SGD accounts with balances of 40.00 and 60" +
-                        ".00", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TRSY\" holds two SGD accounts with balances of 40.00 and 60.00", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 66
     await testRunner.AndAsync("\"treasury-ops\" is signed in and holds the accounts-read permission", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 67
-    await testRunner.WhenAsync("\"treasury-ops\" reads the totals of \"Treasury\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"treasury-ops\" reads the totals of \"TRSY\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 68
     await testRunner.ThenAsync("one line is returned for SGD with a total of 100.00", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -637,13 +635,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 105
-    await testRunner.GivenAsync("the account group \"Treasury\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TRSY\" is closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 106
     await testRunner.AndAsync("\"treasury-ops\" is signed in and holds only the accounts-read permission", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 107
-    await testRunner.WhenAsync("\"treasury-ops\" sends the activate request for \"Treasury\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"treasury-ops\" sends the activate request for \"TRSY\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 108
     await testRunner.ThenAsync("the request is refused as not permitted", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -652,7 +650,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.AndAsync("the response carries no body", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 110
-    await testRunner.AndAsync("the account group \"Treasury\" stays closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the account group \"TRSY\" stays closed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

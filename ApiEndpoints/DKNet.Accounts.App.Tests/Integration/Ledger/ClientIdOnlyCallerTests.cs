@@ -26,7 +26,7 @@ public sealed class ClientIdOnlyCallerTests(AuthOnClientIdOnlyApiFixture fixture
     [Fact]
     public async Task CreatingAnAccountGroup_WithNoSubjectClaim_StampsCreatedByFromTheClientIdFallback()
     {
-        var code = $"M2M-{Guid.NewGuid():N}"[..12];
+        var code = $"M{Guid.NewGuid():N}"[..5].ToUpperInvariant();
         var request = new HttpRequestMessage(HttpMethod.Post, "/v1/account-groups");
         request.Headers.Add(ClientIdOnlyAuthHandler.ClientIdHeaderName, "PayHub");
         request.Headers.Add(ClientIdOnlyAuthHandler.ScopesHeaderName, ScopeNames.AccountsWrite);

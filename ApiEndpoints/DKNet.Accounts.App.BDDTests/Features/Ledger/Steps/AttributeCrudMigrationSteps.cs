@@ -1,10 +1,8 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using DKNet.Accounts.Api.Configs.Auth;
-using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
@@ -37,6 +35,20 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         return id;
     }
 
+    /// <summary>The scenario's throwaway group, created once and reused — for steps that open an account
+    /// without naming a group. Opening reads the group, so a fabricated id no longer works.</summary>
+    private async Task<Guid> DefaultGroupAsync()
+    {
+        if (Guid.TryParse(state.Values.GetValueOrDefault("group:__default"), out var existing) && existing != Guid.Empty)
+        {
+            return existing;
+        }
+
+        var id = (await CreateGroupAsync($"D{Guid.NewGuid():N}"[..5].ToUpperInvariant(), "Customer"))!.Value;
+        state.Values["group:__default"] = id.ToString();
+        return id;
+    }
+
     private async Task<Guid?> OpenAccountAsync(
         string currency,
         Guid? groupId = null,
@@ -45,9 +57,10 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         decimal? overdraftLimit = null,
         string name = "Fixture Account")
     {
+        // Opening reads the group now, so the fallback must be a real group, not a fabricated id.
         var response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
         {
-            groupId = groupId ?? Guid.NewGuid(),
+            groupId = groupId ?? await DefaultGroupAsync(),
             name,
             currency,
             classification,
@@ -292,7 +305,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [Given(@"an account group created four months ago exists")]
     public async Task GivenAnAccountGroupCreatedFourMonthsAgoExists()
     {
-        var code = $"AGE-{Guid.NewGuid():N}"[..12];
+        var code = $"E{Guid.NewGuid():N}"[..5].ToUpperInvariant();
         var id = await CreateGroupAsync(code, "Customer");
         await BackdateGroupCreatedOnAsync(id!.Value, DateTimeOffset.UtcNow.AddMonths(-4));
         state.Values["lastGroupId"] = id.Value.ToString();
@@ -446,7 +459,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     public async Task WhenItOpensAnAccountPermittedToGoNegativeWithNoOverdraftLimit(string name) =>
         state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
         {
-            groupId = Guid.NewGuid(),
+            groupId = await DefaultGroupAsync(),
             name,
             currency = "SGD",
             classification = "Liability",
@@ -495,7 +508,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
             }
             else
             {
-                id = (await CreateGroupAsync($"FIX-{Guid.NewGuid():N}"[..12], "Customer"))!.Value;
+                id = (await CreateGroupAsync($"F{Guid.NewGuid():N}"[..5].ToUpperInvariant(), "Customer"))!.Value;
             }
 
             path = path.Replace("{id}", id.ToString());
@@ -504,7 +517,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         }
 
         object? body = method == HttpMethod.Post && path.StartsWith(GroupsPath) && !path.Contains("reverse")
-            ? new { code = $"FIX-{Guid.NewGuid():N}"[..12], name = "Fixture", type = "Customer", ownerId = "fixture-owner" }
+            ? new { code = $"F{Guid.NewGuid():N}"[..5].ToUpperInvariant(), name = "Fixture", type = "Customer", ownerId = "fixture-owner" }
             : null;
 
         state.Response = await client.SendAsCallerAsync(state, method, path, body);

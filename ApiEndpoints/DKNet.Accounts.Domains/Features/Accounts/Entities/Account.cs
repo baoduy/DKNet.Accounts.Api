@@ -53,7 +53,9 @@ public sealed class Account : AggregateRoot
         }
 
         GroupId = groupId;
-        AccountNumber = accountNumber;
+        // Uppercased for the same reason AccountGroup.Code is: case is not part of an account's identity,
+        // and its unique index must see one spelling of a caller-chosen suffix.
+        AccountNumber = accountNumber.ToUpperInvariant();
         Name = name;
         CurrencyCode = currencyCode;
         Classification = classification;

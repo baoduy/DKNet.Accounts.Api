@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text.Json;
 using DKNet.Accounts.Share.Options;
 
 namespace DKNet.Accounts.App.Tests.Architecture;

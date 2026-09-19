@@ -50,7 +50,7 @@ public sealed class Dknet12IdempotencyHeaderSteps(HttpClient client, ScenarioSta
 
         var groupResponse = await client.SendAsCallerAsync(state, HttpMethod.Post, "/v1/account-groups", new
         {
-            code = $"grp-{Guid.NewGuid():N}", name = $"group-for-{fromName}-{toName}", type = "Customer",
+            code = $"g{Guid.NewGuid():N}"[..5].ToUpperInvariant(), name = $"group-for-{fromName}-{toName}", type = "Customer",
             ownerId = state.CallerClientId
         });
         var groupId = (await TryReadIdAsync(groupResponse))!.Value;

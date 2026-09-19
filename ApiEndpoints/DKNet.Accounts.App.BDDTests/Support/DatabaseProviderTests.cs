@@ -1,7 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using DKNet.Accounts.Infra.Contexts;
-using Shouldly;
-
 namespace DKNet.Accounts.App.BDDTests.Support;
 
 /// <summary>

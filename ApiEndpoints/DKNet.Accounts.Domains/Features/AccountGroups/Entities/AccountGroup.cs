@@ -45,7 +45,10 @@ public sealed class AccountGroup : AggregateRoot
         string ownerId,
         IReadOnlyDictionary<string, string>? metadata)
     {
-        Code = code;
+        // Normalised, not rejected: the code is the literal prefix of every account number in this group,
+        // and case is not part of a group's identity — "trops" and "TROPS" are the same group, so the unique
+        // index has to see one spelling. Uppercasing here covers every caller, seeder included.
+        Code = code.ToUpperInvariant();
         Name = name;
         Description = description;
         Type = type;

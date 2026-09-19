@@ -39,10 +39,11 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
     private async Task<Guid> OpenAccountAsync(
         string label, Guid? groupId = null, bool permittedToGoNegative = false, decimal? overdraftLimit = null)
     {
+        // Opening reads the group now, so the fallback must be a real group, not a fabricated id.
         var currency = label.Split('-')[0];
         var response = await client.SendAsCallerAsync(state, HttpMethod.Post, AccountsPath, new
         {
-            groupId = groupId ?? Guid.NewGuid(),
+            groupId = groupId ?? await GetOrCreateGroupIdAsync("DFLT"),
             name = label,
             currency,
             classification = "Liability",

@@ -1,4 +1,3 @@
-using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
 using DKNet.Accounts.AppServices.Crud;

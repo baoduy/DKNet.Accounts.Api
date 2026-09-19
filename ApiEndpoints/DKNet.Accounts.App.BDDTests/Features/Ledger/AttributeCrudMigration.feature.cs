@@ -136,7 +136,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 6
-    await testRunner.WhenAsync("it creates the account group \"OPS-CASH\" named \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("it creates the account group \"OPSCH\" named \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 7
     await testRunner.ThenAsync("the group is created", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -176,7 +176,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 13
-    await testRunner.WhenAsync("it creates the account group \"OPS-PETTY\" naming \"auditor-9\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("it creates the account group \"OPSPT\" naming \"auditor-9\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 14
     await testRunner.ThenAsync("the group\'s author is recorded as \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -210,7 +210,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 18
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" named \"Operations Cash\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPSCH\" named \"Operations Cash\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 19
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -250,7 +250,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 25
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" named \"Operations Cash\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPSCH\" named \"Operations Cash\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 26
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -330,7 +330,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 39
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" of type \"Internal\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPSCH\" of type \"Internal\" owned by \"acme-pte-ltd\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 40
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
@@ -367,17 +367,17 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 45
-    await testRunner.GivenAsync("the account groups \"OPS-CASH\" of type \"Internal\" and \"OPS-FEES\" of type \"Settleme" +
-                        "nt\" exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account groups \"OPSCH\" of type \"Internal\" and \"OPSFE\" of type \"Settlement\" ex" +
+                        "ist", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 46
     await testRunner.WhenAsync("the calling system \"treasury-ops\" lists the account groups of type \"Internal\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 47
-    await testRunner.ThenAsync("it receives \"OPS-CASH\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("it receives \"OPSCH\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 48
-    await testRunner.AndAsync("it does not receive \"OPS-FEES\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("it does not receive \"OPSFE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -408,7 +408,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 52
-    await testRunner.GivenAsync("no account group \"OPS-GHOST\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("no account group \"OPSGH\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 53
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
@@ -488,7 +488,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("the calling system \"reporting-bot\" is authorised only to read accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 66
-    await testRunner.WhenAsync("it creates the account group \"OPS-CASH\" named \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("it creates the account group \"OPSCH\" named \"Operations Cash\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 67
     await testRunner.ThenAsync("the request is refused as forbidden", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -566,7 +566,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 79
-    await testRunner.GivenAsync("the account group \"OPS-CASH\" holds an account with a balance of 250.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPSCH\" holds an account with a balance of 250.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 80
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -611,7 +611,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 87
-    await testRunner.GivenAsync("the account group \"OPS-ARCHIVE\" named \"Operations Archive\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"OPSAR\" named \"Operations Archive\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 88
     await testRunner.AndAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -773,16 +773,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 115
-    await testRunner.GivenAsync("the account group \"TREASURY-OLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 116
-    await testRunner.WhenAsync("treasury-ops deletes the account group \"TREASURY-OLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops deletes the account group \"TROLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 117
     await testRunner.ThenAsync("the request succeeds with no content", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 118
-    await testRunner.AndAsync("reading \"TREASURY-OLD\" reports that it does not exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("reading \"TROLD\" reports that it does not exist", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -822,16 +822,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 122
-    await testRunner.GivenAsync(string.Format("the account group \"TREASURY-MAIN\" holds one {0}", account), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync(string.Format("the account group \"TRMN\" holds one {0}", account), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 123
-    await testRunner.WhenAsync("treasury-ops deletes the account group \"TREASURY-MAIN\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops deletes the account group \"TRMN\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 124
     await testRunner.ThenAsync("the request is refused with 422 and the code \"GROUP_NOT_EMPTY\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 125
-    await testRunner.AndAsync("the account group \"TREASURY-MAIN\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the account group \"TRMN\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 126
     await testRunner.AndAsync("that account still holds the same group, status and balance", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -942,19 +942,19 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 149
-    await testRunner.GivenAsync("the account group \"TREASURY-OLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TROLD\" holds no account", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 150
     await testRunner.AndAsync("reporting-bot holds the accounts read permission only", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 151
-    await testRunner.WhenAsync("reporting-bot deletes the account group \"TREASURY-OLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("reporting-bot deletes the account group \"TROLD\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 152
     await testRunner.ThenAsync("the request is refused with 403", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 153
-    await testRunner.AndAsync("the account group \"TREASURY-OLD\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the account group \"TROLD\" still exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -1073,7 +1073,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("the calling system \"treasury-ops\" is authorised to write accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 184
-    await testRunner.WhenAsync("it creates the account group \"TREASURY-SG\" named \"Treasury Singapore\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("it creates the account group \"TRSG\" named \"Treasury Singapore\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 185
     await testRunner.ThenAsync("the group is created", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -1110,7 +1110,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 190
-    await testRunner.GivenAsync("the account group \"TREASURY-SG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TRSG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 191
     await testRunner.WhenAsync("the calling system \"treasury-ops\" reads that group", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
@@ -1119,7 +1119,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.ThenAsync("the response is 200", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 193
-    await testRunner.AndAsync("the response carries the code \"TREASURY-SG\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the response carries the code \"TRSG\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -1160,7 +1160,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 197
-    await testRunner.GivenAsync("the account group \"TREASURY-SG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("the account group \"TRSG\" named \"Treasury Singapore\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 198
     await testRunner.AndAsync("the calling system \"report-reader\" is authorised only to read accounts", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");

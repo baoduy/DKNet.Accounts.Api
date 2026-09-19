@@ -144,10 +144,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 6
-    await testRunner.AndAsync("an active, empty account group \"SG-RETAIL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("an active, empty account group \"SGRTL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 7
-    await testRunner.WhenAsync(string.Format("\"priya.menon\" sends {0} for \"SG-RETAIL\"", request), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync(string.Format("\"priya.menon\" sends {0} for \"SGRTL\"", request), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 8
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -187,10 +187,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 19
-    await testRunner.AndAsync("an active, empty account group \"SG-RETAIL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("an active, empty account group \"SGRTL\" exists", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 20
-    await testRunner.WhenAsync("\"priya.menon\" sends a close for \"SG-RETAIL\" naming \"audit-bot\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"priya.menon\" sends a close for \"SGRTL\" naming \"audit-bot\" as the author", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 21
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -230,7 +230,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 27
-    await testRunner.WhenAsync("\"priya.menon\" creates account group \"SG-WHOLESALE\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"priya.menon\" creates account group \"SGWHL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 28
     await testRunner.ThenAsync("the account group\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
@@ -267,7 +267,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
     await testRunner.GivenAsync("\"priya.menon\" is an authenticated person calling from the system \"treasury-ops\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 33
-    await testRunner.WhenAsync("\"priya.menon\" opens account \"SGD-0001\" in group \"SG-RETAIL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("\"priya.menon\" opens account \"SGD-0001\" in group \"SGRTL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 34
     await testRunner.ThenAsync("the account\'s created-by is \"priya.menon\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

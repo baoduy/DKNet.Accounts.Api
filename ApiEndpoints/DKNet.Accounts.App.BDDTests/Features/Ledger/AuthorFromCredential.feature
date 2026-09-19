@@ -3,8 +3,8 @@ Feature: The author of a change comes from the caller's credential
   @new @integration
   Scenario Outline: The person who calls is recorded as the author of a change
     Given "priya.menon" is an authenticated person calling from the system "treasury-ops"
-    And an active, empty account group "SG-RETAIL" exists
-    When "priya.menon" sends <request> for "SG-RETAIL"
+    And an active, empty account group "SGRTL" exists
+    When "priya.menon" sends <request> for "SGRTL"
     Then the request succeeds
     And the account group's updated-by is "priya.menon"
 
@@ -16,21 +16,21 @@ Feature: The author of a change comes from the caller's credential
   @new @integration
   Scenario: An author named in the request body is ignored
     Given "priya.menon" is an authenticated person calling from the system "treasury-ops"
-    And an active, empty account group "SG-RETAIL" exists
-    When "priya.menon" sends a close for "SG-RETAIL" naming "audit-bot" as the author
+    And an active, empty account group "SGRTL" exists
+    When "priya.menon" sends a close for "SGRTL" naming "audit-bot" as the author
     Then the request succeeds
     And the account group's updated-by is "priya.menon"
 
   @new @integration
   Scenario: A new account group records the caller as its author
     Given "priya.menon" is an authenticated person calling from the system "treasury-ops"
-    When "priya.menon" creates account group "SG-WHOLESALE"
+    When "priya.menon" creates account group "SGWHL"
     Then the account group's created-by is "priya.menon"
 
   @new @integration
   Scenario: A new account records the caller as its author
     Given "priya.menon" is an authenticated person calling from the system "treasury-ops"
-    When "priya.menon" opens account "SGD-0001" in group "SG-RETAIL"
+    When "priya.menon" opens account "SGD-0001" in group "SGRTL"
     Then the account's created-by is "priya.menon"
 
   @new @integration

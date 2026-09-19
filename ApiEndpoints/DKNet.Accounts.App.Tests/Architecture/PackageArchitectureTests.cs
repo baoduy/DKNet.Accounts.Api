@@ -146,11 +146,11 @@ public class PackageArchitectureTests
     }
 
     /// <summary>
-    /// DRK-1535 §5, "Every DKNet package resolves to release 12.0.0" — supersedes the DRK-1522 stage-1
-    /// assertion of 11.0.0; the pin half only, the documentation half belongs to the sibling Docs sub-task.
+    /// DRK-1556 §5, "Every DKNet package resolves to release 13.0.0" — supersedes the DRK-1535 stage-1
+    /// assertion of 12.0.0; the pin half only, the documentation half belongs to the sibling Docs sub-task.
     /// </summary>
     [Fact]
-    public void AllDKNetPackageReferences_ShouldResolveToRelease1200()
+    public void AllDKNetPackageReferences_ShouldResolveToRelease1300()
     {
         var srcDir = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "../../../../.."));
@@ -161,7 +161,7 @@ public class PackageArchitectureTests
         var doc = XDocument.Load(directoryPackagesPath);
         var distinctVersions = PackagePinGuard.DistinctDkNetVersions(doc);
 
-        distinctVersions.ShouldBe(["12.0.0"]);
+        distinctVersions.ShouldBe(["13.0.1"]);
     }
 
     [Fact]

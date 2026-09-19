@@ -3,7 +3,6 @@ using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using AccountDto = DKNet.Accounts.AppServices.Accounts.V1.AccountDto;
 using AccountBalanceDto = DKNet.Accounts.AppServices.Accounts.V1.AccountBalanceDto;
-using AccountGroupDto = DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto;
 using PostingDto = DKNet.Accounts.AppServices.Postings.V1.PostingDto;
 
 namespace DKNet.Accounts.AppServices;

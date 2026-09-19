@@ -1,7 +1,7 @@
-using DKNet.AspCore.Extensions.ModelBinding;
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.AppServices.Currencies.V1.Specs;
 using DKNet.Accounts.AppServices.Postings.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
@@ -165,17 +165,29 @@ internal sealed class RecordPostingBatchCommandHandler(
                 accounts[accountId] = account;
             }
 
+            // Loaded once for the whole batch, not once per movement — a 500-movement batch must not issue
+            // 500 currency queries. Currencies is small, fixed reference data, so an unfiltered load plus an
+            // in-memory dictionary lookup per movement is cheaper than a per-movement round trip.
+            var currencies = (await repository.ToListAsync(new SpecGetCurrency(), cancellationToken))
+                .ToDictionary(c => c.Code, StringComparer.OrdinalIgnoreCase);
+
             var postings = new List<Posting>(request.Movements.Count);
             foreach (var movement in request.Movements)
             {
-                var currency = Currency.All.FirstOrDefault(c => c.Code == movement.Currency);
-                if (currency is null)
+                var movementCurrencyCode = movement.Currency.ToUpperInvariant();
+                if (!currencies.TryGetValue(movementCurrencyCode, out var currency))
                 {
                     return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
                         LedgerErrors.UnsupportedCurrency, $"'{movement.Currency}' is not a supported currency."));
                 }
 
-                if (PostingAmount.Validate(movement.Amount, currency) != PostingAmountValidation.Valid)
+                if (!currency.IsActive)
+                {
+                    return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
+                        LedgerErrors.UnsupportedCurrency, $"'{movement.Currency}' is not currently offered."));
+                }
+
+                if (PostingAmount.Validate(movement.Amount, currency.DecimalPlaces) != PostingAmountValidation.Valid)
                 {
                     return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
                         LedgerErrors.InvalidPostingAmount,

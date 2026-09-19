@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.GlobalExceptions;
 

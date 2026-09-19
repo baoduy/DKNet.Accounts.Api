@@ -3,7 +3,6 @@ using DKNet.EfCore.Extensions.Extensions;
 using DKNet.EfCore.Hooks;
 using DKNet.EfCore.Specifications;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using DKNet.Accounts.Domains.Services;
 using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Services;
 
