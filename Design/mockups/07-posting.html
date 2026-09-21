@@ -224,6 +224,10 @@
   .drawer h4{margin:18px 0 8px;font-size:11px;line-height:15px;font-weight:600;
     letter-spacing:.05em;color:var(--muted-foreground)}
   .drawer h4:first-child{margin-top:0}
+  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border)}
+  .drawer > footer a{color:var(--primary);text-decoration:none;font-size:13px;font-weight:600}
+  .drawer > footer a:hover{text-decoration:underline}
+  .drawer > footer[hidden]{display:none}
 </style>
 <div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav on" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
@@ -234,7 +238,7 @@
         <div>
           <h1 class="mono" style="font-size:22px"><svg class="ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>POST-000123</h1>
           <div class="row" style="margin-top:6px"><span class="b neutral">Reversed</span><span class="cap">on</span>
-            <a class="link mono">ACME-000123</a><span class="cap">Operating Account</span></div>
+            <a class="link mono" href="05-account-detail.html">ACME-000123</a><span class="cap">Operating Account</span></div>
         </div>
         <div style="margin-left:auto"><span class="btn dis">Reverse</span></div>
       </div>
@@ -242,7 +246,7 @@
       <div class="card pad" style="border-left:3px solid var(--primary)">
         <div class="lab">REVERSAL LINEAGE</div>
         <div style="margin-top:8px;font-size:13px">
-          Reversed by <a class="link mono">POST-000124</a> on 19 Sep 2026 at 15:10.
+          Reversed by <a class="link mono" href="07-posting.html">POST-000124</a> on 19 Sep 2026 at 15:10.
         </div>
         <div class="note" style="margin-top:6px">
           Already reversed, so Reverse is disabled — a second attempt answers
@@ -269,7 +273,7 @@
             <span class="cap">Calling system</span><span class="mono">payments-gateway</span>
             <span class="cap">Idempotency key</span><span class="mono cap">b2f4-9c11-4a07-8e33</span>
             <span class="cap">Transaction group</span><span class="mono cap">0f7c…a91d</span>
-            <span class="cap">Counterparty</span><span class="mono"><a class="link">MERCH-000044</a></span>
+            <span class="cap">Counterparty</span><span class="mono"><a class="link" href="05-account-detail.html">MERCH-000044</a></span>
             <span class="cap">Counterparty ref</span><span class="mono">MSA-APAC-0041</span>
             <span class="cap">External reference</span><span class="mono">INV-99120</span>
             <span class="cap">Description</span><span>Settlement to merchant</span>
@@ -288,18 +292,23 @@
 <aside class="drawer" role="complementary" aria-hidden="true" aria-label="Details">
   <header><h3>Details</h3><button class="x" type="button" aria-label="Close details">Esc ✕</button></header>
   <div class="content"></div>
+  <footer hidden><a href="#">Open full page &rarr;</a></footer>
 </aside>
 <script>
 (function () {
   var drawer = document.querySelector('.drawer'), app = document.querySelector('.app');
   if (!drawer || !app) return;
   var title = drawer.querySelector('h3'), content = drawer.querySelector('.content'),
-      closeBtn = drawer.querySelector('.x'), picked = null;
+      foot = drawer.querySelector('footer'), footLink = foot.querySelector('a'),
+      picked = null;
 
   function open(tpl, row) {
     title.textContent = tpl.getAttribute('data-title') || 'Details';
     content.innerHTML = tpl.innerHTML;
     content.scrollTop = 0;
+    var href = tpl.getAttribute('data-href');
+    if (href) { footLink.setAttribute('href', href); foot.hidden = false; }
+    else { foot.hidden = true; }
     if (picked) picked.classList.remove('picked');
     picked = row;
     row.classList.add('picked');
@@ -311,17 +320,20 @@
     app.classList.remove('with-drawer');
     drawer.classList.remove('on');
     drawer.setAttribute('aria-hidden', 'true');
-    if (picked) { picked.classList.remove('picked'); picked.focus && picked.focus(); picked = null; }
+    if (picked) { picked.classList.remove('picked'); picked = null; }
   }
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('.x')) { close(); return; }
+    // a real link inside a row navigates; the rest of the row opens the panel.
+    // With no href (the isolated artifact card) nothing matches and the panel opens.
+    if (e.target.closest('a[href]')) return;
     var row = e.target.closest('[data-detail]');
     if (!row) return;
     var tpl = document.getElementById(row.getAttribute('data-detail'));
     if (!tpl) return;
     e.preventDefault();
-    if (row === picked) { close(); return; }   // clicking the open row closes it
+    if (row === picked) { close(); return; }
     open(tpl, row);
   });
   document.addEventListener('keydown', function (e) {

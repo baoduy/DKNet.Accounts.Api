@@ -110,6 +110,30 @@ The mockups are working HTML, not pictures:
   closing it — the point is comparing records. Clicking the open row again, pressing Esc,
   or the close button dismisses it.
 
-Every screen carries its own copy of the ~40 lines of script, for the same reason it
+- **The detail panel links onward.** Where a record has a full page of its own, the panel
+  carries an *Open full page* link to it. Currencies have no detail screen, so their panel
+  has no link rather than a dead one.
+- **A link inside a row navigates; the rest of the row opens the panel.** Clicking an
+  account number goes to the account; clicking the row around it opens the panel. In the
+  artifact, where each screen is an isolated card with no siblings to link to, nothing
+  matches the link rule and every click opens the panel instead.
+
+Every screen carries its own copy of the ~45 lines of script, for the same reason it
 carries its own copy of the tokens: one file, no dependencies, works from a
 double-click.
+
+### Verifying it
+
+```
+python3 Design/mockups/check-links.py
+```
+
+Checks that every href resolves, that every page is reachable by clicking from
+`index.html`, that every row wired to the panel has a template (and no template is
+orphaned), and that each page carries the full sidebar with ADMINISTRATION at its foot.
+Exits non-zero on any failure, so it can go in CI if the mockups start drifting.
+
+All nine screens are reachable. The four detail screens are reached the way they would be
+in the real console — group detail from the groups table, account detail from an account
+row or the panel, statement from the account, posting detail from a statement row — not
+from the sidebar, which lists only the five entry points.

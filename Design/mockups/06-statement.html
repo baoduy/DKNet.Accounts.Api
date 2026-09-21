@@ -224,10 +224,14 @@
   .drawer h4{margin:18px 0 8px;font-size:11px;line-height:15px;font-weight:600;
     letter-spacing:.05em;color:var(--muted-foreground)}
   .drawer h4:first-child{margin-top:0}
+  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border)}
+  .drawer > footer a{color:var(--primary);text-decoration:none;font-size:13px;font-weight:600}
+  .drawer > footer a:hover{text-decoration:underline}
+  .drawer > footer[hidden]{display:none}
 </style>
 <div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav on" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
-    <div class="top"><div class="crumb">Accounts / <b>ACME-000123</b> / Statement</div><div class="search">Search accounts, postings…  ⌘K</div></div>
+    <div class="top"><div class="crumb"><a class="link" href="04-accounts.html">Accounts</a> / <b>ACME-000123</b> / Statement</div><div class="search">Search accounts, postings…  ⌘K</div></div>
     <div class="body">
 
       <div class="row">
@@ -235,7 +239,7 @@
           <h1><svg class="ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Statement</h1>
           <div class="row" style="margin-top:6px"><span class="mono">ACME-000123</span><span class="cap">Operating Account</span><span class="b credit">Active</span></div>
         </div>
-        <div style="margin-left:auto" class="row"><span class="btn pri">Record posting</span></div>
+        <div style="margin-left:auto" class="row"><a class="btn pri" href="08-record-posting.html">Record posting</a></div>
       </div>
 
       <div class="card pad row" style="gap:16px">
@@ -258,17 +262,17 @@
           <thead><tr><th>Effective</th><th>Recorded</th><th>Posting no.</th><th>Description</th>
             <th style="text-align:right">Amount</th><th style="text-align:right">Balance after</th><th style="text-align:right">#</th></tr></thead>
           <tbody>
-            <tr data-detail="d-p121"><td>18 Sep 2026</td><td class="cap">18 Sep 09:02</td><td class="mono"><a class="link">POST-000121</a></td>
+            <tr data-detail="d-p121"><td>18 Sep 2026</td><td class="cap">18 Sep 09:02</td><td class="mono"><a class="link" href="07-posting.html">POST-000121</a></td>
                 <td>Opening balance <span class="chip">OpeningBalance</span></td>
                 <td class="num cr">+10,000.00</td><td class="num">10,000.00</td><td class="num mono cap">1</td></tr>
             <tr data-detail="d-p123"><td>19 Sep 2026</td><td class="cap">19 Sep 14:41</td>
-                <td class="mono"><a class="link">POST-000123</a> <span class="b neutral">Reversed</span></td>
+                <td class="mono"><a class="link" href="07-posting.html">POST-000123</a> <span class="b neutral">Reversed</span></td>
                 <td>Settlement to merchant <span class="chip">Transfer</span></td>
                 <td class="num rev">−892.45</td><td class="num cap">9,107.55</td><td class="num mono cap">2</td></tr>
-            <tr data-detail="d-p124"><td>19 Sep 2026</td><td class="cap">19 Sep 15:10</td><td class="mono"><a class="link">POST-000124</a></td>
-                <td>Reversal of <a class="link mono">POST-000123</a> <span class="chip">Reversal</span></td>
+            <tr data-detail="d-p124"><td>19 Sep 2026</td><td class="cap">19 Sep 15:10</td><td class="mono"><a class="link" href="07-posting.html">POST-000124</a></td>
+                <td>Reversal of <a class="link mono" href="07-posting.html">POST-000123</a> <span class="chip">Reversal</span></td>
                 <td class="num cr">+892.45</td><td class="num">10,000.00</td><td class="num mono cap">3</td></tr>
-            <tr data-detail="d-p131"><td>21 Sep 2026</td><td class="cap">21 Sep 08:15</td><td class="mono"><a class="link">POST-000131</a></td>
+            <tr data-detail="d-p131"><td>21 Sep 2026</td><td class="cap">21 Sep 08:15</td><td class="mono"><a class="link" href="07-posting.html">POST-000131</a></td>
                 <td>Card settlement <span class="chip">Payment</span></td>
                 <td class="num dr">−1,600.00</td><td class="num">8,400.00</td><td class="num mono cap">4</td></tr>
           </tbody>
@@ -287,22 +291,27 @@
     </div>
   </div>
 </div>
-<template id="d-p121" data-title="POST-000121"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000121</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Credit</dd><dt>Amount</dt><dd><span class="num cr" style="text-align:left">+10,000.00</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">10,000.00</span></dd><dt>Effective</dt><dd>18 Sep 2026</dd><dt>Recorded</dt><dd>18 Sep 2026 09:02 UTC</dd><dt>Category</dt><dd><span class="chip">OpeningBalance</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd><span class="cap">Not reversed.</span></dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">migration</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">a41c-0090-4e12-bb70</span></dd></dl></template><template id="d-p123" data-title="POST-000123"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000123</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b neutral">Reversed</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Debit</dd><dt>Amount</dt><dd><span class="num dr" style="text-align:left">−892.45</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">9,107.55</span></dd><dt>Effective</dt><dd>19 Sep 2026</dd><dt>Recorded</dt><dd>19 Sep 2026 14:41 UTC</dd><dt>Category</dt><dd><span class="chip">Transfer</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd>Reversed by <span class="mono">POST-000124</span> on 19 Sep 2026.</dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">payments-gateway</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">b2f4-9c11-4a07-8e33</span></dd></dl></template><template id="d-p124" data-title="POST-000124"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000124</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Credit</dd><dt>Amount</dt><dd><span class="num cr" style="text-align:left">+892.45</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">10,000.00</span></dd><dt>Effective</dt><dd>19 Sep 2026</dd><dt>Recorded</dt><dd>19 Sep 2026 15:10 UTC</dd><dt>Category</dt><dd><span class="chip">Reversal</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd>Reverses <span class="mono">POST-000123</span>.</dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">ops-console</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">c7d0-11a2-49bb-90ef</span></dd></dl></template><template id="d-p131" data-title="POST-000131"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000131</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Debit</dd><dt>Amount</dt><dd><span class="num dr" style="text-align:left">−1,600.00</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">8,400.00</span></dd><dt>Effective</dt><dd>21 Sep 2026</dd><dt>Recorded</dt><dd>21 Sep 2026 08:15 UTC</dd><dt>Category</dt><dd><span class="chip">Payment</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd><span class="cap">Not reversed.</span></dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">card-switch</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">e919-5540-4c81-a2be</span></dd></dl></template>
+<template id="d-p121" data-href="07-posting.html" data-title="POST-000121"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000121</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Credit</dd><dt>Amount</dt><dd><span class="num cr" style="text-align:left">+10,000.00</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">10,000.00</span></dd><dt>Effective</dt><dd>18 Sep 2026</dd><dt>Recorded</dt><dd>18 Sep 2026 09:02 UTC</dd><dt>Category</dt><dd><span class="chip">OpeningBalance</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd><span class="cap">Not reversed.</span></dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">migration</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">a41c-0090-4e12-bb70</span></dd></dl></template><template id="d-p123" data-href="07-posting.html" data-title="POST-000123"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000123</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b neutral">Reversed</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Debit</dd><dt>Amount</dt><dd><span class="num dr" style="text-align:left">−892.45</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">9,107.55</span></dd><dt>Effective</dt><dd>19 Sep 2026</dd><dt>Recorded</dt><dd>19 Sep 2026 14:41 UTC</dd><dt>Category</dt><dd><span class="chip">Transfer</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd>Reversed by <span class="mono">POST-000124</span> on 19 Sep 2026.</dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">payments-gateway</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">b2f4-9c11-4a07-8e33</span></dd></dl></template><template id="d-p124" data-href="07-posting.html" data-title="POST-000124"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000124</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Credit</dd><dt>Amount</dt><dd><span class="num cr" style="text-align:left">+892.45</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">10,000.00</span></dd><dt>Effective</dt><dd>19 Sep 2026</dd><dt>Recorded</dt><dd>19 Sep 2026 15:10 UTC</dd><dt>Category</dt><dd><span class="chip">Reversal</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd>Reverses <span class="mono">POST-000123</span>.</dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">ops-console</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">c7d0-11a2-49bb-90ef</span></dd></dl></template><template id="d-p131" data-href="07-posting.html" data-title="POST-000131"><dl class='kv'><dt>Posting no.</dt><dd><span class="mono">POST-000131</span></dd><dt>Account</dt><dd><span class="mono">ACME-000123</span></dd><dt>Status</dt><dd><span class="b info">Posted</span></dd></dl><h4>Movement</h4><dl class='kv'><dt>Direction</dt><dd>Debit</dd><dt>Amount</dt><dd><span class="num dr" style="text-align:left">−1,600.00</span></dd><dt>Balance after</dt><dd><span class="num" style="text-align:left">8,400.00</span></dd><dt>Effective</dt><dd>21 Sep 2026</dd><dt>Recorded</dt><dd>21 Sep 2026 08:15 UTC</dd><dt>Category</dt><dd><span class="chip">Payment</span></dd></dl><h4>Lineage</h4><dl class='kv'><dt></dt><dd><span class="cap">Not reversed.</span></dd></dl><h4>Provenance</h4><dl class='kv'><dt>Calling system</dt><dd><span class="mono">card-switch</span></dd><dt>Idempotency key</dt><dd><span class="mono cap">e919-5540-4c81-a2be</span></dd></dl></template>
 <aside class="drawer" role="complementary" aria-hidden="true" aria-label="Details">
   <header><h3>Details</h3><button class="x" type="button" aria-label="Close details">Esc ✕</button></header>
   <div class="content"></div>
+  <footer hidden><a href="#">Open full page &rarr;</a></footer>
 </aside>
 <script>
 (function () {
   var drawer = document.querySelector('.drawer'), app = document.querySelector('.app');
   if (!drawer || !app) return;
   var title = drawer.querySelector('h3'), content = drawer.querySelector('.content'),
-      closeBtn = drawer.querySelector('.x'), picked = null;
+      foot = drawer.querySelector('footer'), footLink = foot.querySelector('a'),
+      picked = null;
 
   function open(tpl, row) {
     title.textContent = tpl.getAttribute('data-title') || 'Details';
     content.innerHTML = tpl.innerHTML;
     content.scrollTop = 0;
+    var href = tpl.getAttribute('data-href');
+    if (href) { footLink.setAttribute('href', href); foot.hidden = false; }
+    else { foot.hidden = true; }
     if (picked) picked.classList.remove('picked');
     picked = row;
     row.classList.add('picked');
@@ -314,17 +323,20 @@
     app.classList.remove('with-drawer');
     drawer.classList.remove('on');
     drawer.setAttribute('aria-hidden', 'true');
-    if (picked) { picked.classList.remove('picked'); picked.focus && picked.focus(); picked = null; }
+    if (picked) { picked.classList.remove('picked'); picked = null; }
   }
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('.x')) { close(); return; }
+    // a real link inside a row navigates; the rest of the row opens the panel.
+    // With no href (the isolated artifact card) nothing matches and the panel opens.
+    if (e.target.closest('a[href]')) return;
     var row = e.target.closest('[data-detail]');
     if (!row) return;
     var tpl = document.getElementById(row.getAttribute('data-detail'));
     if (!tpl) return;
     e.preventDefault();
-    if (row === picked) { close(); return; }   // clicking the open row closes it
+    if (row === picked) { close(); return; }
     open(tpl, row);
   });
   document.addEventListener('keydown', function (e) {
