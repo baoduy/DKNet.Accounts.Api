@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "ApiEndpoints/DKNet.Accounts.AppHost/DKNet.Accounts.AppHost.csproj"
+  }
+}
