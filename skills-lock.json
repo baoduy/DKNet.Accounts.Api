@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "skills": {
+    "dknet-auth-and-ownership": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-auth-and-ownership/SKILL.md",
+      "computedHash": "876a8f549f3f4c6409fb9b053c6e5b3fd3cb5de852a6965b475c44dd6fbf2fd3"
+    },
+    "dknet-bdd-tests": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-bdd-tests/SKILL.md",
+      "computedHash": "4d51a1a0d4e774912aa90de04edbd0a0df64dab2f7bc6c9515b654517f5827ee"
+    },
+    "dknet-crud": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-crud/SKILL.md",
+      "computedHash": "cf3c7897144ecf6b4899db86762a521a6db0c00d79fd13dceb091d30e6bbcde0"
+    },
+    "dknet-ddd-principles": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-ddd-principles/SKILL.md",
+      "computedHash": "a8348be51e29e288106e2070b2e294d821178e85e031d6de8fd5db4419d362fd"
+    },
+    "dknet-docs": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-docs/SKILL.md",
+      "computedHash": "40bfc99831c2bc7b24a9e48be8a4bc75a23551d50ad7cb8c4e94e29e858657e3"
+    },
+    "dknet-dto-mapping": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-dto-mapping/SKILL.md",
+      "computedHash": "6516a1ac755a50a30fdcaab5632924941f65186a4c1d259b24f23160db49fb13"
+    },
+    "dknet-efcore-config": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-efcore-config/SKILL.md",
+      "computedHash": "a76f5023224a540ae18e0944ee8571f7c80b725dfeff9663238877e7b7fd92b9"
+    },
+    "dknet-endpoint": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-endpoint/SKILL.md",
+      "computedHash": "4ac51aad75f228a8d39df828ae86ecac413a81cca611a5d1e268551422dfa9be"
+    },
+    "dknet-entity": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-entity/SKILL.md",
+      "computedHash": "7c36ccfcd2b9f136edc90b40359fee8415b5f840860e9a692a7153b5817e45a2"
+    },
+    "dknet-feature": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-feature/SKILL.md",
+      "computedHash": "e4d1ec819eab0e5d468c4a077fa28bcf2761ce4248440b7bfbc7061becf0a148"
+    },
+    "dknet-feature-lifecycle": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-feature-lifecycle/SKILL.md",
+      "computedHash": "8f3e214109673f6e6984d42c21274758d4ac9f827985c722a21016d45a0fb4d0"
+    },
+    "dknet-feature-remove": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-feature-remove/SKILL.md",
+      "computedHash": "8373b9f7e3638a7162c0148db8fd9c57d391975952a82243a77307ca2b8ba40d"
+    },
+    "dknet-messaging-events": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-messaging-events/SKILL.md",
+      "computedHash": "f09b3568869f103ffd67c56d1f6f55e464f2e489ec827db60071a45d922492af"
+    },
+    "dknet-package-adoption": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-package-adoption/SKILL.md",
+      "computedHash": "4b38cc6c2c7256b8a52e42c03164f6f97b269d6dbef9d72c39aa576551370ccd"
+    },
+    "dknet-platform-config": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-platform-config/SKILL.md",
+      "computedHash": "5bb1faa4047198ef433024aa8f03f845aa41ee9cf53a2bdf97f8a55eccd067b6"
+    },
+    "dknet-project-structure": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-project-structure/SKILL.md",
+      "computedHash": "ffabd4016c9dedf3df022255b7b8edc67b3c0b82ca87d53b95f62439aff2e6ba"
+    },
+    "dknet-queries-specs": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-queries-specs/SKILL.md",
+      "computedHash": "043012ca8862a899fb6adac8cc5ed4989300fb20dd92c74fdfccd6fbbe15a5f5"
+    },
+    "dknet-scaffold": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-scaffold/SKILL.md",
+      "computedHash": "b79d8e5607492560fbc5ef68dc8082aa81639f1a191509742a9c7e87f407e271"
+    },
+    "dknet-unit-tests": {
+      "source": "baoduy/DKNet.Templates",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/dknet-unit-tests/SKILL.md",
+      "computedHash": "beb5d0e675899e35957268bbaeea90fc9de971d7a56100628234db9119b1f921"
+    }
+  }
+}
