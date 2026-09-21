@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Account groups — DKNet Accounts Console</title>
+<meta name="description" content="/groups — the generic list contract, one filter bar">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Inlined from tokens.css so this mockup renders standalone — from a file://
+   double-click, an email attachment or a static server. Regenerate both together. */
+/* Generated from the DKNet Accounts Console design system — do not edit by hand.
+   Source of truth: https://claude.ai/artifact/HZpcP3v7spJLbjvavEfGuJ (project/tokens.json)
+
+   Light is the default. Dark follows the OS unless the document sets data-theme. */
+
+:root, :root[data-theme="light"] {
+  --background: #f5f5f5;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --muted: #ebebeb;
+  --muted-foreground: #5c5c5c;
+  --border: #e5e5e5;
+  --input: #737373;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --accent: #e8eeff;
+  --ring: var(--primary);
+  --credit: #166534;
+  --debit: #9f1239;
+  --warning: #92400e;
+  --destructive: #b91c1c;
+  --reversed: #666666;
+  --sidebar: #f5f5f5;
+  --sidebar-border: #e5e5e5;
+  --badge-credit-bg: #dcfce7;
+  --badge-credit-fg: #14532d;
+  --badge-debit-bg: #ffe4e6;
+  --badge-debit-fg: #881337;
+  --badge-warning-bg: #fef3c7;
+  --badge-warning-fg: #78350f;
+  --badge-neutral-bg: #ebebeb;
+  --badge-neutral-fg: #3f3f46;
+  --badge-info-bg: #dbeafe;
+  --badge-info-fg: #1e3a8a;
+  --shadow-card: 0 1px 2px rgba(10,10,10,0.05);
+  --shadow-overlay: 0 8px 24px rgba(10,10,10,0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #171717;
+  --muted: #262626;
+  --muted-foreground: #a1a1a1;
+  --border: #2e2e2e;
+  --input: #737373;
+  --primary: #7aa2ff;
+  --primary-foreground: #0a0a0a;
+  --accent: #1b2440;
+  --ring: var(--primary);
+  --credit: #4ade80;
+  --debit: #fb7185;
+  --warning: #fbbf24;
+  --destructive: #ff6467;
+  --reversed: #949494;
+  --sidebar: #171717;
+  --sidebar-border: #2e2e2e;
+  --badge-credit-bg: #14532d;
+  --badge-credit-fg: #86efac;
+  --badge-debit-bg: #881337;
+  --badge-debit-fg: #fda4af;
+  --badge-warning-bg: #78350f;
+  --badge-warning-fg: #fcd34d;
+  --badge-neutral-bg: #262626;
+  --badge-neutral-fg: #d4d4d4;
+  --badge-info-bg: #1e3a8a;
+  --badge-info-fg: #93c5fd;
+  --shadow-card: none;
+  --shadow-overlay: 0 8px 24px rgba(0,0,0,0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #171717;
+  --muted: #262626;
+  --muted-foreground: #a1a1a1;
+  --border: #2e2e2e;
+  --input: #737373;
+  --primary: #7aa2ff;
+  --primary-foreground: #0a0a0a;
+  --accent: #1b2440;
+  --ring: var(--primary);
+  --credit: #4ade80;
+  --debit: #fb7185;
+  --warning: #fbbf24;
+  --destructive: #ff6467;
+  --reversed: #949494;
+  --sidebar: #171717;
+  --sidebar-border: #2e2e2e;
+  --badge-credit-bg: #14532d;
+  --badge-credit-fg: #86efac;
+  --badge-debit-bg: #881337;
+  --badge-debit-fg: #fda4af;
+  --badge-warning-bg: #78350f;
+  --badge-warning-fg: #fcd34d;
+  --badge-neutral-bg: #262626;
+  --badge-neutral-fg: #d4d4d4;
+  --badge-info-bg: #1e3a8a;
+  --badge-info-fg: #93c5fd;
+  --shadow-card: none;
+  --shadow-overlay: 0 8px 24px rgba(0,0,0,0.7);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-full: 9999px;
+  --font-sans: "Plus Jakarta Sans", Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+</style>
+</head>
+<body>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--background);color:var(--foreground);
+       font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;font-size:14px;line-height:20px}
+  .app{display:flex;min-height:100vh}
+  .side{width:208px;flex:none;background:var(--sidebar);border-right:1px solid var(--sidebar-border);padding:14px 10px}
+  .brand{font-size:15px;font-weight:800;letter-spacing:-.02em;padding:4px 8px 6px}
+  .navsec{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--muted-foreground);padding:14px 8px 4px}
+  .nav{display:block;padding:6px 8px;border-radius:var(--radius-md);color:var(--foreground);text-decoration:none;font-size:13px}
+  .nav.on{background:var(--accent);font-weight:600}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .top{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 24px;
+       border-bottom:1px solid var(--border);background:var(--card)}
+  .crumb{font-size:13px;color:var(--muted-foreground)}
+  .crumb b{color:var(--foreground);font-weight:600}
+  .search{margin-left:auto;width:230px;border:1px solid var(--input);border-radius:var(--radius-md);
+          padding:4px 10px;font-size:12px;color:var(--muted-foreground);background:var(--background)}
+  .body{padding:24px;display:flex;flex-direction:column;gap:20px}
+  h1{margin:0;font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.02em}
+  h2{margin:0;font-size:16px;line-height:22px;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-card)}
+  .pad{padding:16px}
+  .cap{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+  .lab{font-size:11px;line-height:15px;font-weight:600;letter-spacing:.05em;color:var(--muted-foreground)}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:12px;line-height:16px;font-weight:600;letter-spacing:.03em;color:var(--muted-foreground);
+     text-align:left;padding:8px 12px;background:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+  td{font-size:13px;line-height:18px;padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum";font-weight:600}
+  .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  .b{display:inline-block;font-size:12px;line-height:16px;font-weight:500;padding:2px 8px;border-radius:var(--radius-full)}
+  .credit{background:var(--badge-credit-bg);color:var(--badge-credit-fg)}
+  .warning{background:var(--badge-warning-bg);color:var(--badge-warning-fg)}
+  .debit{background:var(--badge-debit-bg);color:var(--badge-debit-fg)}
+  .neutral{background:var(--badge-neutral-bg);color:var(--badge-neutral-fg)}
+  .info{background:var(--badge-info-bg);color:var(--badge-info-fg)}
+  .chip{display:inline-block;font-size:11px;line-height:15px;padding:1px 7px;border-radius:var(--radius-full);
+        background:var(--muted);color:var(--muted-foreground)}
+  .cr{color:var(--credit)}.dr{color:var(--debit)}
+  .rev{color:var(--reversed);text-decoration:line-through}
+  .btn{display:inline-block;font-size:13px;font-weight:600;padding:6px 12px;border-radius:var(--radius-md);
+       border:1px solid var(--input);background:var(--card);color:var(--foreground)}
+  .btn.pri{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}
+  .btn.dis{opacity:.45}
+  .row{display:flex;gap:10px;align-items:center}
+  .link{color:var(--primary);text-decoration:none}
+  .fld{border:1px solid var(--input);border-radius:var(--radius-md);padding:7px 10px;font-size:13px;
+       background:var(--card);color:var(--foreground)}
+  .ro{background:var(--muted);color:var(--muted-foreground)}
+  .note{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+</style>
+<div class="app"><div class="side"><div class="brand">DKNet Accounts</div><div class="navsec">LEDGER</div><a class="nav">Overview</a><a class="nav on">Account groups</a><a class="nav">Accounts</a><a class="nav">Record posting</a><div class="navsec">ADMINISTRATION</div><a class="nav">Currencies</a></div>
+  <div class="main">
+    <div class="top"><div class="crumb"><b>Account groups</b></div><div class="search">Search accounts, postings…  ⌘K</div></div>
+    <div class="body">
+
+      <div class="row"><h1>Account groups</h1><div style="margin-left:auto"><span class="btn pri">Create group</span></div></div>
+      <div class="card">
+        <div class="pad row" style="border-bottom:1px solid var(--border);gap:8px">
+          <span class="fld ro" style="width:220px">Search groups…</span>
+          <span class="fld">Type: Any ▾</span>
+          <span class="fld">Status: Active ▾</span>
+          <span class="cap" style="margin-left:auto">4 of 26</span>
+        </div>
+        <table>
+          <thead><tr><th>Code ↕</th><th>Name ↕</th><th>Type ↕</th><th>Status ↕</th><th>Owner ↕</th><th>Description ↕</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ACME</td><td><a class="link">Acme Holdings</a></td><td><span class="chip">Customer</span></td><td><span class="b credit">Active</span></td><td>cust-88201</td><td class="cap">Primary operating entity</td></tr>
+            <tr><td class="mono">MERCH</td><td><a class="link">Merchant Settlement</a></td><td><span class="chip">Merchant</span></td><td><span class="b credit">Active</span></td><td>ops-settlement</td><td class="cap">Daily merchant payouts</td></tr>
+            <tr><td class="mono">SUSP</td><td><a class="link">Suspense</a></td><td><span class="chip">Suspense</span></td><td><span class="b credit">Active</span></td><td>ops-recon</td><td class="cap">Unmatched movements pending review</td></tr>
+            <tr><td class="mono">LEGACY</td><td><a class="link">Legacy Migration</a></td><td><span class="chip">Internal</span></td><td><span class="b neutral">Closed</span></td><td>ops-migration</td><td class="cap">Closed after 2025 migration</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Filters compile to <span class="mono">filter=Field:Operation:Value</span>, repeatable and AND-ed, at most 20.
+        Free-text search needs two characters. Every column here is a real stored field, so all of them sort.
+      </div>
+
+    </div>
+  </div>
+</div>
+<style>
+  .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;display:flex;gap:6px;align-items:center;
+    background:var(--card);border:1px solid var(--input);border-radius:var(--radius-full);
+    padding:5px 8px;box-shadow:var(--shadow-overlay);
+    font:500 12px/16px "Plus Jakarta Sans",Inter,system-ui,sans-serif}
+  .mockbar a,.mockbar button{color:var(--muted-foreground);text-decoration:none;background:none;
+    border:0;font:inherit;cursor:pointer;padding:2px 6px;border-radius:var(--radius-sm)}
+  .mockbar a:hover,.mockbar button:hover{color:var(--foreground);background:var(--muted)}
+  @media print{.mockbar{display:none}}
+</style>
+<div class="mockbar">
+  <a href="index.html">All screens</a>
+  <span style="color:var(--border)">|</span>
+  <button type="button" onclick="(()=>{const r=document.documentElement;
+    const d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&
+      matchMedia('(prefers-color-scheme: dark)').matches);
+    r.setAttribute('data-theme',d?'light':'dark')})()">Toggle theme</button>
+</div>
+</body>
+</html>

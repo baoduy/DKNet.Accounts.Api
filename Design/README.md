@@ -69,3 +69,30 @@ group.MapGetStatusCounts<Account>("status", new StatusPropertyInfo(nameof(Accoun
 
 Until that route exists, the Overview renders the tiles in a skeleton state with a
 "not yet available" note rather than computing counts client-side over a full listing.
+
+## Mockups
+
+`Design/mockups/` holds a static mockup of every screen, generated from the design
+system's tokens. Open `mockups/index.html`, or any screen file directly — each is
+self-contained, so a file:// double-click renders correctly with no server and no
+network. Every page has a theme toggle; both themes are built in.
+
+| File | Screen |
+|---|---|
+| `01-overview.html` | Overview |
+| `02-groups.html` | Account groups |
+| `03-group-detail.html` | Group detail |
+| `04-accounts.html` | Accounts |
+| `05-account-detail.html` | Account detail — shown on a Dormant account, so the gated action is visible |
+| `06-statement.html` | Statement |
+| `07-posting.html` | Posting detail |
+| `08-record-posting.html` | Record posting |
+| `09-currencies.html` | Currencies |
+
+`mockups/tokens.css` is the compiled token set for the `ui/` app to import. The same CSS
+is inlined into each mockup so the files stand alone; regenerate the two together rather
+than editing either by hand. Both are generated from the design system artifact, which is
+the source of truth for token values.
+
+These show **what** each screen renders. The prose — states, empty cases, refusal
+placement — is in [02-screens.md](02-screens.md) and is not repeated in the markup.
