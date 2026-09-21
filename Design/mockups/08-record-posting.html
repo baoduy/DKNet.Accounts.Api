@@ -235,6 +235,9 @@
   .drawer .more:hover{text-decoration:underline}
   .drawer .more[hidden]{display:none}
   .acts{display:none}
+  .cur{white-space:nowrap}
+  .flag{display:inline-block;width:19px;margin-right:2px;font-size:14px;line-height:1;vertical-align:-1px;
+    font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
 </style>
 <div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav on" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
@@ -249,7 +252,7 @@
         <div class="card pad">
           <div style="display:grid;grid-template-columns:170px 1fr;gap:12px 16px;align-items:center;font-size:13px">
             <span class="cap">Account</span><span class="fld"><span class="mono">ACME-000123</span> — Operating Account ▾</span>
-            <span class="cap">Currency</span><span class="fld ro mono">SGD &nbsp;<span style="font-family:inherit">— from the account, locked</span></span>
+            <span class="cap">Currency</span><span class="fld ro mono cur"><span class="flag">🇸🇬</span>SGD &nbsp;<span style="font-family:inherit">— from the account, locked</span></span>
             <span class="cap">Direction</span>
               <span class="row"><span class="chip" style="background:var(--accent);color:var(--foreground);font-weight:600">Credit</span><span class="chip">Debit</span></span>
             <span class="cap">Amount</span><span class="fld" style="font-variant-numeric:tabular-nums">1,250.00</span>

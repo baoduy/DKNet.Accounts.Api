@@ -33,6 +33,28 @@ Rules, all of them non-negotiable:
 - **`Math.round` is banned.** Amounts are decimal money. Parse and validate as strings
   against the currency's precision; do not route them through float arithmetic.
 
+### `<Currency>`
+
+A currency code with its country flag: `🇸🇬 SGD`. Used at every site that names a currency
+— table cells, balance-tile captions, panel fields, group balance lines.
+
+- **The code is always present.** A flag alone is not a currency; several countries use
+  the dollar, and 🇺🇸 alone cannot distinguish USD from a US-domiciled account.
+- **The flag is decorative** — `aria-hidden`, carrying nothing the code does not.
+- **The slot is fixed at 19px** whether or not a flag exists, so a column stays aligned.
+- **Never in prose.** Body text mentioning a currency uses the bare code.
+
+**Not every currency has a country.** XAU and XAG (gold, silver) and XDR (IMF drawing
+rights) have none; EUR maps to a union rather than a country. Those render the code alone
+in the reserved slot, with no substitute globe or question mark — an invented symbol would
+imply a fact that isn't there.
+
+The mockups use Unicode regional-indicator emoji to stay self-contained. **That is a
+mockup decision.** Windows ships no colour flag glyphs and renders 🇸🇬 as the letters *SG*.
+The console should ship a real flag set — `flag-icons` or build-time inline SVG — keyed by
+ISO 3166-1 alpha-2, with the currency-to-country map held as data beside the currency
+reference the service already serves.
+
 ### `<BalanceTiles>`
 
 Renders `balance`, `availableBalance`, `heldAmount` as three tiles plus the computed
