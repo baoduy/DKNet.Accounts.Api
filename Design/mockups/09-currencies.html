@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1280">
 <title>Currencies — DKNet Accounts Console</title>
-<meta name="description" content="/currencies — reference data, edited rarely, consulted constantly">
+<meta name="description" content="/currencies — the table holds data only; actions live in the panel">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -224,10 +224,17 @@
   .drawer h4{margin:18px 0 8px;font-size:11px;line-height:15px;font-weight:600;
     letter-spacing:.05em;color:var(--muted-foreground)}
   .drawer h4:first-child{margin-top:0}
-  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border)}
-  .drawer > footer a{color:var(--primary);text-decoration:none;font-size:13px;font-weight:600}
-  .drawer > footer a:hover{text-decoration:underline}
+  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border);
+    display:flex;flex-direction:column;gap:10px;background:var(--background)}
   .drawer > footer[hidden]{display:none}
+  .drawer .footnote{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+  .drawer .footnote:empty{display:none}
+  .drawer .actbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .drawer .more{margin-right:auto;color:var(--primary);text-decoration:none;
+    font-size:13px;font-weight:600}
+  .drawer .more:hover{text-decoration:underline}
+  .drawer .more[hidden]{display:none}
+  .acts{display:none}
 </style>
 <div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav on" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
@@ -237,25 +244,16 @@
       <div class="row"><h1><svg class="ico-lg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</h1><div style="margin-left:auto"><span class="btn pri">Add currency</span></div></div>
       <div class="card">
         <table>
-          <thead><tr><th>Code ↕</th><th>Name ↕</th><th style="text-align:right">Decimals ↕</th><th>Status ↕</th><th></th></tr></thead>
+          <thead><tr><th>Code ↕</th><th>Name ↕</th><th style="text-align:right">Decimals ↕</th><th>Status ↕</th></tr></thead>
           <tbody>
-            <tr data-detail="d-c-sgd"><td class="mono">SGD</td><td>Singapore Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr data-detail="d-c-usd"><td class="mono">USD</td><td>US Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr data-detail="d-c-jpy"><td class="mono">JPY</td><td>Japanese Yen</td><td class="num">0</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr data-detail="d-c-bhd"><td class="mono">BHD</td><td>Bahraini Dinar</td><td class="num">3</td><td><span class="b neutral">Inactive</span></td><td style="text-align:right"><span class="btn">Activate</span></td></tr>
+            <tr data-detail="d-c-sgd"><td class="mono">SGD</td><td>Singapore Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td></tr>
+            <tr data-detail="d-c-usd"><td class="mono">USD</td><td>US Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td></tr>
+            <tr data-detail="d-c-jpy"><td class="mono">JPY</td><td>Japanese Yen</td><td class="num">0</td><td><span class="b credit">Active</span></td></tr>
+            <tr data-detail="d-c-bhd"><td class="mono">BHD</td><td>Bahraini Dinar</td><td class="num">3</td><td><span class="b neutral">Inactive</span></td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="card pad" style="max-width:520px;box-shadow:var(--shadow-overlay);border-left:3px solid var(--warning)">
-        <h2>Deactivate JPY?</h2>
-        <div class="note" style="margin-top:8px;font-size:13px;line-height:19px">
-          An inactive currency is refused on <b>open account</b> and on <b>record posting</b> with
-          <span class="mono">UNSUPPORTED_CURRENCY</span>. Existing JPY accounts keep their balances and stay
-          readable; nothing new can move in this currency until it is reactivated.
-        </div>
-        <div class="row" style="margin-top:16px"><span class="btn">Cancel</span><span class="btn pri">Deactivate</span></div>
-      </div>
       <div class="note" style="margin-top:-8px">
         <b>Decimals</b> is not cosmetic — it drives amount validation everywhere in the console. JPY takes none;
         BHD takes three.
@@ -264,27 +262,40 @@
     </div>
   </div>
 </div>
-<template id="d-c-sgd" data-title="SGD · Singapore Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">SGD</span></dd><dt>Name</dt><dd>Singapore Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl></template><template id="d-c-usd" data-title="USD · US Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">USD</span></dd><dt>Name</dt><dd>US Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl></template><template id="d-c-jpy" data-title="JPY · Japanese Yen"><dl class='kv'><dt>Code</dt><dd><span class="mono">JPY</span></dd><dt>Name</dt><dd>Japanese Yen</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">0</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must be whole — JPY takes no decimal places.</span></dd></dl></template><template id="d-c-bhd" data-title="BHD · Bahraini Dinar"><dl class='kv'><dt>Code</dt><dd><span class="mono">BHD</span></dd><dt>Name</dt><dd>Bahraini Dinar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">3</span></dd><dt>Status</dt><dd><span class="b neutral">Inactive</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Refused on open-account and record-posting with UNSUPPORTED_CURRENCY.</span></dd></dl></template>
+<template id="d-c-sgd" data-title="SGD · Singapore Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">SGD</span></dd><dt>Name</dt><dd>Singapore Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl><div class="acts" data-note=""><span class="btn pri">Deactivate</span></div></template><template id="d-c-usd" data-title="USD · US Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">USD</span></dd><dt>Name</dt><dd>US Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl><div class="acts" data-note=""><span class="btn pri">Deactivate</span></div></template><template id="d-c-jpy" data-title="JPY · Japanese Yen"><dl class='kv'><dt>Code</dt><dd><span class="mono">JPY</span></dd><dt>Name</dt><dd>Japanese Yen</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">0</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must be whole — JPY takes no decimal places.</span></dd></dl><div class="acts" data-note=""><span class="btn pri">Deactivate</span></div></template><template id="d-c-bhd" data-title="BHD · Bahraini Dinar"><dl class='kv'><dt>Code</dt><dd><span class="mono">BHD</span></dd><dt>Name</dt><dd>Bahraini Dinar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">3</span></dd><dt>Status</dt><dd><span class="b neutral">Inactive</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Refused on open-account and record-posting with UNSUPPORTED_CURRENCY.</span></dd></dl><div class="acts" data-note=""><span class="btn pri">Activate</span></div></template>
 <aside class="drawer" role="complementary" aria-hidden="true" aria-label="Details">
   <header><h3>Details</h3><button class="x" type="button" aria-label="Close details">Esc ✕</button></header>
   <div class="content"></div>
-  <footer hidden><a href="#">Open full page &rarr;</a></footer>
+  <footer hidden>
+    <div class="footnote"></div>
+    <div class="actbar"><a class="more" href="#">Open full page &rarr;</a><span class="slot"></span></div>
+  </footer>
 </aside>
 <script>
 (function () {
   var drawer = document.querySelector('.drawer'), app = document.querySelector('.app');
   if (!drawer || !app) return;
   var title = drawer.querySelector('h3'), content = drawer.querySelector('.content'),
-      foot = drawer.querySelector('footer'), footLink = foot.querySelector('a'),
+      foot = drawer.querySelector('footer'), more = drawer.querySelector('.more'),
+      slot = drawer.querySelector('.slot'), note = drawer.querySelector('.footnote'),
       picked = null;
 
   function open(tpl, row) {
     title.textContent = tpl.getAttribute('data-title') || 'Details';
     content.innerHTML = tpl.innerHTML;
     content.scrollTop = 0;
+
+    // Lifecycle actions live in the panel's bottom bar, never in the table.
+    var acts = content.querySelector('.acts');
+    slot.innerHTML = acts ? acts.innerHTML : '';
+    note.textContent = acts ? (acts.getAttribute('data-note') || '') : '';
+    if (acts) acts.parentNode.removeChild(acts);
+
     var href = tpl.getAttribute('data-href');
-    if (href) { footLink.setAttribute('href', href); foot.hidden = false; }
-    else { foot.hidden = true; }
+    if (href) { more.setAttribute('href', href); more.hidden = false; }
+    else { more.hidden = true; }
+    foot.hidden = !slot.innerHTML && more.hidden;
+
     if (picked) picked.classList.remove('picked');
     picked = row;
     row.classList.add('picked');
@@ -301,8 +312,6 @@
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('.x')) { close(); return; }
-    // a real link inside a row navigates; the rest of the row opens the panel.
-    // With no href (the isolated artifact card) nothing matches and the panel opens.
     if (e.target.closest('a[href]')) return;
     var row = e.target.closest('[data-detail]');
     if (!row) return;
@@ -318,13 +327,15 @@
 })();
 </script>
 <style>
-  .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;display:flex;gap:6px;align-items:center;
+  .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;transition:right .18s ease;display:flex;gap:6px;align-items:center;
     background:var(--card);border:1px solid var(--input);border-radius:var(--radius-full);
     padding:5px 8px;box-shadow:var(--shadow-overlay);
     font:500 12px/16px "Plus Jakarta Sans",Inter,system-ui,sans-serif}
   .mockbar a,.mockbar button{color:var(--muted-foreground);text-decoration:none;background:none;
     border:0;font:inherit;cursor:pointer;padding:2px 6px;border-radius:var(--radius-sm)}
   .mockbar a:hover,.mockbar button:hover{color:var(--foreground);background:var(--muted)}
+  /* the panel's action bar lives bottom-right too: step aside rather than cover it */
+  .app.with-drawer ~ .mockbar{right:404px}
   @media print{.mockbar{display:none}}
 </style>
 <div class="mockbar">

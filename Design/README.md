@@ -110,6 +110,12 @@ The mockups are working HTML, not pictures:
   closing it — the point is comparing records. Clicking the open row again, pressing Esc,
   or the close button dismisses it.
 
+- **Actions live in the panel's bottom bar, never in the table.** A table is data: no
+  action column, no per-row buttons, and no inline confirm card floating over the page.
+  Select a record and its lifecycle actions — activate, deactivate, close, freeze,
+  reverse — appear in a fixed bar at the foot of the panel. An action the service would
+  refuse is shown disabled with the reason and the refusal code beside it, rather than
+  hidden or left to fail on click.
 - **The detail panel links onward.** Where a record has a full page of its own, the panel
   carries an *Open full page* link to it. Currencies have no detail screen, so their panel
   has no link rather than a dead one.

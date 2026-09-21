@@ -224,10 +224,17 @@
   .drawer h4{margin:18px 0 8px;font-size:11px;line-height:15px;font-weight:600;
     letter-spacing:.05em;color:var(--muted-foreground)}
   .drawer h4:first-child{margin-top:0}
-  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border)}
-  .drawer > footer a{color:var(--primary);text-decoration:none;font-size:13px;font-weight:600}
-  .drawer > footer a:hover{text-decoration:underline}
+  .drawer > footer{padding:12px 16px;border-top:1px solid var(--border);
+    display:flex;flex-direction:column;gap:10px;background:var(--background)}
   .drawer > footer[hidden]{display:none}
+  .drawer .footnote{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+  .drawer .footnote:empty{display:none}
+  .drawer .actbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .drawer .more{margin-right:auto;color:var(--primary);text-decoration:none;
+    font-size:13px;font-weight:600}
+  .drawer .more:hover{text-decoration:underline}
+  .drawer .more[hidden]{display:none}
+  .acts{display:none}
 </style>
 <div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav on" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
@@ -269,27 +276,40 @@
     </div>
   </div>
 </div>
-<template id="d-acme123" data-href="05-account-detail.html" data-title="ACME-000123 · Operating Account"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">ACME-000123</span></dd><dt>Name</dt><dd>Operating Account</dd><dt>Group</dt><dd><span class="mono">ACME</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Liability</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">12,400.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">12,400.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">−5,000.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd>Credits and debits both accepted.</dd></dl></template><template id="d-acme124" data-href="05-account-detail.html" data-title="ACME-000124 · Fee Income"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">ACME-000124</span></dd><dt>Name</dt><dd>Fee Income</dd><dt>Group</dt><dd><span class="mono">ACME</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Income</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">1,192,482.50</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">1,192,482.50</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd>Credits and debits both accepted.</dd></dl></template><template id="d-merch044" data-href="05-account-detail.html" data-title="MERCH-000044 · Settlement — APAC"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">MERCH-000044</span></dd><dt>Name</dt><dd>Settlement — APAC</dd><dt>Group</dt><dd><span class="mono">MERCH</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Liability</span></dd><dt>Status</dt><dd><span class="b warning">Dormant</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">−5,000.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span style="color:var(--warning)">Debits refused — dormant.</span></dd></dl></template><template id="d-susp002" data-href="05-account-detail.html" data-title="SUSP-000002 · Suspense — unmatched"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">SUSP-000002</span></dd><dt>Name</dt><dd>Suspense — unmatched</dd><dt>Group</dt><dd><span class="mono">SUSP</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Asset</span></dd><dt>Status</dt><dd><span class="b debit">Frozen</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">1,204.55</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">1,204.55</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span style="color:var(--debit)">No movement in either direction — frozen.</span></dd></dl></template><template id="d-legacy009" data-href="05-account-detail.html" data-title="LEGACY-000009 · Migration Clearing"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">LEGACY-000009</span></dd><dt>Name</dt><dd>Migration Clearing</dd><dt>Group</dt><dd><span class="mono">LEGACY</span></dd><dt>Currency</dt><dd><span class="mono">USD</span></dd><dt>Classification</dt><dd><span class="chip">Asset</span></dd><dt>Status</dt><dd><span class="b neutral">Closed</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span class="cap">Closed. Read-only.</span></dd></dl></template>
+<template id="d-acme123" data-href="05-account-detail.html" data-title="ACME-000123 · Operating Account"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">ACME-000123</span></dd><dt>Name</dt><dd>Operating Account</dd><dt>Group</dt><dd><span class="mono">ACME</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Liability</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">12,400.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">12,400.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">−5,000.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd>Credits and debits both accepted.</dd></dl><div class="acts" data-note="Balance is 12,400.00 — closing is refused with ACCOUNT_HOLDS_BALANCE."><span class="btn dis">Close account</span></div></template><template id="d-acme124" data-href="05-account-detail.html" data-title="ACME-000124 · Fee Income"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">ACME-000124</span></dd><dt>Name</dt><dd>Fee Income</dd><dt>Group</dt><dd><span class="mono">ACME</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Income</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">1,192,482.50</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">1,192,482.50</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd>Credits and debits both accepted.</dd></dl><div class="acts" data-note="Balance is 1,192,482.50 — closing is refused with ACCOUNT_HOLDS_BALANCE."><span class="btn dis">Close account</span></div></template><template id="d-merch044" data-href="05-account-detail.html" data-title="MERCH-000044 · Settlement — APAC"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">MERCH-000044</span></dd><dt>Name</dt><dd>Settlement — APAC</dd><dt>Group</dt><dd><span class="mono">MERCH</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Liability</span></dd><dt>Status</dt><dd><span class="b warning">Dormant</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">−5,000.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span style="color:var(--warning)">Debits refused — dormant.</span></dd></dl><div class="acts" data-note=""><span class="btn">Freeze</span><span class="btn pri">Close account</span></div></template><template id="d-susp002" data-href="05-account-detail.html" data-title="SUSP-000002 · Suspense — unmatched"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">SUSP-000002</span></dd><dt>Name</dt><dd>Suspense — unmatched</dd><dt>Group</dt><dd><span class="mono">SUSP</span></dd><dt>Currency</dt><dd><span class="mono">SGD</span></dd><dt>Classification</dt><dd><span class="chip">Asset</span></dd><dt>Status</dt><dd><span class="b debit">Frozen</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">1,204.55</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">1,204.55</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span style="color:var(--debit)">No movement in either direction — frozen.</span></dd></dl><div class="acts" data-note="Balance is 1,204.55 — closing is refused with ACCOUNT_HOLDS_BALANCE."><span class="btn">Unfreeze</span><span class="btn dis">Close account</span></div></template><template id="d-legacy009" data-href="05-account-detail.html" data-title="LEGACY-000009 · Migration Clearing"><dl class='kv'><dt>Account no.</dt><dd><span class="mono">LEGACY-000009</span></dd><dt>Name</dt><dd>Migration Clearing</dd><dt>Group</dt><dd><span class="mono">LEGACY</span></dd><dt>Currency</dt><dd><span class="mono">USD</span></dd><dt>Classification</dt><dd><span class="chip">Asset</span></dd><dt>Status</dt><dd><span class="b neutral">Closed</span></dd></dl><h4>Balances</h4><dl class='kv'><dt>Balance</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Available</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Held</dt><dd><span class="num" style="text-align:left">0.00</span></dd><dt>Floor</dt><dd><span class="num" style="text-align:left">0.00</span></dd></dl><h4>Posting</h4><dl class='kv'><dt>Movement</dt><dd><span class="cap">Closed. Read-only.</span></dd></dl><div class="acts" data-note=""><span class="btn pri">Reopen account</span></div></template>
 <aside class="drawer" role="complementary" aria-hidden="true" aria-label="Details">
   <header><h3>Details</h3><button class="x" type="button" aria-label="Close details">Esc ✕</button></header>
   <div class="content"></div>
-  <footer hidden><a href="#">Open full page &rarr;</a></footer>
+  <footer hidden>
+    <div class="footnote"></div>
+    <div class="actbar"><a class="more" href="#">Open full page &rarr;</a><span class="slot"></span></div>
+  </footer>
 </aside>
 <script>
 (function () {
   var drawer = document.querySelector('.drawer'), app = document.querySelector('.app');
   if (!drawer || !app) return;
   var title = drawer.querySelector('h3'), content = drawer.querySelector('.content'),
-      foot = drawer.querySelector('footer'), footLink = foot.querySelector('a'),
+      foot = drawer.querySelector('footer'), more = drawer.querySelector('.more'),
+      slot = drawer.querySelector('.slot'), note = drawer.querySelector('.footnote'),
       picked = null;
 
   function open(tpl, row) {
     title.textContent = tpl.getAttribute('data-title') || 'Details';
     content.innerHTML = tpl.innerHTML;
     content.scrollTop = 0;
+
+    // Lifecycle actions live in the panel's bottom bar, never in the table.
+    var acts = content.querySelector('.acts');
+    slot.innerHTML = acts ? acts.innerHTML : '';
+    note.textContent = acts ? (acts.getAttribute('data-note') || '') : '';
+    if (acts) acts.parentNode.removeChild(acts);
+
     var href = tpl.getAttribute('data-href');
-    if (href) { footLink.setAttribute('href', href); foot.hidden = false; }
-    else { foot.hidden = true; }
+    if (href) { more.setAttribute('href', href); more.hidden = false; }
+    else { more.hidden = true; }
+    foot.hidden = !slot.innerHTML && more.hidden;
+
     if (picked) picked.classList.remove('picked');
     picked = row;
     row.classList.add('picked');
@@ -306,8 +326,6 @@
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('.x')) { close(); return; }
-    // a real link inside a row navigates; the rest of the row opens the panel.
-    // With no href (the isolated artifact card) nothing matches and the panel opens.
     if (e.target.closest('a[href]')) return;
     var row = e.target.closest('[data-detail]');
     if (!row) return;
@@ -323,13 +341,15 @@
 })();
 </script>
 <style>
-  .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;display:flex;gap:6px;align-items:center;
+  .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;transition:right .18s ease;display:flex;gap:6px;align-items:center;
     background:var(--card);border:1px solid var(--input);border-radius:var(--radius-full);
     padding:5px 8px;box-shadow:var(--shadow-overlay);
     font:500 12px/16px "Plus Jakarta Sans",Inter,system-ui,sans-serif}
   .mockbar a,.mockbar button{color:var(--muted-foreground);text-decoration:none;background:none;
     border:0;font:inherit;cursor:pointer;padding:2px 6px;border-radius:var(--radius-sm)}
   .mockbar a:hover,.mockbar button:hover{color:var(--foreground);background:var(--muted)}
+  /* the panel's action bar lives bottom-right too: step aside rather than cover it */
+  .app.with-drawer ~ .mockbar{right:404px}
   @media print{.mockbar{display:none}}
 </style>
 <div class="mockbar">
