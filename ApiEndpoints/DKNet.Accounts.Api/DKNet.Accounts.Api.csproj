@@ -8,7 +8,6 @@
         <ContainerRepository>baoduy/dknet.accounts-api</ContainerRepository>
         <ContainerImageTags>1.0.0;latest</ContainerImageTags>
         <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0-alpine</ContainerBaseImage>
-        <ContainerUser>$APP_UID</ContainerUser>
       <UserSecretsId>DBF01B68-0445-4469-AF72-F0C643004311</UserSecretsId>
   </PropertyGroup>
 

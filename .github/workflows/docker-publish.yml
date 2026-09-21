@@ -58,13 +58,15 @@ jobs:
 
       # The .NET SDK builds and pushes the image itself (container properties live
       # in the csproj), so there is no Dockerfile to keep in sync.
+      # ContainerRuntimeIdentifiers replaces --runtime: the SDK builds one image per RID
+      # and pushes a manifest list, so each tag serves amd64 and arm64 hosts.
       - name: Build & push image
         run: |
           dotnet publish ${{ env.Project_Path }} \
             --configuration Release \
-            --runtime linux-x64 \
             --self-contained false \
             /t:PublishContainer \
+            -p:ContainerRuntimeIdentifiers='"linux-x64;linux-arm64"' \
             -p:ContainerRegistry=ghcr.io \
             -p:ContainerRepository=${{ env.Image_Repository }} \
             -p:ContainerImageTags='"${{ env.NEXT_VERSION }};latest"'
