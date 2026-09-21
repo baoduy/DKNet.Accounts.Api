@@ -96,3 +96,20 @@ the source of truth for token values.
 
 These show **what** each screen renders. The prose — states, empty cases, refusal
 placement — is in [02-screens.md](02-screens.md) and is not repeated in the markup.
+
+### They are clickable
+
+The mockups are working HTML, not pictures:
+
+- **The sidebar navigates.** Every entry is a real link to its screen file. LEDGER sits at
+  the top, ADMINISTRATION at the bottom of the sidebar.
+- **Rows open a detail sidebar.** Clicking an account, group, posting or currency row opens
+  a panel on the right with that record's full detail. The selected row is highlighted and
+  the page content shifts left rather than being covered, so the table stays readable.
+- **The panel is not a modal.** Clicking a second row swaps the panel's content without
+  closing it — the point is comparing records. Clicking the open row again, pressing Esc,
+  or the close button dismisses it.
+
+Every screen carries its own copy of the ~40 lines of script, for the same reason it
+carries its own copy of the tokens: one file, no dependencies, works from a
+double-click.

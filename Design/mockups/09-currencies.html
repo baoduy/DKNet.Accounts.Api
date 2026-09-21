@@ -196,8 +196,36 @@
   .ico{width:16px;height:16px}
   .ico-lg{width:20px;height:20px}
   h1{display:flex;align-items:center;gap:10px}
+
+  .side{display:flex;flex-direction:column}
+  .navgroup-admin{margin-top:auto}
+  tr[data-detail]{cursor:pointer}
+  tr[data-detail]:hover td{background:var(--muted)}
+  .app{transition:padding-right .18s ease}
+  .app.with-drawer{padding-right:392px}
+  .body{overflow-x:auto}
+  tr[data-detail].picked td{background:var(--accent)}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:392px;max-width:92vw;
+    background:var(--card);border-left:1px solid var(--border);box-shadow:var(--shadow-overlay);
+    z-index:50;transform:translateX(100%);transition:transform .18s ease;
+    display:flex;flex-direction:column}
+  .drawer.on{transform:none}
+  .drawer > header{display:flex;align-items:center;gap:10px;padding:14px 16px;
+    border-bottom:1px solid var(--border)}
+  .drawer h3{margin:0;font-size:15px;line-height:21px;font-weight:700}
+  .drawer .x{margin-left:auto;border:0;background:none;color:var(--muted-foreground);
+    cursor:pointer;font:inherit;font-size:16px;line-height:1;padding:5px 8px;
+    border-radius:var(--radius-sm);white-space:nowrap;font-size:12px}
+  .drawer .x:hover{background:var(--muted);color:var(--foreground)}
+  .drawer .content{padding:16px;overflow:auto;flex:1}
+  .kv{display:grid;grid-template-columns:132px 1fr;gap:9px 14px;font-size:13px;line-height:18px;margin:0}
+  .kv dt{margin:0;color:var(--muted-foreground)}
+  .kv dd{margin:0}
+  .drawer h4{margin:18px 0 8px;font-size:11px;line-height:15px;font-weight:600;
+    letter-spacing:.05em;color:var(--muted-foreground)}
+  .drawer h4:first-child{margin-top:0}
 </style>
-<div class="app"><div class="side"><div class="brand">DKNet Accounts</div><div class="navsec">LEDGER</div><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a><div class="navsec">ADMINISTRATION</div><a class="nav on"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div>
+<div class="app"><div class="side"><div class="brand">Bank Accounts</div><div class="navgroup"><div class="navsec">LEDGER</div><a class="nav" href="01-overview.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav" href="02-groups.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav" href="04-accounts.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav" href="08-record-posting.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a></div><div class="navgroup navgroup-admin"><div class="navsec">ADMINISTRATION</div><a class="nav on" href="09-currencies.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div></div>
   <div class="main">
     <div class="top"><div class="crumb"><b>Currencies</b></div><div class="search">Search accounts, postings…  ⌘K</div></div>
     <div class="body">
@@ -207,10 +235,10 @@
         <table>
           <thead><tr><th>Code ↕</th><th>Name ↕</th><th style="text-align:right">Decimals ↕</th><th>Status ↕</th><th></th></tr></thead>
           <tbody>
-            <tr><td class="mono">SGD</td><td>Singapore Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr><td class="mono">USD</td><td>US Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr><td class="mono">JPY</td><td>Japanese Yen</td><td class="num">0</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
-            <tr><td class="mono">BHD</td><td>Bahraini Dinar</td><td class="num">3</td><td><span class="b neutral">Inactive</span></td><td style="text-align:right"><span class="btn">Activate</span></td></tr>
+            <tr data-detail="d-c-sgd"><td class="mono">SGD</td><td>Singapore Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
+            <tr data-detail="d-c-usd"><td class="mono">USD</td><td>US Dollar</td><td class="num">2</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
+            <tr data-detail="d-c-jpy"><td class="mono">JPY</td><td>Japanese Yen</td><td class="num">0</td><td><span class="b credit">Active</span></td><td style="text-align:right"><span class="btn">Deactivate</span></td></tr>
+            <tr data-detail="d-c-bhd"><td class="mono">BHD</td><td>Bahraini Dinar</td><td class="num">3</td><td><span class="b neutral">Inactive</span></td><td style="text-align:right"><span class="btn">Activate</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -232,6 +260,51 @@
     </div>
   </div>
 </div>
+<template id="d-c-sgd" data-title="SGD · Singapore Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">SGD</span></dd><dt>Name</dt><dd>Singapore Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl></template><template id="d-c-usd" data-title="USD · US Dollar"><dl class='kv'><dt>Code</dt><dd><span class="mono">USD</span></dd><dt>Name</dt><dd>US Dollar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">2</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must match 2 decimal places.</span></dd></dl></template><template id="d-c-jpy" data-title="JPY · Japanese Yen"><dl class='kv'><dt>Code</dt><dd><span class="mono">JPY</span></dd><dt>Name</dt><dd>Japanese Yen</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">0</span></dd><dt>Status</dt><dd><span class="b credit">Active</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Amounts must be whole — JPY takes no decimal places.</span></dd></dl></template><template id="d-c-bhd" data-title="BHD · Bahraini Dinar"><dl class='kv'><dt>Code</dt><dd><span class="mono">BHD</span></dd><dt>Name</dt><dd>Bahraini Dinar</dd><dt>Decimal places</dt><dd><span class="num" style="text-align:left">3</span></dd><dt>Status</dt><dd><span class="b neutral">Inactive</span></dd></dl><h4>Effect</h4><dl class='kv'><dt></dt><dd><span class="cap">Refused on open-account and record-posting with UNSUPPORTED_CURRENCY.</span></dd></dl></template>
+<aside class="drawer" role="complementary" aria-hidden="true" aria-label="Details">
+  <header><h3>Details</h3><button class="x" type="button" aria-label="Close details">Esc ✕</button></header>
+  <div class="content"></div>
+</aside>
+<script>
+(function () {
+  var drawer = document.querySelector('.drawer'), app = document.querySelector('.app');
+  if (!drawer || !app) return;
+  var title = drawer.querySelector('h3'), content = drawer.querySelector('.content'),
+      closeBtn = drawer.querySelector('.x'), picked = null;
+
+  function open(tpl, row) {
+    title.textContent = tpl.getAttribute('data-title') || 'Details';
+    content.innerHTML = tpl.innerHTML;
+    content.scrollTop = 0;
+    if (picked) picked.classList.remove('picked');
+    picked = row;
+    row.classList.add('picked');
+    app.classList.add('with-drawer');
+    drawer.classList.add('on');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+  function close() {
+    app.classList.remove('with-drawer');
+    drawer.classList.remove('on');
+    drawer.setAttribute('aria-hidden', 'true');
+    if (picked) { picked.classList.remove('picked'); picked.focus && picked.focus(); picked = null; }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.x')) { close(); return; }
+    var row = e.target.closest('[data-detail]');
+    if (!row) return;
+    var tpl = document.getElementById(row.getAttribute('data-detail'));
+    if (!tpl) return;
+    e.preventDefault();
+    if (row === picked) { close(); return; }   // clicking the open row closes it
+    open(tpl, row);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && drawer.classList.contains('on')) close();
+  });
+})();
+</script>
 <style>
   .mockbar{position:fixed;right:12px;bottom:12px;z-index:99;display:flex;gap:6px;align-items:center;
     background:var(--card);border:1px solid var(--input);border-radius:var(--radius-full);
