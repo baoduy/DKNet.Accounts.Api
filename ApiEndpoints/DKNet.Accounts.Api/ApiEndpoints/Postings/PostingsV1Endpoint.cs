@@ -46,22 +46,15 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.PostingsRead)
             .WithDescription("Read one posting.");
 
-        // Reverse (HAND, DRK-1277 §3 row 16): stays fully hand-written. A [CrudAction] marker would only buy
-        // the three-line Id-only request record, at the cost of a public entity method the generator's own
-        // name-matching binds by convention — a rename, a generator version bump or a namespace move could
-        // silently rebind this request onto the generated handler instead of ReversePostingCommandHandler,
-        // turning every reversal into an unhandled call to a throwing stub. Also: the generated composite's
-        // MapActionById hardcodes the package's default FluentResults->IResult conversion (400 on any
-        // failure), which cannot express this service's LedgerErrors->422 mapping (R3) — so the route stays
-        // hand-mapped either way.
-        group.MapPost("{id:guid}/reverse", async (
-                Guid id,
-                IMessageBus bus,
-                CancellationToken ct) =>
-            {
-                var result = await bus.Send(new ReversePostingRequest { Id = id }, cancellationToken: ct);
-                return result.Response();
-            })
+        // Reverse (GEN-mapper, DRK-1277 §3 row 16): the generic mapper binds the id from the route and reads
+        // nothing from the body, and ReversePostingCommandHandler still handles the request — so this is the
+        // hand-written lambda's behaviour in one line. Status codes are unaffected: LedgerErrors->422/409
+        // comes from the one AddErrorResponses registration (LedgerErrorResponseOptions), which the package
+        // resolves when the response executes, not from whichever mapper registered the route.
+        // Still NOT a [CrudAction]: that marker binds a public entity method by name convention, so a rename,
+        // a generator version bump or a namespace move could silently rebind this request onto the generated
+        // handler instead of ReversePostingCommandHandler, turning every reversal into a call to a throwing stub.
+        group.MapParameterlessActionById<ReversePostingRequest, Guid, PostingDto>("{id:guid}/reverse", "POST")
             .RequireScope(group, ScopeNames.PostingsReverse)
             .Produces<PostingDto>()
             .WithDescription("Reverse a posting.");

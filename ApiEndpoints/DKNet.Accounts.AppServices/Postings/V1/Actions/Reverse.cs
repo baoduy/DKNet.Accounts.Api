@@ -11,7 +11,8 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 /// Reverses a posting. Exempt from the account's floor but not from its status (§ invariants) — a
 /// posting can be reversed at most once.
 /// </summary>
-public sealed record ReversePostingRequest : Fluents.Requests.IWitResponse<PostingDto>
+public sealed record ReversePostingRequest
+    : Fluents.Requests.IWitResponse<PostingDto>, Fluents.Requests.IWithKey<Guid>
 {
     public Guid Id { get; set; }
 }

@@ -25,9 +25,9 @@ services:
 
   api:
     image: ${API_IMAGE:-ghcr.io/baoduy/dknet.accounts-api:latest}
-    # The published image's USER is the literal string "$APP_UID" (csproj used $ instead of
-    # MSBuild's $(...)), which docker cannot resolve. Pin the base image's app user instead.
-    # Drop this once an image built after the csproj fix is published.
+    # ghcr's current :latest has USER "$APP_UID" as a literal string, which docker cannot resolve
+    # ("unable to find user $APP_UID"). The csproj now names the base image's user explicitly, so drop
+    # this line once a :latest built after that fix is published.
     user: "1654:1654"
     depends_on:
       postgres: { condition: service_healthy }

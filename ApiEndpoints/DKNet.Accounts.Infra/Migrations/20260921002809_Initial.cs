@@ -208,6 +208,28 @@ namespace DKNet.Accounts.Infra.Migrations
                 table: "Postings",
                 column: "PostingNumber",
                 unique: true);
+
+            // Fixed, deterministic seed rows (R5: SGD, USD and JPY at minimum), carried over from the
+            // squashed AddCurrencies migration. Hand-written, so `dotnet ef migrations add` never regenerates
+            // them — re-squashing this migration drops them again unless they are copied across by hand.
+            // InsertData bypasses the entity constructor entirely, which is the only way to give these rows
+            // stable ids — Currency's base AggregateRoot ctor hard-codes Guid.NewGuid() with no public Id
+            // setter, so seeding through DataSeedingConfiguration<T> would re-insert (and trip the unique
+            // index) on every startup. CreatedOn is a fixed UTC literal, not DateTimeOffset.UtcNow, so the
+            // migration stays deterministic. Three single-row calls (not one multi-row call) — sidesteps
+            // CA1814 without suppressing it.
+            var seededOn = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            var columns = new[] { "Id", "Code", "Name", "DecimalPlaces", "IsActive", "CreatedBy", "CreatedOn" };
+
+            migrationBuilder.InsertData(
+                schema: "pro", table: "Currencies", columns: columns,
+                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000702"), "SGD", "Singapore Dollar", 2, true, "system", seededOn });
+            migrationBuilder.InsertData(
+                schema: "pro", table: "Currencies", columns: columns,
+                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000840"), "USD", "US Dollar", 2, true, "system", seededOn });
+            migrationBuilder.InsertData(
+                schema: "pro", table: "Currencies", columns: columns,
+                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000392"), "JPY", "Japanese Yen", 0, true, "system", seededOn });
         }
 
         /// <inheritdoc />
