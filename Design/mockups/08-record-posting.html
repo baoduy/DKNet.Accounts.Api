@@ -189,13 +189,20 @@
        background:var(--card);color:var(--foreground)}
   .ro{background:var(--muted);color:var(--muted-foreground)}
   .note{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+
+  .nav{display:flex;align-items:center;gap:9px}
+  .ico,.ico-lg{flex:none;fill:none;stroke:currentColor;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round}
+  .ico{width:16px;height:16px}
+  .ico-lg{width:20px;height:20px}
+  h1{display:flex;align-items:center;gap:10px}
 </style>
-<div class="app"><div class="side"><div class="brand">DKNet Accounts</div><div class="navsec">LEDGER</div><a class="nav">Overview</a><a class="nav">Account groups</a><a class="nav">Accounts</a><a class="nav on">Record posting</a><div class="navsec">ADMINISTRATION</div><a class="nav">Currencies</a></div>
+<div class="app"><div class="side"><div class="brand">DKNet Accounts</div><div class="navsec">LEDGER</div><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Account groups</a><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Accounts</a><a class="nav on"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</a><div class="navsec">ADMINISTRATION</div><a class="nav"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>Currencies</a></div>
   <div class="main">
     <div class="top"><div class="crumb"><b>Record posting</b></div><div class="search">Search accounts, postings…  ⌘K</div></div>
     <div class="body">
 
-      <div class="row"><h1>Record posting</h1>
+      <div class="row"><h1><svg class="ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Record posting</h1>
         <span class="row" style="margin-left:auto"><span class="chip" style="background:var(--accent);color:var(--foreground);font-weight:600">Single</span><span class="chip">Batch</span></span>
       </div>
 
