@@ -36,15 +36,14 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<AccountGroupDto> GetAccountGroupAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<AccountGroupDto>(HttpMethod.Get, $"/{Version}/account-groups/{id}", ct: ct);
 
-    public Task<AccountGroupDto> RenameAccountGroupAsync(Guid id, string name, CancellationToken ct = default) =>
-        SendAsync<AccountGroupDto>(HttpMethod.Put, $"/{Version}/account-groups/{id}", new { name }, ct: ct);
-
-    public Task<AccountGroupDto> ChangeAccountGroupDescriptionAsync(Guid id, string? description, CancellationToken ct = default) =>
-        SendAsync<AccountGroupDto>(HttpMethod.Put, $"/{Version}/account-groups/{id}/change-description", new { description }, ct: ct);
-
-    public Task<AccountGroupDto> ChangeAccountGroupMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default) =>
-        SendAsync<AccountGroupDto>(HttpMethod.Put, $"/{Version}/account-groups/{id}/change-metadata", new { metadata }, ct: ct);
+    public Task<AccountGroupDto> UpdateAccountGroupAsync(
+        Guid id,
+        string? name = null,
+        string? description = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default) =>
+        SendAsync<AccountGroupDto>(
+            HttpMethod.Put, $"/{Version}/account-groups/{id}", new { name, description, metadata }, ct: ct);
 
     public Task<AccountGroupDto> CloseAccountGroupAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<AccountGroupDto>(HttpMethod.Post, $"/{Version}/account-groups/{id}/close", ct: ct);
@@ -72,12 +71,12 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<AccountBalanceDto> GetAccountBalanceAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<AccountBalanceDto>(HttpMethod.Get, $"/{Version}/accounts/{id}/balance", ct: ct);
 
-    public Task<AccountDto> RenameAccountAsync(Guid id, string name, CancellationToken ct = default) =>
-        SendAsync<AccountDto>(HttpMethod.Put, $"/{Version}/accounts/{id}", new { name }, ct: ct);
-
-    public Task<AccountDto> ChangeAccountMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default) =>
-        SendAsync<AccountDto>(HttpMethod.Put, $"/{Version}/accounts/{id}/change-metadata", new { metadata }, ct: ct);
+    public Task<AccountDto> ChangeAccountDetailsAsync(
+        Guid id,
+        string? name = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default) =>
+        SendAsync<AccountDto>(HttpMethod.Put, $"/{Version}/accounts/{id}", new { name, metadata }, ct: ct);
 
     public Task<AccountDto> UpdateAccountAsync(
         Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default) =>
@@ -120,8 +119,13 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<PostingDto> GetPostingAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<PostingDto>(HttpMethod.Get, $"/{Version}/postings/{id}", ct: ct);
 
-    public Task<PostingDto> ReversePostingAsync(Guid id, CancellationToken ct = default) =>
-        SendAsync<PostingDto>(HttpMethod.Post, $"/{Version}/postings/{id}/reverse", ct: ct);
+    // An anonymous body carrying only the reason, deliberately: posting ReversePostingRequest itself would
+    // also serialize id and idempotencyKey as body fields, and a body-borne idempotencyKey is precisely what
+    // the service refuses to trust (R3).
+    public Task<PostingDto> ReversePostingAsync(
+        Guid id, string reason, string idempotencyKey, CancellationToken ct = default) =>
+        SendAsync<PostingDto>(
+            HttpMethod.Post, $"/{Version}/postings/{id}/reverse", new { reason }, idempotencyKey, ct);
 
     // ---- Wire plumbing ----
 

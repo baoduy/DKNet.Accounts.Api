@@ -12,7 +12,7 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 /// by name; <see cref="DKNet.Accounts.Api.ApiEndpoints.Accounts.AccountsV1Endpoint"/> excludes only "Delete"
 /// (accounts publish no delete route). This is spec revision 13 §3, frozen: both entities are served by the
 /// generated route set for every route/operation it can serve. pr-reviewer round 1 finding 7 briefly excluded
-/// "Close" (account groups) and "GetById"/"Rename"/"ChangeMetadata" (accounts) by name to force an explicit
+/// "Close" (account groups) and "GetById"/"ChangeDetails" (accounts) by name to force an explicit
 /// <c>"{id:guid}"</c> pattern each of those routes had before DRK-1522 — that reversed the frozen requirement
 /// and was reverted in round 2. Every one of these routes answers a malformed id with 400, not 404 — the
 /// generated composite's own default pattern is the looser <c>"{id}"</c> — and that is the accepted, documented
@@ -32,10 +32,16 @@ public sealed class AccountGroupExcludedRoutesTests
     {
         var source = File.ReadAllText(sourcePath);
         var match = Regex.Match(source, @"\.Exclude\(([^)]*)\)");
-        match.Success.ShouldBeTrue($"expected an .Exclude(...) call in {sourcePath}");
+        // No .Exclude(...) call at all is the strongest form of "excludes nothing by name" — the account-group
+        // endpoint dropped its empty call rather than keeping a no-op, so absence means an empty set here.
+        if (!match.Success)
+        {
+            return [];
+        }
 
-        return Regex.Matches(match.Groups[1].Value, "\"([^\"]*)\"")
-            .Select(m => m.Groups[1].Value)
+        // Either spelling counts: a quoted route name, or the CrudOp value that covers the whole operation.
+        return Regex.Matches(match.Groups[1].Value, @"""([^""]*)""|CrudOp\.(\w+)")
+            .Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value)
             .ToArray();
     }
 

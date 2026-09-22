@@ -84,28 +84,30 @@ public sealed class AccountGroup : AggregateRoot
     #region Methods
 
     /// <summary>
-    /// Renames the group. No acting-user parameter (DRK-1277 C3) — this is the first <see cref="CrudUpdateAttribute"/>
-    /// member declared on this type, so it lands on the plain <c>PUT {id}</c> route; <c>UpdatedBy</c> is left
-    /// for <c>DataOwnerHook</c> to stamp on save.
+    /// Partial update of the group's editable attributes — the one <see cref="CrudUpdateAttribute"/> member on
+    /// this type, so it lands on the plain <c>PUT {id}</c> route and replaces the former rename /
+    /// change-description / change-metadata trio. A null member means "leave this one alone", so no field can
+    /// be cleared through this route; a body with every member null is refused by
+    /// <c>UpdateAccountGroupRequestValidator</c> rather than answered as a silent no-op. No acting-user
+    /// parameter (DRK-1277 C3) — <c>UpdatedBy</c> is left for <c>DataOwnerHook</c> to stamp on save.
     /// </summary>
     [CrudUpdate]
-    public void Rename(string name)
+    public void Update(string? name, string? description, IReadOnlyDictionary<string, string>? metadata)
     {
-        Name = name;
-    }
+        if (name is not null)
+        {
+            Name = name;
+        }
 
-    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-description</c>.</summary>
-    [CrudUpdate]
-    public void ChangeDescription(string? description)
-    {
-        Description = description;
-    }
+        if (description is not null)
+        {
+            Description = description;
+        }
 
-    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-metadata</c>.</summary>
-    [CrudUpdate]
-    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata)
-    {
-        Metadata = metadata;
+        if (metadata is not null)
+        {
+            Metadata = metadata;
+        }
     }
 
     /// <summary>

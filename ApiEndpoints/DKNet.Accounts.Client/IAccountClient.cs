@@ -21,15 +21,14 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/account-groups/{id}")]
     Task<AccountGroupDto> GetAccountGroupAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Partial update: a null member is left unchanged. At least one must be supplied.</summary>
     [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}")]
-    Task<AccountGroupDto> RenameAccountGroupAsync(Guid id, string name, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}/change-description")]
-    Task<AccountGroupDto> ChangeAccountGroupDescriptionAsync(Guid id, string? description, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}/change-metadata")]
-    Task<AccountGroupDto> ChangeAccountGroupMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default);
+    Task<AccountGroupDto> UpdateAccountGroupAsync(
+        Guid id,
+        string? name = null,
+        string? description = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default);
 
     [AccountRoute("POST", "/v{version:apiVersion}/account-groups/{id}/close")]
     Task<AccountGroupDto> CloseAccountGroupAsync(Guid id, CancellationToken ct = default);
@@ -57,12 +56,14 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/balance")]
     Task<AccountBalanceDto> GetAccountBalanceAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Partial update of name/metadata: a null member is left unchanged. At least one must be
+    /// supplied. Status, overdraft limit and minimum balance go through <see cref="UpdateAccountAsync"/>.</summary>
     [AccountRoute("PUT", "/v{version:apiVersion}/accounts/{id}")]
-    Task<AccountDto> RenameAccountAsync(Guid id, string name, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/accounts/{id}/change-metadata")]
-    Task<AccountDto> ChangeAccountMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default);
+    Task<AccountDto> ChangeAccountDetailsAsync(
+        Guid id,
+        string? name = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default);
 
     /// <summary>{"status":"Closed"} closes the account — mirrors the service's own PATCH contract.</summary>
     [AccountRoute("PATCH", "/v{version:apiVersion}/accounts/{id:guid}")]
@@ -108,6 +109,10 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/postings/{id:guid}")]
     Task<PostingDto> GetPostingAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Reversal requires both: <paramref name="reason"/> travels in the body and is recorded as the
+    /// reversal posting's description, <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request
+    /// header — a retry under the same key returns the reversal already written rather than a refusal.</summary>
     [AccountRoute("POST", "/v{version:apiVersion}/postings/{id:guid}/reverse")]
-    Task<PostingDto> ReversePostingAsync(Guid id, CancellationToken ct = default);
+    Task<PostingDto> ReversePostingAsync(
+        Guid id, string reason, string idempotencyKey, CancellationToken ct = default);
 }

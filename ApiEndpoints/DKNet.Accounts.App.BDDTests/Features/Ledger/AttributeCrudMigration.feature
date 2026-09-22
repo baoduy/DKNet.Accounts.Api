@@ -174,7 +174,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
       | POST /v1/postings/{id}/reverse        | postings.reverse    |
 
   # DRK-1438 §5: the seven account-group routes register through one generated call instead of one
-  # hand-written call each. Four of them (read, rename, change-description, change-metadata) also stop
+  # hand-written call each. Two of them (read, update) also stop
   # restricting the identifier's shape in the route pattern, so a malformed identifier becomes a 400
   # instead of a 404 route miss.
 
@@ -201,9 +201,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
 
     Examples:
       | operation             |
-      | a rename              |
-      | a description change  |
-      | a metadata change     |
+      | an update             |
       | a delete              |
 
   @new @integration
@@ -214,9 +212,7 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Examples:
       | operation             |
       | a read                |
-      | a rename              |
-      | a description change  |
-      | a metadata change     |
+      | an update             |
 
   @new @integration
   Scenario Outline: A well-formed identifier of a group that does not exist is still answered as not found on every generated route
@@ -227,6 +223,4 @@ Feature: Ledger operations behave identically after the CRUD plumbing is consoli
     Examples:
       | operation             |
       | a read                |
-      | a rename              |
-      | a description change  |
-      | a metadata change     |
+      | an update             |

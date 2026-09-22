@@ -1,0 +1,61 @@
+/* Typography — DKNet Accounts Console.
+   Inter for interface and numerals, JetBrains Mono for identifiers, Georgia for the serif
+   slot — the three families the supplied theme names, in that order.
+   Body is 14px and tables 13px: this console is scanned for hours, so it runs denser
+   than the 16px the source template used.
+
+   Tracking lives here in full. It was previously split between this file and spacing.css,
+   which is where the inconsistency crept in. Two sets, both public: the theme's named
+   scale, derived from --tracking-normal the way the theme derives it, and the role values
+   the console's own type uses. */
+
+:root {
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+
+  /* Size / leading pairs, by role */
+  --text-page-title-size: 24px;
+  --text-page-title-leading: 32px;
+  --text-section-size: 16px;
+  --text-section-leading: 22px;
+  --text-panel-title-size: 15px;
+  --text-panel-title-leading: 21px;
+  --text-body-size: 14px;
+  --text-body-leading: 20px;
+  --text-table-size: 13px;
+  --text-table-leading: 18px;
+  --text-caption-size: 12px;
+  --text-caption-leading: 16px;
+  --text-label-size: 11px;
+  --text-label-leading: 15px;
+
+  /* Numerals */
+  --text-amount-size: 13px;
+  --text-amount-leading: 18px;
+  --text-tile-amount-size: 22px;
+  --text-tile-amount-leading: 28px;
+
+  /* Weight */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* Tracking — the theme's named scale, derived from --tracking-normal */
+  --tracking-normal: -0.01em;
+  --tracking-tighter: calc(var(--tracking-normal) - 0.05em);  /* -0.06em */
+  --tracking-tight: calc(var(--tracking-normal) - 0.025em);   /* -0.035em */
+  --tracking-wide: calc(var(--tracking-normal) + 0.025em);    /* 0.015em */
+  --tracking-wider: calc(var(--tracking-normal) + 0.05em);    /* 0.04em */
+  --tracking-widest: calc(var(--tracking-normal) + 0.1em);    /* 0.09em */
+
+  /* Tracking — role values. Uppercase labels need more than the scale gives. */
+  --tracking-title: -0.02em;
+  --tracking-label: 0.05em;
+  --tracking-section-label: 0.06em;
+  --tracking-table-head: 0.03em;
+
+  --numeric-tabular: tabular-nums; /* @kind other */
+}

@@ -1,0 +1,55 @@
+<!-- @dsCard group="Components" viewport="700x1260" name="Feedback" subtitle="RefusalAlert, ScopeGate, Dialog, ConfirmMovement, DetailPanel" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:var(--space-4);background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:var(--text-body-size);line-height:var(--text-body-leading);letter-spacing:var(--tracking-normal)}.lab{font-size:var(--text-label-size);line-height:var(--text-label-leading);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-label);color:var(--muted-foreground);text-transform:uppercase;margin-bottom:var(--space-2)}.grp{margin-bottom:var(--space-5)}.row{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}.stack{display:flex;flex-direction:column;gap:var(--space-3)}.frame{position:relative;transform:translateZ(0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--background)}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.DKNetAccountsDesignSystem_97519d;
+const { RefusalAlert, ScopeGate, Dialog, ConfirmMovement, DetailPanel, DetailList, DetailSection, Button, Badge, Money, Caption, Mono, Card } = NS;
+function App(){
+  return <div>
+    <div className="grp"><div className="lab">RefusalAlert — the code is always shown</div>
+      <div className="stack">
+        <RefusalAlert errors={[{code:'ACCOUNT_HOLDS_BALANCE',message:'This account still holds a balance and cannot be closed. Current balance: 12,400.00 SGD'}]} />
+        <RefusalAlert errors={[{code:'LOCK_TIMEOUT',message:'The account is busy.'}]} retry={<Button size="sm">Retry</Button>} traceId="0HN7A2K3M9QPC:00000012" />
+      </div>
+    </div>
+    <div className="grp"><div className="lab">ScopeGate — refused actions are disabled, never hidden</div><div className="row">
+      <ScopeGate scope="postings.reverse" granted={false}><Button variant="primary">Reverse</Button></ScopeGate>
+      <ScopeGate scope="accounts.write" granted><Button>Close account</Button></ScopeGate>
+    </div></div>
+    <div className="grp"><div className="lab">Dialog — every guarded write passes through one</div>
+      <div className="frame" style={{height:232}}>
+        <Dialog open title="Close this account?" tone="destructive"
+          footer={<><Button>Cancel</Button><Button variant="destructive">Close account</Button></>}>
+          <Mono>MERCH-000044</Mono> holds a balance of <Money amount={0} align="left" /> and has no postings
+          in the last 90 days. Closing is permanent — a closed account cannot be reopened, and its
+          statement stays readable.
+        </Dialog>
+      </div>
+    </div>
+    <div className="grp"><div className="lab">ConfirmMovement — restated in words, never an echo of the form</div>
+      <div className="frame" style={{height:252}}>
+        <ConfirmMovement open direction="Credit" amount={1250} currency="SGD" accountNumber="ACME-000123" accountName="Operating Account" effectiveDate="21 Sep 2026" category="Transfer" />
+      </div>
+    </div>
+    <div className="grp"><div className="lab">DetailPanel — a row opens it; it pushes, it never covers</div>
+      <div className="frame" style={{height:312}}>
+        <DetailPanel open title="MERCH-000044 · Settlement — APAC" style={{width:'100%',boxShadow:'none',borderLeft:0}}
+          moreHref="#" footnote={<span>Balance is 0.00 — closing is allowed.</span>}
+          actions={<><Button size="sm">Freeze</Button><Button size="sm" variant="primary">Close account</Button></>}>
+          <DetailList items={[
+            {label:'Account no.',value:<Mono>MERCH-000044</Mono>},
+            {label:'Status',value:<Badge tone="warning">Dormant</Badge>},
+            {label:'Balance',value:<Money amount={0} align="left" />}]} />
+          <DetailSection>Posting</DetailSection>
+          <DetailList items={[{label:'Movement',value:<span style={{color:'var(--warning)'}}>Debits refused — dormant.</span>}]} />
+        </DetailPanel>
+      </div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

@@ -10,10 +10,10 @@
 > | Attribute | Where it is, in this repository | What it produces |
 > |---|---|---|
 > | `[CrudCreate]` | `AccountGroup`'s constructor — `ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs:40` | `CreateAccountGroupRequest`; the route and handler stay hand-written for the duplicate-code refusal |
-> | `[CrudUpdate]` | `AccountGroup.Rename` / `ChangeDescription` / `ChangeMetadata` — `AccountGroup.cs:93`, `:100`, `:107` | `PUT /v1/account-groups/{id}`, `{id}/change-description`, `{id}/change-metadata` |
-> | `[CrudUpdate]` | `Account.Rename` / `ChangeMetadata` — `ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:131`, `:163` | `PUT /v1/accounts/{id}`, `{id}/change-metadata` |
+> | `[CrudUpdate]` | `AccountGroup.Update` — `AccountGroup.cs:95` | `PUT /v1/account-groups/{id}` (partial: name, description, metadata) |
+> | `[CrudUpdate]` | `Account.ChangeDetails` — `ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs:131` | `PUT /v1/accounts/{id}` (partial: name, metadata) |
 > | `[GenerateDto]` | `AccountGroupDto`, `AccountDto`, `PostingDto` | The records those routes return |
-> | `[CrudAction]` | *unused* — `POST /v1/postings/{id}/reverse` is hand-written on purpose; see `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs:53` |  |
+> | `[CrudAction]` | *unused* — `POST /v1/postings/{id}/reverse` maps through the generic `MapActionById` but keeps its hand-written handler on purpose; see `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs:58` |  |
 >
 > Which of this service's routes are generated and which are hand-written, and why, is recorded in
 > [the README](../README.md#which-routes-are-generated-and-which-are-hand-written).

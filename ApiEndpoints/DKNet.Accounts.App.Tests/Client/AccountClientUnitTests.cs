@@ -83,12 +83,12 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
-    public async Task RenameAccountGroupAsync_SendsPutWithName()
+    public async Task UpdateAccountGroupAsync_SendsPutWithName()
     {
         var handler = new RecordingHandler { ResponseBody = GroupJson };
         var client = ClientFor(handler);
 
-        await client.RenameAccountGroupAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"), "New Name");
+        await client.UpdateAccountGroupAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"), "New Name");
 
         handler.LastRequest!.Method.ShouldBe(HttpMethod.Put);
         handler.LastRequest.RequestUri!.AbsolutePath.ShouldBe("/v1/account-groups/11111111-1111-1111-1111-111111111111");
@@ -97,30 +97,21 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
-    public async Task ChangeAccountGroupDescriptionAsync_SendsPutWithDescription()
+    public async Task UpdateAccountGroupAsync_SendsEveryMemberSupplied()
     {
         var handler = new RecordingHandler { ResponseBody = GroupJson };
         var client = ClientFor(handler);
 
-        await client.ChangeAccountGroupDescriptionAsync(Guid.Parse("11111111-1111-1111-1111-111111111111"), "A group");
+        await client.UpdateAccountGroupAsync(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            description: "A group",
+            metadata: new Dictionary<string, string> { ["region"] = "SG" });
 
-        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEndWith("/change-description");
-        var body = await handler.LastRequest.Content!.ReadAsStringAsync();
+        var body = await handler.LastRequest!.Content!.ReadAsStringAsync();
         body.ShouldContain("\"description\":\"A group\"");
-    }
-
-    [Fact]
-    public async Task ChangeAccountGroupMetadataAsync_SendsPutWithMetadata()
-    {
-        var handler = new RecordingHandler { ResponseBody = GroupJson };
-        var client = ClientFor(handler);
-
-        await client.ChangeAccountGroupMetadataAsync(
-            Guid.Parse("11111111-1111-1111-1111-111111111111"), new Dictionary<string, string> { ["region"] = "SG" });
-
-        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEndWith("/change-metadata");
-        var body = await handler.LastRequest.Content!.ReadAsStringAsync();
         body.ShouldContain("\"region\":\"SG\"");
+        // An omitted member goes over the wire as null — the server reads that as "leave it alone".
+        body.ShouldContain("\"name\":null");
     }
 
     [Fact]
@@ -196,12 +187,12 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
-    public async Task RenameAccountAsync_SendsPutWithName()
+    public async Task ChangeAccountDetailsAsync_SendsPutWithName()
     {
         var handler = new RecordingHandler { ResponseBody = AccountJson };
         var client = ClientFor(handler);
 
-        await client.RenameAccountAsync(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Operating 2");
+        await client.ChangeAccountDetailsAsync(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Operating 2");
 
         handler.LastRequest!.Method.ShouldBe(HttpMethod.Put);
         handler.LastRequest.RequestUri!.AbsolutePath.ShouldBe("/v1/accounts/22222222-2222-2222-2222-222222222222");
@@ -210,17 +201,20 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
-    public async Task ChangeAccountMetadataAsync_SendsPutWithMetadata()
+    public async Task ChangeAccountDetailsAsync_SendsPutWithMetadata()
     {
         var handler = new RecordingHandler { ResponseBody = AccountJson };
         var client = ClientFor(handler);
 
-        await client.ChangeAccountMetadataAsync(
-            Guid.Parse("22222222-2222-2222-2222-222222222222"), new Dictionary<string, string> { ["k"] = "v" });
+        await client.ChangeAccountDetailsAsync(
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            metadata: new Dictionary<string, string> { ["k"] = "v" });
 
-        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEndWith("/change-metadata");
+        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldBe("/v1/accounts/22222222-2222-2222-2222-222222222222");
         var body = await handler.LastRequest.Content!.ReadAsStringAsync();
         body.ShouldContain("\"k\":\"v\"");
+        // An omitted member goes over the wire as null — the server reads that as "leave it alone".
+        body.ShouldContain("\"name\":null");
     }
 
     [Fact]
@@ -356,15 +350,19 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
-    public async Task ReversePostingAsync_SendsPostToReverseRoute()
+    public async Task ReversePostingAsync_SendsTheReasonInTheBodyAndTheKeyInTheHeader()
     {
         var handler = new RecordingHandler { ResponseBody = PostingJson };
         var client = ClientFor(handler);
 
-        await client.ReversePostingAsync(Guid.Parse("44444444-4444-4444-4444-444444444444"));
+        await client.ReversePostingAsync(
+            Guid.Parse("44444444-4444-4444-4444-444444444444"), "Duplicate of TX-991", "rev-key-1");
 
         handler.LastRequest!.Method.ShouldBe(HttpMethod.Post);
         handler.LastRequest.RequestUri!.AbsolutePath.ShouldEndWith("/reverse");
+        handler.LastRequest.Headers.TryGetValues("Idempotency-Key", out var values).ShouldBeTrue();
+        values!.ShouldContain("rev-key-1");
+        (await handler.LastRequest.Content!.ReadAsStringAsync()).ShouldContain("Duplicate of TX-991");
     }
 
     [Fact]

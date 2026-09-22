@@ -46,17 +46,20 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.PostingsRead)
             .WithDescription("Read one posting.");
 
-        // Reverse (GEN-mapper, DRK-1277 §3 row 16): the generic mapper binds the id from the route and reads
-        // nothing from the body, and ReversePostingCommandHandler still handles the request — so this is the
-        // hand-written lambda's behaviour in one line. Status codes are unaffected: LedgerErrors->422/409
-        // comes from the one AddErrorResponses registration (LedgerErrorResponseOptions), which the package
-        // resolves when the response executes, not from whichever mapper registered the route.
+        // Reverse (GEN-mapper, DRK-1277 §3 row 16): MapActionById, not MapParameterlessActionById — reverse
+        // now carries a required `reason` in the body, which the parameterless variant never reads. This one
+        // binds the body AND overwrites Id from the route, and ReversePostingCommandHandler still handles the
+        // request. Status codes are unaffected: LedgerErrors->422/409 comes from the one AddErrorResponses
+        // registration (LedgerErrorResponseOptions), which the package resolves when the response executes,
+        // not from whichever mapper registered the route.
         // Still NOT a [CrudAction]: that marker binds a public entity method by name convention, so a rename,
         // a generator version bump or a namespace move could silently rebind this request onto the generated
         // handler instead of ReversePostingCommandHandler, turning every reversal into a call to a throwing stub.
-        group.MapParameterlessActionById<ReversePostingRequest, Guid, PostingDto>("{id:guid}/reverse", "POST")
+        group.MapActionById<ReversePostingRequest, Guid, PostingDto>("{id:guid}/reverse", "POST")
             .RequireScope(group, ScopeNames.PostingsReverse)
             .Produces<PostingDto>()
-            .WithDescription("Reverse a posting.");
+            .WithDescription(
+                "Reverse a posting. Requires a reason in the body and an idempotency key in the header: " +
+                "Idempotency-Key: {IdempotencyKey}.");
     }
 }

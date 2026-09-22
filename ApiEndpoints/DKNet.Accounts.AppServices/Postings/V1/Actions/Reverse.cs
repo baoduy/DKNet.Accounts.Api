@@ -9,17 +9,42 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
 /// <summary>
 /// Reverses a posting. Exempt from the account's floor but not from its status (§ invariants) — a
-/// posting can be reversed at most once.
+/// posting can be reversed at most once. Both <see cref="Reason"/> and <see cref="IdempotencyKey"/> are
+/// required: the reason is the audit record of WHY the correction was made (there is no other place to put
+/// it — a posting is never edited), and the key makes a retried reversal replay its first outcome instead of
+/// being refused POSTING_ALREADY_REVERSED. <see cref="IdempotencyKey"/> is populated from the
+/// <c>Idempotency-Key</c> request header via <see cref="FromRequestHeaderAttribute"/> — before validation and
+/// before the handler runs — so a caller-supplied body field of the same name can never forge it (R3).
 /// </summary>
 public sealed record ReversePostingRequest
     : Fluents.Requests.IWitResponse<PostingDto>, Fluents.Requests.IWithKey<Guid>
 {
     public Guid Id { get; set; }
+
+    /// <summary>Why this posting is being reversed. Recorded as the reversal posting's
+    /// <see cref="Domains.Features.Postings.Entities.Posting.Description"/>, whose column is varchar(500).</summary>
+    public string Reason { get; set; } = null!;
+
+    [FromRequestHeader("Idempotency-Key")]
+    public string? IdempotencyKey { get; set; }
+}
+
+internal sealed class ReversePostingCommandValidator : AbstractValidator<ReversePostingRequest>
+{
+    public ReversePostingCommandValidator()
+    {
+        RuleFor(r => r.Reason).NotEmpty().MaximumLength(500);
+        RuleFor(r => r.IdempotencyKey).NotEmpty();
+    }
 }
 
 /// <summary>
 /// Writes an opposing posting (same amount, opposite direction, category Reversal, effective-dated the day
-/// it is written) and marks the original reversed with a back-link — one-way, applied at most once. Exempt
+/// it is written, carrying the caller's reason as its description) and marks the original reversed with a
+/// back-link — one-way, applied at most once. The request's idempotency key is checked before anything else
+/// is read, so a retried reversal replays the reversal it already wrote rather than hitting the
+/// already-reversed refusal; a genuinely new request (its own key) against an already-reversed posting is
+/// still refused POSTING_ALREADY_REVERSED. Exempt
 /// from the account's floor only; never from its status gate (frozen/closed refuse either direction; a
 /// dormant account refuses only a reversal that would debit it). Concurrency-safe: two concurrent reversal
 /// requests for the same posting share that posting's account lock, so the second one always re-reads the
@@ -41,6 +66,33 @@ internal sealed class ReversePostingCommandHandler(
         if (string.IsNullOrEmpty(callingSystemId))
         {
             return Result.Fail<PostingDto>("The caller is not authenticated.");
+        }
+
+        // Fails closed rather than trusting ReversePostingCommandValidator to have run: SpecGetPosting SKIPS
+        // its (CallingSystem, IdempotencyKey) clause when the key is null, so the replay lookup below would
+        // match an arbitrary posting and answer a false replay — the one outcome worse than refusing.
+        if (string.IsNullOrEmpty(request.IdempotencyKey))
+        {
+            return Result.Fail<PostingDto>("An Idempotency-Key header is required to reverse a posting.");
+        }
+
+        // Reverse's request is not posting-shaped, so it folds its own meaningful content (which posting, and
+        // why) through the same hash PostingSignature uses for a batch — one varchar(64) either way.
+        var signature = PostingSignature.Hash($"reverse|{request.Id}|{request.Reason}");
+
+        // Pre-lock, exactly as RecordPostingCommandHandler does it — including the accepted race documented
+        // in that handler's ponytail note (two simultaneous first-uses of one key both miss here and the
+        // second is refused 409 by the DB's unique index instead of replaying).
+        var replayed = await repository.FirstOrDefaultAsync(
+            new SpecGetPosting(byCallingSystem: callingSystemId, byIdempotencyKey: request.IdempotencyKey),
+            cancellationToken);
+        if (replayed is not null)
+        {
+            return replayed.IdempotencySignature == signature
+                ? LedgerErrors.Replayed(mapper.Map<PostingDto>(replayed))
+                : Result.Fail<PostingDto>(LedgerErrors.Error(
+                    LedgerErrors.IdempotencyKeyConflict,
+                    "This idempotency key was already used for a different request."));
         }
 
         // A no-tracking projection, deliberately: only to learn which account to lock before the real,
@@ -113,10 +165,10 @@ internal sealed class ReversePostingCommandHandler(
                 original.CounterpartyAccountId,
                 original.CounterpartyReference,
                 callingSystemId,
-                null,
-                null,
+                request.IdempotencyKey,
+                signature,
                 original.ExternalReference,
-                $"Reversal of {original.PostingNumber}",
+                request.Reason,
                 original.Metadata);
             reversal.LinkAsReversalOf(original.Id);
 

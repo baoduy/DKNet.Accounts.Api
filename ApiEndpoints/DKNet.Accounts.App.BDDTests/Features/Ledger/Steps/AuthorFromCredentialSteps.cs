@@ -241,7 +241,8 @@ public sealed class AuthorFromCredentialSteps(HttpClient client, ScenarioState s
     [When(@"""([^""]+)"" reverses that posting")]
     public async Task WhenReversesThatPosting(string caller) =>
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Post, $"{PostingsPath}/{LastPostingId}/reverse");
+            state, HttpMethod.Post, $"{PostingsPath}/{LastPostingId}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
 
     #endregion
 
