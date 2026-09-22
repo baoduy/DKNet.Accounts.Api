@@ -11,9 +11,7 @@
 | POST | `/` | `accounts.write` | Create dialog on `/groups` |
 | GET | `/` | `accounts.read` | `/groups` |
 | GET | `/{id}` | `accounts.read` | `/groups/[id]` |
-| PUT | `/{id}` | `accounts.write` | Inline rename |
-| PUT | `/{id}/change-description` | `accounts.write` | Inline description edit |
-| PUT | `/{id}/change-metadata` | `accounts.write` | Metadata editor |
+| PUT | `/{id}` | `accounts.write` | Inline rename, description edit, metadata editor (partial: send any subset) |
 | POST | `/{id}/close` | `accounts.write` | Close dialog |
 | POST | `/{id}/activate` | `accounts.write` | Activate dialog |
 | DELETE | `/{id}` | `accounts.write` | Delete dialog |
@@ -26,8 +24,7 @@
 | POST | `/` | `accounts.write` | Open account dialog |
 | GET | `/` | `accounts.read` | `/accounts` |
 | GET | `/{id}` | `accounts.read` | `/accounts/[id]` |
-| PUT | `/{id}` | `accounts.write` | Inline rename |
-| PUT | `/{id}/change-metadata` | `accounts.write` | Metadata editor |
+| PUT | `/{id}` | `accounts.write` | Inline rename / metadata editor (partial: send either or both) |
 | PATCH | `/{id}` | `accounts.write` | Status / overdraft / minimum balance |
 | GET | `/{id}/balance` | `accounts.read` | Balance tiles |
 | GET | `/{id}/statement` | **`postings.read`** | `/accounts/[id]/statement` |
@@ -41,7 +38,7 @@ There is **no** `DELETE /v1/accounts/{id}`. Closing is the `PATCH`.
 | POST | `/` | `postings.write` | `/postings/new` — Single |
 | POST | `/batch` | `postings.write` | `/postings/new` — Batch |
 | GET | `/{id}` | `postings.read` | `/postings/[id]` |
-| POST | `/{id}/reverse` | **`postings.reverse`** | Reverse dialog |
+| POST | `/{id}/reverse` | **`postings.reverse`** | Reverse dialog — body `reason` and header `Idempotency-Key` both required |
 
 **No list route.** This is the constraint that shapes the whole information
 architecture — see D5 in [README.md](README.md).
@@ -138,7 +135,7 @@ never on message text.
 | `ACCOUNT_FROZEN` | 422 | Record · Reverse | This account is frozen |
 | `ACCOUNT_DORMANT_DEBIT_REFUSED` | 422 | Record, debit only | This account is dormant — debits are refused |
 | `POSTING_ALREADY_REVERSED` | 422 | Reverse dialog | This posting has already been reversed *(close the dialog and refresh the row)* |
-| `IDEMPOTENCY_KEY_CONFLICT` | **409** | Its own dialog | This idempotency key was already used for a different request *(show the key)* |
+| `IDEMPOTENCY_KEY_CONFLICT` | **409** | Its own dialog · Reverse dialog | This idempotency key was already used for a different request *(show the key)*. From the reverse dialog it means the dialog reused its key after the reason was edited — a bug, not a user error: regenerate the key when the reason changes |
 | `LOCK_TIMEOUT` | 422 | Record · Reverse | The account is busy. **Retry** *(the only refusal with a retry affordance)* |
 
 **Should be unreachable** means the UI prevents it — the currency is read-only, future

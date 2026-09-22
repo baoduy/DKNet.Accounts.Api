@@ -61,13 +61,15 @@ public class AccountTests
     }
 
     [Fact]
-    public void Rename_ChangesName()
+    public void ChangeDetails_AppliesEveryMemberSupplied()
     {
         var account = NewAccount();
+        var metadata = new Dictionary<string, string> { ["region"] = "SG" };
 
-        account.Rename("New Name");
+        account.ChangeDetails("New Name", metadata);
 
         account.Name.ShouldBe("New Name");
+        account.Metadata.ShouldBe(metadata);
     }
 
     [Theory]
@@ -158,14 +160,17 @@ public class AccountTests
     }
 
     [Fact]
-    public void ChangeMetadata_ReplacesTheBag()
+    public void ChangeDetails_LeavesANullMemberAlone()
     {
+        // Partial update: null means "not supplied", never "clear it" — which is why
+        // ChangeDetailsAccountRequestValidator refuses a body with every member null.
         var account = NewAccount();
-        var metadata = new Dictionary<string, string> { ["region"] = "SG" };
+        var originalName = account.Name;
 
-        account.ChangeMetadata(metadata);
+        account.ChangeDetails(name: null, metadata: new Dictionary<string, string> { ["region"] = "SG" });
 
-        account.Metadata.ShouldBe(metadata);
+        account.Name.ShouldBe(originalName);
+        account.Metadata!["region"].ShouldBe("SG");
     }
 
     [Fact]

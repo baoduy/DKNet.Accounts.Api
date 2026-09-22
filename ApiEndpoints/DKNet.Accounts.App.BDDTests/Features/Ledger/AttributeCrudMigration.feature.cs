@@ -105,7 +105,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 47);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/AttributeCrudMigration.feature.ndjson", 41);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -1129,10 +1129,8 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.DescriptionAttribute("A caller without write permission is refused on every generated write route")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("a rename", "33", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a description change", "34", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "35", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a delete", "36", null)]
+        [global::NUnit.Framework.TestCaseAttribute("an update", "33", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a delete", "34", null)]
         public async global::System.Threading.Tasks.Task ACallerWithoutWritePermissionIsRefusedOnEveryGeneratedWriteRoute(string operation, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -1179,10 +1177,8 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.DescriptionAttribute("A badly formed identifier is answered as a bad request on every generated route")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("a read", "37", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a rename", "38", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a description change", "39", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "40", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a read", "35", null)]
+        [global::NUnit.Framework.TestCaseAttribute("an update", "36", null)]
         public async global::System.Threading.Tasks.Task ABadlyFormedIdentifierIsAnsweredAsABadRequestOnEveryGeneratedRoute(string operation, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -1199,7 +1195,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A badly formed identifier is answered as a bad request on every generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 210
+#line 208
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -1209,10 +1205,10 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 211
+#line 209
     await testRunner.WhenAsync(string.Format("\"treasury-ops\" sends {0} for the identifier \"not-a-guid\"", operation), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 212
+#line 210
     await testRunner.ThenAsync("the response is 400", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -1224,10 +1220,8 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             "found on every generated route")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("a read", "41", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a rename", "42", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a description change", "43", null)]
-        [global::NUnit.Framework.TestCaseAttribute("a metadata change", "44", null)]
+        [global::NUnit.Framework.TestCaseAttribute("a read", "37", null)]
+        [global::NUnit.Framework.TestCaseAttribute("an update", "38", null)]
         public async global::System.Threading.Tasks.Task AWell_FormedIdentifierOfAGroupThatDoesNotExistIsStillAnsweredAsNotFoundOnEveryGeneratedRoute(string operation, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -1245,7 +1239,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
                     "found on every generated route", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 222
+#line 218
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -1255,13 +1249,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 223
+#line 219
     await testRunner.GivenAsync("no account group has the identifier \"3f7c1b28-0d4a-4e19-9a5b-7c2e10d4f6ab\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 224
+#line 220
     await testRunner.WhenAsync(string.Format("\"treasury-ops\" sends {0} for that identifier", operation), ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 225
+#line 221
     await testRunner.ThenAsync("the response is 404", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }

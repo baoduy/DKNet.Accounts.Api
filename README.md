@@ -189,9 +189,7 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`); a malformed body → `400` |
 | `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}` | Rename a group. Body: `name`. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}` | Update a group. Body: any of `name`, `description`, `metadata`; a member left out (or null) is unchanged. Returns `200` + the group | `accounts.write` | No member supplied → `400`; malformed id → `400`; unknown id → `404` |
 | `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
@@ -199,15 +197,14 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}` | Rename an account. Body: `name`. Returns `200` + the account | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}/change-metadata` | Change an account's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}` | Update an account. Body: either of `name`, `metadata`; a member left out (or null) is unchanged. Returns `200` + the account | `accounts.write` | No member supplied → `400`; malformed id → `400`; unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
 | `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
 | `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
-| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting | `postings.reverse` | Already reversed (`POSTING_ALREADY_REVERSED`); the account's status does not accept a movement in the reversal's own direction |
+| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
 
 #### Listing groups and accounts
 
@@ -275,18 +272,18 @@ route, and its answer is shaped by the same one setting every other failure goes
 | Route | Source | The orchestration that keeps it hand-written |
 |---|---|---|
 | `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
-| Create, list, read, rename, change-description, change-metadata, delete, activate and close on `/v1/account-groups` | **generated** — all nine from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set, excluding nothing by name; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
+| Create, list, read, update, delete, activate and close on `/v1/account-groups` | **generated** — all seven from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set, excluding nothing by name; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
 | `POST /v1/account-groups/{id}/close` | **generated** | Its `GROUP_HOLDS_BALANCE` refusal is raised by a hand-written command handler sitting behind the generated route, not by a validator a hand-written route calls before dispatch — so the route itself no longer has to be written out |
 | `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
 | `POST /v1/accounts` | hand-written | Allocates the account number server-side, resolves the currency against the reference set (`UNSUPPORTED_CURRENCY`) and enforces a determinate floor (`OVERDRAFT_LIMIT_REQUIRED`). A generated request would expose the account number as a caller-settable field |
-| List, read, rename and change-metadata on `/v1/accounts` | **generated** — all four from one registration | A single `MapAccountCrud(...)` call publishes the set, excluding `Delete` by name: accounts publish no delete route at all, so `DELETE /v1/accounts/{id}` is not a route this service registers |
+| List, read and update on `/v1/accounts` | **generated** — all three from one registration | A single `MapAccountCrud(...)` call publishes the set, excluding `Delete` by name: accounts publish no delete route at all, so `DELETE /v1/accounts/{id}` is not a route this service registers |
 | `GET /v1/accounts/{id}/balance` | hand-written | Projects the three money fields plus the currency into a narrower record than the account itself |
 | `PATCH /v1/accounts/{id}` | hand-written | Refuses a close while the account holds a balance (`ACCOUNT_HOLDS_BALANCE`) and re-checks the floor when a control changes (`OVERDRAFT_LIMIT_REQUIRED`) |
 | `GET /v1/accounts/{id}/statement` | hand-written | A date-bounded page over another aggregate's stream, in stream order |
 | `POST /v1/postings` | hand-written | Idempotency replay/conflict resolution, the per-account posting lock, and the floor, status and currency refusals |
 | `POST /v1/postings/batch` | hand-written | The same, all-or-nothing across several accounts under one transaction group |
 | `GET /v1/postings/{id}` | **generated** | — |
-| `POST /v1/postings/{id}/reverse` | hand-written | Writes the opposing posting and flips the original's status in one step, with its own `422` refusals |
+| `POST /v1/postings/{id}/reverse` | **generated route, hand-written handler** | `MapActionById` binds the id from the route and the `reason` from the body; `ReversePostingCommandHandler` writes the opposing posting and flips the original's status in one step, with its own `422` refusals and its own idempotency replay |
 
 Route registration is in `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/` — one `*V1Endpoint.cs` per
 resource. Account groups and accounts each carry one commented generated registration — nine routes and
@@ -348,7 +345,7 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `401` | — | No or invalid credential |
 | `403` | — | Credential lacks the scope for this operation class |
 | `404` | — | The resource id does not exist |
-| `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same idempotency key, different content |
+| `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same idempotency key, different content. On reverse, "content" is the posting being reversed plus the reason |
 | `422` | `INVALID_POSTING_AMOUNT` | **Both amount refusals share this one code:** the amount is ≤ 0, *or* it has more decimal places than the currency permits. The two conditions are not distinguishable from the response — one code, and one `message` covering both — so check the amount against the currency's decimal places yourself before posting |
 | `422` | `CURRENCY_MISMATCH` | Posting currency ≠ account currency |
 | `422` | `EFFECTIVE_DATE_IN_FUTURE` | Effective date later than the recording date |
@@ -360,7 +357,7 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `ACCOUNT_HOLDS_BALANCE` | Close requested while the balance or held amount ≠ 0 |
 | `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
 | `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
-| `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting |
+| `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting under a key not used before. A retry under the *same* key replays the earlier reversal with `200` instead |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |

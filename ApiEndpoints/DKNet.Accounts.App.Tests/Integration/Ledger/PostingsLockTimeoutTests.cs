@@ -23,11 +23,17 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
 
     private HttpClient Client => fixture.CreateClient();
 
-    private static HttpRequestMessage AsPayHub(HttpMethod method, string uri, object? body = null)
+    private static HttpRequestMessage AsPayHub(
+        HttpMethod method, string uri, object? body = null, string? idempotencyKey = null)
     {
         var request = new HttpRequestMessage(method, uri);
         request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, "PayHub");
         request.Headers.Add(LedgerCallerAuthHandler.ScopesHeaderName, string.Join(' ', ScopeNames.All));
+        if (idempotencyKey is not null)
+        {
+            request.Headers.Add("Idempotency-Key", idempotencyKey);
+        }
+
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);
@@ -140,7 +146,9 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
         var accountId = await OpenAccountAsync();
         var postingId = await SeedPostingAsync(accountId);
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/{postingId}/reverse"));
+        var response = await Client.SendAsync(AsPayHub(
+            HttpMethod.Post, $"{PostingsPath}/{postingId}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();

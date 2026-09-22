@@ -13,7 +13,7 @@ public static class AccountCrudEndpointExtensions
     {
         var options = new global::DKNet.AspCore.Extensions.Endpoints.CrudMapOptions();
         configure?.Invoke(options);
-        options.ValidateRouteNames("Account", "GetById", "GetList", "Delete", "Rename", "ChangeMetadata");
+        options.ValidateRouteNames("Account", "GetById", "GetList", "Delete", "ChangeDetails");
         if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.GetById) && !options.IsExcluded("GetById"))
         {
             var routeBuilder = group.MapGetById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>();
@@ -29,15 +29,10 @@ public static class AccountCrudEndpointExtensions
             var routeBuilder = group.MapDeleteById<global::DKNet.Accounts.Domains.Features.Accounts.Entities.Account, global::System.Guid, DeleteAccountRequest>();
             options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Delete, "Delete", routeBuilder);
         }
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update) && !options.IsExcluded("Rename"))
+        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update) && !options.IsExcluded("ChangeDetails"))
         {
-            var routeBuilder = group.MapPutById<RenameAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}");
-            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "Rename", routeBuilder);
-        }
-        if (!options.IsExcluded(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update) && !options.IsExcluded("ChangeMetadata"))
-        {
-            var routeBuilder = group.MapPutById<ChangeMetadataAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}/change-metadata");
-            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "ChangeMetadata", routeBuilder);
+            var routeBuilder = group.MapPutById<ChangeDetailsAccountRequest, global::System.Guid, global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>("{id}");
+            options.Apply(global::DKNet.AspCore.Extensions.Endpoints.CrudOp.Update, "ChangeDetails", routeBuilder);
         }
         return group;
     }

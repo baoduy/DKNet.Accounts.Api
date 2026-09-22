@@ -315,13 +315,22 @@ An `alert-dialog`, reachable from the statement row, the posting detail, and now
 else. It restates the original movement, states the effect — *"a new opposing posting
 will be recorded; the original is marked Reversed"* — and requires an explicit confirm.
 
+**A reason is required**, not optional: a single-line `textarea` (≤ 500 chars), and confirm
+stays disabled while it is empty. It becomes the reversal's `description`, which is the only
+place the *why* is ever recorded — so the placeholder asks for the offsetting reference
+(*"Duplicate of TX-991"*), not a sentiment. The dialog also sends a per-dialog
+`Idempotency-Key`, generated once when it opens and reused on retry, so a double-submit or a
+timed-out request returns the reversal already written rather than a refusal.
+
 It is worth being plain about what reversal is: it writes a **new** posting and flips the
 original's status. It does not erase anything. The dialog says that, because a user who
 believes they are deleting a row will use it differently from one who knows they are
 appending a correction.
 
 Refusals: `POSTING_ALREADY_REVERSED` (the dialog closes and the row refreshes — someone
-else got there first), `ACCOUNT_CLOSED`, `ACCOUNT_FROZEN`.
+else got there first), `ACCOUNT_CLOSED`, `ACCOUNT_FROZEN`. `IDEMPOTENCY_KEY_CONFLICT` should
+never surface here: it would mean the dialog reused its key after the reason was edited —
+generate a fresh key whenever the reason changes.
 
 ---
 

@@ -291,7 +291,8 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
     [When(@"""[^""]+"" reverses the movement recorded against ""([^""]+)""")]
     public async Task WhenReversesTheMovementRecordedAgainst(string accountName) =>
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Post, $"{PostingsPath}/{state.Values["lastPosting"]}/reverse");
+            state, HttpMethod.Post, $"{PostingsPath}/{state.Values["lastPosting"]}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
 
     [When(@"""(?:[^""]+)"" reads that account group")]
     public async Task WhenReadsThatAccountGroup() =>

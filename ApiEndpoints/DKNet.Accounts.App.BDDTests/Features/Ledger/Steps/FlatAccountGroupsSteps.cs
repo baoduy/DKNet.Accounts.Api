@@ -156,8 +156,8 @@ public sealed class FlatAccountGroupsSteps(HttpClient client, ScenarioState stat
     }
 
     /// <summary>
-    /// Exercises the change-metadata route rather than the removed status-only PATCH (DRK-1418 §5: that
-    /// route no longer exists) — <c>ChangeMetadataAccountGroupRequest</c> has no <c>parentId</c> property
+    /// Exercises the update route rather than the removed status-only PATCH (DRK-1418 §5: that
+    /// route no longer exists) — <c>UpdateAccountGroupRequest</c> has no <c>parentId</c> property
     /// either, so the extra field is ignored the same way <see cref="CreateGroupAsync"/>'s own
     /// <c>extra: new { parentId }</c> already proves it is on create.
     /// </summary>
@@ -168,7 +168,8 @@ public sealed class FlatAccountGroupsSteps(HttpClient client, ScenarioState stat
         var id = state.Values[$"group:{code}"];
         var parentId = state.Values[$"group:{parentCode}"];
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Put, $"{GroupsPath}/{id}/change-metadata", new { parentId });
+            state, HttpMethod.Put, $"{GroupsPath}/{id}",
+            new { description = "Reparented?", parentId });
     }
 
     // Two literal bindings, not one with a `(filtered by|sorted by)` alternation — Reqnroll tries Cucumber
