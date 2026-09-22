@@ -7,12 +7,17 @@ using Microsoft.Extensions.Options;
 namespace DKNet.Accounts.App.TestSupport;
 
 /// <summary>
-/// Fake authentication scheme for the accounts and ledger service's machine-to-machine callers. The calling
-/// system identity is carried as a <c>client_id</c> claim (mirroring the real credential's <c>client_id</c>
-/// claim, §5) and scopes as a space-separated <c>scope</c> claim — the same claim shape the API's own
-/// <c>HasScopeHandler</c> already knows how to read. A request with no <see cref="ClientIdHeaderName"/> header is left
-/// unauthenticated — <see cref="AuthenticateResult.NoResult"/> — so the default-deny fallback policy
-/// refuses it, exercising the "no credential" scenarios without a real token.
+/// Fake authentication scheme for the accounts and ledger service's callers — both a machine-to-machine
+/// credential and a person signed in through Microsoft Entra ID (DRK-1670). The calling application is carried
+/// as one of three claims mirroring the real credential shapes: <c>client_id</c> (machine-to-machine),
+/// <c>azp</c> (a person's v2.0 Entra token) or <c>appid</c> (a person's v1.0 Entra token); scopes as a
+/// space-separated <c>scope</c> claim — the same claim shape the API's own <c>HasScopeHandler</c> already knows
+/// how to read. A request carrying none of <see cref="ClientIdHeaderName"/>/<see cref="AzpHeaderName"/>/
+/// <see cref="AppIdHeaderName"/>/<see cref="SubjectHeaderName"/> is left unauthenticated —
+/// <see cref="AuthenticateResult.NoResult"/> — so the default-deny fallback policy refuses it, exercising the
+/// "no credential" scenarios without a real token. A request naming a person but no calling application at all
+/// (§3 row 5, "A token naming no calling application is still refused") still authenticates, so it reaches the
+/// service's own calling-system guard instead of being refused at the authentication layer.
 /// </summary>
 /// <remarks>
 /// Also carries a <see cref="ClaimTypes.NameIdentifier"/> subject claim when <see cref="SubjectHeaderName"/> is
@@ -30,8 +35,17 @@ public sealed class LedgerCallerAuthHandler(
 {
     public const string SchemeName = "LedgerCallerTestScheme";
 
-    /// <summary>The calling system identity — maps to a <c>client_id</c> claim.</summary>
+    /// <summary>The calling system identity for a machine-to-machine credential — maps to a <c>client_id</c>
+    /// claim.</summary>
     public const string ClientIdHeaderName = "X-Test-Client-Id";
+
+    /// <summary>The calling application named on a person's v2.0 Entra token — maps to an <c>azp</c>
+    /// claim.</summary>
+    public const string AzpHeaderName = "X-Test-Azp";
+
+    /// <summary>The calling application named on a person's v1.0 Entra token — maps to an <c>appid</c>
+    /// claim.</summary>
+    public const string AppIdHeaderName = "X-Test-AppId";
 
     /// <summary>Space-separated scopes — maps to one <c>scope</c> claim.</summary>
     public const string ScopesHeaderName = "X-Test-Scopes";
@@ -43,19 +57,38 @@ public sealed class LedgerCallerAuthHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue(ClientIdHeaderName, out var clientId) || string.IsNullOrEmpty(clientId))
+        var hasClientId = Request.Headers.TryGetValue(ClientIdHeaderName, out var clientId) && !string.IsNullOrEmpty(clientId);
+        var hasAzp = Request.Headers.TryGetValue(AzpHeaderName, out var azp) && !string.IsNullOrEmpty(azp);
+        var hasAppId = Request.Headers.TryGetValue(AppIdHeaderName, out var appId) && !string.IsNullOrEmpty(appId);
+        var hasSubject = Request.Headers.TryGetValue(SubjectHeaderName, out var subject) && !string.IsNullOrEmpty(subject);
+
+        if (!hasClientId && !hasAzp && !hasAppId && !hasSubject)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var claims = new List<Claim> { new("client_id", clientId!) };
+        var claims = new List<Claim>();
+        if (hasClientId)
+        {
+            claims.Add(new Claim("client_id", clientId!));
+        }
 
-        if (Request.Headers.TryGetValue(SubjectHeaderName, out var subject) && !string.IsNullOrEmpty(subject))
+        if (hasAzp)
+        {
+            claims.Add(new Claim("azp", azp!));
+        }
+
+        if (hasAppId)
+        {
+            claims.Add(new Claim("appid", appId!));
+        }
+
+        if (hasSubject)
         {
             claims.Add(new Claim(ClaimTypes.Name, subject!));
             claims.Add(new Claim(ClaimTypes.NameIdentifier, subject!));
         }
-        else
+        else if (hasClientId)
         {
             claims.Add(new Claim(ClaimTypes.Name, clientId!));
         }
