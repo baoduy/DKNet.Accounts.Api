@@ -1,0 +1,43 @@
+<!-- @dsCard group="Components" viewport="700x595" name="Forms" subtitle="Input, Select, Textarea, Checkbox, Switch, MetadataEditor, IdempotencyKeyField, DateRangeFilter" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:var(--space-4);background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:var(--text-body-size);line-height:var(--text-body-leading);letter-spacing:var(--tracking-normal)}.lab{font-size:var(--text-label-size);line-height:var(--text-label-leading);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-label);color:var(--muted-foreground);text-transform:uppercase;margin-bottom:var(--space-2)}.grp{margin-bottom:var(--space-5)}.row{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}.stack{display:flex;flex-direction:column;gap:var(--space-3)}.frame{position:relative;transform:translateZ(0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--background)}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.DKNetAccountsDesignSystem_97519d;
+const { Input, ReadOnlyField, Select, Textarea, Checkbox, Switch, MetadataEditor, IdempotencyKeyField, DateRangeFilter, Icon, Caption } = NS;
+function App(){
+  const [on,setOn] = React.useState(true);
+  const [ck,setCk] = React.useState(true);
+  return <div>
+    <div className="grp"><div className="lab">Input</div><div className="row">
+      <Input defaultValue="Merchant top-up" style={{width:180}} />
+      <Input mono defaultValue="ACME-000123" style={{width:150}} />
+      <Input numeric defaultValue="1,250.00" style={{width:110}} />
+      <Input invalid defaultValue="1,250.005" numeric style={{width:110}} />
+      <Input prefix={<Icon name="search" size={14} />} placeholder="Search accounts…" style={{width:190}} />
+    </div></div>
+    <div className="grp"><div className="lab">Read-only, Select, Textarea</div><div className="row" style={{alignItems:'flex-start'}}>
+      <ReadOnlyField>SGD — from the account, locked</ReadOnlyField>
+      <Select label="Status" options={['Any','Active','Dormant','Frozen','Closed']} />
+      <Select label="Currency" options={['Any','SGD','USD','JPY']} />
+      <Textarea rows={2} defaultValue="Unmatched movements pending review" style={{width:200}} />
+    </div></div>
+    <div className="grp"><div className="lab">Checkbox and Switch</div><div className="row">
+      <Checkbox checked={ck} onChange={e=>setCk(e.target.checked)} label="Permitted to go negative" />
+      <Checkbox disabled label="Disabled" />
+      <Switch checked={on} onChange={e=>setOn(e.target.checked)} label="Currency active" />
+    </div></div>
+    <div className="grp"><div className="lab">DateRangeFilter</div>
+      <DateRangeFilter from="1 Sep 2026" to="21 Sep 2026" preset="30d" />
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'minmax(0, 1fr) minmax(0, 1fr)',gap:'var(--space-4)',alignItems:'start'}}>
+      <div><div className="lab">MetadataEditor</div><MetadataEditor entries={[{key:'region',value:'apac'},{key:'tier',value:'1'}]} /></div>
+      <div><div className="lab">IdempotencyKeyField</div><IdempotencyKeyField value="b2f49c11-4a07-8e33-1d05-77ac41bb0e92" /></div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

@@ -1,0 +1,260 @@
+/* Colour — DKNet Accounts Console.
+   The supplied shadcn/ui theme, carried over verbatim: a Tailwind slate neutral ramp with
+   a lime primary. Token names and roles match shadcn exactly, so any primitive installed
+   from shadcn themes itself with no mapping layer — the full base set, the chart series and
+   the sidebar block. Dark responds to .dark (Tailwind's class variant), to
+   data-theme="dark", and to the OS preference.
+
+   FOUR TOKENS IN THE THEME CANNOT BE USED AS SUPPLIED. All four inherit their problem from
+   shadcn's own defaults rather than from this theme. Each is kept verbatim so a shadcn
+   primitive gets exactly the value it expects, and each has an accessible alias beside it
+   that this system's own components use:
+
+     --input    #e2e8f0, identical to --border   1.23:1 on a card  ->  --border-control
+     --ring     the lime                         1.34:1 on a card  ->  --focus-ring
+     --destructive  with white text              3.76:1            ->  --destructive-solid
+     --accent   #f0fdf4, lighter than --muted    selection paler
+                                                 than hover        ->  --surface-selected
+
+   ONE VALUE IS CHANGED rather than aliased: --muted-foreground, from #64748b to #5d6b7e.
+   At the supplied value it measures 4.34:1 on --muted, and --muted is every table header in
+   the product. The two are near-indistinguishable side by side. This is the only deviation
+   from the theme as given.
+
+   THE LEDGER SIGNALS are the theme's own green, rose and orange families extended to the
+   darker steps that text needs, plus the status badge pairs. Every one clears 4.5:1 against
+   all three surfaces of its own theme. They sit deliberately far from the lime: a true
+   green for credits, never a yellow-green, so a credit amount is never read as the primary.
+
+   THE DARK VALUES APPEAR TWICE — once under :root[data-theme="dark"], :root.dark and once
+   inside @media (prefers-color-scheme: dark). The two blocks MUST agree. A value that
+   diverges between them is invisible in whichever path you are not testing, and it has
+   bitten this file twice: --surface-disabled once shipped its light near-white into the
+   OS-dark path, pairing #e9eef4 with #94a3b8 at 2.20:1. If you edit one block, edit both.
+   The media block may legitimately OMIT a token, but only when light and dark share the
+   same value (there are 10 such: --primary, --primary-foreground, --ring, --chart-1,
+   --chart-3, --secondary-foreground, --destructive-foreground, --sidebar-primary,
+   --sidebar-primary-foreground, --sidebar-ring).
+
+   --link exists because the lime is a fill, not a text colour: black on it measures 15.7:1,
+   but as text on the page ground it measures 1.30:1. Links take the theme's slate. */
+
+:root {
+  --background: #fbfcf8;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #aff33e;
+  --primary-foreground: #000000;
+  --secondary: #334155;
+  --secondary-foreground: #f8fafc;
+  --muted: #f1f5f9;
+  --muted-foreground: #5d6b7e; /* theme supplies #64748b — see note above */
+  --accent: #f0fdf4;
+  --accent-foreground: #166534;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #aff33e;
+  --chart-1: #aff33e;
+  --chart-2: #334155;
+  --chart-3: #22c55e;
+  --chart-4: #64748b;
+  --chart-5: #94a3b8;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #aff33e;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #f8fafc;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #f1f5f9;
+  --sidebar-ring: #aff33e;
+
+  /* Accessible aliases for the four theme tokens that cannot be used as supplied. */
+  --border-control: #7d8b9f;    /* 3.5:1 on a card */
+  --focus-ring: #334155;        /* 10.4:1 on a card */
+  --destructive-solid: #dc2626; /* 4.8:1 with white */
+  --surface-selected: #d4f094;  /* a wash of the primary's own hue */
+
+  /* Interaction states. Hover on a filled control shifts the fill, never its opacity:
+     fading the lime against an off-white ground washes it out instead of deepening it. */
+  --surface-hover: #f1f5f9;
+  --surface-selected-hover: #c5eb7a;
+  --primary-hover: #9ee62b;
+  --destructive-hover: #b91c1c;
+  /* Disabled is a real state here, not an absence: a refused action stays on screen so
+     it can be read. An opacity fade put a black label on pale lime at 2.93:1, so the
+     disabled control takes an inert fill and a foreground that clears 4.6:1 on it. */
+  --surface-disabled: #e9eef4;
+  --text-disabled: #5d6b7e;
+
+  /* Link — the lime is a fill, never text. */
+  --link: #334155;
+
+  /* Scrim behind a dialog — the slate ink, not black. */
+  --scrim: rgba(15, 23, 42, 0.40);
+
+  /* Ledger signals */
+  --credit: #15803d;
+  --debit: #be123c;
+  --warning: #9a3412;
+  --reversed: #5d6b7e;
+
+  /* Status badge pairs */
+  --badge-credit-bg: #dcfce7;
+  --badge-credit-fg: #166534;
+  --badge-debit-bg: #ffe4e6;
+  --badge-debit-fg: #9f1239;
+  --badge-warning-bg: #ffedd5;
+  --badge-warning-fg: #7c2d12;
+  --badge-neutral-bg: #f1f5f9;
+  --badge-neutral-fg: #334155;
+  --badge-info-bg: #dbeafe;
+  --badge-info-fg: #1e40af;
+}
+
+:root[data-theme="dark"], :root.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --primary: #aff33e;
+  --primary-foreground: #000000;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #14532d;
+  --accent-foreground: #aff33e;
+  --destructive: #991b1b;
+  --destructive-foreground: #ffffff;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #aff33e;
+  --chart-1: #aff33e;
+  --chart-2: #3b82f6;
+  --chart-3: #22c55e;
+  --chart-4: #a855f7;
+  --chart-5: #f59e0b;
+  --sidebar: #020617;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #aff33e;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #aff33e;
+
+  --border-control: #64748b;    /* 3.8:1 on a card */
+  --focus-ring: #aff33e;        /* the lime clears 3:1 on a dark ground */
+  --destructive-solid: #991b1b; /* 8.3:1 with white — the theme value works as given */
+  --surface-selected: #14532d;  /* in dark the theme's --accent is darker than --muted */
+
+  /* In dark, hover lightens rather than darkens — the ground is already dark. */
+  --surface-hover: #1e293b;
+  --surface-selected-hover: #166534;
+  --primary-hover: #bdf55e;
+  --destructive-hover: #b91c1c;
+  --surface-disabled: #1e293b;
+  --text-disabled: #94a3b8;
+
+  /* In dark the lime clears 4.5:1 as text, so the link is the primary again. */
+  --link: #aff33e;
+
+  --scrim: rgba(2, 6, 23, 0.70);
+
+  --credit: #4ade80;
+  --debit: #fb7185;
+  --warning: #fb923c;
+  --reversed: #94a3b8;
+
+  --badge-credit-bg: #14532d;
+  --badge-credit-fg: #86efac;
+  --badge-debit-bg: #881337;
+  --badge-debit-fg: #fda4af;
+  --badge-warning-bg: #7c2d12;
+  --badge-warning-fg: #fdba74;
+  --badge-neutral-bg: #1e293b;
+  --badge-neutral-fg: #cbd5e1;
+  --badge-info-bg: #1e3a8a;
+  --badge-info-fg: #93c5fd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #020617;
+    --foreground: #f8fafc;
+    --card: #0f172a;
+    --card-foreground: #f8fafc;
+    --popover: #0f172a;
+    --popover-foreground: #f8fafc;
+    --secondary: #1e293b;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #14532d;
+    --accent-foreground: #aff33e;
+    --destructive: #991b1b;
+    --border: #1e293b;
+    --input: #1e293b;
+    --chart-2: #3b82f6;
+    --chart-4: #a855f7;
+    --chart-5: #f59e0b;
+    --sidebar: #020617;
+    --sidebar-foreground: #f8fafc;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #1e293b;
+
+    --border-control: #64748b;
+    --focus-ring: #aff33e;
+    --destructive-solid: #991b1b;
+    --surface-selected: #14532d;
+    --surface-hover: #1e293b;
+    --surface-selected-hover: #166534;
+    --primary-hover: #bdf55e;
+    --destructive-hover: #b91c1c;
+    --surface-disabled: #1e293b;
+    --text-disabled: #94a3b8;
+    --link: #aff33e;
+    --scrim: rgba(2, 6, 23, 0.70);
+
+    --credit: #4ade80;
+    --debit: #fb7185;
+    --warning: #fb923c;
+    --reversed: #94a3b8;
+
+    --badge-credit-bg: #14532d;
+    --badge-credit-fg: #86efac;
+    --badge-debit-bg: #881337;
+    --badge-debit-fg: #fda4af;
+    --badge-warning-bg: #7c2d12;
+    --badge-warning-fg: #fdba74;
+    --badge-neutral-bg: #1e293b;
+    --badge-neutral-fg: #cbd5e1;
+    --badge-info-bg: #1e3a8a;
+    --badge-info-fg: #93c5fd;
+  }
+}
+
+/* Semantic aliases — role names over the shadcn base names. Both are public. */
+:root {
+  --surface-page: var(--background);
+  --surface-card: var(--card);
+  --surface-subtle: var(--muted);
+  --surface-sidebar: var(--sidebar);
+
+  --text-body: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-on-primary: var(--primary-foreground);
+  --text-link: var(--link);
+  --text-credit: var(--credit);
+  --text-debit: var(--debit);
+  --text-reversed: var(--reversed);
+
+  --border-hairline: var(--border);
+}

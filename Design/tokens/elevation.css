@@ -1,0 +1,46 @@
+/* Elevation — DKNet Accounts Console.
+   The supplied theme's shadow scale, carried over verbatim: one geometry (0px 8px
+   20px) restated at rising opacity, with a tight contact shadow added from sm up.
+   That wide, low-opacity spread is what makes a white card read as lifted off the
+   off-white page ground rather than pasted onto it.
+
+   --shadow-card and --shadow-overlay are this system's two semantic names; they
+   alias into the scale so component code never picks a step by number. */
+
+:root {
+  --shadow-2xs: 0px 8px 20px 0px hsl(0 0% 0% / 0.03);
+  --shadow-xs: 0px 8px 20px 0px hsl(0 0% 0% / 0.03);
+  --shadow-sm: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
+  --shadow: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
+  --shadow-md: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
+  --shadow-lg: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
+  --shadow-xl: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 8px 10px -1px hsl(0 0% 0% / 0.05);
+  --shadow-2xl: 0px 8px 20px 0px hsl(0 0% 0% / 0.13);
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-overlay: var(--shadow-xl);
+}
+
+:root[data-theme="dark"], :root.dark {
+  --shadow-2xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.20);
+  --shadow-xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.20);
+  --shadow-sm: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow-md: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 2px 4px -1px hsl(0 0% 0% / 0.40);
+  --shadow-lg: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 4px 6px -1px hsl(0 0% 0% / 0.40);
+  --shadow-xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 8px 10px -1px hsl(0 0% 0% / 0.40);
+  --shadow-2xl: 0px 10px 25px 0px hsl(0 0% 0% / 1.00);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-2xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.20);
+    --shadow-xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.20);
+    --shadow-sm: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+    --shadow: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 1px 2px -1px hsl(0 0% 0% / 0.40);
+    --shadow-md: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 2px 4px -1px hsl(0 0% 0% / 0.40);
+    --shadow-lg: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 4px 6px -1px hsl(0 0% 0% / 0.40);
+    --shadow-xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.40), 0px 8px 10px -1px hsl(0 0% 0% / 0.40);
+    --shadow-2xl: 0px 10px 25px 0px hsl(0 0% 0% / 1.00);
+  }
+}
