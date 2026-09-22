@@ -42,6 +42,12 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/account-groups/{id:guid}/balances")]
     Task<IReadOnlyList<AccountGroupBalanceLineDto>> GetAccountGroupBalancesAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Every value of <c>AccountGroupStatus</c>, zeros included, optionally narrowed to a
+    /// created-on window (from/to only — any other narrowing is refused).</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/account-groups/status-counts")]
+    Task<IReadOnlyList<StatusCountDto>> GetAccountGroupStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default);
+
     // ---- Accounts (8) ----
 
     [AccountRoute("POST", "/v{version:apiVersion}/accounts/")]
@@ -68,10 +74,22 @@ public interface IAccountClient
     /// <summary>{"status":"Closed"} closes the account — mirrors the service's own PATCH contract.</summary>
     [AccountRoute("PATCH", "/v{version:apiVersion}/accounts/{id:guid}")]
     Task<AccountDto> UpdateAccountAsync(
-        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default);
+        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance,
+        bool? permittedToGoNegative = null, CancellationToken ct = default);
 
     [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/statement")]
     Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default);
+
+    /// <summary>Every value of <c>AccountStatus</c>, zeros included, optionally narrowed to a created-on
+    /// window (from/to only — any other narrowing is refused).</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/accounts/status-counts")]
+    Task<IReadOnlyList<StatusCountDto>> GetAccountStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default);
+
+    /// <summary>The ledger's position by currency, across every account — one line per currency, never
+    /// combined.</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/accounts/balances")]
+    Task<IReadOnlyList<LedgerBalanceLineDto>> GetLedgerBalancesAsync(CancellationToken ct = default);
 
     // ---- Currencies (6) ----
 
@@ -93,7 +111,10 @@ public interface IAccountClient
     [AccountRoute("POST", "/v{version:apiVersion}/currencies/{id}/deactivate")]
     Task<CurrencyDto> DeactivateCurrencyAsync(Guid id, CancellationToken ct = default);
 
-    // ---- Postings (4) ----
+    // ---- Postings (5) ----
+
+    [AccountRoute("GET", "/v{version:apiVersion}/postings/")]
+    Task<PagedResult<PostingDto>> ListPostingsAsync(PostingsListQuery? query = null, CancellationToken ct = default);
 
     /// <summary>Sends <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request header (spec
     /// §3 row 7), never as a body field.</summary>

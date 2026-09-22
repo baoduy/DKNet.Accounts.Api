@@ -77,4 +77,29 @@ public sealed record AccountBalanceDto
     public decimal AvailableBalance { get; init; }
 
     public decimal HeldAmount { get; init; }
+
+    public decimal Floor { get; init; }
+}
+
+/// <summary>Mirrors the service's <c>StatusCountsResult</c> — one status bucket and its aggregated count.</summary>
+public sealed record StatusCountDto
+{
+    public required string Type { get; init; }
+
+    public required string Status { get; init; }
+
+    public int Count { get; init; }
+}
+
+/// <summary>Mirrors the service's <c>LedgerBalanceLineDto</c> — one line per currency across every account in
+/// the ledger, never combined.</summary>
+public sealed record LedgerBalanceLineDto
+{
+    public required string Currency { get; init; }
+
+    public decimal Balance { get; init; }
+
+    public decimal Available { get; init; }
+
+    public decimal Held { get; init; }
 }

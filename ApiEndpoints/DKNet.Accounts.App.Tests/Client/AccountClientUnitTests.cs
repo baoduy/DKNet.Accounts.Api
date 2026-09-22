@@ -163,6 +163,26 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
+    public async Task GetAccountGroupStatusCountsAsync_BuildsFromToQueryStringAndReadsCounts()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """[{"type":"AccountGroupStatus","status":"ACTIVE","count":2}]"""
+        };
+        var client = ClientFor(handler);
+
+        var counts = await client.GetAccountGroupStatusCountsAsync(
+            new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 9, 30, 23, 59, 59, TimeSpan.Zero));
+
+        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEndWith("/account-groups/status-counts");
+        var query = handler.LastRequest.RequestUri.Query;
+        query.ShouldContain("from=");
+        query.ShouldContain("to=");
+        counts.Single().Status.ShouldBe("ACTIVE");
+    }
+
+    [Fact]
     public async Task GetAccountAsync_ReadsOneAccountById()
     {
         var handler = new RecordingHandler { ResponseBody = AccountJson };
@@ -184,6 +204,38 @@ public sealed class AccountClientUnitTests
 
         handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEndWith("/balance");
         balance.Currency.ShouldBe("SGD");
+    }
+
+    [Fact]
+    public async Task GetAccountStatusCountsAsync_WithNoWindow_BuildsThePlainPathAndReadsCounts()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """[{"type":"AccountStatus","status":"ACTIVE","count":4},{"type":"AccountStatus","status":"FROZEN","count":1}]"""
+        };
+        var client = ClientFor(handler);
+
+        var counts = await client.GetAccountStatusCountsAsync();
+
+        handler.LastRequest!.RequestUri!.ToString().ShouldBe($"{ServiceAddress}v1/accounts/status-counts");
+        counts.Count.ShouldBe(2);
+        counts.ShouldContain(c => c.Status == "ACTIVE" && c.Count == 4);
+    }
+
+    [Fact]
+    public async Task GetLedgerBalancesAsync_ReadsOneLinePerCurrency()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """[{"currency":"SGD","balance":150.0,"available":150.0,"held":0.0},{"currency":"USD","balance":20.0,"available":20.0,"held":0.0}]"""
+        };
+        var client = ClientFor(handler);
+
+        var lines = await client.GetLedgerBalancesAsync();
+
+        handler.LastRequest!.RequestUri!.ToString().ShouldBe($"{ServiceAddress}v1/accounts/balances");
+        lines.Count.ShouldBe(2);
+        lines.Single(l => l.Currency == "SGD").Balance.ShouldBe(150.0m);
     }
 
     [Fact]
@@ -256,6 +308,45 @@ public sealed class AccountClientUnitTests
         query.ShouldContain("to=2026-02-01");
         query.ShouldContain("pageIndex=0");
         query.ShouldContain("pageSize=50");
+    }
+
+    [Fact]
+    public async Task ListPostingsAsync_BuildsEveryQueryParameter()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """{"items":[],"pageCount":0,"pageNumber":1,"pageSize":10,"totalItemCount":0,"hasNextPage":false,"hasPreviousPage":false}"""
+        };
+        var client = ClientFor(handler);
+
+        await client.ListPostingsAsync(new PostingsListQuery
+        {
+            From = new DateOnly(2026, 1, 1),
+            To = new DateOnly(2026, 2, 1),
+            AccountId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Direction = "Credit",
+            Category = "Transfer",
+            Status = "Posted",
+            Search = "treasury",
+            OrderBy = "PostingNumber",
+            Desc = true,
+            PageNumber = 2,
+            PageSize = 10
+        });
+
+        handler.LastRequest!.RequestUri!.AbsolutePath.ShouldBe("/v1/postings");
+        var query = handler.LastRequest.RequestUri.Query;
+        query.ShouldContain("from=2026-01-01");
+        query.ShouldContain("to=2026-02-01");
+        query.ShouldContain("accountId=22222222-2222-2222-2222-222222222222");
+        query.ShouldContain("direction=Credit");
+        query.ShouldContain("category=Transfer");
+        query.ShouldContain("status=Posted");
+        query.ShouldContain("search=treasury");
+        query.ShouldContain("orderBy=PostingNumber");
+        query.ShouldContain("desc=true");
+        query.ShouldContain("pageNumber=2");
+        query.ShouldContain("pageSize=10");
     }
 
     [Fact]

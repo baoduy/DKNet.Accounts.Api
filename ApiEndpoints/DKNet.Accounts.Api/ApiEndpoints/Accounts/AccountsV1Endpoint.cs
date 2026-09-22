@@ -5,6 +5,8 @@ using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1;
+using DKNet.Accounts.AppServices.Share.Generics;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
@@ -46,6 +48,21 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 .Configure(CrudOp.GetById, b => b.WithDescription("Read one account."))
                 .Configure(CrudOp.Update, b => b.WithDescription(
                     "Update an account. Send either of name, metadata; a member left out is unchanged.")));
+
+        // Literal segments ("status-counts", "balances") outrank the generated composite's "{id}" read
+        // route regardless of registration order — ASP.NET Core route precedence always prefers a literal
+        // match over a parameter match (spec revision 13 §3 rows 1/4).
+        group.MapGetStatusCounts<Account>("status-counts", new StatusPropertyInfo(nameof(Account.Status), typeof(AccountStatus)));
+
+        group.MapGet("balances", async (
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var balances = await bus.Send(new GetLedgerBalancesQuery(), cancellationToken: ct);
+                return Results.Ok(balances);
+            })
+            .Produces<IReadOnlyCollection<LedgerBalanceLineDto>>()
+            .WithDescription("Read the ledger's position by currency — one line per currency, never combined.");
 
         group.MapGet("{id:guid}/balance", async (
                 Guid id,

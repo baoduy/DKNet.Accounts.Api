@@ -57,6 +57,11 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<IReadOnlyList<AccountGroupBalanceLineDto>> GetAccountGroupBalancesAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<IReadOnlyList<AccountGroupBalanceLineDto>>(HttpMethod.Get, $"/{Version}/account-groups/{id}/balances", ct: ct);
 
+    public Task<IReadOnlyList<StatusCountDto>> GetAccountGroupStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<StatusCountDto>>(
+            HttpMethod.Get, WithStatusCountsQuery($"/{Version}/account-groups/status-counts", from, toDate), ct: ct);
+
     // ---- Accounts (8) ----
 
     public Task<AccountDto> OpenAccountAsync(OpenAccountRequest request, CancellationToken ct = default) =>
@@ -79,13 +84,22 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         SendAsync<AccountDto>(HttpMethod.Put, $"/{Version}/accounts/{id}", new { name, metadata }, ct: ct);
 
     public Task<AccountDto> UpdateAccountAsync(
-        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default) =>
+        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance,
+        bool? permittedToGoNegative = null, CancellationToken ct = default) =>
         SendAsync<AccountDto>(
             HttpMethod.Patch, $"/{Version}/accounts/{id}",
-            new { status, overdraftLimit, minimumBalance }, ct: ct);
+            new { status, overdraftLimit, minimumBalance, permittedToGoNegative }, ct: ct);
 
     public Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default) =>
         SendAsync<PagedResult<PostingDto>>(HttpMethod.Get, WithStatementQuery($"/{Version}/accounts/{id}/statement", query), ct: ct);
+
+    public Task<IReadOnlyList<StatusCountDto>> GetAccountStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<StatusCountDto>>(
+            HttpMethod.Get, WithStatusCountsQuery($"/{Version}/accounts/status-counts", from, toDate), ct: ct);
+
+    public Task<IReadOnlyList<LedgerBalanceLineDto>> GetLedgerBalancesAsync(CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<LedgerBalanceLineDto>>(HttpMethod.Get, $"/{Version}/accounts/balances", ct: ct);
 
     // ---- Currencies (6) ----
 
@@ -107,7 +121,10 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<CurrencyDto> DeactivateCurrencyAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<CurrencyDto>(HttpMethod.Post, $"/{Version}/currencies/{id}/deactivate", ct: ct);
 
-    // ---- Postings (4) ----
+    // ---- Postings (5) ----
+
+    public Task<PagedResult<PostingDto>> ListPostingsAsync(PostingsListQuery? query = null, CancellationToken ct = default) =>
+        SendAsync<PagedResult<PostingDto>>(HttpMethod.Get, WithPostingsListQuery($"/{Version}/postings", query), ct: ct);
 
     public Task<PostingDto> RecordPostingAsync(RecordPostingRequest request, string idempotencyKey, CancellationToken ct = default) =>
         SendAsync<PostingDto>(HttpMethod.Post, $"/{Version}/postings", request, idempotencyKey, ct);
@@ -249,6 +266,72 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         return BuildUri(path, parameters);
     }
 
+    private static string WithPostingsListQuery(string path, PostingsListQuery? query)
+    {
+        if (query is null)
+        {
+            return path;
+        }
+
+        var parameters = new List<(string Key, string Value)>();
+        if (query.From is { } from)
+        {
+            parameters.Add(("from", from.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (query.To is { } to)
+        {
+            parameters.Add(("to", to.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (query.AccountId is { } accountId)
+        {
+            parameters.Add(("accountId", accountId.ToString()));
+        }
+
+        if (!string.IsNullOrEmpty(query.Direction))
+        {
+            parameters.Add(("direction", query.Direction));
+        }
+
+        if (!string.IsNullOrEmpty(query.Category))
+        {
+            parameters.Add(("category", query.Category));
+        }
+
+        if (!string.IsNullOrEmpty(query.Status))
+        {
+            parameters.Add(("status", query.Status));
+        }
+
+        if (!string.IsNullOrEmpty(query.Search))
+        {
+            parameters.Add(("search", query.Search));
+        }
+
+        if (!string.IsNullOrEmpty(query.OrderBy))
+        {
+            parameters.Add(("orderBy", query.OrderBy));
+        }
+
+        if (query.Desc)
+        {
+            parameters.Add(("desc", "true"));
+        }
+
+        if (query.PageNumber is { } pageNumber)
+        {
+            parameters.Add(("pageNumber", pageNumber.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (query.PageSize is { } pageSize)
+        {
+            parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return BuildUri(path, parameters);
+    }
+
     private static string WithStatementQuery(string path, StatementQuery? query)
     {
         if (query is null)
@@ -275,6 +358,22 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         if (query.PageSize is { } pageSize)
         {
             parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return BuildUri(path, parameters);
+    }
+
+    private static string WithStatusCountsQuery(string path, DateTimeOffset? from, DateTimeOffset? to)
+    {
+        var parameters = new List<(string Key, string Value)>();
+        if (from is { } fromValue)
+        {
+            parameters.Add(("from", fromValue.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (to is { } toValue)
+        {
+            parameters.Add(("to", toValue.ToString("O", CultureInfo.InvariantCulture)));
         }
 
         return BuildUri(path, parameters);

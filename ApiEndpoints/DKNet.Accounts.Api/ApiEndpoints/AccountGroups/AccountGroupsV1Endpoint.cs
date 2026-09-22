@@ -1,6 +1,8 @@
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
+using DKNet.Accounts.AppServices.Share.Generics;
+using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.AccountGroups;
 
@@ -40,6 +42,8 @@ internal sealed class AccountGroupsV1Endpoint : IEndpointConfig
             // Configure(CrudOp.Action, ...) would put the same description on both.
             .Configure("Activate", b => b.WithDescription("Reactivate a closed account group."))
             .Configure("Close", b => b.WithDescription("Close an account group. Refused while any account it holds still carries a balance.")));
+
+        group.MapGetStatusCounts<AccountGroup>("status-counts", new StatusPropertyInfo(nameof(AccountGroup.Status), typeof(AccountGroupStatus)));
 
         group.MapGet("{id:guid}/balances", async (
                 Guid id,

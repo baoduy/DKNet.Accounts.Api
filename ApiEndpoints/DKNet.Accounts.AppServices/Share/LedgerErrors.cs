@@ -20,6 +20,7 @@ public static class LedgerErrors
     public const string DuplicateGroupCode = "DUPLICATE_GROUP_CODE";
     public const string DuplicateCurrencyCode = "DUPLICATE_CURRENCY_CODE";
     public const string UnsupportedCurrency = "UNSUPPORTED_CURRENCY";
+    public const string CurrencyHoldsBalance = "CURRENCY_HOLDS_BALANCE";
 
     public const string InvalidPostingAmount = "INVALID_POSTING_AMOUNT";
     public const string CurrencyMismatch = "CURRENCY_MISMATCH";
@@ -31,6 +32,7 @@ public static class LedgerErrors
     public const string PostingAlreadyReversed = "POSTING_ALREADY_REVERSED";
     public const string IdempotencyKeyConflict = "IDEMPOTENCY_KEY_CONFLICT";
     public const string LockTimeout = "LOCK_TIMEOUT";
+    public const string InvalidDateRange = "INVALID_DATE_RANGE";
 
     /// <summary>The <see cref="FluentResults.Success"/> metadata key marking a successful result as an
     /// idempotent replay (the original outcome returned, nothing new recorded) — the API layer reads this to

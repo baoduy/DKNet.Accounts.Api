@@ -164,6 +164,15 @@ public sealed class Account : AggregateRoot
         OverdraftLimit = overdraftLimit;
     }
 
+    /// <summary>
+    /// Grants or withdraws permission to go negative after the account was opened (DRK-1659 §5 surface 3).
+    /// The floor stays the caller's call via <see cref="AccountFloorPolicy"/> — this only assigns the flag.
+    /// </summary>
+    public void ChangePermittedToGoNegative(bool permittedToGoNegative)
+    {
+        PermittedToGoNegative = permittedToGoNegative;
+    }
+
     public void ChangeMinimumBalance(decimal? minimumBalance)
     {
         MinimumBalance = minimumBalance;

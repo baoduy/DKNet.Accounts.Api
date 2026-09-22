@@ -1,7 +1,10 @@
+using FluentValidation;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
+using DKNet.Accounts.AppServices.Postings.V1.Queries;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Postings;
@@ -14,6 +17,71 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Cross-account list (DRK-1659 §5 row "GET /v1/postings"): binds ten explicit primitives, not
+        // [AsParameters] ListPostingsQuery — reproduced directly, [AsParameters] here answers every request
+        // with an unlogged, bodyless 400 (the same minimal-API binding trap AccountsV1Endpoint's statement
+        // route already documents at its own GET route, just triggered here with no sibling route parameter
+        // at all). ListPostingsQueryValidator is instead run explicitly against the assembled query — the
+        // group's AddFluentValidationAutoValidation() endpoint filter (Program.cs) only inspects bound
+        // parameters, so it never sees a query value built inside the lambda body either way.
+        group.MapGet("/", async (
+                DateOnly? from,
+                DateOnly? to,
+                Guid? accountId,
+                string? direction,
+                string? category,
+                string? status,
+                string? search,
+                string? orderBy,
+                bool? desc,
+                int? pageNumber,
+                int? pageSize,
+                IValidator<ListPostingsQuery> validator,
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var query = new ListPostingsQuery
+                {
+                    From = from,
+                    To = to,
+                    AccountId = accountId,
+                    Direction = direction,
+                    Category = category,
+                    Status = status,
+                    Search = search,
+                    OrderBy = orderBy,
+                    Desc = desc ?? false,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+
+                var validation = await validator.ValidateAsync(query, ct);
+                if (!validation.IsValid)
+                {
+                    var errors = validation.Errors
+                        .Select(e => new ErrorItem(
+                            e.ErrorMessage, string.IsNullOrEmpty(e.ErrorCode) ? null : e.ErrorCode, e.PropertyName))
+                        .ToArray();
+                    var errorContext = new ErrorResponseContext { Source = ErrorSource.Validation, Errors = errors };
+                    var problem = new ProblemDetails
+                    {
+                        Title = "Request refused.",
+                        Status = LedgerErrorResponseOptions.StatusCode(errorContext) ?? StatusCodes.Status400BadRequest
+                    };
+                    problem.Extensions["errors"] = errors;
+                    return Results.Problem(problem);
+                }
+
+                var page = await bus.Send(query, cancellationToken: ct);
+                return Results.Ok(new PagedResponse<PostingDto>(page));
+            })
+            .RequireScope(group, ScopeNames.PostingsRead)
+            .Produces<PagedResponse<PostingDto>>()
+            .WithDescription(
+                "List postings across every account, within a required effective-date window of at most " +
+                "90 days. Narrow by account, direction, category or status; search and order over the same " +
+                "fields the statement route projects.");
+
         group.MapPost("/", async (
                 RecordPostingRequest req,
                 IMessageBus bus,

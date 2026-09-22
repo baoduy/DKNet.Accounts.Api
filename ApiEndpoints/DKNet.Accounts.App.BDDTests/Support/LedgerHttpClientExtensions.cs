@@ -4,6 +4,7 @@ namespace DKNet.Accounts.App.BDDTests.Support;
 
 /// <summary>
 /// Sends a request as the scenario's current caller (<see cref="ScenarioState.CallerClientId"/> /
+/// <see cref="ScenarioState.CallerAzp"/> / <see cref="ScenarioState.CallerAppId"/> /
 /// <see cref="ScenarioState.CallerSubject"/> / <see cref="ScenarioState.CallerScopes"/>) via
 /// <see cref="LedgerCallerAuthHandler"/>'s headers. Headers are
 /// set per-request rather than on the shared <see cref="HttpClient"/> so one scenario's caller never bleeds
@@ -19,8 +20,8 @@ internal static class LedgerHttpClientExtensions
         object? body = null,
         string? idempotencyKey = null) =>
         SendAsAsync(
-            client, state.CallerClientId, state.CallerSubject, state.CallerScopes, method, requestUri, body,
-            idempotencyKey);
+            client, state.CallerClientId, state.CallerAzp, state.CallerAppId, state.CallerSubject,
+            state.CallerScopes, method, requestUri, body, idempotencyKey);
 
     public static Task<HttpResponseMessage> SendUnauthenticatedAsync(
         this HttpClient client,
@@ -30,7 +31,9 @@ internal static class LedgerHttpClientExtensions
 
     private static async Task<HttpResponseMessage> SendAsAsync(
         HttpClient client,
-        string clientId,
+        string? clientId,
+        string? azp,
+        string? appId,
         string? subject,
         string[] scopes,
         HttpMethod method,
@@ -39,7 +42,21 @@ internal static class LedgerHttpClientExtensions
         string? idempotencyKey)
     {
         using var request = new HttpRequestMessage(method, requestUri);
-        request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, clientId);
+        if (clientId is not null)
+        {
+            request.Headers.Add(LedgerCallerAuthHandler.ClientIdHeaderName, clientId);
+        }
+
+        if (azp is not null)
+        {
+            request.Headers.Add(LedgerCallerAuthHandler.AzpHeaderName, azp);
+        }
+
+        if (appId is not null)
+        {
+            request.Headers.Add(LedgerCallerAuthHandler.AppIdHeaderName, appId);
+        }
+
         if (subject is not null)
         {
             request.Headers.Add(LedgerCallerAuthHandler.SubjectHeaderName, subject);

@@ -5,10 +5,12 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 /// <summary>
 /// DRK-1522 §5, "Only the routes a generated route set cannot serve stay hand-mapped": the account-group and
 /// account routes registered directly with <c>group.MapGet/MapPost/MapPatch(...)</c> (i.e. outside the
-/// generated <c>MapAccountGroupCrud</c>/<c>MapAccountCrud</c> composites) must be exactly the five the spec
-/// names — reading a group's totals per currency, opening an account, changing an account's status/limits,
-/// reading an account's balance, and reading an account's statement. "Close" moves into the generated
-/// composite by this cycle (§3 row 11), so it must no longer appear in this inventory.
+/// generated <c>MapAccountGroupCrud</c>/<c>MapAccountCrud</c> composites) must be exactly the six the spec
+/// names — reading a group's totals per currency, opening an account, reading the ledger's position by
+/// currency, changing an account's status/limits, reading an account's balance, and reading an account's
+/// statement (DRK-1663 §3 row 4 adds the ledger-balances route; the status-counts routes ride
+/// <c>MapGetStatusCounts</c>, not this pattern, so they stay outside this inventory). "Close" moves into the
+/// generated composite by an earlier cycle (§3 row 11), so it must no longer appear in this inventory.
 /// </summary>
 public sealed class HandMappedRouteInventoryTests
 {
@@ -30,7 +32,7 @@ public sealed class HandMappedRouteInventoryTests
             .Select(m => (Method: m.Groups[1].Value, Path: m.Groups[2].Value));
 
     [Fact]
-    public void HandMappedRoutes_MatchExactlyTheFiveRoutesAGeneratedSetCannotServe()
+    public void HandMappedRoutes_MatchExactlyTheSixRoutesAGeneratedSetCannotServe()
     {
         var handMapped = HandMappedRoutes(AccountGroupsEndpointSourcePath)
             .Concat(HandMappedRoutes(AccountsEndpointSourcePath))
@@ -40,6 +42,7 @@ public sealed class HandMappedRouteInventoryTests
             [
                 ("Get", "{id:guid}/balances"), // reading a group's totals per currency
                 ("Post", "/"), // opening an account
+                ("Get", "balances"), // reading the ledger's position by currency
                 ("Patch", "{id:guid}"), // changing an account's status/limits
                 ("Get", "{id:guid}/balance"), // reading an account's balance
                 ("Get", "{id:guid}/statement") // reading an account's statement

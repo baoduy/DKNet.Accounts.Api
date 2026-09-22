@@ -22,4 +22,8 @@ public sealed record AccountGroupBalanceLineDto
     public string Currency { get; init; } = null!;
 
     public decimal Balance { get; init; }
+
+    public decimal Available { get; init; }
+
+    public decimal Held { get; init; }
 }

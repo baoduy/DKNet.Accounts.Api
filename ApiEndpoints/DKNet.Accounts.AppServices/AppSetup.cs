@@ -2,7 +2,6 @@
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using AccountDto = DKNet.Accounts.AppServices.Accounts.V1.AccountDto;
-using AccountBalanceDto = DKNet.Accounts.AppServices.Accounts.V1.AccountBalanceDto;
 using PostingDto = DKNet.Accounts.AppServices.Postings.V1.PostingDto;
 
 namespace DKNet.Accounts.AppServices;
@@ -44,9 +43,6 @@ public static class AppSetup
             .Map(dest => dest.Currency, src => src.CurrencyCode)
             .Map(dest => dest.AvailableBalanceAmount, src => src.AvailableBalance)
             .Map(dest => dest.AccountOpenedOn, src => src.OpenedOn);
-
-        TypeAdapterConfig<Account, AccountBalanceDto>.NewConfig()
-            .Map(dest => dest.Currency, src => src.CurrencyCode);
 
         TypeAdapterConfig<Posting, PostingDto>.NewConfig()
             .Map(dest => dest.SignedAmount, src => src.SignedValue);
