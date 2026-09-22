@@ -65,7 +65,9 @@ internal static class StatusCountsEndpointMapperExtensions
                         }
                         return Results.Ok(results);
                     })
-                .CacheOutput()
+                // DRK-1659 §4: status counts are answered live — no response is cached anywhere in this
+                // service today, and a stale count on the home screen is worse than a fresh query. Do not
+                // add `.CacheOutput()` back without wiring a cache-invalidation story for this route.
                 .ProducesCommons()
                 .Produces<List<StatusCountsResult>>()
                 .Produces(StatusCodes.Status400BadRequest)
