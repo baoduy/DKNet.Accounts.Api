@@ -31,6 +31,7 @@ public static class LedgerErrors
     public const string PostingAlreadyReversed = "POSTING_ALREADY_REVERSED";
     public const string IdempotencyKeyConflict = "IDEMPOTENCY_KEY_CONFLICT";
     public const string LockTimeout = "LOCK_TIMEOUT";
+    public const string InvalidDateRange = "INVALID_DATE_RANGE";
 
     /// <summary>The <see cref="FluentResults.Success"/> metadata key marking a successful result as an
     /// idempotent replay (the original outcome returned, nothing new recorded) — the API layer reads this to

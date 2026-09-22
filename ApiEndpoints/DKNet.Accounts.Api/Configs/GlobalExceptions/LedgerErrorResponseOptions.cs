@@ -43,7 +43,8 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.AccountDormantDebitRefused,
         LedgerErrors.PostingAlreadyReversed,
         LedgerErrors.LockTimeout,
-        LedgerErrors.IdempotencyKeyConflict
+        LedgerErrors.IdempotencyKeyConflict,
+        LedgerErrors.InvalidDateRange
     };
 
     internal static bool IsKnownCode(string? code) => code is not null && KnownCodes.Contains(code);
