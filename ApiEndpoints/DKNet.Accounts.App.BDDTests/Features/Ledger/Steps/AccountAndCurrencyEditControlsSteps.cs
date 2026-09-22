@@ -13,6 +13,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 [Binding]
 public sealed class AccountAndCurrencyEditControlsSteps(HttpClient client, ScenarioState state)
 {
+    private const string FeatureName = "Account and currency edit controls";
     private const string AccountsPath = "/v1/accounts";
     private const string CurrenciesPath = "/v1/currencies";
     private const string GroupsPath = "/v1/account-groups";
@@ -153,12 +154,40 @@ public sealed class AccountAndCurrencyEditControlsSteps(HttpClient client, Scena
         doc.GetProperty("floor").GetDecimal().ShouldBe(-500.00m);
     }
 
+    // Scoped to this feature so it wins over LedgerSteps.ThenTheRequestIsRefused's catch-all (which asserts
+    // status only, defaulting to 422) — this route's sibling ACCOUNT_HOLDS_BALANCE refusal is also a 422 on
+    // PATCH /v1/accounts/{id}, so asserting the code too is what stops a Build that returns the wrong refusal
+    // from passing by accident (dev-leader AT-approval rejection round 1).
+    [Then(@"the request is refused because an overdraft limit is required")]
+    [Scope(Feature = FeatureName)]
+    public async Task ThenTheRequestIsRefusedBecauseAnOverdraftLimitIsRequired()
+    {
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var doc = await ReadJsonAsync(state.Response!);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == "OVERDRAFT_LIMIT_REQUIRED")
+            .ShouldBeTrue($"expected an error carrying code OVERDRAFT_LIMIT_REQUIRED, got: {doc}");
+    }
+
     [Then(@"the account is still not permitted to go negative")]
     public async Task ThenTheAccountIsStillNotPermittedToGoNegative()
     {
         var accountId = state.Values["account"];
         var doc = await ReadJsonAsync(await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{accountId}"));
         doc.GetProperty("permittedToGoNegative").GetBoolean().ShouldBeFalse();
+    }
+
+    // Same reasoning as the overdraft-limit binding above: scoped so it wins over the status-only catch-all,
+    // and asserts CURRENCY_HOLDS_BALANCE by name so a Build returning any other 422 stays red.
+    [Then(@"the request is refused because accounts still hold a balance in it")]
+    [Scope(Feature = FeatureName)]
+    public async Task ThenTheRequestIsRefusedBecauseAccountsStillHoldABalanceInIt()
+    {
+        state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var doc = await ReadJsonAsync(state.Response!);
+        doc.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == "CURRENCY_HOLDS_BALANCE")
+            .ShouldBeTrue($"expected an error carrying code CURRENCY_HOLDS_BALANCE, got: {doc}");
     }
 
     [Then(@"SGD is still active")]
