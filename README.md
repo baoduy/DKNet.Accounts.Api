@@ -296,9 +296,12 @@ four respectively; the one generated posting route is still commented individual
 `ApiEndpoints/DKNet.Accounts.App.Tests/Architecture/RouteScopeCoverageTests.cs` enumerates the live
 routes and fails the build if any one loses the scope this table names, however it was registered.
 
-**Authentication.** JWT bearer, machine-to-machine only, default-deny — any route not explicitly
-anonymous needs an authenticated caller. The calling system's identity is read from the credential's
-`client_id` claim; a `recordedBy` field in a request body is ignored, not rejected. Scopes are read from
+**Authentication.** JWT bearer, default-deny — any route not explicitly anonymous needs an authenticated
+caller, whether the credential is a machine's or belongs to a person signed in through Microsoft Entra ID.
+The calling system's identity is read from the credential's `client_id` claim, else `azp` (a v2.0 token),
+else `appid` (a v1.0 token) — the first present wins; a `recordedBy` field in a request body is ignored, not
+rejected. This value names the calling application, never the individual: two operators using the same
+console share one calling-system value, so idempotency is scoped per application. Scopes are read from
 the `scp` or `scope` claim (space-separated) and are per operation class:
 
 | Scope | Grants |
