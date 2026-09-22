@@ -20,6 +20,7 @@ public static class LedgerErrors
     public const string DuplicateGroupCode = "DUPLICATE_GROUP_CODE";
     public const string DuplicateCurrencyCode = "DUPLICATE_CURRENCY_CODE";
     public const string UnsupportedCurrency = "UNSUPPORTED_CURRENCY";
+    public const string CurrencyHoldsBalance = "CURRENCY_HOLDS_BALANCE";
 
     public const string InvalidPostingAmount = "INVALID_POSTING_AMOUNT";
     public const string CurrencyMismatch = "CURRENCY_MISMATCH";

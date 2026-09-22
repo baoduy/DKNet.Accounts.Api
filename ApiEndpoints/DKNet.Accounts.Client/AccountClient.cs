@@ -84,10 +84,11 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         SendAsync<AccountDto>(HttpMethod.Put, $"/{Version}/accounts/{id}", new { name, metadata }, ct: ct);
 
     public Task<AccountDto> UpdateAccountAsync(
-        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default) =>
+        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance,
+        bool? permittedToGoNegative = null, CancellationToken ct = default) =>
         SendAsync<AccountDto>(
             HttpMethod.Patch, $"/{Version}/accounts/{id}",
-            new { status, overdraftLimit, minimumBalance }, ct: ct);
+            new { status, overdraftLimit, minimumBalance, permittedToGoNegative }, ct: ct);
 
     public Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default) =>
         SendAsync<PagedResult<PostingDto>>(HttpMethod.Get, WithStatementQuery($"/{Version}/accounts/{id}/statement", query), ct: ct);

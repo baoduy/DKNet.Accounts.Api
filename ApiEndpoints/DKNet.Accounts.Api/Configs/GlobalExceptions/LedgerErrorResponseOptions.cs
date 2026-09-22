@@ -34,6 +34,7 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.DuplicateGroupCode,
         LedgerErrors.DuplicateCurrencyCode,
         LedgerErrors.UnsupportedCurrency,
+        LedgerErrors.CurrencyHoldsBalance,
         LedgerErrors.InvalidPostingAmount,
         LedgerErrors.CurrencyMismatch,
         LedgerErrors.EffectiveDateInFuture,

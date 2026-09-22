@@ -74,7 +74,8 @@ public interface IAccountClient
     /// <summary>{"status":"Closed"} closes the account — mirrors the service's own PATCH contract.</summary>
     [AccountRoute("PATCH", "/v{version:apiVersion}/accounts/{id:guid}")]
     Task<AccountDto> UpdateAccountAsync(
-        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default);
+        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance,
+        bool? permittedToGoNegative = null, CancellationToken ct = default);
 
     [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/statement")]
     Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default);
