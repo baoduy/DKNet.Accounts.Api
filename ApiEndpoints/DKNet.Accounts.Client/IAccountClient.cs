@@ -93,7 +93,10 @@ public interface IAccountClient
     [AccountRoute("POST", "/v{version:apiVersion}/currencies/{id}/deactivate")]
     Task<CurrencyDto> DeactivateCurrencyAsync(Guid id, CancellationToken ct = default);
 
-    // ---- Postings (4) ----
+    // ---- Postings (5) ----
+
+    [AccountRoute("GET", "/v{version:apiVersion}/postings/")]
+    Task<PagedResult<PostingDto>> ListPostingsAsync(PostingsListQuery? query = null, CancellationToken ct = default);
 
     /// <summary>Sends <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request header (spec
     /// §3 row 7), never as a body field.</summary>

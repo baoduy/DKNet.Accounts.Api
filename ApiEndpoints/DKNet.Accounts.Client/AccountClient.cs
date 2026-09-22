@@ -107,7 +107,10 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<CurrencyDto> DeactivateCurrencyAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<CurrencyDto>(HttpMethod.Post, $"/{Version}/currencies/{id}/deactivate", ct: ct);
 
-    // ---- Postings (4) ----
+    // ---- Postings (5) ----
+
+    public Task<PagedResult<PostingDto>> ListPostingsAsync(PostingsListQuery? query = null, CancellationToken ct = default) =>
+        SendAsync<PagedResult<PostingDto>>(HttpMethod.Get, WithPostingsListQuery($"/{Version}/postings", query), ct: ct);
 
     public Task<PostingDto> RecordPostingAsync(RecordPostingRequest request, string idempotencyKey, CancellationToken ct = default) =>
         SendAsync<PostingDto>(HttpMethod.Post, $"/{Version}/postings", request, idempotencyKey, ct);
@@ -244,6 +247,72 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         if (query.ToDate is { } toDate)
         {
             parameters.Add(("toDate", toDate.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        return BuildUri(path, parameters);
+    }
+
+    private static string WithPostingsListQuery(string path, PostingsListQuery? query)
+    {
+        if (query is null)
+        {
+            return path;
+        }
+
+        var parameters = new List<(string Key, string Value)>();
+        if (query.From is { } from)
+        {
+            parameters.Add(("from", from.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (query.To is { } to)
+        {
+            parameters.Add(("to", to.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (query.AccountId is { } accountId)
+        {
+            parameters.Add(("accountId", accountId.ToString()));
+        }
+
+        if (!string.IsNullOrEmpty(query.Direction))
+        {
+            parameters.Add(("direction", query.Direction));
+        }
+
+        if (!string.IsNullOrEmpty(query.Category))
+        {
+            parameters.Add(("category", query.Category));
+        }
+
+        if (!string.IsNullOrEmpty(query.Status))
+        {
+            parameters.Add(("status", query.Status));
+        }
+
+        if (!string.IsNullOrEmpty(query.Search))
+        {
+            parameters.Add(("search", query.Search));
+        }
+
+        if (!string.IsNullOrEmpty(query.OrderBy))
+        {
+            parameters.Add(("orderBy", query.OrderBy));
+        }
+
+        if (query.Desc)
+        {
+            parameters.Add(("desc", "true"));
+        }
+
+        if (query.PageNumber is { } pageNumber)
+        {
+            parameters.Add(("pageNumber", pageNumber.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (query.PageSize is { } pageSize)
+        {
+            parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
         }
 
         return BuildUri(path, parameters);

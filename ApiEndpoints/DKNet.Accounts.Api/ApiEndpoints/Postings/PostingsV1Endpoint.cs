@@ -2,6 +2,7 @@ using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Postings.V1.Actions;
+using DKNet.Accounts.AppServices.Postings.V1.Queries;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Postings;
@@ -14,6 +15,48 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
 
     public void Map(RouteGroupBuilder group)
     {
+        // Cross-account list (DRK-1659 §5 row "GET /v1/postings"): the required effective-date window and
+        // its INVALID_DATE_RANGE refusal are Build's job (§9 Q3) — this stage wires the route and its scope
+        // so RouteScopeCoverageTests/RouteParityTests see it, over a handler stub that throws.
+        group.MapGet("/", async (
+                DateOnly? from,
+                DateOnly? to,
+                Guid? accountId,
+                string? direction,
+                string? category,
+                string? status,
+                string? search,
+                string? orderBy,
+                bool? desc,
+                int? pageNumber,
+                int? pageSize,
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var query = new ListPostingsQuery
+                {
+                    From = from,
+                    To = to,
+                    AccountId = accountId,
+                    Direction = direction,
+                    Category = category,
+                    Status = status,
+                    Search = search,
+                    OrderBy = orderBy,
+                    Desc = desc ?? false,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+                var page = await bus.Send(query, cancellationToken: ct);
+                return Results.Ok(new PagedResponse<PostingDto>(page));
+            })
+            .RequireScope(group, ScopeNames.PostingsRead)
+            .Produces<PagedResponse<PostingDto>>()
+            .WithDescription(
+                "List postings across every account, within a required effective-date window of at most " +
+                "90 days. Narrow by account, direction, category or status; search and order over the same " +
+                "fields the statement route projects.");
+
         group.MapPost("/", async (
                 RecordPostingRequest req,
                 IMessageBus bus,
