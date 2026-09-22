@@ -57,6 +57,11 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
     public Task<IReadOnlyList<AccountGroupBalanceLineDto>> GetAccountGroupBalancesAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<IReadOnlyList<AccountGroupBalanceLineDto>>(HttpMethod.Get, $"/{Version}/account-groups/{id}/balances", ct: ct);
 
+    public Task<IReadOnlyList<StatusCountDto>> GetAccountGroupStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<StatusCountDto>>(
+            HttpMethod.Get, WithStatusCountsQuery($"/{Version}/account-groups/status-counts", from, toDate), ct: ct);
+
     // ---- Accounts (8) ----
 
     public Task<AccountDto> OpenAccountAsync(OpenAccountRequest request, CancellationToken ct = default) =>
@@ -86,6 +91,14 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
 
     public Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default) =>
         SendAsync<PagedResult<PostingDto>>(HttpMethod.Get, WithStatementQuery($"/{Version}/accounts/{id}/statement", query), ct: ct);
+
+    public Task<IReadOnlyList<StatusCountDto>> GetAccountStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<StatusCountDto>>(
+            HttpMethod.Get, WithStatusCountsQuery($"/{Version}/accounts/status-counts", from, toDate), ct: ct);
+
+    public Task<IReadOnlyList<LedgerBalanceLineDto>> GetLedgerBalancesAsync(CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<LedgerBalanceLineDto>>(HttpMethod.Get, $"/{Version}/accounts/balances", ct: ct);
 
     // ---- Currencies (6) ----
 
@@ -344,6 +357,22 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         if (query.PageSize is { } pageSize)
         {
             parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return BuildUri(path, parameters);
+    }
+
+    private static string WithStatusCountsQuery(string path, DateTimeOffset? from, DateTimeOffset? to)
+    {
+        var parameters = new List<(string Key, string Value)>();
+        if (from is { } fromValue)
+        {
+            parameters.Add(("from", fromValue.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        if (to is { } toValue)
+        {
+            parameters.Add(("to", toValue.ToString("O", CultureInfo.InvariantCulture)));
         }
 
         return BuildUri(path, parameters);

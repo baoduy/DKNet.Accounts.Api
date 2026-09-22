@@ -23,6 +23,14 @@ internal sealed class GetAccountGroupBalancesQueryHandler(IRepositorySpec reposi
         CancellationToken cancellationToken) =>
         await repository.Query(new SpecListAccounts(groupId: request.Id))
             .GroupBy(a => a.CurrencyCode)
-            .Select(g => new AccountGroupBalanceLineDto { Currency = g.Key, Balance = g.Sum(a => a.Balance) })
+            .Select(g => new AccountGroupBalanceLineDto
+            {
+                Currency = g.Key,
+                Balance = g.Sum(a => a.Balance),
+                // R1: available always equals balance (no hold mechanism exists yet) — read off the account's
+                // own Balance column rather than its unmapped AvailableBalance computed property.
+                Available = g.Sum(a => a.Balance),
+                Held = g.Sum(a => a.HeldAmount)
+            })
             .ToListAsync(cancellationToken);
 }

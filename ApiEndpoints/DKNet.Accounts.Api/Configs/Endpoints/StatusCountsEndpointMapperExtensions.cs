@@ -26,9 +26,37 @@ internal static class StatusCountsEndpointMapperExtensions
             params StatusPropertyInfo[] properties) where TEntity : DomainEntity
         {
             return app.MapGet(endpoint,
-                    async ([AsParameters] GenericStatusCountsParameters parameters,
+                    async (HttpRequest request,
+                        [AsParameters] GenericStatusCountsParameters parameters,
                         [FromServices] IRepositorySpec repo) =>
                     {
+                        // R2: this route's only narrowing is the created-on window (from/to) — any other query
+                        // key is refused with 400, never silently ignored the way [AsParameters] binding would
+                        // otherwise leave it. Shaped as a plain `errors[]` array, this service's own business-
+                        // refusal shape, never the ASP.NET model-binding failure's `errors` object.
+                        var unknownKeys = request.Query.Keys
+                            .Where(k => !string.Equals(k, "from", StringComparison.OrdinalIgnoreCase) &&
+                                        !string.Equals(k, "to", StringComparison.OrdinalIgnoreCase))
+                            .ToArray();
+                        if (unknownKeys.Length > 0)
+                        {
+                            return Results.Json(
+                                new
+                                {
+                                    errors = new[]
+                                    {
+                                        new
+                                        {
+                                            code = "UnsupportedNarrowing",
+                                            message =
+                                                $"Unsupported query parameter(s): {string.Join(", ", unknownKeys)}. " +
+                                                "Only 'from' and 'to' are accepted."
+                                        }
+                                    }
+                                },
+                                statusCode: StatusCodes.Status400BadRequest);
+                        }
+
                         var results = new List<StatusCountsResult>();
                         foreach (var property in properties)
                         {
@@ -40,6 +68,7 @@ internal static class StatusCountsEndpointMapperExtensions
                 .CacheOutput()
                 .ProducesCommons()
                 .Produces<List<StatusCountsResult>>()
+                .Produces(StatusCodes.Status400BadRequest)
                 .WithDescription(
                     $"Retrieve grouped counts of '{string.Join(',', properties.Select(p => p.Name))}' for {typeof(TEntity).Name} within date range.");
         }

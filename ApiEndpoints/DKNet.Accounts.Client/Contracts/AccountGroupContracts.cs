@@ -43,4 +43,8 @@ public sealed record AccountGroupBalanceLineDto
     public required string Currency { get; init; }
 
     public decimal Balance { get; init; }
+
+    public decimal Available { get; init; }
+
+    public decimal Held { get; init; }
 }
