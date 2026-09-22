@@ -81,8 +81,8 @@ below — an integrator should never need to read the code to know what a field 
 ### Reference currencies — what the service can denominate
 
 The service knows which currencies it supports and how many decimal places each is legally denominated
-to. That precision is enforced on every posting amount. The set is fixed reference data, read through
-`GET /v1/currencies`.
+to. That precision is enforced on every posting amount. Currencies are stored records — created, renamed,
+activated and deactivated — not fixed reference data. List them through `GET /v1/currencies`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -186,6 +186,7 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | Method | Route | What it does | Scope | Refused when |
 |---|---|---|---|---|
 | `GET` | `/v1/currencies` | List supported currencies and their decimal places | `accounts.read` | — |
+| `POST` | `/v1/currencies/{id}/deactivate` | Deactivate a currency, so it is no longer offered for new accounts. No request body. Returns `200` + the currency | `accounts.write` | An account in that currency still holds a balance (`CURRENCY_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`); a malformed body → `400` |
 | `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Malformed id → `400`; unknown id → `404` |
@@ -193,14 +194,18 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
+| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency — each line carrying the balance, the available amount and the held amount. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
+| `GET` | `/v1/account-groups/status-counts` | Count account groups by status — `Active`, `Closed` — including a value no group currently holds. Optional `fromDate`/`toDate` window on the date each group was created | `accounts.read` | A narrowing other than the date window → `400` |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
+| `GET` | `/v1/accounts/status-counts` | Count accounts by status — `Active`, `Frozen`, `Dormant`, `Closed` — including a value no account currently holds. Optional `fromDate`/`toDate` window on the date each account was created | `accounts.read` | A narrowing other than the date window → `400` |
+| `GET` | `/v1/accounts/balances` | The ledger's balances grouped by currency, across every account group — each line carries the balance, the available amount and the held amount. Currencies are never combined | `accounts.read` | — |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Malformed id → `400`; unknown id → `404` |
 | `PUT` | `/v1/accounts/{id}` | Update an account. Body: either of `name`, `metadata`; a member left out (or null) is unchanged. Returns `200` + the account | `accounts.write` | No member supplied → `400`; malformed id → `400`; unknown id → `404` |
-| `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
+| `GET` | `/v1/accounts/{id}/balance` | Read the balance alone, plus the account's floor | `accounts.read` | Unknown id → `404` |
+| `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it; a member left out is unchanged | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination, including permitting negative with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
+| `GET` | `/v1/postings` | List postings across every account, within a required effective-date window (`from`, `to`) of at most 90 days. Narrow by `accountId`, `direction`, `category`, `status`; shares `search`, `orderBy`, `desc`, `pageNumber`, `pageSize` with [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `postings.read` | No date window, or one wider than 90 days (`INVALID_DATE_RANGE`); unknown filter/order field, or a malformed filter triple → `400` |
 | `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
@@ -271,7 +276,7 @@ route, and its answer is shaped by the same one setting every other failure goes
 
 | Route | Source | The orchestration that keeps it hand-written |
 |---|---|---|
-| `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
+| Create, list, read, update, activate and deactivate on `/v1/currencies` | **generated** — all six from one registration | A single `MapCurrencyCrud(...)` call publishes the whole set, excluding only `Delete`; they move together when the generator is upgraded. Currencies are stored records, not the old static `Currency.All` lookup. Deactivate's `CURRENCY_HOLDS_BALANCE` refusal is raised by a hand-written command handler sitting behind the generated route |
 | Create, list, read, update, delete, activate and close on `/v1/account-groups` | **generated** — all seven from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set, excluding nothing by name; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
 | `POST /v1/account-groups/{id}/close` | **generated** | Its `GROUP_HOLDS_BALANCE` refusal is raised by a hand-written command handler sitting behind the generated route, not by a validator a hand-written route calls before dispatch — so the route itself no longer has to be written out |
 | `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
@@ -362,6 +367,8 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |
 | `422` | `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing was recorded — retry, reusing the same `Idempotency-Key` |
+| `422` | `INVALID_DATE_RANGE` | The cross-account posting list was requested with no effective-date window, or one wider than 90 days |
+| `422` | `CURRENCY_HOLDS_BALANCE` | Currency deactivation requested while an account denominated in it still holds a balance |
 
 Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that
 file is the authority if this table and the service ever disagree.
