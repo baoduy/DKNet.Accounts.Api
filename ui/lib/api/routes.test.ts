@@ -11,7 +11,27 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings/{id}/reverse' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/currencies' });
-    expect(routes).toHaveLength(7);
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/currencies/{id}' });
+    expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/currencies/{id}' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies/{id}/activate' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies/{id}/deactivate' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'DELETE', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/close' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/activate' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}/balances' });
+    expect(routes).toHaveLength(20);
+  });
+});
+
+describe('PUT support (DRK-1697 §3 row 4)', () => {
+  it('accepts PUT as a declared route method', () => {
+    expect(isLedgerRouteAllowed('PUT', ['account-groups', '11111111-1111-4111-8111-111111111111'])).toBe(true);
+    expect(isLedgerRouteAllowed('put', ['currencies', '11111111-1111-4111-8111-111111111111'])).toBe(true);
   });
 });
 

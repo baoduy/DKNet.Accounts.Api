@@ -6,7 +6,7 @@
  */
 import contract from '@/contract/openapi.json';
 
-export type LedgerHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type LedgerHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface LedgerRoute {
   method: LedgerHttpMethod;
@@ -14,7 +14,7 @@ export interface LedgerRoute {
   pathTemplate: string;
 }
 
-const METHOD_KEYS: Record<LedgerHttpMethod, string> = { GET: 'get', POST: 'post', PATCH: 'patch', DELETE: 'delete' };
+const METHOD_KEYS: Record<LedgerHttpMethod, string> = { GET: 'get', POST: 'post', PUT: 'put', PATCH: 'patch', DELETE: 'delete' };
 
 /** Every route the generated contract declares. */
 export function allowedLedgerRoutes(): LedgerRoute[] {

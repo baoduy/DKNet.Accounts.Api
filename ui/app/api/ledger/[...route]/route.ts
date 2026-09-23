@@ -73,5 +73,6 @@ async function passThrough(request: NextRequest, context: RouteParams): Promise<
 
 export const GET = passThrough;
 export const POST = passThrough;
+export const PUT = passThrough;
 export const PATCH = passThrough;
 export const DELETE = passThrough;

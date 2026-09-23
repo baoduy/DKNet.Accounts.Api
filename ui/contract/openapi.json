@@ -115,6 +115,183 @@
         "responses": {
           "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } } } } }
         }
+      },
+      "post": {
+        "operationId": "registerCurrency",
+        "summary": "Register a currency.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCurrencyRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/currencies/{id}": {
+      "get": {
+        "operationId": "getCurrency",
+        "summary": "Read one currency.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateCurrency",
+        "summary": "Correct a currency's name.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCurrencyRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/currencies/{id}/activate": {
+      "post": {
+        "operationId": "activateCurrency",
+        "summary": "Reactivate a currency.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/currencies/{id}/deactivate": {
+      "post": {
+        "operationId": "deactivateCurrency",
+        "summary": "Deactivate a currency, so it is no longer offered for new accounts.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups": {
+      "get": {
+        "operationId": "listAccountGroups",
+        "summary": "List account groups, narrowed, sorted and paged.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } },
+          { "name": "fromDate", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "toDate", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedAccountGroupResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createAccountGroup",
+        "summary": "Create a group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAccountGroupRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/account-groups/{id}": {
+      "get": {
+        "operationId": "getAccountGroup",
+        "summary": "Read one group.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateAccountGroup",
+        "summary": "Change a group's name, description or metadata.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAccountGroupRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAccountGroup",
+        "summary": "Delete a group that holds no account.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "204": { "description": "No Content" },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/close": {
+      "post": {
+        "operationId": "closeAccountGroup",
+        "summary": "Close a group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/activate": {
+      "post": {
+        "operationId": "activateAccountGroup",
+        "summary": "Reopen a closed group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/balances": {
+      "get": {
+        "operationId": "getAccountGroupBalances",
+        "summary": "Read a group's balances, one line per currency.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupBalanceLineDto" } } } }
+          },
+          "404": { "description": "Not Found" }
+        }
       }
     }
   },
@@ -186,10 +363,92 @@
       },
       "CurrencyDto": {
         "type": "object",
-        "required": ["code", "decimalPlaces"],
+        "required": ["id", "code", "name", "decimalPlaces", "isActive"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "decimalPlaces": { "type": "integer" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "CreateCurrencyRequest": {
+        "type": "object",
+        "required": ["code", "name", "decimalPlaces"],
         "properties": {
           "code": { "type": "string" },
+          "name": { "type": "string" },
           "decimalPlaces": { "type": "integer" }
+        }
+      },
+      "UpdateCurrencyRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "AccountGroupType": {
+        "type": "string",
+        "enum": ["Customer", "Merchant", "Internal", "Suspense", "Settlement"]
+      },
+      "AccountGroupStatus": {
+        "type": "string",
+        "enum": ["Active", "Closed"]
+      },
+      "AccountGroupDto": {
+        "type": "object",
+        "required": ["id", "code", "name", "type", "status", "ownerId"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/AccountGroupType" },
+          "status": { "$ref": "#/components/schemas/AccountGroupStatus" },
+          "ownerId": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "CreateAccountGroupRequest": {
+        "type": "object",
+        "required": ["code", "name", "type", "ownerId"],
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/AccountGroupType" },
+          "ownerId": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "UpdateAccountGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "AccountGroupBalanceLineDto": {
+        "type": "object",
+        "required": ["currency", "balance", "available", "held"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" },
+          "available": { "type": "string" },
+          "held": { "type": "string" }
+        }
+      },
+      "PagedAccountGroupResponse": {
+        "type": "object",
+        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
+          "pageIndex": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" }
         }
       },
       "ErrorItem": {

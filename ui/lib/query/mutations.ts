@@ -8,7 +8,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
-import { accountBalanceKey, postingsListKey } from './keys';
+import { accountBalanceKey, accountGroupBalancesKey, accountGroupKey, accountGroupsListKey, currenciesKey, currencyKey, postingsListKey } from './keys';
 
 export interface RecordPostingInput {
   accountId: string;
@@ -112,4 +112,98 @@ export function useReversePosting(): { mutate: (input: ReversePostingInput) => P
   });
 
   return { mutate: (input) => mutation.mutateAsync(input) };
+}
+
+/**
+ * DRK-1697 §3 row 10 — write hooks for account groups and currencies, shaped like
+ * `useRecordPosting` above: `{ ok, errors, traceId }`, invalidating the affected query keys
+ * (row 9) on success only. Build stage implements every body; these stubs only pin the
+ * signatures `AccountGroupsScreen` / `CurrenciesScreen` (rows 11-12) compile against.
+ *
+ * R3: a group's `code` and `ownerId`, and a currency's `code` and `decimalPlaces`, are
+ * settable only at creation/registration — absent from every input below that acts on an
+ * existing record.
+ */
+export type AccountGroupType = 'Customer' | 'Merchant' | 'Internal' | 'Suspense' | 'Settlement';
+
+export interface LedgerMutationResult {
+  ok: boolean;
+  errors?: LedgerError[];
+  traceId?: string;
+}
+
+export interface CreateAccountGroupInput {
+  code: string;
+  name: string;
+  description?: string;
+  type: AccountGroupType;
+  ownerId: string;
+  metadata?: Record<string, string>;
+}
+
+export interface UpdateAccountGroupInput {
+  groupId: string;
+  name?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
+function notImplemented<TInput>(): { mutate: (input: TInput) => Promise<LedgerMutationResult> } {
+  return {
+    mutate: (_input: TInput) => {
+      throw new Error('Not implemented — DRK-1697 Build stage (row 10).');
+    },
+  };
+}
+
+export function useCreateAccountGroup(): { mutate: (input: CreateAccountGroupInput) => Promise<LedgerMutationResult> } {
+  void accountGroupsListKey;
+  return notImplemented<CreateAccountGroupInput>();
+}
+
+export function useUpdateAccountGroup(): { mutate: (input: UpdateAccountGroupInput) => Promise<LedgerMutationResult> } {
+  void accountGroupKey;
+  return notImplemented<UpdateAccountGroupInput>();
+}
+
+export function useCloseAccountGroup(): { mutate: (input: { groupId: string }) => Promise<LedgerMutationResult> } {
+  return notImplemented<{ groupId: string }>();
+}
+
+export function useActivateAccountGroup(): { mutate: (input: { groupId: string }) => Promise<LedgerMutationResult> } {
+  return notImplemented<{ groupId: string }>();
+}
+
+export function useDeleteAccountGroup(): { mutate: (input: { groupId: string }) => Promise<LedgerMutationResult> } {
+  void accountGroupBalancesKey;
+  return notImplemented<{ groupId: string }>();
+}
+
+export interface RegisterCurrencyInput {
+  code: string;
+  name: string;
+  decimalPlaces: number;
+}
+
+export interface RenameCurrencyInput {
+  currencyId: string;
+  name: string;
+}
+
+export function useRegisterCurrency(): { mutate: (input: RegisterCurrencyInput) => Promise<LedgerMutationResult> } {
+  void currenciesKey;
+  return notImplemented<RegisterCurrencyInput>();
+}
+
+export function useRenameCurrency(): { mutate: (input: RenameCurrencyInput) => Promise<LedgerMutationResult> } {
+  void currencyKey;
+  return notImplemented<RenameCurrencyInput>();
+}
+
+export function useActivateCurrency(): { mutate: (input: { currencyId: string }) => Promise<LedgerMutationResult> } {
+  return notImplemented<{ currencyId: string }>();
+}
+
+export function useDeactivateCurrency(): { mutate: (input: { currencyId: string }) => Promise<LedgerMutationResult> } {
+  return notImplemented<{ currencyId: string }>();
 }
