@@ -90,12 +90,10 @@ contract no longer matches it; CI runs it ahead of `typecheck` (`.github/workflo
 
 ### Ledger data caching
 
-`ui/lib/query/client.tsx` is the designated TanStack Query provider every ledger screen will
-mount under: money-bearing queries get `staleTime: 0` and refetch on mount and on window focus,
-so a figure on screen is never older than the console's own last write, while the currency list
-is cheap and held for the whole session (`staleTime: Infinity`). At the time of writing this is
-still a stub (`ui/lib/query/client.tsx:19-21` throws) — it lands with the Build sub-task landing
-alongside this one.
+`ui/lib/query/client.tsx` is the TanStack Query provider every ledger screen mounts under. Its
+default is `staleTime: 0` with refetch on mount and on window focus, so a figure on screen is
+never older than the console's own last write; a query needing the currency list's cheaper
+lifetime overrides `staleTime` to `Infinity` per call.
 
 ### Ledger component kit
 
