@@ -19,10 +19,17 @@ import { signInAs } from '../support/sign-in';
 
 test.use({ colorScheme: 'light' });
 
-function relativeLuminance(hex: string): number {
-  const value = hex.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16) / 255);
-  const [rl, gl, bl] = [r, g, b].map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+/** Parses a computed `rgb(r, g, b)` / `rgba(r, g, b, a)` string, as `getComputedStyle` returns it. */
+function parseRgb(rgb: string): [number, number, number] {
+  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) throw new Error(`not an rgb() colour: ${rgb}`);
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  const [rl, gl, bl] = [r, g, b]
+    .map((c) => c / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
 }
 
@@ -44,8 +51,11 @@ test("The four accessibility corrections the design system records are in force"
   const fill = await deleteButton.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(fill).toBe('rgb(220, 38, 38)'); // #dc2626
 
-  // A selected row is clearly darker than a hovered row.
-  const selectedLuminance = relativeLuminance('#d4f094');
-  const hoveredLuminance = relativeLuminance('#f1f5f9');
-  expect(selectedLuminance).toBeLessThan(hoveredLuminance);
+  // A selected row is clearly darker than a hovered row — read from the rendered rows,
+  // not from the token literals, so a console that gets the colours wrong fails here.
+  const selectedBg = await page.getByTestId('selected-row').evaluate((el) => getComputedStyle(el).backgroundColor);
+  const hoveredBg = await page.getByTestId('hovered-row').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(selectedBg).toBe('rgb(212, 240, 148)'); // --surface-selected #d4f094
+  expect(hoveredBg).toBe('rgb(241, 245, 249)'); // --surface-hover #f1f5f9
+  expect(relativeLuminance(parseRgb(selectedBg))).toBeLessThan(relativeLuminance(parseRgb(hoveredBg)));
 });
