@@ -8,10 +8,10 @@
  *     And no account, posting or currency value is found
  *     And the console has written nothing outside its own prefix
  */
-import { expect, test } from '@playwright/test';
 import { CONSOLE_REDIS_KEY_PREFIX, MAI } from '../support/fixtures';
 import { connectTestRedis } from '../support/redis';
 import { signInAs } from '../support/sign-in';
+import { expect, test } from '../support/test';
 
 test('The cache holds the session and the token and nothing else', async ({ page, baseURL }) => {
   const redis = connectTestRedis();

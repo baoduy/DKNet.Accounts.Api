@@ -6,10 +6,10 @@
  *     Then the cache holds no token for Mai
  *     And the console sends no expired token to the ledger service
  */
-import { expect, test } from '@playwright/test';
 import { CONSOLE_REDIS_KEY_PREFIX, MAI } from '../support/fixtures';
 import { connectTestRedis } from '../support/redis';
 import { signInAs } from '../support/sign-in';
+import { expect, test } from '../support/test';
 
 const CANARY_ACCESS_TOKEN = 'MAI-CANARY-ACCESS-TOKEN-11-EXPIRED-DO-NOT-SEND';
 

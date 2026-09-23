@@ -12,11 +12,11 @@
  * so it has not), before the Redis-shape assertion, which would otherwise hold trivially
  * even with nothing implemented and prove nothing.
  */
-import { expect, test } from '@playwright/test';
 import { CONSOLE_REDIS_KEY_PREFIX, MAI } from '../support/fixtures';
 import { connectTestRedis } from '../support/redis';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
+import { expect, test } from '../support/test';
 
 test("No ledger answer is kept on the console's own side between requests", async ({ page, baseURL }) => {
   await seedLedgerAccounts([
