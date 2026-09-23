@@ -6,7 +6,11 @@
  *     Then she sees a description column
  *     And she sees no running balance column
  *
- * R6 — no test asserts a running-balance column; this test asserts its absence.
+ * R6 — no test asserts a running-balance column; this test asserts its absence. A running
+ * balance is `StatementTable`'s own **"Balance after"** column (`components/ledger/
+ * StatementTable.tsx:51`) — if `PostingsPanel` reuses that table as-is, the forbidden
+ * column is on screen under a heading a bare `/running balance/i` regex never matches. Both
+ * are asserted absent by name.
  * RED today: `components/accounts/PostingsPanel.tsx` does not exist.
  */
 import { render, screen } from '@testing-library/react';
@@ -33,5 +37,8 @@ describe('The posting list shows a description and no running balance', () => {
 
     expect(screen.getByRole('columnheader', { name: 'Description' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /running balance/i })).toBeNull();
+    // `StatementTable`'s own running-balance column, by its actual heading text — the regex
+    // above alone would go green with this forbidden column still on screen.
+    expect(screen.queryByRole('columnheader', { name: /balance after/i })).toBeNull();
   });
 });

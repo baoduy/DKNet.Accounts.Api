@@ -8,6 +8,12 @@
  * "Before she can act again" — an ordering assertion, not just an eventual refresh: the
  * record control must be usable again only once the refreshed balance is on screen.
  * RED today: no `/accounts/{account}` route exists yet.
+ *
+ * dev-leader AT review round 1, finding 3: asserting the refreshed balance and an enabled
+ * control after the fact does not prove ordering — the control could have stayed enabled
+ * the whole time. The `POST /api/ledger/postings` response is held open so the in-flight
+ * state is observable: the control must be disabled and the balance still 12,400.00 while
+ * the write is pending, only becoming available once the refreshed 12,900.00 is on screen.
  */
 import { expect, test } from '@playwright/test';
 import { MAI_WITH_WRITE } from '../support/fixtures';
@@ -20,6 +26,15 @@ test('The values on screen follow a write', async ({ page, baseURL }) => {
   ]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
 
+  let releaseResponse: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  await page.route('**/api/ledger/postings', async (route) => {
+    await held;
+    await route.continue();
+  });
+
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByRole('button', { name: 'Record posting' }).click();
   await page.getByLabel('Direction').selectOption('Credit');
@@ -27,6 +42,13 @@ test('The values on screen follow a write', async ({ page, baseURL }) => {
   await page.getByLabel('Category').selectOption('Transfer');
   await page.getByRole('button', { name: 'Record' }).click();
 
+  // While the write is still in flight: the control is unavailable and the balance unchanged.
+  await expect(page.getByRole('button', { name: 'Record posting' })).toBeDisabled();
+  await expect(page.getByTestId('account-balance')).toContainText('12,400.00');
+
+  releaseResponse();
+
+  // Only once the refreshed balance is on screen does the control become usable again.
   await expect(page.getByTestId('account-balance')).toContainText('12,900.00');
   await expect(page.getByRole('button', { name: 'Record posting' })).toBeEnabled();
 });
