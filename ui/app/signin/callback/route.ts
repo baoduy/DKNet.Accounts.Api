@@ -30,7 +30,9 @@ export async function GET(request: NextRequest): Promise<Response> {
   const response = NextResponse.redirect(new URL(result.returnTo, config.baseUrl));
   response.cookies.set(SESSION_COOKIE_NAME, signCookieValue(config.sessionSecret, session.sessionId), {
     httpOnly: true,
-    secure: true,
+    // `page.request`-style HTTP clients (unlike a real browser on loopback) never attach a
+    // `Secure` cookie over plain HTTP — match the scheme this console is actually served on.
+    secure: config.baseUrl.startsWith('https://'),
     sameSite: 'lax',
     path: '/',
     expires: new Date(session.expiresAt * 1000),

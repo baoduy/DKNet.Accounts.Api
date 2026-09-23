@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "import"],
+  "jsPlugins": ["./oxlint-plugins/design-system.js"],
+  "ignorePatterns": ["node_modules/**", ".next/**", ".next-*/**"],
+  "rules": {
+    "design-system/no-restricted-literal": "error",
+    "design-system/jsx-prop-shape": "error",
+    "react/forbid-elements": ["error", { "forbid": [] }],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "components/core/**",
+              "components/feedback/**",
+              "components/forms/**",
+              "components/ledger/**",
+              "components/shell/**",
+              "ui_kits/account-detail/**",
+              "ui_kits/account-groups-crud/**",
+              "ui_kits/accounts-crud/**",
+              "ui_kits/currencies-crud/**",
+              "ui_kits/overview/**",
+              "ui_kits/records-crud/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/index.js"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

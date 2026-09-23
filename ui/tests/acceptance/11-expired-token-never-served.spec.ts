@@ -6,20 +6,22 @@
  *     Then the cache holds no token for Mai
  *     And the console sends no expired token to the ledger service
  */
-import { expect, test } from '@playwright/test';
 import { CONSOLE_REDIS_KEY_PREFIX, MAI } from '../support/fixtures';
 import { connectTestRedis } from '../support/redis';
 import { signInAs } from '../support/sign-in';
+import { expect, test } from '../support/test';
 
 const CANARY_ACCESS_TOKEN = 'MAI-CANARY-ACCESS-TOKEN-11-EXPIRED-DO-NOT-SEND';
 
 test('An expired token is never served from the cache', async ({ page, baseURL }) => {
-  // A 1-second-lived token stands in for "signed in an hour ago, since expired" — the
-  // cache entry's TTL is pinned to the token's own `exp` (R7), so it evicts itself.
+  // A 5-second-lived token stands in for "signed in an hour ago, since expired" — the
+  // cache entry's TTL is pinned to the token's own `exp` (R7), so it evicts itself. 5s
+  // (rather than 1s) gives the sign-in redirect chain itself room to finish on a slow
+  // runner before the clock starts counting down to expiry.
   await signInAs(page, {
     consoleBaseUrl: baseURL!,
     email: MAI.email,
-    expiresInOverride: 1,
+    expiresInOverride: 5,
     accessTokenOverride: CANARY_ACCESS_TOKEN,
   });
 
@@ -30,7 +32,8 @@ test('An expired token is never served from the cache', async ({ page, baseURL }
     const keys = await redis.keys(`${CONSOLE_REDIS_KEY_PREFIX}*token*`);
     expect(keys.length).toBeGreaterThan(0);
 
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    // 7s of wait against a 5s TTL: 2s of margin past expiry, not a bare tie against it.
+    await new Promise((resolve) => setTimeout(resolve, 7_000));
 
     for (const key of keys) {
       expect(await redis.get(key)).toBeNull();

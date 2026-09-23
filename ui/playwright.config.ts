@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import { DEFAULT_CONSOLE_BASE, DEFAULT_CONSOLE_PORT, FAKE_OIDC_PORT, FAKE_REDIS_PORT, defaultConsoleEnv } from './tests/support/fixtures';
+import { DEFAULT_CONSOLE_BASE, DEFAULT_CONSOLE_PORT, FAKE_LEDGER_PORT, FAKE_OIDC_PORT, FAKE_REDIS_PORT, defaultConsoleEnv } from './tests/support/fixtures';
 
 export default defineConfig({
   testDir: './tests/acceptance',
@@ -7,7 +7,7 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [['list'], ['./scripts/reset-console-redis-reporter.ts']],
+  reporter: [['list'], ['./scripts/reset-console-redis-reporter.ts'], ['./scripts/reset-fake-ledger-reporter.ts']],
   use: {
     baseURL: DEFAULT_CONSOLE_BASE,
     trace: 'retain-on-failure',
@@ -27,6 +27,13 @@ export default defineConfig({
       timeout: 30_000,
       reuseExistingServer: true,
       env: { FAKE_OIDC_PORT: String(FAKE_OIDC_PORT) },
+    },
+    {
+      command: 'pnpm exec tsx tests/fakes/fake-ledger-service.ts',
+      port: FAKE_LEDGER_PORT,
+      timeout: 30_000,
+      reuseExistingServer: true,
+      env: { FAKE_LEDGER_PORT: String(FAKE_LEDGER_PORT) },
     },
     {
       command: `pnpm exec next dev -p ${DEFAULT_CONSOLE_PORT}`,

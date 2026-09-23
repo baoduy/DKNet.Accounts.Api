@@ -1,0 +1,215 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DKNet.Accounts.Api",
+    "version": "1",
+    "description": "DRK-1684 §3 row 1 — committed snapshot of the ledger service's own published OpenAPI document. Regenerated and diffed by `verify:contract` (row 3); never hand-edited."
+  },
+  "servers": [{ "url": "/v1" }],
+  "paths": {
+    "/accounts/balances": {
+      "get": {
+        "operationId": "getLedgerBalances",
+        "summary": "Read the ledger's position by currency — one line per currency, never combined.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/LedgerBalanceLineDto" } } } }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/balance": {
+      "get": {
+        "operationId": "getAccountBalance",
+        "summary": "Read an account's balance.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountBalanceDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/accounts/{id}/statement": {
+      "get": {
+        "operationId": "getAccountStatement",
+        "summary": "Read an account's postings as a date-bounded, paged statement in stream order.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "pageIndex", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedPostingResponse" } } } }
+        }
+      }
+    },
+    "/postings": {
+      "get": {
+        "operationId": "listPostings",
+        "summary": "List postings across every account, within a required effective-date window of at most 90 days.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "accountId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "direction", "in": "query", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedPostingResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "recordPosting",
+        "summary": "Record one credit or debit. Idempotency key is required in the header.",
+        "security": [{ "bearer": ["postings.write"] }],
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordPostingRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "409": { "description": "Idempotency key conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/postings/{id}/reverse": {
+      "post": {
+        "operationId": "reversePosting",
+        "summary": "Reverse a posting. Requires a reason in the body and an idempotency key in the header.",
+        "security": [{ "bearer": ["postings.reverse"] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/currencies": {
+      "get": {
+        "operationId": "listCurrencies",
+        "summary": "List the reference currency set.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "LedgerBalanceLineDto": {
+        "type": "object",
+        "required": ["currency", "balance"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" }
+        }
+      },
+      "AccountBalanceDto": {
+        "type": "object",
+        "required": ["currency", "balance", "availableBalance", "heldAmount", "floor"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" },
+          "availableBalance": { "type": "string" },
+          "heldAmount": { "type": "string" },
+          "floor": { "type": "string" }
+        }
+      },
+      "PostingDto": {
+        "type": "object",
+        "required": ["id", "postingNumber", "accountId", "streamPosition", "direction", "amount", "signedAmount", "currency", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "postingNumber": { "type": "string" },
+          "accountId": { "type": "string", "format": "uuid" },
+          "streamPosition": { "type": "integer" },
+          "direction": { "type": "string" },
+          "amount": { "type": "string" },
+          "signedAmount": { "type": "string" },
+          "currency": { "type": "string" },
+          "status": { "type": "string" },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "effectiveDate": { "type": "string", "format": "date" }
+        }
+      },
+      "PagedPostingResponse": {
+        "type": "object",
+        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/PostingDto" } },
+          "pageIndex": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" }
+        }
+      },
+      "RecordPostingRequest": {
+        "type": "object",
+        "required": ["accountId", "direction", "amount", "currency", "category"],
+        "properties": {
+          "accountId": { "type": "string", "format": "uuid" },
+          "direction": { "type": "string", "enum": ["Debit", "Credit"] },
+          "amount": { "type": "string" },
+          "currency": { "type": "string" },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "effectiveDate": { "type": "string", "format": "date" }
+        }
+      },
+      "CurrencyDto": {
+        "type": "object",
+        "required": ["code", "decimalPlaces"],
+        "properties": {
+          "code": { "type": "string" },
+          "decimalPlaces": { "type": "integer" }
+        }
+      },
+      "ErrorItem": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "code": { "type": "string" },
+          "field": { "type": "string" }
+        }
+      },
+      "RefusalBody": {
+        "type": "object",
+        "required": ["status", "errors", "traceId"],
+        "properties": {
+          "status": { "type": "integer" },
+          "errors": { "type": "array", "items": { "$ref": "#/components/schemas/ErrorItem" } },
+          "traceId": { "type": "string" }
+        }
+      }
+    }
+  }
+}

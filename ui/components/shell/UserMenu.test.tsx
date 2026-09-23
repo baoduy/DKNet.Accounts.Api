@@ -26,6 +26,17 @@ describe('UserMenu', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
+  it('addresses the operator directly, never the test persona, beside a missing scope (pr-reviewer finding 5, DRK-1687)', () => {
+    render(createElement(UserMenu, { name: 'Nam Tran', scopes: ['accounts.read'], missingScopes: ['postings.reverse'] }));
+    expect(screen.getByText('You cannot reverse a posting without this permission.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nam Tran cannot|Mai cannot/)).toBeNull();
+  });
+
+  it('falls back to "do this" for a missing scope with no known consequence', () => {
+    render(createElement(UserMenu, { name: 'Mai Nguyen', scopes: [], missingScopes: ['unknown.scope'] }));
+    expect(screen.getByText('You cannot do this without this permission.')).toBeInTheDocument();
+  });
+
   it('states no missing scopes when the token carries them all', () => {
     render(createElement(UserMenu, { name: 'Mai Nguyen', scopes: ['accounts.read'], missingScopes: [] }));
     expect(screen.queryByText(/without this permission/i)).toBeNull();
@@ -41,5 +52,15 @@ describe('UserMenu', () => {
     const form = screen.getByRole('button', { name: /Sign out/ }).closest('form');
     expect(form).toHaveAttribute('action', '/signout');
     expect(form).toHaveAttribute('method', 'post');
+  });
+
+  it('opens on a native disclosure element, not a JS-only trigger — the panel is in the DOM before any click', () => {
+    const { container } = render(createElement(UserMenu, { name: 'Mai Nguyen' }));
+    // A JS-driven menu (Radix or a useState toggle) would mount `role="menu"` only after
+    // an open state flips — a `<details>` never needs that: this assertion alone would go
+    // red the moment the trigger stopped being native, unclicked, before hydration ever runs.
+    expect(container.querySelector('details')).not.toBeNull();
+    expect(container.querySelector('details > summary[role="button"]')).not.toBeNull();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 });

@@ -16,6 +16,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   // A plain HTML `<form method="post">` (the identity menu's sign-out button, no client JS
   // needed) expects a navigable response, not a bare 204.
   const response = NextResponse.redirect(new URL('/signin', config.baseUrl), 303);
-  response.cookies.set(SESSION_COOKIE_NAME, '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 });
+  response.cookies.set(SESSION_COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: config.baseUrl.startsWith('https://'),
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
   return response;
 }

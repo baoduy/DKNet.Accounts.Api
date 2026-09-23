@@ -3,7 +3,7 @@ import { KNOWN_SCOPES, SCOPE_CONSEQUENCES } from './scopes';
 
 describe('scopes', () => {
   it('names the known scope set the console can display (DRK-1669 §9 Q2)', () => {
-    expect(KNOWN_SCOPES).toEqual(['accounts.read', 'postings.read', 'postings.reverse']);
+    expect(KNOWN_SCOPES).toEqual(['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse']);
   });
 
   it('states a non-empty consequence for every known scope', () => {

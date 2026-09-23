@@ -61,6 +61,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.Dotnet_Version }}
+
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: ui/package.json
@@ -75,6 +80,14 @@ jobs:
       - name: Install dependencies
         working-directory: ui
         run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: ui
+        run: pnpm run lint
+
+      - name: Verify contract
+        working-directory: ui
+        run: pnpm run verify:contract
 
       - name: Typecheck
         working-directory: ui

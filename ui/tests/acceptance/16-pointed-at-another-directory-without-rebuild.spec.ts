@@ -14,14 +14,14 @@ const PORT = 3204;
 const BASE = `http://127.0.0.1:${PORT}`;
 
 test('The console is pointed at another directory without a rebuild', async ({ page }) => {
-  let handle = await startConsole(defaultConsoleEnv(PORT), PORT);
+  let handle = await startConsole(defaultConsoleEnv(PORT), PORT, '/signin');
   try {
     await page.goto(`${BASE}/signin`);
     expect(page.url()).toContain('drunk-coding-tenant');
 
     await stopConsole(handle);
     // Same built application, no rebuild — only the environment changes.
-    handle = await startConsole({ ...defaultConsoleEnv(PORT), CONSOLE_ENTRA_TENANT_ID: TENANT_OTHER_DIRECTORY }, PORT);
+    handle = await startConsole({ ...defaultConsoleEnv(PORT), CONSOLE_ENTRA_TENANT_ID: TENANT_OTHER_DIRECTORY }, PORT, '/signin');
 
     await page.goto(`${BASE}/signin`);
     expect(page.url()).toContain(TENANT_OTHER_DIRECTORY);

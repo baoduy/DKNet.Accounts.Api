@@ -1,15 +1,24 @@
 import '@testing-library/jest-dom/vitest';
 
-/** jsdom has no `matchMedia` implementation — stub it so the theme picks up an OS preference. */
-export function mockPrefersColorScheme(preference: 'light' | 'dark'): void {
-  window.matchMedia = ((query: string) => ({
-    matches: query.includes('dark') ? preference === 'dark' : preference === 'light',
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+/** jsdom implements none of these — Radix's Popper (dropdown/tooltip/sheet positioning) needs them. */
+if (typeof window !== 'undefined') {
+  if (!window.ResizeObserver) {
+    window.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+  }
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
 }

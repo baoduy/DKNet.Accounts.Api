@@ -114,8 +114,35 @@ function spawnNextDev(env: NodeJS.ProcessEnv, port: number): ChildProcess {
   });
 }
 
-/** Starts `next dev` on `env.PORT` and waits until the console it spawned is listening. */
-export async function startConsole(env: NodeJS.ProcessEnv, port: number): Promise<ConsoleHandle> {
+/**
+ * `next dev` accepts the TCP connection the moment it starts listening, but does not compile
+ * a route's module tree until the first *request* for it — `waitForPort` alone lets that
+ * compile happen inside a spec's own (much shorter) `navigationTimeout` instead of here,
+ * under a timeout sized for a cold compile. A response of any status confirms the route
+ * handler actually ran; a connection error (the brief window between "listening" and
+ * "routing", or — on a restart — the old process's port not yet released) just retries.
+ */
+async function warmUpRoute(baseUrl: string, path: string, timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await fetch(`${baseUrl}${path}`);
+      return;
+    } catch {
+      if (Date.now() > deadline) {
+        throw new Error(`console did not answer ${path} on ${baseUrl} within ${timeoutMs}ms`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+}
+
+/**
+ * Starts `next dev` on `env.PORT` and waits until the console it spawned is listening, then
+ * warms `warmupPath` (the first path the caller will `page.goto`) so the route is already
+ * compiled before the test's own navigation — never a raw "is the port open" check.
+ */
+export async function startConsole(env: NodeJS.ProcessEnv, port: number, warmupPath = '/'): Promise<ConsoleHandle> {
   if (await isPortOccupied(port)) {
     throw new Error(`cannot start console: port ${port} is already in use by another process`);
   }
@@ -139,6 +166,7 @@ export async function startConsole(env: NodeJS.ProcessEnv, port: number): Promis
     throw error;
   }
 
+  await warmUpRoute(`http://127.0.0.1:${port}`, warmupPath);
   return handle;
 }
 

@@ -1,7 +1,5 @@
-'use client';
-
-import { useLayoutEffect } from 'react';
 import type { CSSProperties, JSX, ReactNode } from 'react';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 export interface AppShellProps {
   sidebar?: ReactNode;
@@ -17,7 +15,11 @@ export interface AppShellProps {
 /**
  * The console frame: fixed left navigation (`Sidebar`), fixed top bar (search field +
  * `UserMenu`), and a page header above the content region. Ported from
- * Design/components/shell/AppShell.jsx.
+ * Design/components/shell/AppShell.jsx onto shadcn primitives.
+ *
+ * Theme follows the operator's system preference from the CSS cascade alone
+ * (`Design/tokens/base.css`, `colors.css`'s `@media (prefers-color-scheme: dark)` block) —
+ * no JS reads or mirrors it (AT 21, dev-leader ruling on DRK-1680 row 9 amendment).
  */
 export function AppShell({
   sidebar,
@@ -29,61 +31,31 @@ export function AppShell({
   children,
   style,
 }: AppShellProps): JSX.Element {
-  // No stored theme choice exists (out of scope this ticket) — the frame picks up the OS
-  // preference itself, live: an OS theme change flips it with no reload, via the same
-  // `prefers-color-scheme` query the CSS `@media` block matches. jsdom (the unit-test
-  // harness) cannot resolve `var()` in a computed `background`/`color` shorthand, so this
-  // reads the already-resolved custom properties and mirrors them onto `document.body`
-  // inline — real browsers already get the same values from base.css alone.
-  useLayoutEffect(() => {
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const applyTheme = (): void => {
-      document.documentElement.dataset.theme = mql.matches ? 'dark' : 'light';
-      const rootStyle = getComputedStyle(document.documentElement);
-      document.body.style.backgroundColor = rootStyle.getPropertyValue('--background').trim();
-      document.body.style.color = rootStyle.getPropertyValue('--foreground').trim();
-    };
-
-    applyTheme();
-    mql.addEventListener('change', applyTheme);
-    return () => mql.removeEventListener('change', applyTheme);
-  }, []);
-
   return (
-    <div style={{ display: 'flex', minHeight: '100%', position: 'relative', overflow: 'hidden', background: 'var(--background)', ...style }}>
+    <div style={style} className="relative flex min-h-full overflow-hidden bg-background">
       <div
-        style={{
-          display: 'flex',
-          flex: 1,
-          minWidth: 0,
-          paddingRight: panelOpen && panelBehavior === 'shift' ? 'var(--drawer-width)' : 0,
-          transition: 'padding-right var(--duration-panel) var(--easing-panel)',
-        }}
+        className="flex min-w-0 flex-1 transition-[padding-right] duration-[var(--duration-panel)] ease-[var(--easing-panel)]"
+        style={panelOpen && panelBehavior === 'shift' ? { paddingRight: 'var(--drawer-width)' } : undefined}
       >
         {sidebar}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <header
-            style={{
-              height: 'var(--topbar-height)',
-              flex: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              padding: '0 var(--page-padding)',
-              borderBottom: '1px solid var(--border)',
-              background: 'var(--card)',
-            }}
-          >
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-(--topbar-height) flex-none items-center gap-3 border-b border-border bg-card px-(--page-padding)">
             {breadcrumb}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{topbarRight}</div>
+            <div className="ml-auto flex items-center gap-2">{topbarRight}</div>
           </header>
-          <main style={{ padding: 'var(--page-padding)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', overflowX: 'auto' }}>
-            {children}
-          </main>
+          <main className="flex flex-col gap-5 overflow-x-auto p-(--page-padding)">{children}</main>
         </div>
+        {panelBehavior === 'shift' && panel ? (
+          <div className="fixed inset-y-0 right-0 w-(--drawer-width) border-l border-border bg-card p-5">{panel}</div>
+        ) : null}
       </div>
-      {panel}
+      {panelBehavior === 'overlay' && panel ? (
+        // `modal={false}` (row 5): a non-modal overlay that never dims or blocks the region
+        // behind it — Radix's own setting for that, not a bespoke rewrite.
+        <Sheet open={panelOpen} modal={false}>
+          <SheetContent side="right">{panel}</SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   );
 }

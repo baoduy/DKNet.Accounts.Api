@@ -1,64 +1,55 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { AppShell } from './AppShell';
-import '../../app/globals.css';
 
-/**
- * A real, dispatchable `MediaQueryList` fake (unlike `tests/unit/setup.ts`'s frozen stub,
- * whose listeners are permanently no-ops) — this is what proves A4: an OS theme change
- * flips the frame live, with no reload.
- */
-function installControllableMatchMedia(initialMatches: boolean): { flip: () => void } {
-  let matches = initialMatches;
-  const target = new EventTarget();
-  const mql = {
-    get matches() {
-      return matches;
-    },
-    media: '(prefers-color-scheme: dark)',
-    addEventListener: (type: string, listener: EventListener) => target.addEventListener(type, listener),
-    removeEventListener: (type: string, listener: EventListener) => target.removeEventListener(type, listener),
-    dispatchEvent: (event: Event) => target.dispatchEvent(event),
-  };
-  window.matchMedia = (() => mql) as unknown as typeof window.matchMedia;
-  return {
-    flip: () => {
-      matches = !matches;
-      target.dispatchEvent(new Event('change'));
-    },
-  };
-}
-
-describe('AppShell — live OS theme changes (A4)', () => {
-  afterEach(() => {
-    document.documentElement.dataset.theme = '';
+describe('AppShell', () => {
+  it('renders the sidebar, top bar content, breadcrumb and page content', () => {
+    render(
+      createElement(
+        AppShell,
+        {
+          sidebar: createElement('nav', { 'aria-label': 'Primary' }, 'Sidebar'),
+          breadcrumb: createElement('span', {}, 'Breadcrumb'),
+          topbarRight: createElement('span', {}, 'TopbarRight'),
+        },
+        createElement('p', {}, 'Content'),
+      ),
+    );
+    expect(screen.getByText('Sidebar')).toBeInTheDocument();
+    expect(screen.getByText('Breadcrumb')).toBeInTheDocument();
+    expect(screen.getByText('TopbarRight')).toBeInTheDocument();
+    expect(screen.getByText('Content')).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 
-  it('flips the frame when the OS theme changes, with no reload', () => {
-    const media = installControllableMatchMedia(false);
-    render(createElement(AppShell, {}));
-
-    expect(document.documentElement.dataset.theme).toBe('light');
-    const lightBg = document.body.style.backgroundColor;
-
-    media.flip();
-
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(document.body.style.backgroundColor).not.toBe(lightBg);
+  it('does not render panel content when panelOpen is false', () => {
+    render(createElement(AppShell, { panel: createElement('div', {}, 'Panel content'), panelOpen: false }));
+    expect(screen.queryByText('Panel content')).toBeNull();
   });
 
-  it('removes its media-query listener on unmount', () => {
-    const media = installControllableMatchMedia(false);
-    const { unmount } = render(createElement(AppShell, {}));
-    expect(document.documentElement.dataset.theme).toBe('light');
+  it('renders the panel inline and reserves layout space when panelBehavior is "shift"', () => {
+    render(
+      createElement(AppShell, {
+        panel: createElement('div', {}, 'Panel content'),
+        panelOpen: true,
+        panelBehavior: 'shift',
+      }),
+    );
+    expect(screen.getByText('Panel content')).toBeInTheDocument();
+  });
 
-    unmount();
-    // A flip after unmount only leaves `theme` unchanged if the effect's cleanup actually
-    // removed the listener; a missing `return () => mql.removeEventListener(...)` leaks the
-    // listener and this still fires, flipping `theme` to 'dark' even with no mounted AppShell.
-    media.flip();
-
-    expect(document.documentElement.dataset.theme).toBe('light');
+  it('renders the panel as a non-modal overlay when panelBehavior is "overlay"', () => {
+    render(
+      createElement(AppShell, {
+        panel: createElement('div', {}, 'Panel content'),
+        panelOpen: true,
+        panelBehavior: 'overlay',
+      }),
+    );
+    expect(screen.getByText('Panel content')).toBeInTheDocument();
+    // Non-modal (row 5): the region behind the panel stays interactive — no Radix scroll-lock
+    // or focus-trap wrapper renders around the rest of the page.
+    expect(document.body).not.toHaveAttribute('data-scroll-locked');
   });
 });

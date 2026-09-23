@@ -20,13 +20,13 @@ const PORT = 3201;
 const BASE = `http://127.0.0.1:${PORT}`;
 
 test('Restarting the console does not sign the operator out', async ({ page }) => {
-  let handle = await startConsole(defaultConsoleEnv(PORT), PORT);
+  let handle = await startConsole(defaultConsoleEnv(PORT), PORT, '/signin');
   try {
     await signInAs(page, { consoleBaseUrl: BASE, email: MAI.email });
     await expect(page.getByText('LEDGER')).toBeVisible();
 
     await stopConsole(handle);
-    handle = await startConsole(defaultConsoleEnv(PORT), PORT);
+    handle = await startConsole(defaultConsoleEnv(PORT), PORT, '/');
 
     await page.goto(`${BASE}/`);
 
