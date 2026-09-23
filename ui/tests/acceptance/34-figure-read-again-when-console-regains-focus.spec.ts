@@ -51,7 +51,14 @@ test('A figure is read again when the console comes back into focus', async ({ p
     },
   ]);
 
-  // Brings the console back into focus.
-  await page.bringToFront();
+  // Brings the console back into focus. `page.bringToFront()` cannot drive this: opening
+  // `otherTab` above gives it its own visibility state, so the console `page` stays
+  // `visible` throughout and never fires `visibilitychange` — true here and in headless CI
+  // alike (same headless Chromium in `.github/workflows/build.yml`), not a sandbox quirk.
+  // TanStack Query's default focus manager reacts to a real `visibilitychange` event on
+  // `window` (`@tanstack/query-core`'s `focusManager`), so dispatch one in the page itself —
+  // the same event a real tab-focus would fire — and let the provider's own listener decide
+  // to refetch, rather than calling `invalidateQueries`/`focusManager` from the test.
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
   await expect(page.getByTestId('detail-panel')).toContainText('12,900.00');
 });
