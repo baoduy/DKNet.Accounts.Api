@@ -18,6 +18,7 @@ env:
   Project_Path: 'ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj'
   Client_Project_Path: 'ApiEndpoints/DKNet.Accounts.Client/DKNet.Accounts.Client.csproj'
   Image_Repository: 'baoduy/dknet.accounts-api'
+  Console_Image_Repository: 'baoduy/dknet.accounts-console'
   Dotnet_Version: 10.x
 
 jobs:
@@ -71,6 +72,16 @@ jobs:
             -p:ContainerRepository=${{ env.Image_Repository }} \
             -p:ContainerImageTags='"${{ env.NEXT_VERSION }};latest"'
 
+      - name: Build & push console image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ui/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.Console_Image_Repository }}:${{ env.NEXT_VERSION }}
+            ghcr.io/${{ env.Console_Image_Repository }}:latest
+
       - name: Pack NuGet package
         run: |
           dotnet pack ${{ env.Client_Project_Path }} \
@@ -100,4 +111,5 @@ jobs:
       - name: Summary
         run: |
           echo "Pushed ghcr.io/${{ env.Image_Repository }}:${{ env.NEXT_VERSION }} and :latest" >> $GITHUB_STEP_SUMMARY
+          echo "Pushed ghcr.io/${{ env.Console_Image_Repository }}:${{ env.NEXT_VERSION }} and :latest" >> $GITHUB_STEP_SUMMARY
           echo "Pushed DKNet.Accounts.Client ${{ env.NEXT_VERSION }} to GitHub Packages" >> $GITHUB_STEP_SUMMARY

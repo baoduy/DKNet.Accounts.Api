@@ -13,27 +13,28 @@
     "test:mutation": "stryker run"
   },
   "dependencies": {
+    "ioredis": "5.4.2",
     "next": "15.5.4",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
     "openid-client": "6.5.0",
-    "ioredis": "5.4.2"
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
   },
   "devDependencies": {
-    "typescript": "5.7.3",
+    "@playwright/test": "1.61.1",
+    "@stryker-mutator/core": "8.7.1",
+    "@stryker-mutator/vitest-runner": "8.7.1",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.2.0",
     "@types/node": "22.10.10",
     "@types/react": "19.0.8",
     "@types/react-dom": "19.0.3",
-    "@playwright/test": "1.61.1",
-    "vitest": "3.0.5",
     "@vitejs/plugin-react": "4.3.4",
-    "@testing-library/react": "16.2.0",
-    "@testing-library/jest-dom": "6.6.3",
-    "jsdom": "26.0.0",
+    "@vitest/coverage-v8": "3.0.5",
     "jose": "5.9.6",
+    "jsdom": "26.0.0",
     "tsx": "4.19.2",
-    "@stryker-mutator/core": "8.7.1",
-    "@stryker-mutator/vitest-runner": "8.7.1",
+    "typescript": "5.7.3",
+    "vitest": "3.0.5",
     "yaml": "2.7.0"
   }
 }

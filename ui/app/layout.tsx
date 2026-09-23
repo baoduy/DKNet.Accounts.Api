@@ -13,5 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }): JSX.Element {
-  throw new Error('Not implemented');
+  return (
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body>{children}</body>
+    </html>
+  );
 }

@@ -1,3 +1,4 @@
+import Redis from 'ioredis';
 import type { ConsoleConfig } from './config';
 
 /**
@@ -17,10 +18,13 @@ let client: RedisLike | undefined;
 
 /** Lazily creates (or returns) the shared Redis client for `config.redisUrl`. */
 export function getRedisClient(config: Pick<ConsoleConfig, 'redisUrl'>): RedisLike {
-  throw new Error('Not implemented');
+  if (!client) {
+    client = new Redis(config.redisUrl, { lazyConnect: false, maxRetriesPerRequest: 2 }) as unknown as RedisLike;
+  }
+  return client;
 }
 
 /** Builds a key under the console's own prefix — the only shape the console ever writes. */
 export function prefixedKey(config: Pick<ConsoleConfig, 'redisKeyPrefix'>, ...parts: string[]): string {
-  throw new Error('Not implemented');
+  return `${config.redisKeyPrefix}${parts.join(':')}`;
 }

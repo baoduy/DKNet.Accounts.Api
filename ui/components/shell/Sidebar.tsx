@@ -1,4 +1,8 @@
+'use client';
+
+import { useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
+import { Icon } from '@/components/core';
 
 export interface NavEntry {
   id: string;
@@ -38,6 +42,68 @@ export interface SidebarProps {
   style?: CSSProperties;
 }
 
-export function Sidebar(props: SidebarProps): JSX.Element {
-  throw new Error('Not implemented');
+export function Sidebar({ sections = CONSOLE_NAV, active, onNavigate, style }: SidebarProps): JSX.Element {
+  return (
+    <nav
+      style={{
+        width: 'var(--sidebar-width)',
+        flex: 'none',
+        background: 'var(--sidebar)',
+        borderRight: '1px solid var(--sidebar-border)',
+        padding: 'var(--space-3) var(--space-2)',
+        display: 'flex',
+        flexDirection: 'column',
+        ...style,
+      }}
+    >
+      <div style={{ fontSize: 'var(--text-panel-title-size)', fontWeight: 'var(--weight-extrabold)', letterSpacing: 'var(--tracking-title)', padding: '4px 8px 10px' }}>
+        Accounts
+      </div>
+      {sections.map((section) => (
+        <div key={section.title} style={section.pinToBottom ? { marginTop: 'auto' } : undefined}>
+          <div
+            style={{
+              fontSize: 'var(--text-label-size)',
+              fontWeight: 'var(--weight-semibold)',
+              letterSpacing: 'var(--tracking-section-label)',
+              color: 'var(--muted-foreground)',
+              padding: '14px 8px 4px',
+            }}
+          >
+            {section.title}
+          </div>
+          {section.items.map((item) => (
+            <NavItem key={item.id} item={item} active={active === item.id} onNavigate={onNavigate} />
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function NavItem({ item, active, onNavigate }: { item: NavEntry; active: boolean; onNavigate?: (item: NavEntry) => void }): JSX.Element {
+  const [hover, setHover] = useState(false);
+  return (
+    <a
+      href={item.href ?? '#'}
+      onClick={onNavigate ? (e) => { e.preventDefault(); onNavigate(item); } : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        padding: 'var(--space-2)',
+        borderRadius: 'var(--radius-md)',
+        textDecoration: 'none',
+        fontSize: 'var(--text-table-size)',
+        color: 'var(--foreground)',
+        fontWeight: active ? 'var(--weight-semibold)' : 'var(--weight-regular)',
+        background: active ? 'var(--surface-selected)' : hover ? 'var(--muted)' : 'transparent',
+      }}
+    >
+      <Icon name={item.icon} size={16} />
+      {item.label}
+    </a>
+  );
 }

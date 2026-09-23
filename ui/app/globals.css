@@ -16,3 +16,11 @@
   --destructive: var(--destructive-solid);
   --accent: var(--surface-selected);
 }
+
+/* The identity menu's <summary> is its own disclosure toggle — hide the browser's default
+   marker glyph, which the chevron icon already stands in for. */
+summary::-webkit-details-marker,
+summary::marker {
+  display: none;
+  content: '';
+}

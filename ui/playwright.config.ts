@@ -7,7 +7,7 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [['list']],
+  reporter: [['list'], ['./scripts/reset-console-redis-reporter.ts']],
   use: {
     baseURL: DEFAULT_CONSOLE_BASE,
     trace: 'retain-on-failure',

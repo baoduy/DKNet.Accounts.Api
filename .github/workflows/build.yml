@@ -54,3 +54,40 @@ jobs:
       - name: Test
         if: steps.sln.outputs.found == 'true'
         run: dotnet test ${{ env.Project_Path }} --no-build --configuration Release --verbosity minimal
+
+  console-build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ui/package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: ui
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        working-directory: ui
+        run: pnpm run test:unit
+
+      - name: Install Playwright browsers
+        working-directory: ui
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Acceptance tests
+        working-directory: ui
+        run: pnpm run test:acceptance

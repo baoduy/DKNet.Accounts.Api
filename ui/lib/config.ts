@@ -25,10 +25,35 @@ export type ConsoleConfigMode = 'configured' | 'notConfigured';
  * R9: blank tenant/client must not throw — the console still starts in `notConfigured` mode.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConsoleConfig {
-  throw new Error('Not implemented');
+  const required = (name: string): string => {
+    const value = env[name];
+    if (!value) {
+      throw new Error(`Missing required environment variable: ${name}`);
+    }
+    return value;
+  };
+
+  return {
+    entraTenantId: env.CONSOLE_ENTRA_TENANT_ID ?? '',
+    entraClientId: env.CONSOLE_ENTRA_CLIENT_ID ?? '',
+    entraClientSecret: env.CONSOLE_ENTRA_CLIENT_SECRET ?? '',
+    entraScopes: (env.CONSOLE_ENTRA_SCOPES ?? '').split(' ').filter(Boolean),
+    apiBaseUrl: env.CONSOLE_API_BASE_URL ?? '',
+    baseUrl: required('CONSOLE_BASE_URL'),
+    redisUrl: required('CONSOLE_REDIS_URL'),
+    redisKeyPrefix: env.CONSOLE_REDIS_KEY_PREFIX ?? 'console:',
+    sessionSecret: required('CONSOLE_SESSION_SECRET'),
+    tokenEncryptionKey: required('CONSOLE_TOKEN_ENCRYPTION_KEY'),
+    port: Number(env.CONSOLE_PORT ?? env.PORT ?? 3000),
+  };
 }
 
 /** Whether the console has enough directory values to attempt sign-in. */
 export function getConfigMode(config: Pick<ConsoleConfig, 'entraTenantId' | 'entraClientId'>): ConsoleConfigMode {
-  throw new Error('Not implemented');
+  return config.entraTenantId && config.entraClientId ? 'configured' : 'notConfigured';
+}
+
+/** Real Microsoft Entra ID by default; overridden in tests to point at the fake issuer. */
+export function entraIssuerBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CONSOLE_ENTRA_ISSUER_BASE_URL ?? 'https://login.microsoftonline.com';
 }

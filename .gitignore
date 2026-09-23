@@ -86,9 +86,12 @@ Thumbs.db
 # ui/ (Next.js console)
 ui/node_modules/
 ui/.next/
+ui/.next-*/
 ui/playwright-report/
 ui/test-results/
+ui/coverage/
 ui/reports/
 ui/StrykerOutput/
+ui/.stryker-tmp/
 ui/next-env.d.ts
 ui/*.tsbuildinfo
