@@ -3,9 +3,6 @@
  * form field should show and everything else, which goes to `RefusalAlert`
  * (`components/feedback/RefusalAlert.tsx` already does the reverse filter — this is the
  * producer side a write hook composes with it).
- *
- * Mode: acceptance-tests (DRK-1684). Not implemented yet — Build turns
- * `30-refusal-naming-a-field-is-shown-on-that-field.spec.ts` green by replacing this stub.
  */
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
 
@@ -16,6 +13,15 @@ export interface RoutedRefusal {
   alertErrors: LedgerError[];
 }
 
-export function routeRefusal(_errors: LedgerError[]): RoutedRefusal {
-  throw new Error('Not implemented: DRK-1684 §3 row 10 — refusal routing');
+export function routeRefusal(errors: LedgerError[]): RoutedRefusal {
+  const fieldErrors: Record<string, LedgerError> = {};
+  const alertErrors: LedgerError[] = [];
+  for (const error of errors) {
+    if (error.field) {
+      fieldErrors[error.field] = error;
+    } else {
+      alertErrors.push(error);
+    }
+  }
+  return { fieldErrors, alertErrors };
 }

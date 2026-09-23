@@ -28,4 +28,9 @@ export async function signInAs(
       .evaluate((el, value) => ((el as HTMLInputElement).value = String(value)), options.expiresInOverride);
   }
   await page.getByRole('button', { name: 'Sign in' }).click();
+  // The click submits the fake issuer's (cross-origin) form, which redirects back through
+  // `/signin/callback` — where the session cookie is set — to `returnTo`. Waiting for the
+  // browser to land back on the console's own origin guarantees that cookie is committed
+  // before a caller's next action (e.g. a same-context `page.request` call).
+  await page.waitForURL((url) => url.origin === new URL(options.consoleBaseUrl).origin);
 }

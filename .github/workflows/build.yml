@@ -61,6 +61,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.Dotnet_Version }}
+
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: ui/package.json

@@ -19,7 +19,7 @@
  * a `style` attribute — just never a background/color/border/box-shadow/padding value.
  */
 import { expect, test } from '@playwright/test';
-import { KNOWN_SCOPES } from '../../lib/scopes';
+import { KNOWN_SCOPES, SCOPE_CONSEQUENCES } from '../../lib/scopes';
 import { signInAs } from '../support/sign-in';
 
 const GRANTED_SCOPES = ['accounts.read', 'postings.read'];
@@ -49,7 +49,9 @@ test('The identity menu still names the directory and the permissions', async ({
   for (const scope of MISSING_SCOPES) {
     await expect(menu.getByText(scope)).toBeVisible();
   }
-  await expect(menu.getByText(/without this permission/i)).toBeVisible();
+  for (const scope of MISSING_SCOPES) {
+    await expect(menu.getByText(new RegExp(`${SCOPE_CONSEQUENCES[scope]}.*without this permission`, 'i'))).toBeVisible();
+  }
 
   // Drawn on its new base controls: no hand-rolled inline `style` restating a token value
   // (Radix's own positioning custom properties on this element are not a restated token).

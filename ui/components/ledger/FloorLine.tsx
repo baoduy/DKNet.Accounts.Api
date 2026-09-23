@@ -10,24 +10,24 @@ export interface FloorPolicy {
 }
 
 /**
- * The computed floor, mirroring `AccountFloorPolicy`:
+ * The computed floor, mirroring `AccountFloorPolicy.Floor` (`AccountFloorPolicy.cs:32-34`):
  *
- * | permittedToGoNegative | overdraftLimit | minimumBalance | floor |
- * |---|---|---|---|
- * | false | — | null | 0.00 |
- * | false | — | set  | the minimum balance |
- * | true  | set | —   | −overdraftLimit |
- * | true  | **null** | — | invalid — refused with OVERDRAFT_LIMIT_REQUIRED |
+ * | permittedToGoNegative | overdraftLimit | floor |
+ * |---|---|---|
+ * | false | — | `Math.max(0, minimumBalance ?? 0)` |
+ * | true  | set | `Math.max(-overdraftLimit, minimumBalance ?? MinValue)` |
+ * | true  | **null** | invalid — refused with OVERDRAFT_LIMIT_REQUIRED |
  */
 export function computeFloor(
   policy: Pick<FloorPolicy, 'permittedToGoNegative' | 'overdraftLimit' | 'minimumBalance'>,
 ): number | null {
   if (policy.permittedToGoNegative) {
     if (policy.overdraftLimit === null || policy.overdraftLimit === undefined) return null;
-    return -Number(policy.overdraftLimit);
+    const minimum = policy.minimumBalance === null || policy.minimumBalance === undefined ? Number.MIN_SAFE_INTEGER : Number(policy.minimumBalance);
+    return Math.max(-Number(policy.overdraftLimit), minimum);
   }
-  if (policy.minimumBalance === null || policy.minimumBalance === undefined) return 0;
-  return Number(policy.minimumBalance);
+  const minimum = policy.minimumBalance === null || policy.minimumBalance === undefined ? 0 : Number(policy.minimumBalance);
+  return Math.max(0, minimum);
 }
 
 export interface FloorLineProps {
@@ -36,15 +36,14 @@ export interface FloorLineProps {
   style?: CSSProperties;
   /**
    * DRK-1684 §3 row 11c — the service's own `AccountBalanceDto.Floor`, exact text, no local
-   * recomputation. Not yet honoured by `FloorLine` below (Mode: acceptance-tests) — Build
-   * makes this the render source when set, falling back to `computeFloor` only when a caller
-   * has no balance response.
+   * recomputation. Takes precedence over `computeFloor`, which is the fallback for callers
+   * with no balance response.
    */
   floor?: string;
 }
 
-export function FloorLine({ account, decimalPlaces = 2, style }: FloorLineProps): JSX.Element {
-  const floor = computeFloor(account);
+export function FloorLine({ account, decimalPlaces = 2, style, floor: floorProp }: FloorLineProps): JSX.Element {
+  const floor = floorProp !== undefined ? Number(floorProp) : computeFloor(account);
 
   if (floor === null) {
     return <p style={style}>Floor OVERDRAFT_LIMIT_REQUIRED — permitted to go negative with no overdraft limit set.</p>;

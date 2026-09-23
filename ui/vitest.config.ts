@@ -12,12 +12,12 @@ export default defineConfig({
     globals: true,
     // `tests/` is the frozen acceptance-test suite (DRK-1669 approval round 2) — unit tests
     // for production modules live beside their source instead, under `lib/`.
-    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx', 'lib/**/*.test.ts', 'components/**/*.test.tsx'],
+    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx', 'lib/**/*.test.ts', 'lib/**/*.test.tsx', 'components/**/*.test.tsx'],
     css: true,
     setupFiles: ['tests/unit/setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['lib/**/*.ts', 'components/**/*.tsx'],
+      include: ['lib/**/*.ts', 'lib/**/*.tsx', 'components/**/*.tsx'],
     },
   },
 });

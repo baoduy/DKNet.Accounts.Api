@@ -1,21 +1,31 @@
 /**
  * DRK-1684 §3 row 7 — the TanStack Query provider every screen mounts under. Money-bearing
- * queries get `staleTime: 0` and refetch on mount and on window focus (R4); the currency
- * list is cheap to hold for the session (`staleTime: Infinity`).
- *
- * Mode: acceptance-tests (DRK-1684). Not implemented yet — Build turns
- * `33-a-figure-is-read-again-when-the-screen-showing-it-opens.spec.ts` and
- * `34-a-figure-is-read-again-when-the-console-comes-back-into-focus.spec.ts` green by
- * replacing this stub.
+ * queries get `staleTime: 0` and refetch on mount and on window focus (R4); a query that
+ * needs the currency list's cheaper lifetime (`staleTime: Infinity`) overrides it per-call.
  */
 'use client';
 
-import type { JSX, ReactNode } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 export interface QueryProviderProps {
   children: ReactNode;
 }
 
-export function QueryProvider(_props: QueryProviderProps): JSX.Element {
-  throw new Error('Not implemented: DRK-1684 §3 row 7 — TanStack Query provider');
+function createQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        retry: false,
+      },
+    },
+  });
+}
+
+export function QueryProvider({ children }: QueryProviderProps): JSX.Element {
+  const [queryClient] = useState(createQueryClient);
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

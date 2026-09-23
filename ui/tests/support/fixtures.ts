@@ -60,8 +60,8 @@ export const NAM: FixtureUser = {
   scopes: ['accounts.read'],
 };
 
-/** The console-wide known scope set (DRK-1669 §9 Q2 default). */
-export const KNOWN_SCOPES = ['accounts.read', 'postings.read', 'postings.reverse'];
+/** The console-wide known scope set (DRK-1669 §9 Q2 default) — all 5 the service defines (DRK-1684 §3 row 11/12). */
+export const KNOWN_SCOPES = ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'];
 
 /** Console env shared by every scenario that does not need its own dedicated process. */
 export function defaultConsoleEnv(port: number = DEFAULT_CONSOLE_PORT): NodeJS.ProcessEnv {

@@ -3,13 +3,12 @@
  * (`ScopeGate`) and the idempotency key `useIdempotencyKey` minted (§3 "Writes and
  * refusals"); on success it invalidates the affected query keys (row 8) and regenerates the
  * key — never before a success.
- *
- * Mode: acceptance-tests (DRK-1684). Not implemented yet — Build turns
- * `31-a-new-key-is-used-only-after-a-posting-is-recorded.spec.ts` and
- * `32-a-balance-is-never-shown-from-a-copy-older-than-the-last-write.spec.ts` green by
- * replacing this stub.
  */
+'use client';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
+import { accountBalanceKey, postingsListKey } from './keys';
 
 export interface RecordPostingInput {
   accountId: string;
@@ -29,5 +28,37 @@ export interface RecordPostingResult {
 }
 
 export function useRecordPosting(): { mutate: (input: RecordPostingInput) => Promise<RecordPostingResult> } {
-  throw new Error('Not implemented: DRK-1684 §3 row 9 — record-posting write hook');
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: RecordPostingInput): Promise<RecordPostingResult & { accountId: string }> => {
+      const response = await fetch('/api/ledger/postings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': input.idempotencyKey },
+        body: JSON.stringify({
+          accountId: input.accountId,
+          direction: input.direction,
+          amount: input.amount,
+          currency: input.currency,
+          category: input.category,
+          description: input.description,
+          effectiveDate: input.effectiveDate,
+        }),
+      });
+
+      if (response.ok) {
+        return { ok: true, accountId: input.accountId };
+      }
+
+      const body = (await response.json()) as { errors?: LedgerError[]; traceId?: string };
+      return { ok: false, errors: body.errors, traceId: body.traceId, accountId: input.accountId };
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return;
+      queryClient.invalidateQueries({ queryKey: accountBalanceKey(result.accountId) });
+      queryClient.invalidateQueries({ queryKey: postingsListKey({}) });
+    },
+  });
+
+  return { mutate: (input) => mutation.mutateAsync(input) };
 }
