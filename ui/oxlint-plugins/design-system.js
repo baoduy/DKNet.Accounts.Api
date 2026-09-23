@@ -25,6 +25,9 @@ const LITERAL_PATTERNS = [
  * require to stay unchanged. Design's own richer catalogue (Button, Card, Money, ...) belongs
  * to ledger surfaces not yet rebuilt on shadcn; enforcing it here would false-positive on
  * shadcn's own composition props (e.g. `asChild`) that those elements don't know about yet.
+ *
+ * DRK-1683 §3 row 19 extends this with the 16 ledger-kit components this slice ships,
+ * transcribed from `Design/_adherence.oxlintrc.json`'s `no-restricted-syntax` selectors.
  * @type {Record<string, { props: string[]; literals?: Record<string, string> }>}
  */
 const COMPONENT_SHAPES = {
@@ -33,6 +36,39 @@ const COMPONENT_SHAPES = {
     props: ['sidebar', 'breadcrumb', 'topbarRight', 'panel', 'panelOpen', 'panelBehavior', 'children', 'style'],
     literals: { panelBehavior: '^(?:overlay|shift)$' },
   },
+  Money: {
+    props: ['amount', 'currency', 'decimalPlaces', 'signed', 'showCurrency', 'struck', 'tone', 'align', 'size', 'style'],
+    literals: { tone: '^(?:credit|debit)$', align: '^(?:left|right)$', size: '^(?:row|tile)$' },
+  },
+  StatusBadge: {
+    props: ['status', 'tone', 'style'],
+    literals: { tone: '^(?:credit|debit|warning|info|neutral)$' },
+  },
+  LedgerColumn: {
+    props: ['key', 'header', 'sortable', 'queryAs', 'align', 'render'],
+    literals: { align: '^(?:left|right)$' },
+  },
+  DetailPanel: {
+    props: ['open', 'title', 'children', 'onClose', 'moreHref', 'moreLabel', 'actions', 'footnote', 'style'],
+  },
+  ScopeGate: { props: ['scope', 'granted', 'reason', 'children', 'style'] },
+  IdempotencyKeyField: { props: ['value', 'onRegenerate', 'note', 'style'] },
+  MovementLeg: {
+    props: ['direction', 'amount', 'currency', 'decimalPlaces', 'accountNumber'],
+    literals: { direction: '^(?:Credit|Debit)$' },
+  },
+  CurrencyBalance: { props: ['currency', 'amount', 'decimalPlaces'] },
+  FloorPolicy: { props: ['permittedToGoNegative', 'overdraftLimit', 'minimumBalance', 'currency', 'decimalPlaces'] },
+  StatementRowShape: {
+    props: ['id', 'effectiveDate', 'recordedAt', 'postingNumber', 'description', 'category', 'signedAmount', 'balanceAfter', 'streamPosition', 'status'],
+    literals: { status: '^(?:Posted|Reversed)$' },
+  },
+  MetadataEntry: { props: ['key', 'value'] },
+  DatePreset: { props: ['value', 'label'] },
+  SelectOption: { props: ['value', 'label'] },
+  Currency: { props: ['code', 'showFlag', 'style'] },
+  AccountBalanceShape: { props: ['balance', 'availableBalance', 'heldAmount', 'currency', 'decimalPlaces'] },
+  LedgerError: { props: ['code', 'message', 'field'] },
 };
 
 const ALWAYS_ALLOWED_PROPS = new Set(['key', 'ref', 'className', 'children']);

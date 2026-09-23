@@ -1,4 +1,6 @@
 import type { CSSProperties, JSX } from 'react';
+import { Id } from '@/components/ui/id';
+import { StatusBadge } from '@/components/ledger/StatusBadge';
 
 export interface IdProps {
   value: string;
@@ -7,8 +9,8 @@ export interface IdProps {
   style?: CSSProperties;
 }
 
-export function AccountNumber(_props: IdProps): JSX.Element {
-  throw new Error('Not implemented: AccountNumber');
+export function AccountNumber({ value, href, onNavigate, style }: IdProps): JSX.Element {
+  return <Id value={value} href={href} onNavigate={onNavigate} style={style} />;
 }
 
 export interface PostingNumberProps extends IdProps {
@@ -16,6 +18,11 @@ export interface PostingNumberProps extends IdProps {
   reversed?: boolean;
 }
 
-export function PostingNumber(_props: PostingNumberProps): JSX.Element {
-  throw new Error('Not implemented: PostingNumber');
+export function PostingNumber({ value, href, onNavigate, style, reversed = false }: PostingNumberProps): JSX.Element {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Id value={value} href={href} onNavigate={onNavigate} style={style} />
+      {reversed ? <StatusBadge status="Reversed" /> : null}
+    </span>
+  );
 }

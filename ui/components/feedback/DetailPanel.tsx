@@ -1,4 +1,7 @@
 import type { CSSProperties, JSX, ReactNode } from 'react';
+import { cn } from '@/components/ui/utils';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 /**
  * The right-hand panel a row opens. Content only — the sliding, non-blocking chrome is
@@ -20,8 +23,38 @@ export interface DetailPanelProps {
   style?: CSSProperties;
 }
 
-export function DetailPanel(_props: DetailPanelProps): JSX.Element {
-  throw new Error('Not implemented: DetailPanel');
+export function DetailPanel({
+  title,
+  children,
+  onClose,
+  moreHref,
+  moreLabel = 'View full record',
+  actions,
+  footnote,
+  style,
+}: DetailPanelProps): JSX.Element {
+  return (
+    <div className="flex h-full flex-col gap-4" style={style}>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-[length:var(--text-panel-title-size)] font-semibold">{title}</h2>
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+          Close
+        </Button>
+      </div>
+
+      {moreHref ? (
+        <a href={moreHref} className="text-link hover:underline">
+          {moreLabel}
+        </a>
+      ) : null}
+
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto">{children}</div>
+
+      {footnote ? <p className="text-[length:var(--text-caption-size)] text-muted-foreground">{footnote}</p> : null}
+
+      {actions ? <div className="flex items-center justify-end gap-2">{actions}</div> : null}
+    </div>
+  );
 }
 
 export interface DetailListItem {
@@ -34,8 +67,17 @@ export interface DetailListProps {
   style?: CSSProperties;
 }
 
-export function DetailList(_props: DetailListProps): JSX.Element {
-  throw new Error('Not implemented: DetailList');
+export function DetailList({ items, style }: DetailListProps): JSX.Element {
+  return (
+    <dl className="flex flex-col gap-2" style={style}>
+      {items.map((item, index) => (
+        <div key={index} className="flex items-center justify-between gap-4">
+          <dt className="text-muted-foreground">{item.label}</dt>
+          <dd>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export interface DetailSectionProps {
@@ -45,6 +87,11 @@ export interface DetailSectionProps {
   style?: CSSProperties;
 }
 
-export function DetailSection(_props: DetailSectionProps): JSX.Element {
-  throw new Error('Not implemented: DetailSection');
+export function DetailSection({ children, divider = true, style }: DetailSectionProps): JSX.Element {
+  return (
+    <div style={style}>
+      {divider ? <Separator className="mb-3" /> : null}
+      <div className={cn('text-[length:var(--text-section-size)] font-semibold', divider && 'mt-3')}>{children}</div>
+    </div>
+  );
 }

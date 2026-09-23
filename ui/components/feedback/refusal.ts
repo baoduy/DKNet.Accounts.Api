@@ -10,6 +10,7 @@ export type AttemptFailure =
   | { kind: 'transport' }
   | { kind: 'refusal'; errors: LedgerError[] };
 
-export function classifyFailure(_failure: AttemptFailure): boolean {
-  throw new Error('Not implemented: classifyFailure');
+export function classifyFailure(failure: AttemptFailure): boolean {
+  if (failure.kind === 'timeout' || failure.kind === 'transport') return true;
+  return failure.errors.some((error) => error.code === 'LOCK_TIMEOUT');
 }

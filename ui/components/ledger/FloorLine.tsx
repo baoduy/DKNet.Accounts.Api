@@ -1,4 +1,5 @@
 import type { CSSProperties, JSX } from 'react';
+import { formatAmount } from '@/components/ledger/Money';
 
 export interface FloorPolicy {
   permittedToGoNegative: boolean;
@@ -19,9 +20,14 @@ export interface FloorPolicy {
  * | true  | **null** | — | invalid — refused with OVERDRAFT_LIMIT_REQUIRED |
  */
 export function computeFloor(
-  _policy: Pick<FloorPolicy, 'permittedToGoNegative' | 'overdraftLimit' | 'minimumBalance'>,
+  policy: Pick<FloorPolicy, 'permittedToGoNegative' | 'overdraftLimit' | 'minimumBalance'>,
 ): number | null {
-  throw new Error('Not implemented: computeFloor');
+  if (policy.permittedToGoNegative) {
+    if (policy.overdraftLimit === null || policy.overdraftLimit === undefined) return null;
+    return -Number(policy.overdraftLimit);
+  }
+  if (policy.minimumBalance === null || policy.minimumBalance === undefined) return 0;
+  return Number(policy.minimumBalance);
 }
 
 export interface FloorLineProps {
@@ -30,6 +36,21 @@ export interface FloorLineProps {
   style?: CSSProperties;
 }
 
-export function FloorLine(_props: FloorLineProps): JSX.Element {
-  throw new Error('Not implemented: FloorLine');
+export function FloorLine({ account, decimalPlaces = 2, style }: FloorLineProps): JSX.Element {
+  const floor = computeFloor(account);
+
+  if (floor === null) {
+    return <p style={style}>Floor OVERDRAFT_LIMIT_REQUIRED — permitted to go negative with no overdraft limit set.</p>;
+  }
+
+  const negative = floor < 0;
+  const formatted = formatAmount(String(floor), decimalPlaces);
+  const sign = negative ? '−' : '';
+  const detail = account.permittedToGoNegative
+    ? `permitted to go negative, overdraft limit ${formatAmount(account.overdraftLimit ?? 0, decimalPlaces)}`
+    : 'not permitted to go negative';
+
+  return (
+    <p style={style}>{`Floor ${sign}${formatted} ${account.currency} — ${detail}.`}</p>
+  );
 }
