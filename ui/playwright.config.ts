@@ -29,9 +29,13 @@ export default defineConfig({
       env: { FAKE_OIDC_PORT: String(FAKE_OIDC_PORT) },
     },
     {
-      command: `pnpm exec next dev -p ${DEFAULT_CONSOLE_PORT}`,
+      // A production build, not `next dev`: dev's on-demand compilation and unminified
+      // bundle push client hydration well past when a fresh navigation's first click can
+      // land, which no operator ever sees against a shipped image (DRK-1681 ruling,
+      // Option B). `timeout` covers the build step ahead of the server actually listening.
+      command: `pnpm exec next build && pnpm exec next start -p ${DEFAULT_CONSOLE_PORT}`,
       port: DEFAULT_CONSOLE_PORT,
-      timeout: 60_000,
+      timeout: 180_000,
       // Never adopt a stray leftover process from an earlier run — always start (and
       // own) a fresh one, so a mid-run crash surfaces as a clear webServer failure
       // instead of a silent ERR_CONNECTION_REFUSED partway through the suite.
