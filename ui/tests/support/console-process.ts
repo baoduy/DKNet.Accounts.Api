@@ -10,11 +10,35 @@ import { fileURLToPath } from 'node:url';
 
 const UI_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
 
+// `next dev` forks its own dist/server/lib/start-server.js worker (the process that actually
+// holds the port) rather than exec'ing into it — so the port-holding process is always a
+// grandchild of whatever spawns `next`. Spawning `pnpm exec next dev` added a THIRD layer
+// (pnpm itself) on top of that, of uncertain signal-forwarding behaviour. Spawning the `next`
+// binary directly removes that extra layer, and `detached: true` makes the spawned `next`
+// process the leader of its own process group — since `fork()` puts its child in the parent's
+// group by default, `process.kill(-pid, signal)` reaches next AND its start-server worker in
+// one signal, regardless of whether next's own SIGTERM handler gets a chance to run first.
+const NEXT_BIN = path.join(UI_ROOT, 'node_modules', '.bin', 'next');
+const STOP_GRACE_MS = 5_000;
+
 export interface ConsoleHandle {
   process: ChildProcess;
   stdout: string;
   stderr: string;
   port: number;
+}
+
+function isPortOccupied(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ port, host: '127.0.0.1' }, () => {
+      socket.end();
+      resolve(true);
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
 }
 
 function waitForPort(port: number, timeoutMs = 30_000): Promise<void> {
@@ -35,6 +59,58 @@ function waitForPort(port: number, timeoutMs = 30_000): Promise<void> {
       });
     };
     attempt();
+  });
+}
+
+/** Mirror of `waitForPort` — resolves once a connect to `port` is refused. */
+function waitForPortFree(port: number, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const attempt = (): void => {
+      const socket = connect({ port, host: '127.0.0.1' }, () => {
+        socket.end();
+        if (Date.now() > deadline) {
+          reject(new Error(`port ${port} is still in use after ${timeoutMs}ms`));
+        } else {
+          setTimeout(attempt, 300);
+        }
+      });
+      socket.on('error', () => {
+        socket.destroy();
+        resolve();
+      });
+    };
+    attempt();
+  });
+}
+
+/** Signals the whole process group the console's `next` process leads — see NEXT_BIN comment. */
+function killConsoleGroup(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid === undefined) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+}
+
+function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
+
+function spawnNextDev(env: NodeJS.ProcessEnv, port: number): ChildProcess {
+  return spawn(NEXT_BIN, ['dev', '-p', String(port)], {
+    cwd: UI_ROOT,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
 }
 
@@ -62,28 +138,34 @@ async function warmUpRoute(baseUrl: string, path: string, timeoutMs = 60_000): P
 }
 
 /**
- * Starts `next dev` on `env.PORT`, waits until it is listening, then warms `warmupPath` (the
- * first path the caller will `page.goto`) so the route is already compiled before the test's
- * own navigation — never a raw "is the port open" check.
+ * Starts `next dev` on `env.PORT` and waits until the console it spawned is listening, then
+ * warms `warmupPath` (the first path the caller will `page.goto`) so the route is already
+ * compiled before the test's own navigation — never a raw "is the port open" check.
  */
 export async function startConsole(env: NodeJS.ProcessEnv, port: number, warmupPath = '/'): Promise<ConsoleHandle> {
-  const child = spawn('pnpm', ['exec', 'next', 'dev', '-p', String(port)], {
-    cwd: UI_ROOT,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    // Its own process group (`detached` on Linux sets pgid = pid) so `stopConsole` can signal
-    // the whole tree at once: `pnpm exec next dev` forks the `next` CLI, which forks the
-    // actual `next-server` worker that answers requests — a plain `child.kill()` only ever
-    // reached the `pnpm` wrapper, leaving `next-server` running (and pegging a CPU core)
-    // indefinitely after the test that started it had already moved on.
-    detached: true,
-  });
+  if (await isPortOccupied(port)) {
+    throw new Error(`cannot start console: port ${port} is already in use by another process`);
+  }
 
+  const child = spawnNextDev(env, port);
   const handle: ConsoleHandle = { process: child, stdout: '', stderr: '', port };
   child.stdout?.on('data', (chunk) => (handle.stdout += String(chunk)));
   child.stderr?.on('data', (chunk) => (handle.stderr += String(chunk)));
 
-  await waitForPort(port);
+  const exitedEarly = new Promise<never>((_resolve, reject) => {
+    child.once('exit', (code, signal) => {
+      reject(new Error(`console for port ${port} exited before it started listening (code ${code}, signal ${signal})`));
+    });
+  });
+  exitedEarly.catch(() => {}); // avoid an unhandled rejection if this fires after we've already returned
+
+  try {
+    await Promise.race([waitForPort(port), exitedEarly]);
+  } catch (error) {
+    killConsoleGroup(child, 'SIGKILL');
+    throw error;
+  }
+
   await warmUpRoute(`http://127.0.0.1:${port}`, warmupPath);
   return handle;
 }
@@ -93,11 +175,7 @@ export async function startConsole(env: NodeJS.ProcessEnv, port: number, warmupP
  * scenarios where the console must refuse to start at all (R8).
  */
 export function startConsoleExpectingExit(env: NodeJS.ProcessEnv, port: number, timeoutMs = 20_000): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  const child = spawn('pnpm', ['exec', 'next', 'dev', '-p', String(port)], {
-    cwd: UI_ROOT,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const child = spawnNextDev(env, port);
 
   let stdout = '';
   let stderr = '';
@@ -106,7 +184,7 @@ export function startConsoleExpectingExit(env: NodeJS.ProcessEnv, port: number, 
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      killConsoleGroup(child, 'SIGKILL');
       reject(new Error(`console did not exit within ${timeoutMs}ms — stdout:\n${stdout}\nstderr:\n${stderr}`));
     }, timeoutMs);
     child.on('exit', (code) => {
@@ -116,25 +194,12 @@ export function startConsoleExpectingExit(env: NodeJS.ProcessEnv, port: number, 
   });
 }
 
-/** Signals the whole process group `startConsole` put `handle.process` in charge of. */
-function killGroup(handle: ConsoleHandle, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-handle.process.pid!, signal);
-  } catch {
-    // Group already gone, or this platform has no process groups — fall back to the direct child.
-    handle.process.kill(signal);
-  }
-}
-
 export async function stopConsole(handle: ConsoleHandle): Promise<void> {
-  killGroup(handle, 'SIGTERM');
-  const exited = await new Promise<boolean>((resolve) => {
-    handle.process.once('exit', () => resolve(true));
-    setTimeout(() => resolve(false), 5_000);
-  });
-  // A graceful SIGTERM that the `next-server` worker did not act on within the grace period —
-  // force it, so no CPU-spinning orphan survives into the next test.
+  killConsoleGroup(handle.process, 'SIGTERM');
+  const exited = await waitForExit(handle.process, STOP_GRACE_MS);
   if (!exited) {
-    killGroup(handle, 'SIGKILL');
+    killConsoleGroup(handle.process, 'SIGKILL');
+    await waitForExit(handle.process, STOP_GRACE_MS);
   }
+  await waitForPortFree(handle.port);
 }
