@@ -14,9 +14,10 @@ import { formatAmount, Money } from './Money';
 
 describe('An amount is drawn at its own currency\'s scale', () => {
   it.each([
-    { currency: 'JPY', places: 0, amount: 44120000, shown: '44,120,000' },
-    { currency: 'SGD', places: 2, amount: 1204882.5, shown: '1,204,882.50' },
-    { currency: 'BHD', places: 3, amount: 318.004, shown: '318.004' },
+    { currency: 'JPY', places: 0, amount: '44120000', shown: '44,120,000' },
+    // Unpadded on purpose: proves formatAmount pads to the currency's scale, not just formats.
+    { currency: 'SGD', places: 2, amount: '1204882.5', shown: '1,204,882.50' },
+    { currency: 'BHD', places: 3, amount: '318.004', shown: '318.004' },
   ])('$currency at $places decimal places shows $shown', ({ places, amount, shown }) => {
     expect(formatAmount(amount, places)).toBe(shown);
   });
@@ -24,7 +25,7 @@ describe('An amount is drawn at its own currency\'s scale', () => {
 
 describe('A negative amount uses the minus character', () => {
   it('shows the minus character, never a hyphen, before the digits', () => {
-    render(createElement(Money, { amount: -892.45, currency: 'SGD', decimalPlaces: 2, signed: true }));
+    render(createElement(Money, { amount: '-892.45', currency: 'SGD', decimalPlaces: 2, signed: true }));
     // U+2212 MINUS SIGN, not U+002D HYPHEN-MINUS.
     expect(screen.getByText('−892.45')).toBeInTheDocument();
     expect(screen.queryByText('-892.45')).toBeNull();

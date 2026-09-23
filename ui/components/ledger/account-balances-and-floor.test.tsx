@@ -14,7 +14,7 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { BalanceTiles } from './BalanceTiles';
-import { computeFloor, FloorLine } from './FloorLine';
+import { FloorLine } from './FloorLine';
 
 const ACCOUNT = {
   balance: '12400.00',
@@ -33,14 +33,20 @@ const FLOOR_POLICY = {
 };
 
 describe("An account shows three values and its floor", () => {
-  it('shows balance, available and held as three separate values', () => {
+  it('shows balance, available and held as three separate, named tiles', () => {
     render(createElement(BalanceTiles, { account: ACCOUNT }));
-    expect(screen.getByText('12,400.00')).toBeInTheDocument();
+    // Three labelled tiles, not just two numbers — Balance and Available are equal
+    // today by design (BalanceTiles.prompt.md), so the value alone can't tell them apart.
+    expect(screen.getByText('Balance')).toBeInTheDocument();
+    expect(screen.getByText('Available')).toBeInTheDocument();
+    expect(screen.getByText('Held')).toBeInTheDocument();
+    expect(screen.getAllByText('12,400.00')).toHaveLength(2);
     expect(screen.getByText('0.00')).toBeInTheDocument();
   });
 
   it('states the floor as -5,000.00 SGD', () => {
-    expect(computeFloor(FLOOR_POLICY)).toBe(-5000);
+    // computeFloor's contract returns a number (FloorLine.d.ts) — the rendered,
+    // string-formatted assertion below is what actually proves the floor, per R1.
     render(createElement(FloorLine, { account: FLOOR_POLICY }));
     expect(screen.getByText(/−5,000\.00\s*SGD/)).toBeInTheDocument();
   });
