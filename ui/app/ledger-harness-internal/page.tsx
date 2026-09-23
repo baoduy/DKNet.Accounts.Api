@@ -119,13 +119,13 @@ function LedgerHarnessContent(): JSX.Element {
       category: fields.category,
       effectiveDate: fields.effectiveDate || undefined,
       idempotencyKey,
+      regenerateIdempotencyKey: regenerate,
     });
 
     if (result.ok) {
       setRecorded(true);
       setFormOpen(false);
       setFields(BLANK_FIELDS);
-      regenerate();
       return;
     }
 

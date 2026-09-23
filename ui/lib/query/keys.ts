@@ -17,3 +17,13 @@ export function postingsListKey(filters: Record<string, unknown>): readonly unkn
 export function currenciesKey(): readonly unknown[] {
   return ['ledger', 'currencies'] as const;
 }
+
+/**
+ * DRK-1684 row 7 / pr-reviewer finding 7 (DRK-1687): the currency list is reference data for
+ * the session — held at `staleTime: Infinity`, opting out of the global `refetchOnMount:
+ * 'always'` / `refetchOnWindowFocus: true` money-query defaults (`lib/query/client.tsx`).
+ * Spread into `useQuery`: `useQuery({ ...currenciesQueryOptions(), queryFn })`.
+ */
+export function currenciesQueryOptions(): { queryKey: readonly unknown[]; staleTime: number; refetchOnMount: false; refetchOnWindowFocus: false } {
+  return { queryKey: currenciesKey(), staleTime: Infinity, refetchOnMount: false, refetchOnWindowFocus: false };
+}

@@ -112,7 +112,7 @@ export function UserMenu({
         {missingScopes.length ? (
           <div className="mt-2 text-[length:var(--text-caption-size)] text-muted-foreground">
             {missingScopes.map((s) => (
-              <div key={s}>Mai cannot {SCOPE_CONSEQUENCES[s] ?? 'do this'} without this permission.</div>
+              <div key={s}>You cannot {SCOPE_CONSEQUENCES[s] ?? 'do this'} without this permission.</div>
             ))}
           </div>
         ) : null}

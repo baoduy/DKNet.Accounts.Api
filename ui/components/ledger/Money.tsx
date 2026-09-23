@@ -11,7 +11,8 @@ export function formatAmount(amount: number | string, decimalPlaces = 2): string
   return decimalPlaces > 0 ? `${groupedInt}.${paddedFrac}` : groupedInt;
 }
 
-function isNegativeAmount(amount: number | string): boolean {
+/** True for a negative amount, exact-text-safe: never routes the value through `Number`. */
+export function isNegativeAmount(amount: number | string): boolean {
   return typeof amount === 'number' ? amount < 0 : amount.trim().startsWith('-');
 }
 

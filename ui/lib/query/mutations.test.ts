@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { accountBalanceKey, postingsListKey } from './keys';
-import { useRecordPosting } from './mutations';
+import { useRecordPosting, useReversePosting } from './mutations';
 
 function wrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -14,12 +14,13 @@ afterEach(() => {
 });
 
 describe('useRecordPosting', () => {
-  it('posts to /api/ledger/postings with the idempotency key header and invalidates the account balance on success', async () => {
+  it('posts to /api/ledger/postings with the idempotency key header, invalidates the account balance and mints a new key on success', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const regenerateIdempotencyKey = vi.fn();
     const { result } = renderHook(() => useRecordPosting(), { wrapper: wrapper(queryClient) });
 
     const response = await result.current.mutate({
@@ -31,6 +32,7 @@ describe('useRecordPosting', () => {
       description: 'a note',
       effectiveDate: '2026-09-01',
       idempotencyKey: 'key-1',
+      regenerateIdempotencyKey,
     });
 
     expect(response.ok).toBe(true);
@@ -49,9 +51,12 @@ describe('useRecordPosting', () => {
     });
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountBalanceKey('ACME-000123') }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: postingsListKey({}) });
+    // pr-reviewer finding 3 (DRK-1687): the hook's own doc comment promises regeneration on
+    // success — pinned here so a future edit that drops it fails loudly, not silently.
+    expect(regenerateIdempotencyKey).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the service refusal unchanged and invalidates nothing on failure', async () => {
+  it('returns the service refusal unchanged, invalidates nothing and never mints a new key on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       json: async () => ({ errors: [{ message: 'The debit would take the account past its floor.', code: 'INSUFFICIENT_FUNDS' }], traceId: 't-1' }),
@@ -60,6 +65,7 @@ describe('useRecordPosting', () => {
 
     const queryClient = new QueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const regenerateIdempotencyKey = vi.fn();
     const { result } = renderHook(() => useRecordPosting(), { wrapper: wrapper(queryClient) });
 
     const response = await result.current.mutate({
@@ -69,6 +75,7 @@ describe('useRecordPosting', () => {
       currency: 'SGD',
       category: 'Transfer',
       idempotencyKey: 'key-2',
+      regenerateIdempotencyKey,
     });
 
     expect(response).toEqual(
@@ -79,5 +86,58 @@ describe('useRecordPosting', () => {
       }),
     );
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(regenerateIdempotencyKey).not.toHaveBeenCalled();
+  });
+});
+
+describe('useReversePosting', () => {
+  it('posts to /api/ledger/postings/:id/reverse with the idempotency key header, invalidates postings and mints a new key on success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const regenerateIdempotencyKey = vi.fn();
+    const { result } = renderHook(() => useReversePosting(), { wrapper: wrapper(queryClient) });
+
+    const response = await result.current.mutate({
+      postingId: 'PST0000000001',
+      reason: 'Recorded in error',
+      idempotencyKey: 'key-3',
+      regenerateIdempotencyKey,
+    });
+
+    expect(response.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('/api/ledger/postings/PST0000000001/reverse', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'key-3' },
+      body: JSON.stringify({ reason: 'Recorded in error' }),
+    });
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: postingsListKey({}) }));
+    expect(regenerateIdempotencyKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the service refusal unchanged and never mints a new key on failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ errors: [{ message: 'Already reversed.', code: 'POSTING_ALREADY_REVERSED' }], traceId: 't-2' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const regenerateIdempotencyKey = vi.fn();
+    const { result } = renderHook(() => useReversePosting(), { wrapper: wrapper(queryClient) });
+
+    const response = await result.current.mutate({
+      postingId: 'PST0000000001',
+      reason: 'Recorded in error',
+      idempotencyKey: 'key-4',
+      regenerateIdempotencyKey,
+    });
+
+    expect(response).toEqual(
+      expect.objectContaining({ ok: false, errors: [{ message: 'Already reversed.', code: 'POSTING_ALREADY_REVERSED' }], traceId: 't-2' }),
+    );
+    expect(regenerateIdempotencyKey).not.toHaveBeenCalled();
   });
 });

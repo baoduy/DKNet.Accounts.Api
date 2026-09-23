@@ -31,7 +31,15 @@ export function allowedLedgerRoutes(): LedgerRoute[] {
 function matchesTemplate(pathTemplate: string, routeSegments: string[]): boolean {
   const templateSegments = pathTemplate.split('/').filter(Boolean);
   if (templateSegments.length !== routeSegments.length) return false;
-  return templateSegments.every((segment, index) => segment.startsWith('{') || segment === routeSegments[index]);
+  return templateSegments.every((segment, index) => {
+    const routeSegment = routeSegments[index];
+    if (segment.startsWith('{')) {
+      // A `{param}` accepts any single path segment's value — never one carrying its own
+      // `/` or `\`, which would let it resolve outside the matched template once forwarded.
+      return !routeSegment.includes('/') && !routeSegment.includes('\\');
+    }
+    return segment === routeSegment;
+  });
 }
 
 /** Whether `method` + `routeSegments` (from `[...route]`) matches a route the contract declares. */

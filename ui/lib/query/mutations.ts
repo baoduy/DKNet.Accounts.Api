@@ -19,9 +19,25 @@ export interface RecordPostingInput {
   description?: string;
   effectiveDate?: string;
   idempotencyKey: string;
+  /** Called once the service actually recorded the posting — never before. The hook does
+   * not own the key (`useIdempotencyKey` does), so the caller hands in how to mint a new one. */
+  regenerateIdempotencyKey: () => void;
 }
 
 export interface RecordPostingResult {
+  ok: boolean;
+  errors?: LedgerError[];
+  traceId?: string;
+}
+
+export interface ReversePostingInput {
+  postingId: string;
+  reason: string;
+  idempotencyKey: string;
+  regenerateIdempotencyKey: () => void;
+}
+
+export interface ReversePostingResult {
   ok: boolean;
   errors?: LedgerError[];
   traceId?: string;
@@ -31,7 +47,7 @@ export function useRecordPosting(): { mutate: (input: RecordPostingInput) => Pro
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (input: RecordPostingInput): Promise<RecordPostingResult & { accountId: string }> => {
+    mutationFn: async (input: RecordPostingInput): Promise<RecordPostingResult & { accountId: string; regenerateIdempotencyKey: () => void }> => {
       const response = await fetch('/api/ledger/postings', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'Idempotency-Key': input.idempotencyKey },
@@ -47,16 +63,45 @@ export function useRecordPosting(): { mutate: (input: RecordPostingInput) => Pro
       });
 
       if (response.ok) {
-        return { ok: true, accountId: input.accountId };
+        return { ok: true, accountId: input.accountId, regenerateIdempotencyKey: input.regenerateIdempotencyKey };
       }
 
       const body = (await response.json()) as { errors?: LedgerError[]; traceId?: string };
-      return { ok: false, errors: body.errors, traceId: body.traceId, accountId: input.accountId };
+      return { ok: false, errors: body.errors, traceId: body.traceId, accountId: input.accountId, regenerateIdempotencyKey: input.regenerateIdempotencyKey };
     },
     onSuccess: (result) => {
       if (!result.ok) return;
       queryClient.invalidateQueries({ queryKey: accountBalanceKey(result.accountId) });
       queryClient.invalidateQueries({ queryKey: postingsListKey({}) });
+      result.regenerateIdempotencyKey();
+    },
+  });
+
+  return { mutate: (input) => mutation.mutateAsync(input) };
+}
+
+export function useReversePosting(): { mutate: (input: ReversePostingInput) => Promise<ReversePostingResult> } {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: ReversePostingInput): Promise<ReversePostingResult & { regenerateIdempotencyKey: () => void }> => {
+      const response = await fetch(`/api/ledger/postings/${input.postingId}/reverse`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': input.idempotencyKey },
+        body: JSON.stringify({ reason: input.reason }),
+      });
+
+      if (response.ok) {
+        return { ok: true, regenerateIdempotencyKey: input.regenerateIdempotencyKey };
+      }
+
+      const body = (await response.json()) as { errors?: LedgerError[]; traceId?: string };
+      return { ok: false, errors: body.errors, traceId: body.traceId, regenerateIdempotencyKey: input.regenerateIdempotencyKey };
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return;
+      queryClient.invalidateQueries({ queryKey: postingsListKey({}) });
+      result.regenerateIdempotencyKey();
     },
   });
 

@@ -23,7 +23,11 @@ function refusal(status: number, message: string): Response {
 async function passThrough(request: NextRequest, context: RouteParams): Promise<Response> {
   const { route } = await context.params;
 
-  if (!isLedgerRouteAllowed(request.method, route)) {
+  // Next has already percent-decoded each catch-all segment, so a segment carrying its own
+  // `/` or `\` (e.g. `..%2F..%2Fadmin`) is a traversal attempt, not a legitimate {param}
+  // value — refuse it before the allowlist ever sees it (R2: no outbound call).
+  const hasPathSeparator = route.some((segment) => segment.includes('/') || segment.includes('\\'));
+  if (hasPathSeparator || !isLedgerRouteAllowed(request.method, route)) {
     return refusal(404, `The console's contract does not declare ${request.method} /${route.join('/')}.`);
   }
 
@@ -40,7 +44,9 @@ async function passThrough(request: NextRequest, context: RouteParams): Promise<
     return refusal(401, 'Session has no valid access token.');
   }
 
-  const targetUrl = new URL(`${config.apiBaseUrl}/v1/${route.join('/')}`);
+  // Built from the segments the allowlist matched, each re-encoded — never the raw path —
+  // so nothing forwarded can resolve outside `/v1` on the ledger service.
+  const targetUrl = new URL(`${config.apiBaseUrl}/v1/${route.map(encodeURIComponent).join('/')}`);
   targetUrl.search = request.nextUrl.search;
 
   const outboundHeaders = new Headers();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountBalanceKey, accountsListKey, currenciesKey, postingsListKey } from './keys';
+import { accountBalanceKey, accountsListKey, currenciesKey, currenciesQueryOptions, postingsListKey } from './keys';
 
 describe('query keys', () => {
   it('keys an account balance by its account id, sharable across every caller', () => {
@@ -18,6 +18,15 @@ describe('query keys', () => {
 
   it('gives the currency list one fixed key', () => {
     expect(currenciesKey()).toEqual(['ledger', 'currencies']);
+  });
+
+  it('opts the currency list out of the global money-query defaults (pr-reviewer finding 7, DRK-1687)', () => {
+    expect(currenciesQueryOptions()).toEqual({
+      queryKey: currenciesKey(),
+      staleTime: Infinity,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    });
   });
 
   it('never collides across resources', () => {

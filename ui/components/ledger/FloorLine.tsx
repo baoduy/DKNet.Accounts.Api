@@ -1,5 +1,5 @@
 import type { CSSProperties, JSX } from 'react';
-import { formatAmount } from '@/components/ledger/Money';
+import { formatAmount, isNegativeAmount } from '@/components/ledger/Money';
 
 export interface FloorPolicy {
   permittedToGoNegative: boolean;
@@ -43,14 +43,16 @@ export interface FloorLineProps {
 }
 
 export function FloorLine({ account, decimalPlaces = 2, style, floor: floorProp }: FloorLineProps): JSX.Element {
-  const floor = floorProp !== undefined ? Number(floorProp) : computeFloor(account);
+  // The service's own text, kept exact end to end — never routed through `Number`, which
+  // loses digits past `Number.MAX_SAFE_INTEGER` (a real money figure).
+  const floor = floorProp ?? computeFloor(account);
 
   if (floor === null) {
     return <p style={style}>Floor OVERDRAFT_LIMIT_REQUIRED — permitted to go negative with no overdraft limit set.</p>;
   }
 
-  const negative = floor < 0;
-  const formatted = formatAmount(String(floor), decimalPlaces);
+  const negative = isNegativeAmount(floor);
+  const formatted = formatAmount(floor, decimalPlaces);
   const sign = negative ? '−' : '';
   const detail = account.permittedToGoNegative
     ? `permitted to go negative, overdraft limit ${formatAmount(account.overdraftLimit ?? 0, decimalPlaces)}`
