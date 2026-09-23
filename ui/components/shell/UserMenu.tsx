@@ -1,13 +1,6 @@
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import type { CSSProperties, JSX } from 'react';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/components/ui/utils';
 import { SCOPE_CONSEQUENCES } from '@/lib/scopes';
 
@@ -30,8 +23,16 @@ function initialsOf(name: string): string {
 }
 
 /**
- * Ported from Design/components/shell/UserMenu.jsx onto shadcn's `DropdownMenu`. `provider`
- * defaults to "Microsoft Entra ID" so the menu always names the provider in full (DRK-1669 §3).
+ * Ported from Design/components/shell/UserMenu.jsx, restyled onto shadcn/Tailwind classes.
+ * `provider` defaults to "Microsoft Entra ID" so the menu always names the provider in full
+ * (DRK-1669 §3).
+ *
+ * A native `<details>`/`<summary>` disclosure, not shadcn's `DropdownMenu` — a recorded
+ * exception to R1/R2 (DRK-1681 ruling, round 2): it opens on the very first click, before
+ * any client bundle has hydrated. Radix replays nothing lost to that race, in production as
+ * much as in a `next dev` acceptance run — a `<details>` element needs no JS to open at all.
+ * Keep this comment: it is the reason this one control isn't Radix, and it is what stops the
+ * next pass from re-litigating that swap. `UserMenu.test.tsx` pins the element as native.
  */
 export function UserMenu({
   name,
@@ -44,11 +45,11 @@ export function UserMenu({
   style,
 }: UserMenuProps): JSX.Element {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <details style={style} className="relative">
+      <summary
+        role="button"
         aria-label="Account menu"
-        style={style}
-        className="flex max-w-55 items-center gap-2 rounded-md p-1 pr-2 text-[length:var(--text-table-size)] text-foreground"
+        className="flex max-w-55 list-none items-center gap-2 rounded-md p-1 pr-2 text-[length:var(--text-table-size)] font-[inherit] text-foreground [&::-webkit-details-marker]:hidden [&::marker]:hidden"
       >
         <span
           aria-hidden="true"
@@ -58,19 +59,26 @@ export function UserMenu({
         </span>
         <span className="overflow-hidden font-semibold text-ellipsis whitespace-nowrap">{name}</span>
         <ChevronDown size={14} className="flex-none text-muted-foreground" />
-      </DropdownMenuTrigger>
+      </summary>
 
-      <DropdownMenuContent className="w-72">
-        <DropdownMenuLabel>Signed in</DropdownMenuLabel>
+      <div
+        role="menu"
+        className="absolute top-[calc(100%+var(--space-2))] right-0 z-40 w-72 rounded-lg border border-border bg-popover p-4 text-left text-popover-foreground shadow-overlay"
+      >
+        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
+          Signed in
+        </div>
         <div className="mt-1 text-[length:var(--text-table-size)] font-semibold">{name}</div>
         <div className="text-[length:var(--text-caption-size)] text-muted-foreground">
           <span className="font-mono">{email}</span>
         </div>
         <div className="mt-1.5 text-[length:var(--text-caption-size)] text-muted-foreground">{provider}</div>
 
-        <DropdownMenuSeparator />
+        <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
 
-        <DropdownMenuLabel>Directory</DropdownMenuLabel>
+        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
+          Directory
+        </div>
         <div className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-[length:var(--text-caption-size)]">
           <span className="text-muted-foreground">Tenant</span>
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">
@@ -84,9 +92,11 @@ export function UserMenu({
           ) : null}
         </div>
 
-        <DropdownMenuSeparator />
+        <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
 
-        <DropdownMenuLabel>Scopes on this token</DropdownMenuLabel>
+        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
+          Scopes on this token
+        </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {scopes.map((s) => (
             <Badge key={s} variant="selected" className="font-mono">
@@ -107,7 +117,7 @@ export function UserMenu({
           </div>
         ) : null}
 
-        <DropdownMenuSeparator />
+        <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
 
         <form action="/signout" method="post">
           <button
@@ -120,7 +130,7 @@ export function UserMenu({
             Sign out
           </button>
         </form>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </div>
+    </details>
   );
 }
