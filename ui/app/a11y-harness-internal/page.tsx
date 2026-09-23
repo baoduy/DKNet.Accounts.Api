@@ -9,8 +9,12 @@ import type { JSX } from 'react';
 export default function A11yHarnessPage(): JSX.Element {
   return (
     <div>
-      <input data-testid="text-field" placeholder="Reference" style={{ border: '1px solid var(--border-control)' }} />
-      <input data-testid="focus-field" style={{ border: '1px solid var(--border-control)' }} />
+      <input
+        data-testid="text-field"
+        placeholder="Reference"
+        style={{ borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border-control)' }}
+      />
+      <input data-testid="focus-field" style={{ borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border-control)' }} />
       <button data-testid="delete-button" style={{ background: 'var(--destructive-solid)', color: 'var(--destructive-foreground)' }}>
         Delete
       </button>

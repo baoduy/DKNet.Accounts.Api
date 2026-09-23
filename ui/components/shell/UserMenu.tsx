@@ -1,5 +1,14 @@
+import { ChevronDown, ArrowRight } from 'lucide-react';
 import type { CSSProperties, JSX } from 'react';
-import { Caption, Chip, Icon, Label, Mono, Note, Separator } from '@/components/core';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/components/ui/utils';
 import { SCOPE_CONSEQUENCES } from '@/lib/scopes';
 
 export interface UserMenuProps {
@@ -21,154 +30,97 @@ function initialsOf(name: string): string {
 }
 
 /**
- * Ported from Design/components/shell/UserMenu.jsx. `provider` defaults to
- * "Microsoft Entra ID" so the menu always names the provider in full (DRK-1669 §3).
- *
- * A native `<details>`/`<summary>` disclosure, not React state: it opens on the very first
- * click, before any client bundle has hydrated — a dropdown built on `useState` stays
- * unresponsive to the operator's first click until hydration catches up.
+ * Ported from Design/components/shell/UserMenu.jsx onto shadcn's `DropdownMenu`. `provider`
+ * defaults to "Microsoft Entra ID" so the menu always names the provider in full (DRK-1669 §3).
  */
-export function UserMenu({ name, email, tenant, provider = 'Microsoft Entra ID', scopes = [], missingScopes = [], objectId, style }: UserMenuProps): JSX.Element {
+export function UserMenu({
+  name,
+  email,
+  tenant,
+  provider = 'Microsoft Entra ID',
+  scopes = [],
+  missingScopes = [],
+  objectId,
+  style,
+}: UserMenuProps): JSX.Element {
   return (
-    <details style={{ position: 'relative', ...style }}>
-      <summary
-        role="button"
+    <DropdownMenu>
+      <DropdownMenuTrigger
         aria-label="Account menu"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          padding: '4px var(--space-2) 4px 4px',
-          borderRadius: 'var(--radius-md)',
-          font: 'inherit',
-          fontSize: 'var(--text-table-size)',
-          color: 'var(--foreground)',
-          cursor: 'pointer',
-          maxWidth: 220,
-          listStyle: 'none',
-        }}
+        style={style}
+        className="flex max-w-55 items-center gap-2 rounded-md p-1 pr-2 text-[length:var(--text-table-size)] text-foreground"
       >
         <span
           aria-hidden="true"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 26,
-            height: 26,
-            flex: 'none',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--muted)',
-            color: 'var(--muted-foreground)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--text-label-size)',
-            fontWeight: 'var(--weight-semibold)',
-          }}
+          className="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-md bg-muted font-mono text-[length:var(--text-label-size)] font-semibold text-muted-foreground"
         >
           {initialsOf(name)}
         </span>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 'var(--weight-semibold)' }}>{name}</span>
-        <Icon name="chevron-down" size={14} style={{ flex: 'none', color: 'var(--muted-foreground)' }} />
-      </summary>
+        <span className="overflow-hidden font-semibold text-ellipsis whitespace-nowrap">{name}</span>
+        <ChevronDown size={14} className="flex-none text-muted-foreground" />
+      </DropdownMenuTrigger>
 
-      <div
-        role="menu"
-        style={{
-          position: 'absolute',
-          top: 'calc(100% + 6px)',
-          right: 0,
-          width: 288,
-          zIndex: 40,
-          background: 'var(--popover)',
-          color: 'var(--popover-foreground)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-overlay)',
-          padding: 'var(--card-padding)',
-          textAlign: 'left',
-        }}
-      >
-        <Label>Signed in</Label>
-        <div style={{ marginTop: 4, fontSize: 'var(--text-table-size)', fontWeight: 'var(--weight-semibold)' }}>{name}</div>
-        <div>
-          <Caption>
-            <Mono style={{ fontSize: 'var(--text-caption-size)' }}>{email}</Mono>
-          </Caption>
+      <DropdownMenuContent className="w-72">
+        <DropdownMenuLabel>Signed in</DropdownMenuLabel>
+        <div className="mt-1 text-[length:var(--text-table-size)] font-semibold">{name}</div>
+        <div className="text-[length:var(--text-caption-size)] text-muted-foreground">
+          <span className="font-mono">{email}</span>
         </div>
-        <Note style={{ marginTop: 6 }}>{provider}</Note>
+        <div className="mt-1.5 text-[length:var(--text-caption-size)] text-muted-foreground">{provider}</div>
 
-        <Separator style={{ margin: 'var(--space-4) 0' }} />
+        <DropdownMenuSeparator />
 
-        <Label>Directory</Label>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'max-content minmax(0, 1fr)',
-            gap: '4px var(--space-3)',
-            marginTop: 'var(--space-2)',
-            fontSize: 'var(--text-caption-size)',
-          }}
-        >
-          <Caption>Tenant</Caption>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant || <Caption>Not stated.</Caption>}</span>
+        <DropdownMenuLabel>Directory</DropdownMenuLabel>
+        <div className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-[length:var(--text-caption-size)]">
+          <span className="text-muted-foreground">Tenant</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {tenant || <span className="text-muted-foreground">Not stated.</span>}
+          </span>
           {objectId ? (
             <>
-              <Caption>Object ID</Caption>
-              <Mono style={{ fontSize: 'var(--text-caption-size)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{objectId}</Mono>
+              <span className="text-muted-foreground">Object ID</span>
+              <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap">{objectId}</span>
             </>
           ) : null}
         </div>
 
-        <Separator style={{ margin: 'var(--space-4) 0' }} />
+        <DropdownMenuSeparator />
 
-        <Label>Scopes on this token</Label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <DropdownMenuLabel>Scopes on this token</DropdownMenuLabel>
+        <div className="mt-2 flex flex-wrap gap-2">
           {scopes.map((s) => (
-            <Chip key={s} selected>
-              <Mono style={{ fontSize: 'var(--text-label-size)' }}>{s}</Mono>
-            </Chip>
+            <Badge key={s} variant="selected" className="font-mono">
+              {s}
+            </Badge>
           ))}
           {missingScopes.map((s) => (
-            <Chip key={s} style={{ background: 'var(--surface-disabled)', color: 'var(--text-disabled)', textDecoration: 'line-through' }}>
-              <Mono style={{ fontSize: 'var(--text-label-size)' }}>{s}</Mono>
-            </Chip>
+            <Badge key={s} variant="disabled" className="font-mono">
+              {s}
+            </Badge>
           ))}
         </div>
         {missingScopes.length ? (
-          <Note style={{ marginTop: 'var(--space-2)' }}>
+          <div className="mt-2 text-[length:var(--text-caption-size)] text-muted-foreground">
             {missingScopes.map((s) => (
               <div key={s}>Mai cannot {SCOPE_CONSEQUENCES[s] ?? 'do this'} without this permission.</div>
             ))}
-          </Note>
+          </div>
         ) : null}
 
-        <Separator style={{ margin: 'var(--space-4) 0' }} />
+        <DropdownMenuSeparator />
 
         <form action="/signout" method="post">
           <button
             type="submit"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-2)',
-              width: '100%',
-              fontFamily: 'var(--font-sans)',
-              fontSize: 'var(--text-caption-size)',
-              fontWeight: 'var(--weight-semibold)',
-              padding: 'var(--space-1) var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-control)',
-              background: 'var(--card)',
-              color: 'var(--foreground)',
-              cursor: 'pointer',
-            }}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-md border border-border-control bg-card px-3 py-1 text-[length:var(--text-caption-size)] font-semibold text-foreground',
+            )}
           >
-            <Icon name="arrow-right" size={14} />
+            <ArrowRight size={14} />
             Sign out
           </button>
         </form>
-      </div>
-    </details>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

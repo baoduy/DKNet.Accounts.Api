@@ -45,7 +45,17 @@ export default async function ConsoleHome(): Promise<JSX.Element> {
       topbarRight={
         <>
           <div role="search">
-            <input aria-label="Search" placeholder="Search" style={{ border: '1px solid var(--border-control)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2)' }} />
+            <input
+              aria-label="Search"
+              placeholder="Search"
+              style={{
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: 'var(--border-control)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-2)',
+              }}
+            />
           </div>
           <UserMenu
             name={session.displayName}

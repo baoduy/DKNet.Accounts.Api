@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
-import { Icon } from '@/components/core';
+import { CONSOLE_ICONS } from '@/components/shell/icons';
+import { cn } from '@/components/ui/utils';
 
 export interface NavEntry {
   id: string;
@@ -45,31 +45,15 @@ export interface SidebarProps {
 export function Sidebar({ sections = CONSOLE_NAV, active, onNavigate, style }: SidebarProps): JSX.Element {
   return (
     <nav
-      style={{
-        width: 'var(--sidebar-width)',
-        flex: 'none',
-        background: 'var(--sidebar)',
-        borderRight: '1px solid var(--sidebar-border)',
-        padding: 'var(--space-3) var(--space-2)',
-        display: 'flex',
-        flexDirection: 'column',
-        ...style,
-      }}
+      style={style}
+      className="flex w-(--sidebar-width) flex-none flex-col border-r border-sidebar-border bg-sidebar p-2 text-sidebar-foreground"
     >
-      <div style={{ fontSize: 'var(--text-panel-title-size)', fontWeight: 'var(--weight-extrabold)', letterSpacing: 'var(--tracking-title)', padding: '4px 8px 10px' }}>
+      <div className="px-2 pt-1 pb-2.5 text-[length:var(--text-panel-title-size)] font-extrabold tracking-[var(--tracking-title)]">
         Accounts
       </div>
       {sections.map((section) => (
-        <div key={section.title} style={section.pinToBottom ? { marginTop: 'auto' } : undefined}>
-          <div
-            style={{
-              fontSize: 'var(--text-label-size)',
-              fontWeight: 'var(--weight-semibold)',
-              letterSpacing: 'var(--tracking-section-label)',
-              color: 'var(--muted-foreground)',
-              padding: '14px 8px 4px',
-            }}
-          >
+        <div key={section.title} className={section.pinToBottom ? 'mt-auto' : undefined}>
+          <div className="px-2 pt-3.5 pb-1 text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-section-label)] text-muted-foreground">
             {section.title}
           </div>
           {section.items.map((item) => (
@@ -82,27 +66,25 @@ export function Sidebar({ sections = CONSOLE_NAV, active, onNavigate, style }: S
 }
 
 function NavItem({ item, active, onNavigate }: { item: NavEntry; active: boolean; onNavigate?: (item: NavEntry) => void }): JSX.Element {
-  const [hover, setHover] = useState(false);
+  const IconComponent = CONSOLE_ICONS[item.icon];
   return (
     <a
       href={item.href ?? '#'}
-      onClick={onNavigate ? (e) => { e.preventDefault(); onNavigate(item); } : undefined}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--space-2)',
-        padding: 'var(--space-2)',
-        borderRadius: 'var(--radius-md)',
-        textDecoration: 'none',
-        fontSize: 'var(--text-table-size)',
-        color: 'var(--foreground)',
-        fontWeight: active ? 'var(--weight-semibold)' : 'var(--weight-regular)',
-        background: active ? 'var(--surface-selected)' : hover ? 'var(--muted)' : 'transparent',
-      }}
+      aria-current={active ? 'page' : undefined}
+      onClick={
+        onNavigate
+          ? (event) => {
+              event.preventDefault();
+              onNavigate(item);
+            }
+          : undefined
+      }
+      className={cn(
+        'flex items-center gap-2 rounded-md p-2 text-[length:var(--text-table-size)] no-underline',
+        active ? 'bg-surface-selected font-semibold text-foreground' : 'font-normal text-foreground hover:bg-muted',
+      )}
     >
-      <Icon name={item.icon} size={16} />
+      {IconComponent ? <IconComponent size={16} /> : null}
       {item.label}
     </a>
   );

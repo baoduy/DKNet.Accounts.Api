@@ -76,6 +76,10 @@ jobs:
         working-directory: ui
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        working-directory: ui
+        run: pnpm run lint
+
       - name: Typecheck
         working-directory: ui
         run: pnpm run typecheck

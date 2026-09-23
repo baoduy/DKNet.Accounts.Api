@@ -1,3 +1,5 @@
+@import 'tailwindcss';
+
 /* Design system tokens — pulled by relative path, never restated (DRK-1669 §3 R1). */
 @import '../../Design/tokens/colors.css';
 @import '../../Design/tokens/spacing.css';
@@ -17,10 +19,81 @@
   --accent: var(--surface-selected);
 }
 
-/* The identity menu's <summary> is its own disclosure toggle — hide the browser's default
-   marker glyph, which the chevron icon already stands in for. */
-summary::-webkit-details-marker,
-summary::marker {
-  display: none;
-  content: '';
+/* Tailwind v4, CSS-first: every utility below reads straight off the custom property of
+   the same role, never a restated value (R3). No `.dark` class variant is declared here —
+   theme stays on the CSS cascade alone (`Design/tokens/base.css`, `colors.css`'s
+   `@media (prefers-color-scheme: dark)` block), the mechanism AT 21 requires. */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Accessible aliases (Design/tokens/colors.css header note) and ledger signal colours —
+     every shadcn primitive and this console's own components reach for these by name. */
+  --color-border-control: var(--border-control);
+  --color-focus-ring: var(--focus-ring);
+  --color-destructive-solid: var(--destructive-solid);
+  --color-surface-selected: var(--surface-selected);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-selected-hover: var(--surface-selected-hover);
+  --color-primary-hover: var(--primary-hover);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-surface-disabled: var(--surface-disabled);
+  --color-text-disabled: var(--text-disabled);
+  --color-link: var(--link);
+  --color-scrim: var(--scrim);
+  --color-credit: var(--credit);
+  --color-debit: var(--debit);
+  --color-warning: var(--warning);
+  --color-reversed: var(--reversed);
+  --color-badge-credit-bg: var(--badge-credit-bg);
+  --color-badge-credit-fg: var(--badge-credit-fg);
+  --color-badge-debit-bg: var(--badge-debit-bg);
+  --color-badge-debit-fg: var(--badge-debit-fg);
+  --color-badge-warning-bg: var(--badge-warning-bg);
+  --color-badge-warning-fg: var(--badge-warning-fg);
+  --color-badge-neutral-bg: var(--badge-neutral-bg);
+  --color-badge-neutral-fg: var(--badge-neutral-fg);
+  --color-badge-info-bg: var(--badge-info-bg);
+  --color-badge-info-fg: var(--badge-info-fg);
 }
