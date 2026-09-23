@@ -51,7 +51,9 @@ test("The build fails when the console's copy of the contract is out of date", (
     }
 
     expect(exitCode).not.toBe(0);
-    expect(output).toContain('/postings/{id}/reverse');
+    // Not `toContain('/postings/{id}/reverse')` — the fixture's own `.../reverse-moved` path
+    // (line 34) would satisfy that too. The drifted route, not just any route containing it.
+    expect(output).toMatch(/\/postings\/\{id\}\/reverse(?![\w-])/);
   } finally {
     rmSync(fixtureDir, { recursive: true, force: true });
   }

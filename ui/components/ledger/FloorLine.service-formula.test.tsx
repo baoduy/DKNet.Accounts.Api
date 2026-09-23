@@ -32,6 +32,9 @@ describe('FloorLine — renders the service’s own floor when given one (row 11
         floor: '-5000.00',
       }),
     );
-    expect(screen.getByText(/-5,000\.00|−5,000\.00/)).toBeInTheDocument();
+    // The minus character (U+2212), never a hyphen (U+002D) — "Must stay true" on the spec's
+    // own list — which is exactly the conversion a service value arriving as the hyphen
+    // `'-5000.00'` needs `FloorLine` to make.
+    expect(screen.getByText(/−5,000\.00/)).toBeInTheDocument();
   });
 });

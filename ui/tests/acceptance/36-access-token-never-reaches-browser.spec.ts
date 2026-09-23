@@ -10,11 +10,19 @@
  * (`/api/ledger/...`) — that much is structural. What is not yet true is that the read
  * actually succeeds and returns the service's answer with no token anywhere in it (R1). RED
  * today: row 5 is a stub that always throws before ever reading the cached token.
+ *
+ * The leak this scenario actually guards against is the cached token's literal bytes
+ * reaching a response — as a bare JWT, not wrapped in `Bearer `. `accessTokenOverride`
+ * (mirrors `09-stored-token-unreadable.spec.ts`) fixes that literal so the test can look
+ * for it directly, in every same-origin response's body and headers, not one hand-picked
+ * body.
  */
 import { expect, test } from '@playwright/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
+
+const CANARY_ACCESS_TOKEN = 'MAI-CANARY-ACCESS-TOKEN-36-DO-NOT-LEAK-TO-BROWSER';
 
 test('The access token never reaches the browser', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
@@ -29,10 +37,20 @@ test('The access token never reaches the browser', async ({ page, baseURL }) => 
       minimumBalance: '0.00',
     },
   ]);
-  await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
+  await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email, accessTokenOverride: CANARY_ACCESS_TOKEN });
 
   const requestUrls: string[] = [];
   page.on('request', (request) => requestUrls.push(request.url()));
+
+  const responses: Array<{ url: string; headers: Record<string, string>; bodyPromise: Promise<string> }> = [];
+  page.on('response', (response) => {
+    if (!response.url().startsWith(baseURL!)) return; // same-origin only — the browser never talks to the ledger service directly
+    responses.push({
+      url: response.url(),
+      headers: response.headers(),
+      bodyPromise: response.text().catch(() => ''),
+    });
+  });
 
   // A real fetch from inside the browser page — not `page.request`, which never touches the
   // browser's own network stack — is what "the browser sends its request" actually means.
@@ -46,5 +64,15 @@ test('The access token never reaches the browser', async ({ page, baseURL }) => 
   expect(requestUrls.every((url) => !url.includes('4499'))).toBe(true);
 
   expect(result.status).toBe(200);
-  expect(result.body).not.toContain('Bearer');
+  expect(result.body).not.toContain(CANARY_ACCESS_TOKEN);
+
+  // No response the browser received — any of them, not just the one this test triggered —
+  // carries the cached token, in a header or in a body.
+  for (const response of responses) {
+    const body = await response.bodyPromise;
+    expect(body).not.toContain(CANARY_ACCESS_TOKEN);
+    for (const value of Object.values(response.headers)) {
+      expect(value).not.toContain(CANARY_ACCESS_TOKEN);
+    }
+  }
 });
