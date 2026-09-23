@@ -27,6 +27,12 @@ test('A refusal that carries no code still shows what the service said', async (
   await page.getByRole('button', { name: 'Save changes' }).click();
 
   const panel = page.getByTestId('detail-panel');
-  await expect(panel.getByText('At least one field must be supplied.')).toBeVisible();
+  const alertLine = panel.locator('li').filter({ hasText: 'At least one field must be supplied.' });
+  await expect(alertLine).toBeVisible();
   await expect(panel.getByText(/Trace:/)).toBeVisible();
+
+  // dev-leader review: R4 — the service sent no code, so the console must invent none. The
+  // alert's own line carries only the message when `error.code` is absent (`RefusalAlert.tsx`);
+  // an exact match on the message alone catches a Build that renders an invented code before it.
+  await expect(alertLine).toHaveText('At least one field must be supplied.');
 });

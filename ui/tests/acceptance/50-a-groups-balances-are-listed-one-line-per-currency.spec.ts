@@ -51,4 +51,8 @@ test("A group's balances are listed one line per currency", async ({ page, baseU
   await expect(panel.getByText('USD')).toBeVisible();
   await expect(panel.getByText('400.00')).toBeVisible();
   await expect(panel.getByText('not combined into a total')).toBeVisible();
+
+  // dev-leader review: the spec's "shows no total" half was unasserted — a screen that
+  // rendered SGD, USD, the caption AND a combined 1,650.00 figure passed anyway.
+  await expect(panel.getByText('1,650.00')).toHaveCount(0);
 });

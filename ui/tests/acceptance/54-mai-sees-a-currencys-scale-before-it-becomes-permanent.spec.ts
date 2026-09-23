@@ -34,6 +34,8 @@ test("Mai sees a currency's scale before it becomes permanent", async ({ page, b
   const row = page.getByRole('row', { name: /VND/ });
   await expect(row.getByText('Vietnamese Dong')).toBeVisible();
   await expect(row.getByText('Active')).toBeVisible();
+  // dev-leader review: "0 decimal places" was unasserted — the row's own cell must read 0.
+  await expect(row.locator('td').filter({ hasText: /^0$/ })).toBeVisible();
 
   await row.click();
   await page.getByRole('button', { name: 'Edit currency' }).click();
