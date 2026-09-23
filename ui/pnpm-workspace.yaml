@@ -1,6 +1,9 @@
 allowBuilds:
   esbuild: true
   sharp: true
+# Waiver for the pinned `next@15.5.26` CVE fix (A5): pnpm's default minimum-release-age
+# guard would otherwise block installing a release this recent. Remove this list at the
+# next `next` version bump.
 minimumReleaseAgeExclude:
   - '@next/env@15.5.26'
   - '@next/swc-darwin-arm64@15.5.26'

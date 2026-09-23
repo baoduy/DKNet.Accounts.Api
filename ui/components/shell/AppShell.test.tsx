@@ -51,10 +51,14 @@ describe('AppShell — live OS theme changes (A4)', () => {
   it('removes its media-query listener on unmount', () => {
     const media = installControllableMatchMedia(false);
     const { unmount } = render(createElement(AppShell, {}));
-    unmount();
+    expect(document.documentElement.dataset.theme).toBe('light');
 
-    // A listener call after unmount would throw only if React left a stale closure touching
-    // an unmounted DOM; this proves the effect cleaned up rather than leaking a listener.
-    expect(() => media.flip()).not.toThrow();
+    unmount();
+    // A flip after unmount only leaves `theme` unchanged if the effect's cleanup actually
+    // removed the listener; a missing `return () => mql.removeEventListener(...)` leaks the
+    // listener and this still fires, flipping `theme` to 'dark' even with no mounted AppShell.
+    media.flip();
+
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 });

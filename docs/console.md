@@ -73,7 +73,7 @@ are `.env.sample`'s shipped values.
 | `CONSOLE_BASE_URL` | string (URL) | `http://localhost:3000` | The console's own externally reachable address. Every post-sign-in redirect is resolved against it; anything else is discarded. Also the base of the Entra redirect URI. |
 | `CONSOLE_REDIS_URL` | string | `redis://localhost:6379` | Redis the console uses for the session and the cached token. Overridden by compose to the in-network address. |
 | `CONSOLE_REDIS_KEY_PREFIX` | string | `console:` | Prefix on every key the console writes to Redis. |
-| `CONSOLE_SESSION_SECRET` | string | a real 32-byte placeholder | Signs the session cookie. Ships non-blank so the stack boots as-is — generate your own with `openssl rand -base64 32` before any real deployment. |
+| `CONSOLE_SESSION_SECRET` | string | a self-evident placeholder | Signs the session cookie. Ships non-blank so the stack boots as-is — generate your own with `openssl rand -base64 32` before any real deployment. |
 | `CONSOLE_TOKEN_ENCRYPTION_KEY` | string | a real 32-byte placeholder | Encrypts the cached access/refresh token in Redis (exact 32 bytes required). Missing or the wrong length → the console exits non-zero, naming this key. Ships non-blank for the same reason as the session secret — generate your own with `openssl rand -hex 16`. |
 | `CONSOLE_PORT` | int | `3000` | Port the console listens on; published as `${CONSOLE_PORT:-3000}:3000` in `docker-compose.yml`. |
 
