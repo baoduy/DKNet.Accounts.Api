@@ -6,15 +6,16 @@
  *     Then the frame draws in dark
  *     And she did not reload the page
  *
- * DRK-1679 §3 row 9: "Today's mechanism is `prefers-color-scheme` in CSS — keep a
- * CSS-driven mechanism; a JS class toggle that needs a reload fails the scenario."
- * `Design/tokens/base.css:7-15` already sets `body { background: var(--background) }`, so
- * the theme already flips through pure CSS cascade with no reload, in a real browser, today
- * — confirmed empirically: `document.body` carries no inline `style` attribute despite
- * `AppShell`'s `useLayoutEffect` (`ui/components/shell/AppShell.tsx:38-51`) also writing
- * one, and both computed background colours below already match. This AT is GREEN against
- * today's code (see the RED-authoring report: this scenario needed no new work to satisfy,
- * only the AT to pin it, which is the whole discovery this run reports up).
+ * A behaviour-**preservation** scenario under R6, like "the frame an operator already knows
+ * survives the rebuild" — green before the rebuild by definition, so it is a regression
+ * guard here, not a RED-first gate. Its marker is the CSS-driven mechanism DRK-1679 §3 row
+ * 9 requires: "Today's mechanism is `prefers-color-scheme` in CSS — keep a CSS-driven
+ * mechanism; a JS class toggle that needs a reload fails the scenario." `AppShell`'s
+ * `useLayoutEffect` (`ui/components/shell/AppShell.tsx:38-51`) mirrors the resolved custom
+ * properties onto `document.body.style` in JS — a second, competing mechanism alongside
+ * `Design/tokens/base.css:7-15`'s `body { background: var(--background) }` — and this AT's
+ * last assertion forbids it: Build removes that effect (row 9 amendment, dev-leader ruling
+ * on DRK-1680), and the CSS cascade alone must still carry the theme with no reload.
  *
  * Literal background colours copied from Design/tokens/colors.css (source of truth, R2):
  *   light --background #fbfcf8 · dark --background #020617
