@@ -7,6 +7,8 @@ reconcile against.
 - **Full walkthrough:** [docs/integration-guide.md](docs/integration-guide.md) — authenticate, create a
   group, open an account, post, read the balance back, page a statement.
 - **Machine-readable contract:** `GET /openapi/v1.json` on a running instance.
+- **Operations console:** [docs/console.md](docs/console.md) — a Next.js console for signing in
+  with Entra ID and running the service locally alongside it. No screen ships yet.
 
 > **Delivery status at this commit.** Every route in [the API contract](#the-api-contract) is
 > implemented and exercised by the acceptance suite — reference currencies, account groups, accounts,
@@ -56,6 +58,9 @@ dotnet test DKNet.Accounts.sln --settings coverage.runsettings
 The acceptance suite starts its own `postgres:16-alpine` container through Testcontainers, so Docker
 must be running before `dotnet test` — the scenarios are asserted against the same relational provider
 a deployment uses, not an in-memory stand-in.
+
+`docker-compose.yml` runs the whole local stack instead — Postgres, Redis, this API and the
+[operations console](docs/console.md) — from a copy of `.env.sample`.
 
 The `Development` profile turns authorization off, turns OpenAPI on, and migrates the database on start
 (`ApiEndpoints/DKNet.Accounts.Api/appsettings.Development.json`). Health is on `/healthz`; the OpenAPI
