@@ -34,6 +34,13 @@ export interface FloorLineProps {
   account: FloorPolicy;
   decimalPlaces?: number;
   style?: CSSProperties;
+  /**
+   * DRK-1684 §3 row 11c — the service's own `AccountBalanceDto.Floor`, exact text, no local
+   * recomputation. Not yet honoured by `FloorLine` below (Mode: acceptance-tests) — Build
+   * makes this the render source when set, falling back to `computeFloor` only when a caller
+   * has no balance response.
+   */
+  floor?: string;
 }
 
 export function FloorLine({ account, decimalPlaces = 2, style }: FloorLineProps): JSX.Element {

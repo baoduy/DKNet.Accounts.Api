@@ -80,6 +80,10 @@ jobs:
         working-directory: ui
         run: pnpm run lint
 
+      - name: Verify contract
+        working-directory: ui
+        run: pnpm run verify:contract
+
       - name: Typecheck
         working-directory: ui
         run: pnpm run typecheck

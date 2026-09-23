@@ -9,6 +9,10 @@ export const FAKE_OIDC_BASE = `http://127.0.0.1:${FAKE_OIDC_PORT}`;
 export const FAKE_REDIS_PORT = 16532;
 export const FAKE_REDIS_URL = `redis://127.0.0.1:${FAKE_REDIS_PORT}`;
 
+/** DRK-1684 §3 row 15 — the fake standing in for the ledger service itself. */
+export const FAKE_LEDGER_PORT = 4499;
+export const FAKE_LEDGER_BASE = `http://127.0.0.1:${FAKE_LEDGER_PORT}`;
+
 export const DEFAULT_CONSOLE_PORT = 3100;
 export const DEFAULT_CONSOLE_BASE = `http://127.0.0.1:${DEFAULT_CONSOLE_PORT}`;
 
@@ -71,7 +75,7 @@ export function defaultConsoleEnv(port: number = DEFAULT_CONSOLE_PORT): NodeJS.P
     CONSOLE_ENTRA_CLIENT_SECRET: CLIENT_SECRET,
     CONSOLE_ENTRA_SCOPES: KNOWN_SCOPES.join(' '),
     CONSOLE_ENTRA_ISSUER_BASE_URL: FAKE_OIDC_BASE,
-    CONSOLE_API_BASE_URL: 'http://127.0.0.1:8080',
+    CONSOLE_API_BASE_URL: FAKE_LEDGER_BASE,
     CONSOLE_REDIS_URL: FAKE_REDIS_URL,
     CONSOLE_REDIS_KEY_PREFIX: CONSOLE_REDIS_KEY_PREFIX,
     CONSOLE_SESSION_SECRET: SESSION_SECRET,
