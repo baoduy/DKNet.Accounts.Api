@@ -102,6 +102,7 @@ describe('useReversePosting', () => {
 
     const response = await result.current.mutate({
       postingId: 'PST0000000001',
+      accountId: 'ACME-000123',
       reason: 'Recorded in error',
       idempotencyKey: 'key-3',
       regenerateIdempotencyKey,
@@ -113,7 +114,10 @@ describe('useReversePosting', () => {
       headers: { 'content-type': 'application/json', 'Idempotency-Key': 'key-3' },
       body: JSON.stringify({ reason: 'Recorded in error' }),
     });
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: postingsListKey({}) }));
+    // pr-reviewer finding 10 (DRK-1687, round 2): a reversal changes a balance too — it must
+    // invalidate accountBalanceKey the same way useRecordPosting does, not postings alone.
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountBalanceKey('ACME-000123') }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: postingsListKey({}) });
     expect(regenerateIdempotencyKey).toHaveBeenCalledTimes(1);
   });
 
@@ -125,16 +129,19 @@ describe('useReversePosting', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const regenerateIdempotencyKey = vi.fn();
     const { result } = renderHook(() => useReversePosting(), { wrapper: wrapper(queryClient) });
 
     const response = await result.current.mutate({
       postingId: 'PST0000000001',
+      accountId: 'ACME-000123',
       reason: 'Recorded in error',
       idempotencyKey: 'key-4',
       regenerateIdempotencyKey,
     });
 
+    expect(invalidateSpy).not.toHaveBeenCalled();
     expect(response).toEqual(
       expect.objectContaining({ ok: false, errors: [{ message: 'Already reversed.', code: 'POSTING_ALREADY_REVERSED' }], traceId: 't-2' }),
     );
