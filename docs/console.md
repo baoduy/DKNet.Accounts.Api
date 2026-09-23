@@ -57,23 +57,28 @@ that the token doesn't carry (`ui/components/shell/UserMenu.tsx`,
 
 ## ⚙️ Configuration reference
 
-Every key below is read at container start (`ui/lib/config.ts`). **`.env.sample` on this branch
-does not yet carry a console section** — the table follows the contract in DRK-1674 §5 instead;
-reconcile against `.env.sample` once it lands.
+Every key below is validated at container start by `ui/instrumentation.ts`'s `register()` hook,
+which calls `loadConfig()` in `ui/lib/config.ts` — the one startup hook the standalone
+`server.js` this image ships actually runs (`next.config.ts`'s own function only runs for the
+`next dev`/`next build`/`next start` CLIs, never for the built standalone server). Defaults below
+are `.env.sample`'s shipped values.
 
-| Key | Type | Default | Effect |
+| Key | Type | Shipped default | Effect |
 |---|---|---|---|
 | `CONSOLE_ENTRA_TENANT_ID` | string | blank | Entra tenant (directory) ID. Blank → not-configured mode. |
 | `CONSOLE_ENTRA_CLIENT_ID` | string | blank | App registration (client) ID. Blank → not-configured mode. |
-| `CONSOLE_ENTRA_CLIENT_SECRET` | string | — | Confidential-client secret for the app registration above. |
-| `CONSOLE_ENTRA_SCOPES` | space-separated string | — | Scopes requested at sign-in, e.g. `accounts.read postings.read postings.reverse`. |
-| `CONSOLE_API_BASE_URL` | string (URL) | — | Base URL of `DKNet.Accounts.Api` the console calls. |
-| `CONSOLE_BASE_URL` | string (URL) | — | The console's own externally reachable address. Every post-sign-in redirect is resolved against it; anything else is discarded. Also the base of the Entra redirect URI. |
-| `CONSOLE_REDIS_URL` | string | — | Redis the console uses for the session and the cached token. |
+| `CONSOLE_ENTRA_CLIENT_SECRET` | string | blank | Confidential-client secret for the app registration above. |
+| `CONSOLE_ENTRA_SCOPES` | space-separated string | `accounts.read postings.read postings.reverse` | Scopes requested at sign-in. |
+| `CONSOLE_API_BASE_URL` | string (URL) | `http://localhost:8080` | Base URL of `DKNet.Accounts.Api` the console calls. Overridden by compose to the in-network address. |
+| `CONSOLE_BASE_URL` | string (URL) | `http://localhost:3000` | The console's own externally reachable address. Every post-sign-in redirect is resolved against it; anything else is discarded. Also the base of the Entra redirect URI. |
+| `CONSOLE_REDIS_URL` | string | `redis://localhost:6379` | Redis the console uses for the session and the cached token. Overridden by compose to the in-network address. |
 | `CONSOLE_REDIS_KEY_PREFIX` | string | `console:` | Prefix on every key the console writes to Redis. |
-| `CONSOLE_SESSION_SECRET` | string | — | Signs the session cookie. |
-| `CONSOLE_TOKEN_ENCRYPTION_KEY` | string | — | Encrypts the cached access/refresh token in Redis. Missing → the console exits non-zero, naming this key. |
+| `CONSOLE_SESSION_SECRET` | string | a real 32-byte placeholder | Signs the session cookie. Ships non-blank so the stack boots as-is — generate your own with `openssl rand -base64 32` before any real deployment. |
+| `CONSOLE_TOKEN_ENCRYPTION_KEY` | string | a real 32-byte placeholder | Encrypts the cached access/refresh token in Redis (exact 32 bytes required). Missing or the wrong length → the console exits non-zero, naming this key. Ships non-blank for the same reason as the session secret — generate your own with `openssl rand -hex 16`. |
 | `CONSOLE_PORT` | int | `3000` | Port the console listens on; published as `${CONSOLE_PORT:-3000}:3000` in `docker-compose.yml`. |
+
+`CONSOLE_ENTRA_TENANT_ID` and `CONSOLE_ENTRA_CLIENT_ID` are the only two keys genuinely blank in
+`.env.sample` — fill those in; every other key already ships a working value.
 
 ### Entra app registration
 
