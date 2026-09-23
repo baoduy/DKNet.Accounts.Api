@@ -82,3 +82,13 @@ Thumbs.db
 .vscode/
 **/logs
 !.env.sample
+
+# ui/ (Next.js console)
+ui/node_modules/
+ui/.next/
+ui/playwright-report/
+ui/test-results/
+ui/reports/
+ui/StrykerOutput/
+ui/next-env.d.ts
+ui/*.tsbuildinfo
