@@ -24,4 +24,14 @@ describe('isLedgerRouteAllowed — a {param} segment must not carry a path separ
   it('still allows an ordinary {param} value with none of those characters', () => {
     expect(isLedgerRouteAllowed('GET', ['accounts', 'ACME-000123', 'balance'])).toBe(true);
   });
+
+  /**
+   * DRK-1696 §5 rule R1 — the traversal rule proven at the route-allowlist layer itself, on
+   * an account route, not only on the balance route pr-reviewer finding 1 named. The rule is
+   * `matchesTemplate`'s `{param}` guard; it must hold for every route the contract declares,
+   * not just the one the original finding happened to hit.
+   */
+  it('refuses a percent-decoded traversal inside an account {id} segment', () => {
+    expect(isLedgerRouteAllowed('GET', ['accounts', '../../admin', 'balance'])).toBe(false);
+  });
 });

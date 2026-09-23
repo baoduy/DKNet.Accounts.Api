@@ -1,7 +1,12 @@
 import { FAKE_LEDGER_BASE } from './fixtures';
 
 export interface LedgerAccountFixture {
+  id?: string;
   accountNumber: string;
+  groupId?: string;
+  name?: string;
+  classification?: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
+  status?: 'Active' | 'Frozen' | 'Dormant' | 'Closed';
   currency: string;
   decimalPlaces: number;
   balance: string;
@@ -10,6 +15,38 @@ export interface LedgerAccountFixture {
   permittedToGoNegative: boolean;
   overdraftLimit?: string | null;
   minimumBalance?: string | null;
+  externalReference?: string;
+  metadata?: Record<string, string>;
+  openedOn?: string;
+  closedOn?: string | null;
+  streamPosition?: number;
+}
+
+export interface LedgerAccountGroupFixture {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  status?: 'Active' | 'Closed';
+  ownerId?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface LedgerPostingFixture {
+  id: string;
+  postingNumber: string;
+  accountId: string;
+  streamPosition: number;
+  direction: 'Debit' | 'Credit';
+  amount: string;
+  signedAmount: string;
+  balanceAfter: string;
+  currency: string;
+  status?: 'Posted' | 'Reversed';
+  category: string;
+  description?: string;
+  effectiveDate?: string;
 }
 
 /** Resets `fake-ledger-service.ts` to an empty dataset. */
@@ -22,7 +59,47 @@ export async function seedLedgerAccounts(accounts: LedgerAccountFixture[]): Prom
   await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ accounts }),
+    body: JSON.stringify({
+      accounts: accounts.map((account) => ({
+        id: account.id ?? account.accountNumber,
+        accountNumber: account.accountNumber,
+        groupId: account.groupId ?? 'group-default',
+        name: account.name ?? account.accountNumber,
+        classification: account.classification ?? 'Asset',
+        status: account.status ?? 'Active',
+        currency: account.currency,
+        decimalPlaces: account.decimalPlaces,
+        balance: account.balance,
+        availableBalance: account.availableBalance,
+        heldAmount: account.heldAmount,
+        permittedToGoNegative: account.permittedToGoNegative,
+        overdraftLimit: account.overdraftLimit ?? null,
+        minimumBalance: account.minimumBalance ?? null,
+        externalReference: account.externalReference,
+        metadata: account.metadata,
+        openedOn: account.openedOn ?? new Date(0).toISOString(),
+        closedOn: account.closedOn ?? null,
+        streamPosition: account.streamPosition ?? 0,
+      })),
+    }),
+  });
+}
+
+/** Seeds account groups into `fake-ledger-service.ts` (upsert by `id`). */
+export async function seedLedgerAccountGroups(groups: LedgerAccountGroupFixture[]): Promise<void> {
+  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ accountGroups: groups.map((group) => ({ status: 'Active', ...group })) }),
+  });
+}
+
+/** Seeds postings into `fake-ledger-service.ts`, appended to the existing stream. */
+export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Promise<void> {
+  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ postings: postings.map((posting) => ({ status: 'Posted', ...posting })) }),
   });
 }
 

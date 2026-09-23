@@ -51,6 +51,12 @@ export const MAI_MISSING_REVERSE_SCOPE: FixtureUser = {
   scopes: ['accounts.read', 'postings.read'],
 };
 
+/** Same operator, granted `accounts.write` and `postings.write` too — DRK-1696 §5: opening, editing and recording. */
+export const MAI_WITH_WRITE: FixtureUser = {
+  ...MAI,
+  scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'],
+};
+
 export const NAM: FixtureUser = {
   email: 'nam@drunkcoding.net',
   name: 'Nam Tran',
