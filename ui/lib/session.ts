@@ -29,7 +29,7 @@ function sessionKey(config: ReturnType<typeof loadConfig>, sessionId: string): s
 /** Opens a session record in Redis (`SETEX` to `input.expiresAt`) and returns it with a fresh `sessionId`. */
 export async function createSession(input: Omit<ConsoleSession, 'sessionId'>): Promise<ConsoleSession> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   const session: ConsoleSession = { sessionId: randomUUID(), ...input };
   const ttlSeconds = Math.max(1, session.expiresAt - Math.floor(Date.now() / 1000));
   await redis.setex(sessionKey(config, session.sessionId), ttlSeconds, JSON.stringify(session));
@@ -39,7 +39,7 @@ export async function createSession(input: Omit<ConsoleSession, 'sessionId'>): P
 /** Reads a session by id. A miss (expired or unknown) returns `null`, never a fallback. */
 export async function getSession(sessionId: string): Promise<ConsoleSession | null> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   const raw = await redis.get(sessionKey(config, sessionId));
   return raw ? (JSON.parse(raw) as ConsoleSession) : null;
 }
@@ -47,6 +47,6 @@ export async function getSession(sessionId: string): Promise<ConsoleSession | nu
 /** Removes a session record — used by `/signout`. */
 export async function destroySession(sessionId: string): Promise<void> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   await redis.del(sessionKey(config, sessionId));
 }

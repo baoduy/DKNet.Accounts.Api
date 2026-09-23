@@ -11,7 +11,6 @@ const TEST_CONFIG = {
   redisKeyPrefix: 'console:',
   sessionSecret: 'session-secret',
   tokenEncryptionKey: '0123456789abcdef0123456789abcdef',
-  port: 3100,
 };
 const entraIssuerBaseUrl = vi.fn(() => 'http://127.0.0.1:4488');
 vi.mock('./config', () => ({
@@ -119,6 +118,22 @@ describe('beginSignIn', () => {
       undefined,
       undefined,
     );
+  });
+
+  it('never relaxes HTTPS in production, even for a misconfigured http issuer', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      await beginSignIn();
+      expect(discovery).toHaveBeenCalledWith(
+        new URL('http://127.0.0.1:4488/drunk-coding-tenant'),
+        TEST_CONFIG.entraClientId,
+        TEST_CONFIG.entraClientSecret,
+        undefined,
+        undefined,
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('resolves a same-origin returnTo, keeping only the path and query (R5)', async () => {

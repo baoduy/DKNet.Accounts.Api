@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const RedisConstructor = vi.fn().mockImplementation(() => ({ id: Math.random() }));
 vi.mock('ioredis', () => ({ default: RedisConstructor }));
+vi.mock('./config', () => ({ loadConfig: () => ({ redisUrl: 'redis://127.0.0.1:6379' }) }));
 
 const { getRedisClient, prefixedKey } = await import('./redis');
 
@@ -16,10 +17,11 @@ describe('prefixedKey', () => {
 });
 
 describe('getRedisClient', () => {
-  it('lazily creates one shared client for the process', () => {
-    const a = getRedisClient({ redisUrl: 'redis://127.0.0.1:6379' });
-    const b = getRedisClient({ redisUrl: 'redis://127.0.0.1:6379' });
+  it('lazily creates one shared client for the process, from CONSOLE_REDIS_URL', () => {
+    const a = getRedisClient();
+    const b = getRedisClient();
     expect(a).toBe(b);
     expect(RedisConstructor).toHaveBeenCalledTimes(1);
+    expect(RedisConstructor).toHaveBeenCalledWith('redis://127.0.0.1:6379', expect.anything());
   });
 });

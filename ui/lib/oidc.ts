@@ -49,8 +49,9 @@ function resolveReturnTo(baseUrl: string, candidate: string | undefined): string
 async function discover(config: ConsoleConfig): Promise<client.Configuration> {
   const issuerBase = entraIssuerBaseUrl();
   const issuerUrl = new URL(`${issuerBase.replace(/\/$/, '')}/${config.entraTenantId}`);
-  // The fake OIDC issuer standing in for Entra ID in tests runs over plain HTTP.
-  const insecure = issuerUrl.protocol === 'http:';
+  // The fake OIDC issuer standing in for Entra ID in tests runs over plain HTTP — never
+  // relaxed in production, even if CONSOLE_ENTRA_ISSUER_BASE_URL were ever misconfigured.
+  const insecure = issuerUrl.protocol === 'http:' && process.env.NODE_ENV !== 'production';
   return client.discovery(
     issuerUrl,
     config.entraClientId,
@@ -81,7 +82,7 @@ export async function beginSignIn(returnTo?: string): Promise<{ redirectUrl: str
     code_challenge_method: 'S256',
   });
 
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   await redis.setex(signInStateKey(config, state), SIGN_IN_STATE_TTL_SECONDS, JSON.stringify(signInState));
 
   return { redirectUrl: authorizationUrl.toString(), state: signInState };
@@ -115,7 +116,7 @@ export function scopesFromAccessToken(accessToken: string): string[] {
  */
 export async function completeSignIn(params: { code: string; state: string }): Promise<SignInResult> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   const key = signInStateKey(config, params.state);
   const raw = await redis.get(key);
   if (!raw) {

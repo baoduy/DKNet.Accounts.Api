@@ -30,16 +30,24 @@ export function AppShell({
   style,
 }: AppShellProps): JSX.Element {
   // No stored theme choice exists (out of scope this ticket) — the frame picks up the OS
-  // preference itself, on every render, the same way the CSS `@media` block would. jsdom
-  // (the unit-test harness) cannot resolve `var()` in a computed `background`/`color`
-  // shorthand, so this reads the already-resolved custom properties and mirrors them onto
-  // `document.body` inline — real browsers already get the same values from base.css alone.
+  // preference itself, live: an OS theme change flips it with no reload, via the same
+  // `prefers-color-scheme` query the CSS `@media` block matches. jsdom (the unit-test
+  // harness) cannot resolve `var()` in a computed `background`/`color` shorthand, so this
+  // reads the already-resolved custom properties and mirrors them onto `document.body`
+  // inline — real browsers already get the same values from base.css alone.
   useLayoutEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
-    const rootStyle = getComputedStyle(document.documentElement);
-    document.body.style.backgroundColor = rootStyle.getPropertyValue('--background').trim();
-    document.body.style.color = rootStyle.getPropertyValue('--foreground').trim();
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = (): void => {
+      document.documentElement.dataset.theme = mql.matches ? 'dark' : 'light';
+      const rootStyle = getComputedStyle(document.documentElement);
+      document.body.style.backgroundColor = rootStyle.getPropertyValue('--background').trim();
+      document.body.style.color = rootStyle.getPropertyValue('--foreground').trim();
+    };
+
+    applyTheme();
+    mql.addEventListener('change', applyTheme);
+    return () => mql.removeEventListener('change', applyTheme);
   }, []);
 
   return (

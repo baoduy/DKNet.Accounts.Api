@@ -26,7 +26,7 @@ export async function storeAccessToken(
   refreshToken?: string,
 ): Promise<void> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   const record: CachedAccessToken = {
     sessionId,
     encryptedToken: encrypt(config.tokenEncryptionKey, accessToken),
@@ -40,7 +40,7 @@ export async function storeAccessToken(
 /** Reads and decrypts the cached token for a session. Expired or missing → `null`. */
 export async function getAccessToken(sessionId: string): Promise<{ accessToken: string; refreshToken?: string } | null> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   const raw = await redis.get(tokenKey(config, sessionId));
   if (!raw) return null;
   const record = JSON.parse(raw) as CachedAccessToken;
@@ -54,6 +54,6 @@ export async function getAccessToken(sessionId: string): Promise<{ accessToken: 
 /** Drops the cached token for a session — used by `/signout`. */
 export async function deleteAccessToken(sessionId: string): Promise<void> {
   const config = loadConfig();
-  const redis = getRedisClient(config);
+  const redis = getRedisClient();
   await redis.del(tokenKey(config, sessionId));
 }

@@ -24,7 +24,6 @@ describe('loadConfig', () => {
         CONSOLE_ENTRA_SCOPES: 'accounts.read postings.read',
         CONSOLE_API_BASE_URL: 'http://127.0.0.1:8080',
         CONSOLE_REDIS_KEY_PREFIX: 'console:',
-        CONSOLE_PORT: '3100',
       }),
     );
 
@@ -39,7 +38,6 @@ describe('loadConfig', () => {
       redisKeyPrefix: 'console:',
       sessionSecret: 'session-secret',
       tokenEncryptionKey: '0123456789abcdef0123456789abcdef',
-      port: 3100,
     });
   });
 
@@ -52,17 +50,23 @@ describe('loadConfig', () => {
     },
   );
 
-  it('defaults entraScopes, redisKeyPrefix and port when unset', () => {
+  it('defaults entraScopes and redisKeyPrefix when unset', () => {
     const config = loadConfig(env(BASE_ENV));
     expect(config.entraScopes).toEqual([]);
     expect(config.redisKeyPrefix).toBe('console:');
-    expect(config.port).toBe(3000);
     expect(config.entraTenantId).toBe('');
     expect(config.entraClientId).toBe('');
   });
 
-  it('falls back to PORT when CONSOLE_PORT is unset', () => {
-    expect(loadConfig(env({ ...BASE_ENV, PORT: '4000' })).port).toBe(4000);
+  it.each([
+    ['too short', '0123456789abcdef'],
+    ['too long', '0123456789abcdef0123456789abcdef-extra'],
+  ])('refuses a token encryption key that is %s (A3)', (_label, key) => {
+    expect(() => loadConfig(env({ ...BASE_ENV, CONSOLE_TOKEN_ENCRYPTION_KEY: key }))).toThrow(/32 bytes/);
+  });
+
+  it('accepts an exactly-32-byte token encryption key', () => {
+    expect(loadConfig(env(BASE_ENV)).tokenEncryptionKey).toBe('0123456789abcdef0123456789abcdef');
   });
 });
 

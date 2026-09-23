@@ -13,8 +13,10 @@ export interface ConsoleConfig {
   redisKeyPrefix: string;
   sessionSecret: string;
   tokenEncryptionKey: string;
-  port: number;
 }
+
+/** AES-256 needs exactly 32 key bytes — `CONSOLE_TOKEN_ENCRYPTION_KEY` is used as raw UTF-8 key material (`lib/crypto.ts`). */
+const TOKEN_ENCRYPTION_KEY_BYTES = 32;
 
 export type ConsoleConfigMode = 'configured' | 'notConfigured';
 
@@ -33,6 +35,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConsoleConfig 
     return value;
   };
 
+  const tokenEncryptionKey = required('CONSOLE_TOKEN_ENCRYPTION_KEY');
+  const keyBytes = Buffer.byteLength(tokenEncryptionKey, 'utf8');
+  if (keyBytes !== TOKEN_ENCRYPTION_KEY_BYTES) {
+    throw new Error(`CONSOLE_TOKEN_ENCRYPTION_KEY must be exactly ${TOKEN_ENCRYPTION_KEY_BYTES} bytes (utf8); got ${keyBytes}`);
+  }
+
   return {
     entraTenantId: env.CONSOLE_ENTRA_TENANT_ID ?? '',
     entraClientId: env.CONSOLE_ENTRA_CLIENT_ID ?? '',
@@ -43,8 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConsoleConfig 
     redisUrl: required('CONSOLE_REDIS_URL'),
     redisKeyPrefix: env.CONSOLE_REDIS_KEY_PREFIX ?? 'console:',
     sessionSecret: required('CONSOLE_SESSION_SECRET'),
-    tokenEncryptionKey: required('CONSOLE_TOKEN_ENCRYPTION_KEY'),
-    port: Number(env.CONSOLE_PORT ?? env.PORT ?? 3000),
+    tokenEncryptionKey,
   };
 }
 
