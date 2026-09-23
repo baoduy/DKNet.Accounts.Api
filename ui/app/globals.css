@@ -1,0 +1,26 @@
+/* Design system tokens — pulled by relative path, never restated (DRK-1669 §3 R1). */
+@import '../../Design/tokens/colors.css';
+@import '../../Design/tokens/spacing.css';
+@import '../../Design/tokens/typography.css';
+@import '../../Design/tokens/elevation.css';
+@import '../../Design/tokens/base.css';
+
+/* fonts.css is deliberately NOT imported: it loads Inter and JetBrains Mono from the
+   Google CDN, and the console must serve its own typefaces (R10). See app/layout.tsx,
+   which binds next/font/google output to --font-sans / --font-mono instead. */
+
+/* The four accessibility overrides Design/README.md:203 records, carried verbatim. */
+:root {
+  --input: var(--border-control);
+  --ring: var(--focus-ring);
+  --destructive: var(--destructive-solid);
+  --accent: var(--surface-selected);
+}
+
+/* The identity menu's <summary> is its own disclosure toggle — hide the browser's default
+   marker glyph, which the chevron icon already stands in for. */
+summary::-webkit-details-marker,
+summary::marker {
+  display: none;
+  content: '';
+}
