@@ -18,6 +18,9 @@ namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 /// </summary>
 public sealed record UpdateAccountRequest : Fluents.Requests.IWitResponse<AccountDto>
 {
+    /// <summary>Always the route's <c>{id}</c>, set by the endpoint — never read from the body, so a caller
+    /// cannot have the request validated against one account and applied to another (DRK-1723).</summary>
+    [JsonIgnore]
     public Guid Id { get; set; }
 
     public AccountStatus? Status { get; set; }
@@ -51,8 +54,9 @@ internal sealed class UpdateAccountCommandValidator : AbstractValidator<UpdateAc
                     .FirstOrDefaultAsync(ct);
         }
 
-        // PATCH /accounts/{id} binds only the body, and the endpoint validation runs before the route's id is
-        // copied onto the request — so until then the id is the route's.
+        // The endpoint validates the body before it copies the route's id onto the request, and the body can
+        // never carry one (Id is [JsonIgnore]) — so over HTTP the id is the route's. A caller that builds the
+        // request itself (a direct send) sets Id.
         Guid AccountIdOf(UpdateAccountRequest request) =>
             request.Id != Guid.Empty
                 ? request.Id

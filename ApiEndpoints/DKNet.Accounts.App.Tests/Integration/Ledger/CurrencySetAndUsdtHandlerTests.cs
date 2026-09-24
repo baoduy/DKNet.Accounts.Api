@@ -305,6 +305,27 @@ public sealed class CurrencySetAndUsdtHandlerTests(LedgerApiFixture fixture) : I
         (await SendOkAsync(HttpMethod.Get, $"{AccountsPath}/{accountId}")).TryGetProperty(member, out _).ShouldBeFalse();
     }
 
+    // DRK-1723 review finding: the limit rule must check the account the PATCH writes to — the route's — never
+    // an id the caller slips into the body.
+    [Fact]
+    public async Task PatchingALimit_WithAnotherIdInTheBody_IsCheckedAgainstTheRoutesAccount()
+    {
+        var sgdAccountId = await OpenAccountAsync("SGD");
+        var code = "THR" + new string(Guid.NewGuid().ToString("N").Where(char.IsLetter).Take(4).ToArray()).ToUpperInvariant();
+        await SendOkAsync(HttpMethod.Post, "/v1/currencies", new { code, name = "Three Places", decimalPlaces = 3 });
+        var threePlaceAccountId = await OpenAccountAsync(code);
+
+        var withRandomId = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{sgdAccountId}",
+            new { id = Guid.NewGuid(), minimumBalance = 10.123m }));
+        var withThreePlaceAccountId = await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{sgdAccountId}",
+            new { id = threePlaceAccountId, minimumBalance = 10.123m }));
+
+        await ShouldBeRefusedAsync(withRandomId, LedgerErrors.InvalidLimitAmount, "MinimumBalance");
+        await ShouldBeRefusedAsync(withThreePlaceAccountId, LedgerErrors.InvalidLimitAmount, "MinimumBalance");
+        (await SendOkAsync(HttpMethod.Get, $"{AccountsPath}/{sgdAccountId}")).TryGetProperty("minimumBalance", out _).ShouldBeFalse();
+        (await SendOkAsync(HttpMethod.Get, $"{AccountsPath}/{threePlaceAccountId}")).TryGetProperty("minimumBalance", out _).ShouldBeFalse();
+    }
+
     [Fact]
     public async Task PatchingALimitAtTheCurrencysPlaces_IsAccepted()
     {

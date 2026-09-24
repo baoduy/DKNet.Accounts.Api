@@ -8,6 +8,8 @@ internal sealed record SeededCurrency(Guid Id, string Code, string Name, int Dec
 /// test harness that re-seeds a database the migrations never ran on — so the two can never disagree.
 /// A fiat id ends in its ISO 4217 numeric code (<c>c0de0001-…-000000000978</c> is EUR); a non-ISO asset
 /// takes the <c>c0de0002-</c> prefix, which no ISO-derived id can collide with.
+/// Never edit or reorder a list once its migration has shipped — a migration re-reads it every time it runs.
+/// A new seeded currency goes in a new list, inserted by its own new migration, and joins <see cref="All"/>.
 /// </summary>
 internal static class SeededCurrencies
 {
