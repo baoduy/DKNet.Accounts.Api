@@ -17,6 +17,8 @@ export interface ConfirmMovementProps {
   direction?: 'Credit' | 'Debit';
   amount?: number | string;
   currency?: string;
+  /** Unused by the single movement since DRK-1713 §3 row 11 — it restates the amount as typed,
+   * never re-scaled. Batch legs carry their own. */
   decimalPlaces?: number;
   accountNumber?: string;
   accountName?: string;
@@ -35,7 +37,6 @@ export function ConfirmMovement({
   direction,
   amount,
   currency,
-  decimalPlaces,
   accountNumber,
   accountName,
   effectiveDate,
@@ -66,17 +67,21 @@ export function ConfirmMovement({
             </ul>
           </div>
         ) : (
-          <p>
-            This will {direction === 'Debit' ? 'debit' : 'credit'}{' '}
-            <Money amount={amount ?? 0} currency={currency} decimalPlaces={decimalPlaces} showCurrency />{' '}
-            {direction === 'Debit' ? 'from' : 'to'} <AccountNumber value={accountNumber ?? ''} />
-            {accountName ? ` (${accountName})` : ''}
-            {effectiveDate ? `, effective ${effectiveDate}` : ''}
-            {category ? `, category ${category}` : ''}.
-          </p>
+          <>
+            {/* DRK-1713 §3 row 11 — the movement restated with the amount exactly as typed: never
+                through `Money`, which would re-pad or regroup it. */}
+            <p>
+              {direction} {String(amount ?? '')} {currency} {direction === 'Debit' ? 'from' : 'to'} <AccountNumber value={accountNumber ?? ''} />
+            </p>
+            {accountName || effectiveDate || category ? (
+              <p className="text-muted-foreground">
+                {[accountName, effectiveDate ? `effective ${effectiveDate}` : '', category ? `category ${category}` : ''].filter(Boolean).join(', ')}
+              </p>
+            ) : null}
+          </>
         )}
 
-        {consequence ? <p className="text-muted-foreground">{consequence}</p> : null}
+        {consequence ? <div className="text-muted-foreground">{consequence}</div> : null}
 
         <DialogFooter>
           <Button variant="default" onClick={onBack}>

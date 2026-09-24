@@ -23,9 +23,9 @@ describe('ConfirmMovement — single movement', () => {
         confirmLabel: 'Record posting',
       }),
     );
-    expect(document.body.querySelector('p')?.textContent).toBe(
-      'This will debit 12,400.00 SGD from ACME-000123 (Operating Account), effective 21 Sep 2026, category Transfer.',
-    );
+    const [movement, details] = Array.from(document.body.querySelectorAll('p')).map((p) => p.textContent);
+    expect(movement).toBe('Debit 12400.00 SGD from ACME-000123');
+    expect(details).toBe('Operating Account, effective 21 Sep 2026, category Transfer');
 
     screen.getByRole('button', { name: 'Back' }).click();
     expect(onBack).toHaveBeenCalled();
@@ -43,9 +43,30 @@ describe('ConfirmMovement — single movement', () => {
         consequence: 'A new opposing posting will be recorded; the original is marked Reversed. Nothing is deleted.',
       }),
     );
-    expect(document.body.querySelector('p')?.textContent).toBe('This will credit 892.45 SGD to ACME-000123.');
+    expect(document.body.querySelector('p')?.textContent).toBe('Credit 892.45 SGD to ACME-000123');
     expect(screen.getByText(/Nothing is deleted/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
+  });
+});
+
+describe('ConfirmMovement — single movement details', () => {
+  it('lists only the optional details given, the amount still exactly as typed', () => {
+    render(createElement(ConfirmMovement, { direction: 'Credit', amount: '9007199254740993.01', currency: 'SGD', decimalPlaces: 2, accountNumber: 'ACME-000123', category: 'Fee' }));
+    const [movement, details] = Array.from(document.body.querySelectorAll('p')).map((p) => p.textContent);
+    expect(movement).toBe('Credit 9007199254740993.01 SGD to ACME-000123');
+    expect(details).toBe('category Fee');
+  });
+
+  it('lists an effective date given alone', () => {
+    render(createElement(ConfirmMovement, { direction: 'Credit', amount: '1', currency: 'JPY', accountNumber: 'ACME-000123', effectiveDate: '2026-09-01' }));
+    expect(Array.from(document.body.querySelectorAll('p')).map((p) => p.textContent)[1]).toBe('effective 2026-09-01');
+  });
+});
+
+describe('ConfirmMovement — single movement, bare', () => {
+  it('draws no details line when no optional detail is given, and no amount when none is given', () => {
+    render(createElement(ConfirmMovement, { direction: 'Debit', currency: 'SGD', accountNumber: 'ACME-000123' }));
+    expect(Array.from(document.body.querySelectorAll('p')).map((p) => p.textContent)).toEqual(['Debit  SGD from ACME-000123']);
   });
 });
 
@@ -63,7 +84,7 @@ describe('ConfirmMovement — batch mode', () => {
 
   it('falls back to an empty account number when none is given', () => {
     render(createElement(ConfirmMovement, { direction: 'Credit', amount: '10.00', currency: 'SGD' }));
-    expect(document.body.querySelector('p')?.textContent).toBe('This will credit 10.00 SGD to .');
+    expect(document.body.querySelector('p')?.textContent).toBe('Credit 10.00 SGD to ');
   });
 
   it('falls back to the single-movement paragraph when legs is an empty array', () => {

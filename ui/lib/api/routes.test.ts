@@ -10,6 +10,8 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/postings' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings/{id}/reverse' });
+    // DRK-1713 §3 row 1 — reading one posting, to follow a posting to its reversal.
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/postings/{id}' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/currencies' });
     // DRK-1696 §3 row 1 — the accounts screen's own widening of the allowlist.
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts' });
@@ -31,7 +33,7 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/close' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/activate' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}/balances' });
-    expect(routes).toHaveLength(25);
+    expect(routes).toHaveLength(26);
   });
 });
 
@@ -63,9 +65,9 @@ describe('isLedgerRouteAllowed', () => {
 
   it('refuses a path with the wrong segment count, even as a prefix or suffix match', () => {
     expect(isLedgerRouteAllowed('GET', ['accounts', 'ACME-000123', 'balance', 'extra'])).toBe(false);
-    // Not `/currencies/extra` — DRK-1697 §3a's `GET /currencies/{id}` legitimately matches any
-    // 2-segment `currencies/*` path now. `/postings` has no `{id}`-shaped GET at all.
-    expect(isLedgerRouteAllowed('GET', ['postings', 'extra'])).toBe(false);
+    // Not `/currencies/extra` or `/postings/extra` — `GET /currencies/{id}` (DRK-1697 §3a) and
+    // `GET /postings/{id}` (DRK-1713 §3 row 1) legitimately match any 2-segment path there.
+    expect(isLedgerRouteAllowed('GET', ['postings', 'a', 'b'])).toBe(false);
   });
 
   it('requires every segment to match, not merely one of them', () => {

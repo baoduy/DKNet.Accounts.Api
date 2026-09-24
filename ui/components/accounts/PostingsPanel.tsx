@@ -31,6 +31,9 @@ export interface PostingsPanelRow {
   status?: string;
   description?: string;
   effectiveDate: string;
+  /** DRK-1713 §3 row 14 — the links between a posting and its reversal, so `Reverse` is refused on either. */
+  reversedByPostingId?: string | null;
+  reversesPostingId?: string | null;
 }
 
 export interface PostingsPanelFilter {

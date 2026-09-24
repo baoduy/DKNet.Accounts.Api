@@ -25,6 +25,8 @@ test("A refused posting is shown with the service's own code", async ({ page, ba
   await page.getByLabel('Amount', { exact: true }).fill('20000.00');
   await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record' }).click();
+  // DRK-1713 §3 row 10 — recording is confirmed before anything is sent.
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
 
   await expect(page.getByText('INSUFFICIENT_FUNDS')).toBeVisible();
   await expect(page.getByText('The debit would take the account past its floor.')).toBeVisible();

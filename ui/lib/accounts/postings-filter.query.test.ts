@@ -110,3 +110,25 @@ describe('defaultPostingsFilter', () => {
     expect(filter.status).toBe('');
   });
 });
+
+describe('toPostingsQuery — the Records screen (DRK-1713 §3 row 3)', () => {
+  it('names no account when the account id is empty', () => {
+    expect(toPostingsQuery('', BASE)!.has('accountId')).toBe(false);
+  });
+
+  it('sends nothing for a 1-character search, and a 2-character search as typed', () => {
+    expect(toPostingsQuery('', { ...BASE, search: 'P' })).toBeNull();
+    expect(toPostingsQuery('', { ...BASE, search: 'P-' })!.get('search')).toBe('P-');
+  });
+
+  it('omits search, orderBy, desc and pageNumber when unset', () => {
+    const params = toPostingsQuery('', BASE)!;
+    expect(['search', 'orderBy', 'desc', 'pageNumber'].filter((key) => params.has(key))).toEqual([]);
+  });
+
+  it('sends orderBy, desc and pageNumber when set, and no desc for an ascending order', () => {
+    const params = toPostingsQuery('', { ...BASE, orderBy: 'Amount', desc: true, pageNumber: 2 }, 10)!;
+    expect(params.toString()).toBe('from=2026-01-01&to=2026-01-31&orderBy=Amount&desc=true&pageNumber=2&pageSize=10');
+    expect(toPostingsQuery('', { ...BASE, orderBy: 'Amount', desc: false })!.has('desc')).toBe(false);
+  });
+});

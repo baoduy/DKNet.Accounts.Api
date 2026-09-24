@@ -26,12 +26,19 @@ export function postingPeriodError(from: string, to: string): string | null {
   return spanDays > MAX_POSTING_PERIOD_DAYS ? `The period may span at most ${MAX_POSTING_PERIOD_DAYS} days.` : null;
 }
 
+export const MIN_POSTING_SEARCH_LENGTH = 2;
+
 export interface PostingsFilterState {
   from: string;
   to: string;
   direction: string;
   category: string;
   status: string;
+  /** DRK-1713 §3 row 3 — the Records screen's own search, sort and page; the detail screen sets none. */
+  search?: string;
+  orderBy?: string;
+  desc?: boolean;
+  pageNumber?: number;
 }
 
 /** Opens on the last 30 days, per the decision log ("the detail screen's posting list opens
@@ -41,18 +48,24 @@ export function defaultPostingsFilter(now: Date = new Date()): PostingsFilterSta
   return { from: toDateOnly(from), to: toDateOnly(now), direction: '', category: '', status: '' };
 }
 
-/** Screen state → the service's query string. A period over 90 days produces no query at all
- * (R2 — no call is ever made for a refused period). */
+/** Screen state → the service's query string. A period over 90 days, or a search term under 2
+ * characters, produces no query at all (R2 — no call is ever made for a refused period or term).
+ * An empty `accountId` lists postings across every account (DRK-1713 §3 row 3). */
 export function toPostingsQuery(accountId: string, filter: PostingsFilterState, pageSize?: number): URLSearchParams | null {
   if (postingPeriodError(filter.from, filter.to) !== null) return null;
+  if (filter.search && filter.search.length < MIN_POSTING_SEARCH_LENGTH) return null;
 
   const params = new URLSearchParams();
-  params.set('accountId', accountId);
+  if (accountId) params.set('accountId', accountId);
   params.set('from', filter.from);
   params.set('to', filter.to);
   if (filter.direction) params.set('direction', filter.direction);
   if (filter.category) params.set('category', filter.category);
   if (filter.status) params.set('status', filter.status);
+  if (filter.search) params.set('search', filter.search);
+  if (filter.orderBy) params.set('orderBy', filter.orderBy);
+  if (filter.desc) params.set('desc', 'true');
+  if (filter.pageNumber !== undefined) params.set('pageNumber', String(filter.pageNumber));
   if (pageSize !== undefined) params.set('pageSize', String(pageSize));
   return params;
 }

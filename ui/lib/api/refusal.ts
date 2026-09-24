@@ -22,12 +22,27 @@ function normaliseFieldKey(field: string): string {
   return field.charAt(0).toLowerCase() + field.slice(1);
 }
 
-export function routeRefusal(errors: LedgerError[]): RoutedRefusal {
+/**
+ * DRK-1713 §3 row 13 — the record form's codes the service sends with no `field`: an account
+ * status refusal belongs on the account control, an amount or floor refusal on the amount.
+ */
+export const RECORD_POSTING_CODE_FIELDS: Record<string, string> = {
+  ACCOUNT_FROZEN: 'accountId',
+  ACCOUNT_CLOSED: 'accountId',
+  ACCOUNT_DORMANT_DEBIT_REFUSED: 'accountId',
+  INSUFFICIENT_FUNDS: 'amount',
+  INVALID_POSTING_AMOUNT: 'amount',
+};
+
+/** `codeFields` routes a field-less entry by its code; the caller names only the codes its own
+ * controls can carry, so any other form keeps showing them in its alert. */
+export function routeRefusal(errors: LedgerError[], codeFields: Record<string, string> = {}): RoutedRefusal {
   const fieldErrors: Record<string, LedgerError> = {};
   const alertErrors: LedgerError[] = [];
   for (const error of errors) {
-    if (error.field) {
-      fieldErrors[normaliseFieldKey(error.field)] = error;
+    const field = error.field ? normaliseFieldKey(error.field) : error.code ? codeFields[error.code] : undefined;
+    if (field) {
+      fieldErrors[field] = error;
     } else {
       alertErrors.push(error);
     }
