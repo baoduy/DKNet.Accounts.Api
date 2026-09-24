@@ -18,6 +18,28 @@ export function currenciesKey(): readonly unknown[] {
   return ['ledger', 'currencies'] as const;
 }
 
+/** DRK-1697 §3 row 9 — one key per account-groups resource, mirroring the accounts/postings shapes above. */
+export function accountGroupsListKey(filters: Record<string, unknown>): readonly unknown[] {
+  return ['ledger', 'account-groups', filters] as const;
+}
+
+export function accountGroupKey(groupId: string): readonly unknown[] {
+  return ['ledger', 'account-group', groupId] as const;
+}
+
+export function accountGroupBalancesKey(groupId: string): readonly unknown[] {
+  return ['ledger', 'account-group', groupId, 'balances'] as const;
+}
+
+export function currencyKey(currencyId: string): readonly unknown[] {
+  return ['ledger', 'currency', currencyId] as const;
+}
+
+/** The ledger-wide per-currency totals (`GET /v1/accounts/balances`) — used only to tell whether a currency still holds a balance. */
+export function ledgerBalancesKey(): readonly unknown[] {
+  return ['ledger', 'accounts', 'balances'] as const;
+}
+
 /**
  * DRK-1684 row 7 / pr-reviewer finding 7 (DRK-1687): the currency list is reference data for
  * the session — held at `staleTime: Infinity`, opting out of the global `refetchOnMount:

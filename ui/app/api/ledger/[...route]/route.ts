@@ -68,10 +68,14 @@ async function passThrough(request: NextRequest, context: RouteParams): Promise<
   responseHeaders.delete('content-encoding');
   responseHeaders.delete('content-length');
   responseHeaders.delete('transfer-encoding');
-  return new Response(responseBody, { status: ledgerResponse.status, headers: responseHeaders });
+  // A 204 (e.g. `DELETE /v1/account-groups/{id}`) is spec'd to carry no body — the `Response`
+  // constructor throws if handed one even when it is a zero-length buffer.
+  const hasNoBody = [204, 205, 304].includes(ledgerResponse.status);
+  return new Response(hasNoBody ? null : responseBody, { status: ledgerResponse.status, headers: responseHeaders });
 }
 
 export const GET = passThrough;
 export const POST = passThrough;
+export const PUT = passThrough;
 export const PATCH = passThrough;
 export const DELETE = passThrough;

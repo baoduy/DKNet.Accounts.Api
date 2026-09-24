@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { accountBalanceKey, accountsListKey, currenciesKey, currenciesQueryOptions, postingsListKey } from './keys';
+import {
+  accountBalanceKey,
+  accountGroupBalancesKey,
+  accountGroupKey,
+  accountGroupsListKey,
+  accountsListKey,
+  currenciesKey,
+  currenciesQueryOptions,
+  currencyKey,
+  ledgerBalancesKey,
+  postingsListKey,
+} from './keys';
 
 describe('query keys', () => {
   it('keys an account balance by its account id, sharable across every caller', () => {
@@ -30,8 +41,35 @@ describe('query keys', () => {
   });
 
   it('never collides across resources', () => {
-    const keys = [accountBalanceKey('x'), accountsListKey({}), postingsListKey({}), currenciesKey()];
+    const keys = [
+      accountBalanceKey('x'),
+      accountsListKey({}),
+      postingsListKey({}),
+      currenciesKey(),
+      accountGroupsListKey({}),
+      accountGroupKey('g1'),
+      accountGroupBalancesKey('g1'),
+      currencyKey('c1'),
+    ];
     const serialized = keys.map((key) => JSON.stringify(key));
     expect(new Set(serialized).size).toBe(keys.length);
+  });
+
+  it('keys an account groups list by its filters', () => {
+    expect(accountGroupsListKey({ status: 'Closed' })).toEqual(['ledger', 'account-groups', { status: 'Closed' }]);
+  });
+
+  it('keys a single account group and its balances by group id', () => {
+    expect(accountGroupKey('TRSY')).toEqual(['ledger', 'account-group', 'TRSY']);
+    expect(accountGroupBalancesKey('TRSY')).toEqual(['ledger', 'account-group', 'TRSY', 'balances']);
+  });
+
+  it('keys a single currency by its id', () => {
+    expect(currencyKey('VND')).toEqual(['ledger', 'currency', 'VND']);
+    expect(currencyKey('VND')).not.toEqual(currencyKey('SGD'));
+  });
+
+  it('gives the ledger-wide balances one fixed key', () => {
+    expect(ledgerBalancesKey()).toEqual(['ledger', 'accounts', 'balances']);
   });
 });

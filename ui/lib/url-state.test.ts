@@ -23,9 +23,19 @@ describe('parseListViewState / toListViewSearchParams', () => {
     expect(state.filters).toEqual({ currency: 'SGD' });
   });
 
-  it('omits sort, page and open when unset', () => {
+  it('omits sort, page, pageSize and open when unset', () => {
     const state = parseListViewState(new URLSearchParams('currency=SGD'));
     expect(state).toEqual({ filters: { currency: 'SGD' } });
+  });
+
+  it('round-trips an explicit pageSize, engaged only once pagination is used', () => {
+    const state = { filters: { status: 'Closed' }, page: 2, pageSize: 10 };
+    expect(parseListViewState(toListViewSearchParams(state))).toEqual(state);
+  });
+
+  it('excludes pageSize from the parsed filters', () => {
+    const state = parseListViewState(new URLSearchParams('status=Closed&pageSize=10'));
+    expect(state.filters).toEqual({ status: 'Closed' });
   });
 
   it('produces no search params for an empty state', () => {
