@@ -18,6 +18,14 @@ export function currenciesKey(): readonly unknown[] {
   return ['ledger', 'currencies'] as const;
 }
 
+export function accountKey(idOrNumber: string): readonly unknown[] {
+  return ['ledger', 'account', idOrNumber] as const;
+}
+
+export function accountGroupsKey(): readonly unknown[] {
+  return ['ledger', 'account-groups'] as const;
+}
+
 /**
  * DRK-1684 row 7 / pr-reviewer finding 7 (DRK-1687): the currency list is reference data for
  * the session — held at `staleTime: Infinity`, opting out of the global `refetchOnMount:

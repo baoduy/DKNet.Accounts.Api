@@ -1,0 +1,124 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useAccount, useAccountGroups, useAccounts, useCurrencies } from './query';
+
+function wrapper(queryClient: QueryClient) {
+  return ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+function jsonResponse(body: unknown, status = 200): { status: number; text: () => Promise<string> } {
+  return { status, text: async () => JSON.stringify(body) };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('useAccounts', () => {
+  it('fetches the paged list through the pass-through, parsed with parseLedgerJson', async () => {
+    const page = { items: [{ accountNumber: 'ACME-000001', balance: '100.00' }], pageNumber: 1, pageSize: 20, pageCount: 1, totalItemCount: 1 };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccounts({ filters: {} }), { wrapper: wrapper(queryClient) });
+
+    // parseLedgerJson reads every numeric literal back as text (R1) — pageNumber/pageCount
+    // included, not only money fields.
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        items: page.items,
+        pageNumber: '1',
+        pageSize: '20',
+        pageCount: '1',
+        totalItemCount: '1',
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/ledger/accounts?pageNumber=1'));
+  });
+
+  it('makes no call for a search term under the minimum length', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    renderHook(() => useAccounts({ filters: { search: 'a' } }), { wrapper: wrapper(queryClient) });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAccount', () => {
+  it('reads a guid id directly and reports it found', async () => {
+    const account = { id: '11111111-1111-4111-8111-111111111111', accountNumber: 'ACME-000123' };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(account));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccount('11111111-1111-4111-8111-111111111111'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual({ found: true, account }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts/11111111-1111-4111-8111-111111111111');
+  });
+
+  it('resolves a non-guid via filter=AccountNumber:Equal:<value>', async () => {
+    const account = { id: 'a1', accountNumber: 'ACME-000123' };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [account] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccount('ACME-000123'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual({ found: true, account }));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('filter=AccountNumber%3AEqual%3AACME-000123'));
+  });
+
+  it('reports a guid id the service returns 404 for as not found — never the first row', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 404, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccount('11111111-1111-4111-8111-111111111111'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual({ found: false }));
+  });
+
+  it('reports an account number matching no row as not found — never the first row', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccount('ACME-999999'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual({ found: false }));
+  });
+});
+
+describe('useAccountGroups', () => {
+  it('fetches the account groups list, unwrapping the paged envelope', async () => {
+    const groups = [{ id: 'g1', code: 'ACME', name: 'ACME' }];
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: groups }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccountGroups(), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual(groups));
+    expect(fetchMock).toHaveBeenCalledWith('/api/ledger/account-groups');
+  });
+});
+
+describe('useCurrencies', () => {
+  it('fetches the currency list with the reference-data query options', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{ code: 'SGD', decimalPlaces: 2 }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useCurrencies(), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual([{ code: 'SGD', decimalPlaces: '2' }]));
+    expect(fetchMock).toHaveBeenCalledWith('/api/ledger/currencies');
+  });
+});

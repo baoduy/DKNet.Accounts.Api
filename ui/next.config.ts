@@ -14,6 +14,11 @@ export default function config(phase: string): NextConfig {
 
   return {
     output: 'standalone',
+    // The floating dev-tools badge renders a button labelled "Open Next.js Dev Tools", which
+    // collides with any on-screen button whose own name contains "Open" (e.g. the accounts
+    // form's `Open` submit) under the acceptance suite's substring-matching role queries.
+    // Dev-only UI; never present in a production build.
+    devIndicators: false,
     // The acceptance suite runs several `next dev` instances against this same checkout,
     // one at a time, on different ports (the shared `webServer` plus per-scenario restarts).
     // Without this they'd all write into the same `.next/`, corrupting each other's dev

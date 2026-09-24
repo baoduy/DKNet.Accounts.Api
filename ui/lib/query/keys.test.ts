@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountBalanceKey, accountsListKey, currenciesKey, currenciesQueryOptions, postingsListKey } from './keys';
+import { accountBalanceKey, accountGroupsKey, accountKey, accountsListKey, currenciesKey, currenciesQueryOptions, postingsListKey } from './keys';
 
 describe('query keys', () => {
   it('keys an account balance by its account id, sharable across every caller', () => {
@@ -29,8 +29,17 @@ describe('query keys', () => {
     });
   });
 
+  it('keys a single account by its id or account number, sharable across every caller', () => {
+    expect(accountKey('ACME-000123')).toEqual(accountKey('ACME-000123'));
+    expect(accountKey('ACME-000123')).not.toEqual(accountKey('ACME-000456'));
+  });
+
+  it('gives the account groups list one fixed key', () => {
+    expect(accountGroupsKey()).toEqual(['ledger', 'account-groups']);
+  });
+
   it('never collides across resources', () => {
-    const keys = [accountBalanceKey('x'), accountsListKey({}), postingsListKey({}), currenciesKey()];
+    const keys = [accountBalanceKey('x'), accountsListKey({}), postingsListKey({}), currenciesKey(), accountKey('x'), accountGroupsKey()];
     const serialized = keys.map((key) => JSON.stringify(key));
     expect(new Set(serialized).size).toBe(keys.length);
   });

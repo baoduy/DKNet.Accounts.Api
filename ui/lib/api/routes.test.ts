@@ -11,7 +11,14 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/postings/{id}/reverse' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/currencies' });
-    expect(routes).toHaveLength(7);
+    // DRK-1696 §3 row 1 — the accounts screen's own widening of the allowlist.
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/accounts' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts/{id}' });
+    expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/accounts/{id}' });
+    expect(routes).toContainEqual({ method: 'PATCH', pathTemplate: '/accounts/{id}' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups' });
+    expect(routes).toHaveLength(13);
   });
 });
 
@@ -36,7 +43,7 @@ describe('isLedgerRouteAllowed', () => {
 
   it('refuses a path with the wrong segment count, even as a prefix or suffix match', () => {
     expect(isLedgerRouteAllowed('GET', ['accounts', 'ACME-000123', 'balance', 'extra'])).toBe(false);
-    expect(isLedgerRouteAllowed('GET', ['accounts'])).toBe(false);
+    expect(isLedgerRouteAllowed('GET', ['currencies', 'extra'])).toBe(false);
   });
 
   it('requires every segment to match, not merely one of them', () => {

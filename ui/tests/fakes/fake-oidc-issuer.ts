@@ -23,11 +23,15 @@ import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 const PORT = Number(process.env.FAKE_OIDC_PORT ?? 4488);
 
 const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName: string; scopes: string[] }> = {
+  // DRK-1696 §5 introduces `MAI_WITH_WRITE` (`accounts.write`, `postings.write`) against this
+  // same identity/email — no scope-count-sensitive scenario targets `mai@drunkcoding.net`
+  // directly (those use the distinct `mai-partial@...`/`nam@...` identities below), so the
+  // full grant is a safe superset for every scenario driving this address.
   'mai@drunkcoding.net': {
     name: 'Mai Nguyen',
     objectId: '11111111-1111-4111-8111-111111111111',
     tenantName: 'Drunk Coding',
-    scopes: ['accounts.read', 'postings.read', 'postings.reverse'],
+    scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'],
   },
   'mai-partial@drunkcoding.net': {
     name: 'Mai Nguyen',
