@@ -10,8 +10,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(mockSearch),
 }));
 
-function jsonResponse(body: unknown, status = 200): { status: number; text: () => Promise<string>; json: () => Promise<unknown> } {
-  return { status, text: async () => JSON.stringify(body), json: async () => body };
+function jsonResponse(body: unknown, status = 200): { status: number; ok: boolean; text: () => Promise<string>; json: () => Promise<unknown> } {
+  return { status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body), json: async () => body };
 }
 
 const ACCOUNTS_PAGE = {

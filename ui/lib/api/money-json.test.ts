@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { isZeroAmount, parseLedgerJsonPreservingNumbers, readLedgerJson } from './money-json';
 
 describe('parseLedgerJsonPreservingNumbers', () => {
+  it('ends an exponent at the first non-digit, keeping the next member intact', () => {
+    expect(parseLedgerJsonPreservingNumbers('{"a":1e5,"b":2,"c":1E-5}')).toEqual({ a: '1e5', b: '2', c: '1E-5' });
+  });
+
   it('keeps every digit of a number past 2^53, as a string', () => {
     const parsed = parseLedgerJsonPreservingNumbers('{"balance":9007199254740993.01}') as { balance: unknown };
     expect(parsed.balance).toBe('9007199254740993.01');

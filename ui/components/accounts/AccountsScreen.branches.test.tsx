@@ -1,6 +1,6 @@
 /**
  * DRK-1704 rework, finding 12 — mutation-survivor disposition for `AccountsScreen.tsx`
- * (`AccountsScreen.test.tsx` is frozen; these are additive coverage for the same component).
+ * (additive coverage beside `AccountsScreen.test.tsx`, the build-owned unit test).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within, type RenderResult } from '@testing-library/react';
@@ -358,5 +358,93 @@ describe('AccountsScreen — a refused open', () => {
     // routing render it — a filter that drops everything (the `() => undefined` mutant) would
     // starve the screen's own alert and leave only one copy.
     expect(screen.getAllByText('General busted.')).toHaveLength(2);
+  });
+});
+
+describe('AccountsScreen — review round 2', () => {
+  it('sends the typed notes as metadata.notes on the open POST (B2)', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.resolve(jsonResponse({ id: 'a2' }, 201));
+      return Promise.resolve(fetchDispatcher(url));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open account' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Open account' }));
+    await waitFor(() => expect(within(screen.getByLabelText('Group')).getByRole('option')).toBeTruthy());
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'New account');
+    await user.type(screen.getByLabelText('Free-form notes'), 'Opened for payroll');
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+
+    const postCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')!);
+    expect(JSON.parse((postCall[1] as RequestInit).body as string).metadata).toEqual({ notes: 'Opened for payroll' });
+  });
+
+  it('sends no metadata on the open POST when no notes were typed (B2)', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.resolve(jsonResponse({ id: 'a2' }, 201));
+      return Promise.resolve(fetchDispatcher(url));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open account' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Open account' }));
+    await waitFor(() => expect(within(screen.getByLabelText('Group')).getByRole('option')).toBeTruthy());
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'New account');
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+
+    const postCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')!);
+    expect(JSON.parse((postCall[1] as RequestInit).body as string)).not.toHaveProperty('metadata');
+  });
+
+  it('draws no phantom row while the account list itself is still loading', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/ledger/accounts')) return new Promise(() => {});
+        return Promise.resolve(fetchDispatcher(url));
+      }),
+    );
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByRole('option', { name: 'SGD' })).toBeInTheDocument());
+    expect(screen.getByText('No accounts found.')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('draws no amount, never a guessed 2 places, while the currency scale is unknown (nit 4)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/ledger/currencies')) return new Promise(() => {});
+        return Promise.resolve(fetchDispatcher(url));
+      }),
+    );
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByText('Operating account')).toBeInTheDocument());
+    expect(screen.queryByText('100.00 SGD')).toBeNull();
+    expect(screen.queryByText('100.00')).toBeNull();
+  });
+
+  it("shows a refused currency read in the service's own words, the list still on screen (nit 4)", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/ledger/currencies')) return Promise.resolve(jsonResponse({ errors: [{ message: 'The currency list is unavailable.', code: 'CURRENCIES_DOWN' }], traceId: 't-9' }, 503));
+        return Promise.resolve(fetchDispatcher(url));
+      }),
+    );
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByText('The currency list is unavailable.')).toBeInTheDocument());
+    expect(screen.getByText('CURRENCIES_DOWN')).toBeInTheDocument();
+    expect(screen.getByText(/t-9/)).toBeInTheDocument();
+    expect(screen.getByText('Operating account')).toBeInTheDocument();
+    expect(screen.queryByText('100.00')).toBeNull();
   });
 });

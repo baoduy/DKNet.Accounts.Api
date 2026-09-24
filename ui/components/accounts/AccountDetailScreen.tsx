@@ -45,7 +45,8 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
     return <AccountDetail account={null} />;
   }
 
-  const decimalPlaces = (currenciesQuery.data ?? []).find((currency) => currency.code === account.currency)?.decimalPlaces ?? 2;
+  // No amount is drawn until the currency's own scale is known — never a guessed 2 places.
+  const decimalPlaces = currenciesQuery.data?.find((currency) => currency.code === account.currency)?.decimalPlaces;
   const balance = balanceQuery.data;
   const groupName = (groupsQuery.data ?? []).find((group) => group.id === account.groupId)?.name ?? '';
   const metadata = (account.metadata ?? undefined) as Record<string, string> | undefined;
@@ -70,6 +71,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
     classification: account.classification,
     groupName,
     notes: metadata?.notes ?? '',
+    metadata,
   };
 
   const postingRows: PostingsPanelRow[] = (postingsQuery.data?.items ?? []).map((posting) => ({
@@ -86,16 +88,21 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
   }));
 
   return (
-    <AccountDetail
-      account={detailAccount}
-      accountId={account.id}
-      grantedScopes={grantedScopes}
-      postings={postingRows}
-      postingsFrom={filter.from}
-      postingsTo={filter.to}
-      postingsFilter={{ direction: filter.direction, category: filter.category, status: filter.status }}
-      onPostingsFilterChange={(next) => setFilter((current) => ({ ...current, ...next }))}
-      onPostingsPeriodChange={(from, to) => setFilter((current) => ({ ...current, from, to }))}
-    />
+    <>
+      {currenciesQuery.isError ? (
+        <RefusalAlert errors={[toLedgerError(currenciesQuery.error)]} traceId={ledgerErrorTraceId(currenciesQuery.error)} />
+      ) : null}
+      <AccountDetail
+        account={detailAccount}
+        accountId={account.id}
+        grantedScopes={grantedScopes}
+        postings={postingRows}
+        postingsFrom={filter.from}
+        postingsTo={filter.to}
+        postingsFilter={{ direction: filter.direction, category: filter.category, status: filter.status }}
+        onPostingsFilterChange={(next) => setFilter((current) => ({ ...current, ...next }))}
+        onPostingsPeriodChange={(from, to) => setFilter((current) => ({ ...current, from, to }))}
+      />
+    </>
   );
 }

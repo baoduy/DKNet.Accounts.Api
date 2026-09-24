@@ -11,7 +11,8 @@ export interface AccountsTableRow {
   accountNumber: string;
   name: string;
   currency: string;
-  decimalPlaces: number;
+  /** Absent until the currency's scale is known — the amount cells stay empty until then. */
+  decimalPlaces?: number;
   balance: string;
   availableBalance: string;
   openedOn: string;

@@ -67,14 +67,16 @@ export const ACCOUNT_COLUMNS: LedgerColumn<AccountsTableRow>[] = [
     header: 'Balance',
     sortable: true,
     align: 'right',
-    render: (row) => createElement(Money, { amount: row.balance, currency: row.currency, decimalPlaces: row.decimalPlaces, showCurrency: true }),
+    render: (row) =>
+      row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.balance, currency: row.currency, decimalPlaces: row.decimalPlaces, showCurrency: true }),
   },
   {
     key: 'availableBalance',
     header: 'Available balance',
     sortable: false,
     align: 'right',
-    render: (row) => createElement(Money, { amount: row.availableBalance, currency: row.currency, decimalPlaces: row.decimalPlaces }),
+    render: (row) =>
+      row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.availableBalance, currency: row.currency, decimalPlaces: row.decimalPlaces }),
   },
   { key: 'openedOn', header: 'Opened', sortable: false },
   { key: 'status', header: 'Status', render: (row) => createElement(StatusBadge, { status: row.status }) },

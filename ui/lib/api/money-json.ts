@@ -81,12 +81,3 @@ export async function readLedgerJson(response: Response): Promise<unknown> {
 export function isZeroAmount(amount: string): boolean {
   return /^[-+]?0(\.0+)?$/.test(amount);
 }
-
-/**
- * The 2xx range, computed from `status` alone — never `response.ok`, which a hand-built test
- * double (`{ status, text }`, no `ok` getter) never carries, unlike a real `fetch` `Response`
- * (DRK-1704 finding 5/9).
- */
-export function isOkStatus(status: number): boolean {
-  return status >= 200 && status < 300;
-}

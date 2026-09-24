@@ -24,6 +24,8 @@ export interface AccountStatusControlProps {
    * predates this field) — the service refuses Close on either amount being non-zero. */
   heldAmount?: string;
   currency: string;
+  /** Absent until the currency's scale is known — the held figure is then quoted as the
+   * service's own text, never re-scaled to a guessed 2 places. */
   decimalPlaces?: number;
   granted?: boolean;
   style?: CSSProperties;
@@ -35,7 +37,7 @@ export function AccountStatusControl({
   balance,
   heldAmount = '0',
   currency,
-  decimalPlaces = 2,
+  decimalPlaces,
   granted = true,
   style,
 }: AccountStatusControlProps): JSX.Element {
@@ -66,7 +68,7 @@ export function AccountStatusControl({
         reason={
           blockedByBalance ? (
             <>
-              The account holds {formatAmount(balance, decimalPlaces)} {currency} and cannot be closed. <span className="font-mono font-semibold">ACCOUNT_HOLDS_BALANCE</span>
+              The account holds {decimalPlaces === undefined ? balance : formatAmount(balance, decimalPlaces)} {currency} and cannot be closed. <span className="font-mono font-semibold">ACCOUNT_HOLDS_BALANCE</span>
             </>
           ) : undefined
         }

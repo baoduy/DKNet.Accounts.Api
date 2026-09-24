@@ -1,7 +1,7 @@
 /**
  * DRK-1697 §3 row 8 — typed read layer over `/api/ledger/currencies*`.
  */
-import { isOkStatus, readLedgerJson } from '@/lib/api/money-json';
+import { readLedgerJson } from '@/lib/api/money-json';
 import { refusalError } from '@/lib/api/refusal';
 
 export interface Currency {
@@ -31,14 +31,14 @@ export function toCurrency(raw: unknown): Currency {
 export async function fetchCurrencies(): Promise<Currency[]> {
   const response = await fetch('/api/ledger/currencies');
   const body = await readLedgerJson(response);
-  if (!isOkStatus(response.status)) throw refusalError(body);
+  if (!response.ok) throw refusalError(body);
   return (body as unknown[]).map(toCurrency);
 }
 
 export async function fetchCurrency(currencyId: string): Promise<Currency> {
   const response = await fetch(`/api/ledger/currencies/${encodeURIComponent(currencyId)}`);
   const body = await readLedgerJson(response);
-  if (!isOkStatus(response.status)) throw refusalError(body);
+  if (!response.ok) throw refusalError(body);
   return toCurrency(body);
 }
 
@@ -50,6 +50,6 @@ export async function fetchCurrency(currencyId: string): Promise<Currency> {
 export async function fetchLedgerBalances(): Promise<LedgerBalanceLine[]> {
   const response = await fetch('/api/ledger/accounts/balances');
   const body = await readLedgerJson(response);
-  if (!isOkStatus(response.status)) throw refusalError(body);
+  if (!response.ok) throw refusalError(body);
   return body as LedgerBalanceLine[];
 }

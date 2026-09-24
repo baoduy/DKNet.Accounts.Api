@@ -81,7 +81,7 @@ describe('useAccount', () => {
   });
 
   it('reports a guid id the service returns 404 for as not found — never the first row', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ status: 404, text: async () => '' });
+    const fetchMock = vi.fn().mockResolvedValue({ status: 404, ok: false, text: async () => '' });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();

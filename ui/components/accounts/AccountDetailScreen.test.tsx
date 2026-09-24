@@ -218,7 +218,7 @@ describe('AccountDetailScreen', () => {
     expect(screen.queryByText('undefined')).toBeNull();
   });
 
-  it('never crashes on a currency with no match, falling back to a decimal default of 2', async () => {
+  it('draws no amount, never a guessed 2 places, for a currency the list does not carry (review round 2 nit 4)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
@@ -233,7 +233,10 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
+    expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
+    expect(screen.getByTestId('account-floor')).toBeEmptyDOMElement();
+    expect(screen.queryByTestId('postings-panel')).toBeNull();
   });
 
   it("finds the account's own currency by code, not merely the first one offered", async () => {
@@ -307,7 +310,7 @@ describe('AccountDetailScreen', () => {
     await waitFor(() => expect(screen.getByLabelText('Group')).toHaveValue('ACME Group'));
   });
 
-  it('never crashes when the currency and group lists are still loading once the account resolves', async () => {
+  it('draws no amount while the currency list is still loading once the account resolves (review round 2 nit 4)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
@@ -322,7 +325,8 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
+    expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
     expect(screen.getByLabelText('Group')).toHaveValue('');
   });
 
@@ -338,5 +342,42 @@ describe('AccountDetailScreen', () => {
     // replaces the setFilter merge with `{}` would wipe it back to the default.
     expect(screen.getByLabelText('Direction filter')).toHaveValue('Debit');
     expect(screen.getByLabelText('To')).toHaveValue('2026-09-10');
+  });
+  it("shows a refused currency read in the service's own words, and no amount (review round 2 nit 4)", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse({ errors: [{ message: 'The currency list is unavailable.', code: 'CURRENCIES_DOWN' }], traceId: 't-9' }, 503));
+        return dispatch(true)(url);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByText('The currency list is unavailable.')).toBeInTheDocument());
+    expect(screen.getByText('CURRENCIES_DOWN')).toBeInTheDocument();
+    expect(screen.getByText(/t-9/)).toBeInTheDocument();
+    expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
+  });
+
+  it('carries every metadata key through a notes change, never erasing the others (review round 2 B1)', async () => {
+    const seeded = { ...ACCOUNT, metadata: { source: 'core-banking', region: 'SG', notes: 'Reconciled monthly' } };
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT' || init?.method === 'PATCH') return Promise.resolve(jsonResponse({ id: 'a1' }));
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [seeded] }));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: ['accounts.write'] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue('Reconciled monthly'));
+    await user.clear(screen.getByLabelText('Free-form notes'));
+    await user.type(screen.getByLabelText('Free-form notes'), 'Closed for audit');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')!);
+    expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { source: 'core-banking', region: 'SG', notes: 'Closed for audit' } });
   });
 });

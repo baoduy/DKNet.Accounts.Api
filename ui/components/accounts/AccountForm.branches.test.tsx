@@ -221,3 +221,26 @@ describe('AccountForm — edit mode never submits the locked fields', () => {
     expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'Frozen' }));
   });
 });
+
+describe('AccountForm — open-mode field refusals on group and currency (review round 2 nit 5)', () => {
+  it('marks the Group select invalid and shows its message', () => {
+    render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES, errors: [{ message: 'The group is archived.', field: 'GroupId' }] }));
+    expect(screen.getByLabelText('Group')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Currency')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByRole('alert')).toHaveTextContent('The group is archived.');
+  });
+
+  it('marks the Currency select invalid and shows its message', () => {
+    render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES, errors: [{ message: 'The currency is inactive.', field: 'Currency' }] }));
+    expect(screen.getByLabelText('Currency')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Group')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByRole('alert')).toHaveTextContent('The currency is inactive.');
+  });
+
+  it('marks neither select when no field-named refusal is present', () => {
+    render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES }));
+    expect(screen.getByLabelText('Group')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByLabelText('Currency')).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

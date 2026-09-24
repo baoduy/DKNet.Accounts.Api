@@ -32,16 +32,19 @@ const POSTING: PostingsPanelRow = {
   effectiveDate: '2026-09-01',
 };
 
-function renderDetail(grantedScopes: string[] = ['postings.reverse']): ReturnType<typeof render> {
+function renderDetail(grantedScopes: string[] = ['postings.reverse'], account: AccountDetailAccount = ACCOUNT): ReturnType<typeof render> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(AccountDetail, { account: ACCOUNT, accountId: 'a1', postings: [POSTING], grantedScopes }),
+      createElement(AccountDetail, { account, accountId: 'a1', postings: [POSTING], grantedScopes }),
     ),
   );
 }
+
+/** Review round 2 B1 — the service replaces the whole metadata map on `PUT` (`Account.cs:144-146`). */
+const SEEDED: AccountDetailAccount = { ...ACCOUNT, notes: '', metadata: { source: 'core-banking', region: 'SG' } };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -143,6 +146,17 @@ describe('AccountDetail — the write surfaces it composes', () => {
     expect(screen.queryByText('undefined')).toBeNull();
   });
 
+  it('draws no amount — no tile figure, no floor, no postings — until the currency scale is known (review round 2 nit 4)', () => {
+    renderDetail(['accounts.write'], { ...ACCOUNT, decimalPlaces: undefined, balance: '12400.5' });
+    expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
+    expect(screen.getByTestId('account-available-balance')).toHaveTextContent(/^Available$/);
+    expect(screen.getByTestId('account-held-amount')).toHaveTextContent(/^Held$/);
+    expect(screen.getByTestId('account-floor')).toBeEmptyDOMElement();
+    expect(screen.queryByTestId('postings-panel')).toBeNull();
+    // The rest of the screen still works.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
   it('shows no refusal on first render, before any save (kills the bogus-initial-array mutants)', () => {
     renderDetail(['accounts.write']);
     expect(screen.getByRole('button', { name: 'Save' }).closest('form')!.querySelector('[data-slot="card"]')).toBeNull();
@@ -175,11 +189,11 @@ describe('AccountDetail — the write surfaces it composes', () => {
 });
 
 describe('AccountDetail — saving the edit form (DRK-1704 finding 4)', () => {
-  it('carries a changed note through PUT as metadata.notes, even when the name is unchanged', async () => {
+  it('carries a changed note through PUT with every other metadata key kept, and no name', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1', accountNumber: 'ACME-000123' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    renderDetail(['accounts.write']);
+    renderDetail(['accounts.write'], SEEDED);
 
     await user.clear(screen.getByLabelText('Free-form notes'));
     await user.type(screen.getByLabelText('Free-form notes'), 'Reconciled monthly');
@@ -188,7 +202,21 @@ describe('AccountDetail — saving the edit form (DRK-1704 finding 4)', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts/a1', expect.objectContaining({ method: 'PUT' })));
     const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT')!;
     const body = JSON.parse((putCall[1] as RequestInit).body as string);
-    expect(body.metadata).toEqual({ notes: 'Reconciled monthly' });
+    expect(body).toEqual({ metadata: { source: 'core-banking', region: 'SG', notes: 'Reconciled monthly' } });
+  });
+
+  it('sends a rename as name alone — no metadata, so the stored map is never replaced', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write'], SEEDED);
+
+    await user.clear(screen.getByLabelText('Name', { exact: true }));
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'Renamed account');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT')!);
+    expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ name: 'Renamed account' });
   });
 
   it('skips the PUT entirely when neither the name nor the notes changed', async () => {

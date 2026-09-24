@@ -59,7 +59,7 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
     accountNumber: account.accountNumber,
     name: account.name,
     currency: account.currency,
-    decimalPlaces: decimalPlacesByCurrency.get(account.currency) ?? 2,
+    decimalPlaces: decimalPlacesByCurrency.get(account.currency),
     balance: account.balance,
     availableBalance: account.availableBalance,
     openedOn: account.openedOn,
@@ -79,6 +79,7 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
       permittedToGoNegative: values.floor.permittedToGoNegative,
       overdraftLimit: values.floor.overdraftLimit,
       minimumBalance: values.floor.minimumBalance,
+      metadata: values.notes ? { notes: values.notes } : undefined,
     });
     if (result.ok) {
       // Stays open rather than auto-closing: the operator can open another account right
@@ -123,6 +124,10 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
           <Button onClick={() => setFormOpen(true)}>Open account</Button>
         </ScopeGate>
       </div>
+
+      {currenciesQuery.isError ? (
+        <RefusalAlert errors={[toLedgerError(currenciesQuery.error)]} traceId={ledgerErrorTraceId(currenciesQuery.error)} />
+      ) : null}
 
       {accountsQuery.isError ? (
         <RefusalAlert errors={[toLedgerError(accountsQuery.error)]} traceId={ledgerErrorTraceId(accountsQuery.error)} />

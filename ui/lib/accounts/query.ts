@@ -8,7 +8,6 @@
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { parseLedgerJson } from '@/lib/api/json';
-import { isOkStatus } from '@/lib/api/money-json';
 import { refusalError } from '@/lib/api/refusal';
 import { fetchCurrencies, type Currency } from '@/lib/query/currencies';
 import type { components } from '@/lib/api/schema';
@@ -31,7 +30,7 @@ const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 async function fetchLedgerJson(path: string): Promise<unknown> {
   const response = await fetch(path);
   const body = parseLedgerJson(await response.text());
-  if (!isOkStatus(response.status)) throw refusalError(body);
+  if (!response.ok) throw refusalError(body);
   return body;
 }
 
@@ -62,7 +61,7 @@ export function useAccount(idOrNumber: string): UseQueryResult<AccountLookup> {
         // of being mistaken for one (DRK-1704 finding 5).
         if (response.status === 404) return { found: false };
         const body = parseLedgerJson(await response.text());
-        if (!isOkStatus(response.status)) throw refusalError(body);
+        if (!response.ok) throw refusalError(body);
         return { found: true, account: body as AccountDto };
       }
       const params = new URLSearchParams({ filter: `AccountNumber:Equal:${idOrNumber}` });

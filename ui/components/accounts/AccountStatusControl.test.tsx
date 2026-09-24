@@ -16,6 +16,7 @@ function renderControl(props: Partial<React.ComponentProps<typeof AccountStatusC
         status: 'Active',
         balance: '0.00',
         currency: 'SGD',
+        decimalPlaces: 2,
         ...props,
       }),
     ),
@@ -38,6 +39,11 @@ describe('AccountStatusControl', () => {
     expect(button).toBeDisabled();
     expect(screen.getByText(/12,400\.00 SGD/)).toBeInTheDocument();
     expect(screen.getByText('ACCOUNT_HOLDS_BALANCE')).toBeInTheDocument();
+  });
+
+  it("quotes the service's own figure, never re-scaled to a guessed 2 places, until the scale is known (review round 2 nit 4)", () => {
+    renderControl({ balance: '12400.5', decimalPlaces: undefined });
+    expect(screen.getByText(/The account holds 12400\.5 SGD/)).toBeInTheDocument();
   });
 
   it('disables closing on a zero balance that still carries a held amount (DRK-1704 finding 2)', () => {

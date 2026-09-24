@@ -141,13 +141,21 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
       <label className="flex flex-col gap-1">
         Group
         {mode === 'open' ? (
-          <select value={groupId} onChange={(event) => setGroupId(event.target.value)} aria-label="Group">
-            {groups.map((group) => (
-              <option key={group.value} value={group.value}>
-                {group.label}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={groupId}
+              onChange={(event) => setGroupId(event.target.value)}
+              aria-label="Group"
+              aria-invalid={fieldErrors.groupId ? 'true' : undefined}
+            >
+              {groups.map((group) => (
+                <option key={group.value} value={group.value}>
+                  {group.label}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.groupId ? <span role="alert">{fieldErrors.groupId.message}</span> : null}
+          </>
         ) : (
           <select value={account.groupName} disabled aria-label="Group">
             <option value={account.groupName}>{account.groupName}</option>
@@ -158,13 +166,21 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
       <label className="flex flex-col gap-1">
         Currency
         {mode === 'open' ? (
-          <select value={currency} onChange={(event) => setCurrency(event.target.value)} aria-label="Currency">
-            {currencies.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              aria-label="Currency"
+              aria-invalid={fieldErrors.currency ? 'true' : undefined}
+            >
+              {currencies.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.currency ? <span role="alert">{fieldErrors.currency.message}</span> : null}
+          </>
         ) : (
           <select value={account.currency} disabled aria-label="Currency">
             <option value={account.currency}>{account.currency}</option>

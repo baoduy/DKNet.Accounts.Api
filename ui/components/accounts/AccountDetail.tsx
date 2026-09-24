@@ -29,7 +29,9 @@ export interface AccountDetailAccount {
   accountNumber: string;
   name: string;
   currency: string;
-  decimalPlaces: number;
+  /** The currency's own scale — absent until the currency read has answered, and no amount is
+   * drawn until then (never a guessed 2). */
+  decimalPlaces?: number;
   balance: string;
   availableBalance: string;
   heldAmount: string;
@@ -43,6 +45,9 @@ export interface AccountDetailAccount {
   groupName?: string;
   externalReference?: string;
   notes?: string;
+  /** The account's whole metadata map — `PUT` replaces it wholesale (`Account.cs:144-146`), so a
+   * notes change resends every other key with it. */
+  metadata?: Record<string, string>;
   classification?: string;
 }
 
@@ -73,11 +78,13 @@ function AccountEditPanel({ accountId, account, writeGranted }: { accountId: str
     // concurrently when only one half of the form changed. The service has no dedicated
     // "notes" field, so the free-form text rides in `metadata.notes` (DRK-1704 finding 4).
     const errors: LedgerError[] = [];
-    if (values.name !== account.name || values.notes !== (account.notes ?? '')) {
+    const nameChanged = values.name !== account.name;
+    const notesChanged = values.notes !== (account.notes ?? '');
+    if (nameChanged || notesChanged) {
       const nameResult = await changeDetails.mutate({
         accountId,
-        name: values.name !== account.name ? values.name : undefined,
-        metadata: { notes: values.notes },
+        name: nameChanged ? values.name : undefined,
+        metadata: notesChanged ? { ...account.metadata, notes: values.notes } : undefined,
       });
       if (!nameResult.ok) errors.push(...(nameResult.errors ?? []));
     }
@@ -138,6 +145,7 @@ export function AccountDetail({
   }
 
   const decimalPlaces = account.decimalPlaces;
+  const scaleKnown = decimalPlaces !== undefined;
   const selectedPosting = postings.find((posting) => posting.id === selectedPostingId) ?? null;
   const writeGranted = grantedScopes.includes('accounts.write');
 
@@ -146,30 +154,32 @@ export function AccountDetail({
       <div className="flex flex-wrap gap-6">
         <div className="flex flex-col gap-1" data-testid="account-balance">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Balance</span>
-          <Money amount={account.balance} decimalPlaces={decimalPlaces} size="tile" align="left" />
+          {scaleKnown ? <Money amount={account.balance} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-available-balance">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Available</span>
-          <Money amount={account.availableBalance} decimalPlaces={decimalPlaces} size="tile" align="left" />
+          {scaleKnown ? <Money amount={account.availableBalance} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-held-amount">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Held</span>
-          <Money amount={account.heldAmount} decimalPlaces={decimalPlaces} size="tile" align="left" />
+          {scaleKnown ? <Money amount={account.heldAmount} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
         </div>
       </div>
 
       <div data-testid="account-floor">
-        <FloorLine
-          account={{
-            permittedToGoNegative: account.permittedToGoNegative,
-            overdraftLimit: account.overdraftLimit,
-            minimumBalance: account.minimumBalance,
-            currency: account.currency,
-            decimalPlaces,
-          }}
-          decimalPlaces={decimalPlaces}
-          floor={account.floor}
-        />
+        {scaleKnown ? (
+          <FloorLine
+            account={{
+              permittedToGoNegative: account.permittedToGoNegative,
+              overdraftLimit: account.overdraftLimit,
+              minimumBalance: account.minimumBalance,
+              currency: account.currency,
+              decimalPlaces,
+            }}
+            decimalPlaces={decimalPlaces}
+            floor={account.floor}
+          />
+        ) : null}
       </div>
 
       <div className="flex items-center gap-3">
@@ -191,16 +201,18 @@ export function AccountDetail({
 
       {accountId ? <AccountEditPanel accountId={accountId} account={account} writeGranted={writeGranted} /> : null}
 
-      <PostingsPanel
-        rows={postings}
-        from={postingsFrom}
-        to={postingsTo}
-        filter={postingsFilter}
-        onFilterChange={onPostingsFilterChange}
-        onPeriodChange={onPostingsPeriodChange}
-        selectedId={selectedPostingId}
-        onSelectRow={(row) => setSelectedPostingId(row.id === selectedPostingId ? null : row.id)}
-      />
+      {scaleKnown ? (
+        <PostingsPanel
+          rows={postings}
+          from={postingsFrom}
+          to={postingsTo}
+          filter={postingsFilter}
+          onFilterChange={onPostingsFilterChange}
+          onPeriodChange={onPostingsPeriodChange}
+          selectedId={selectedPostingId}
+          onSelectRow={(row) => setSelectedPostingId(row.id === selectedPostingId ? null : row.id)}
+        />
+      ) : null}
 
       {accountId ? (
         <RecordPostingForm
