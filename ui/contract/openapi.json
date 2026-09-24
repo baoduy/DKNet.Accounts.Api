@@ -7,6 +7,80 @@
   },
   "servers": [{ "url": "/v1" }],
   "paths": {
+    "/accounts": {
+      "get": {
+        "operationId": "listAccounts",
+        "summary": "List accounts. Shares the generic list query surface with /account-groups.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedAccountResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "openAccount",
+        "summary": "Open an account.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpenAccountRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "Read one account.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateAccount",
+        "summary": "Update an account's name and/or metadata.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAccountRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "patch": {
+        "operationId": "setAccountControls",
+        "summary": "Change status, overdraftLimit, minimumBalance and permittedToGoNegative only.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PatchAccountRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
     "/accounts/balances": {
       "get": {
         "operationId": "getLedgerBalances",
@@ -379,6 +453,74 @@
           "code": { "type": "string" },
           "name": { "type": "string" },
           "decimalPlaces": { "type": "integer" }
+        }
+      },
+      "AccountDto": {
+        "type": "object",
+        "required": ["id", "groupId", "accountNumber", "name", "currency", "classification", "status", "balance", "availableBalance", "heldAmount", "permittedToGoNegative", "streamPosition", "openedOn"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid" },
+          "accountNumber": { "type": "string" },
+          "name": { "type": "string" },
+          "currency": { "type": "string" },
+          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "balance": { "type": "string" },
+          "availableBalance": { "type": "string" },
+          "heldAmount": { "type": "string" },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "permittedToGoNegative": { "type": "boolean" },
+          "streamPosition": { "type": "integer" },
+          "externalReference": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+          "openedOn": { "type": "string", "format": "date-time" },
+          "closedOn": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PagedAccountResponse": {
+        "type": "object",
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountDto" } },
+          "pageNumber": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
+        }
+      },
+      "OpenAccountRequest": {
+        "type": "object",
+        "required": ["groupId", "name", "currency", "classification", "permittedToGoNegative"],
+        "properties": {
+          "groupId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "currency": { "type": "string" },
+          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "permittedToGoNegative": { "type": "boolean" },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "externalReference": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "UpdateAccountRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "PatchAccountRequest": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "permittedToGoNegative": { "type": "boolean" }
         }
       },
       "UpdateCurrencyRequest": {

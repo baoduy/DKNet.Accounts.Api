@@ -3,8 +3,16 @@
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
-  "reporters": ["clear-text", "html"],
+  "reporters": ["clear-text", "html", "json"],
   "coverageAnalysis": "perTest",
-  "mutate": ["lib/**/*.ts", "lib/**/*.tsx", "!lib/**/*.test.ts", "!lib/**/*.test.tsx"],
+  "mutate": [
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "!lib/**/*.test.ts",
+    "!lib/**/*.test.tsx",
+    "components/accounts/**/*.tsx",
+    "!components/accounts/**/*.test.tsx"
+  ],
+  "vitest": { "configFile": "vitest.stryker.config.ts" },
   "thresholds": { "high": 80, "low": 60, "break": null }
 }

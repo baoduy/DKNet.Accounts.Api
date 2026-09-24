@@ -1,4 +1,41 @@
 export interface paths {
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List accounts. Shares the generic list query surface with /account-groups. */
+        get: operations["listAccounts"];
+        put?: never;
+        /** Open an account. */
+        post: operations["openAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one account. */
+        get: operations["getAccount"];
+        /** Update an account's name and/or metadata. */
+        put: operations["updateAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change status, overdraftLimit, minimumBalance and permittedToGoNegative only. */
+        patch: operations["setAccountControls"];
+        trace?: never;
+    };
     "/accounts/balances": {
         parameters: {
             query?: never;
@@ -307,6 +344,71 @@ export interface components {
             name: string;
             decimalPlaces: number;
         };
+        AccountDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            groupId: string;
+            accountNumber: string;
+            name: string;
+            currency: string;
+            /** @enum {string} */
+            classification: "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+            /** @enum {string} */
+            status: "Active" | "Frozen" | "Dormant" | "Closed";
+            balance: string;
+            availableBalance: string;
+            heldAmount: string;
+            overdraftLimit?: string;
+            minimumBalance?: string;
+            permittedToGoNegative: boolean;
+            streamPosition: number;
+            externalReference?: string;
+            metadata?: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            openedOn: string;
+            /** Format: date-time */
+            closedOn?: string;
+        };
+        PagedAccountResponse: {
+            items: components["schemas"]["AccountDto"][];
+            pageNumber: number;
+            pageSize: number;
+            pageCount: number;
+            totalItemCount: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+        };
+        OpenAccountRequest: {
+            /** Format: uuid */
+            groupId: string;
+            name: string;
+            currency: string;
+            /** @enum {string} */
+            classification: "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+            permittedToGoNegative: boolean;
+            overdraftLimit?: string;
+            minimumBalance?: string;
+            externalReference?: string;
+            metadata?: {
+                [key: string]: string;
+            };
+        };
+        UpdateAccountRequest: {
+            name?: string;
+            metadata?: {
+                [key: string]: string;
+            };
+        };
+        PatchAccountRequest: {
+            /** @enum {string} */
+            status?: "Active" | "Frozen" | "Dormant" | "Closed";
+            overdraftLimit?: string;
+            minimumBalance?: string;
+            permittedToGoNegative?: boolean;
+        };
         UpdateCurrencyRequest: {
             name: string;
         };
@@ -376,6 +478,188 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAccounts: {
+        parameters: {
+            query?: {
+                filter?: string[];
+                search?: string;
+                orderBy?: string;
+                desc?: boolean;
+                pageNumber?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedAccountResponse"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    openAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDto"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDto"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setAccountControls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
     getLedgerBalances: {
         parameters: {
             query?: never;

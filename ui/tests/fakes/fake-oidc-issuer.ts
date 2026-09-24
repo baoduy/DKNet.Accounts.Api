@@ -23,6 +23,10 @@ import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 const PORT = Number(process.env.FAKE_OIDC_PORT ?? 4488);
 
 const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName: string; scopes: string[] }> = {
+  // DRK-1696 §3 row 11: `MAI`, `MAI_MISSING_REVERSE_SCOPE` and `MAI_WITH_WRITE` are three
+  // distinct scope grants for the same operator — each needs its own address, or whichever
+  // grant lands last here wins for every scenario driving `mai@drunkcoding.net` (DRK-1696 §7
+  // AT notes: this collided with spec 62's identity, which needs the reverse scope absent).
   'mai@drunkcoding.net': {
     name: 'Mai Nguyen',
     objectId: '11111111-1111-4111-8111-111111111111',
@@ -34,6 +38,12 @@ const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName
     objectId: '11111111-1111-4111-8111-111111111111',
     tenantName: 'Drunk Coding',
     scopes: ['accounts.read', 'postings.read'],
+  },
+  'mai-write@drunkcoding.net': {
+    name: 'Mai Nguyen',
+    objectId: '11111111-1111-4111-8111-111111111111',
+    tenantName: 'Drunk Coding',
+    scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'],
   },
   'nam@drunkcoding.net': {
     name: 'Nam Tran',

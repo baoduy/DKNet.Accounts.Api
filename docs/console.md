@@ -1,9 +1,9 @@
 # DKNet Accounts Console
 
 A Next.js operations console that signs an operator into `DKNet.Accounts.Api` with Microsoft
-Entra ID, and reads and writes the ledger through its own pass-through endpoint. No ledger
-*screen* ships yet (`ui/app/page.tsx` still renders the frame with no data), but the access
-layer, the endpoint and the ledger component kit do.
+Entra ID, and reads and writes the ledger through its own pass-through endpoint. The accounts
+screen and the account detail screen are the ledger screens that ship (`ui/app/page.tsx`'s own
+frame still renders no data).
 
 ## ✨ Why use it?
 
@@ -35,10 +35,9 @@ This starts `postgres`, `redis`, the API and the console together
 publishes on `${CONSOLE_PORT:-3000}` — check `.env.sample` on this branch for the current port
 mapping.
 
-> **No ledger screen ships yet.** Signing in reaches the framed shell — sidebar, page header,
-> identity menu — with no ledger or administration screen behind it (`ui/app/page.tsx`). The
-> ledger access layer, the pass-through endpoint and the ledger component kit this screen will
-> be built from already ship — see *Features* below.
+> **The accounts screen and the account detail screen ship.** Signing in reaches the accounts list
+> at `/accounts`; opening an account reaches its detail at `/accounts/<account-number>`. The root
+> frame at `/` still shows no data. See *Features* below.
 
 ## 🧩 Features
 
@@ -69,6 +68,42 @@ known-scope set is the ledger contract's five: `accounts.read`, `accounts.write`
 reversing a posting, and `accounts.write`/`postings.write` gate every ledger write
 (`ui/lib/scopes.ts`).
 
+### Accounts screen
+
+`/accounts` lists accounts: search (2 characters minimum — a shorter term is never sent), a
+currency filter, sortable columns, and paging. The whole view — filter, sort and page — round-trips
+through the page address, so a copied link reproduces the same view. Each row's account number
+links to `/accounts/<account-number>` — the account detail screen, below. A row's status is one of
+the account's four: `Active`, `Frozen`, `Dormant`, `Closed`.
+
+Opening an account (`accounts.write`) is the one write this screen offers: group, currency and
+accounting classification (`Asset`, `Liability`, `Equity`, `Income`, `Expense`) are chosen from
+lists the service itself supplies, never typed; the account number is assigned by the service.
+Floor settings — permitted to go negative, overdraft limit, smallest permitted balance — are
+always answered, never left at a silent default. Permitting negative with no overdraft limit is
+refused as `OVERDRAFT_LIMIT_REQUIRED`; an unsupported currency is refused as
+`UNSUPPORTED_CURRENCY`. The one close/reopen control lives on the detail screen, not here.
+
+### Account detail screen
+
+`/accounts/<account-number>` shows one account: its balance, available balance and held amount,
+and the floor the service states for it (permitted to go negative, overdraft limit, smallest
+permitted balance). An address matching no account renders a not-found message alone — never
+another account's data.
+
+Its status is one of the same four values, next to a quick close/reopen control: closing is
+disabled with the held figure and `ACCOUNT_HOLDS_BALANCE` while the account still holds a balance
+or a held amount; reopening has no such condition. A separate status setting (in the account's
+edit form, alongside its name and floor) can set any of the four directly, not only close/reopen.
+
+Below that, the postings list opens on the last 30 days, editable through two date inputs (from,
+to) plus 7/30/90-day presets. An empty or unparseable period, one with the end before the start,
+or one over 90 days is refused on screen with its own message and never sent to the service.
+Narrows further by direction, category and status. Recording a posting (`postings.write`) is
+against this account only: the account and its currency are locked, not choosable. Reversing a
+posting (`postings.reverse`) needs a reason; without the permission the reverse action stays
+visible and disabled, stating that it needs `postings.reverse`.
+
 ### Ledger pass-through endpoint
 
 `ui/app/api/ledger/[...route]/route.ts` proxies `GET`/`POST`/`PUT`/`PATCH`/`DELETE` under `/api/ledger/…`
@@ -76,9 +111,11 @@ to `DKNet.Accounts.Api`: it resolves the operator's session, decrypts her access
 server-side, forwards the caller's `Idempotency-Key`, and returns the ledger service's answer
 unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
 (`ui/lib/api/routes.ts`) — the set of routes the generated OpenAPI contract declares — and refused
-before any outbound call if the route isn't in it. The token never crosses back to the browser —
-the service still checks every permission itself, so a control disabled on screen for a missing
-scope is convenience only, not the enforcement point.
+before any outbound call if the route isn't in it. This cycle widens that set with the account
+operations the accounts screen needs: opening an account, listing accounts, reading one, updating
+its name/metadata, and changing its status/floor controls. The token never crosses back to the
+browser — the service still checks every permission itself, so a control disabled on screen for a
+missing scope is convenience only, not the enforcement point.
 
 ### Typed access layer and contract drift check
 
@@ -173,17 +210,19 @@ the secret server-side, never in the browser):
 
 ## ⚠️ Gotchas & limits
 
-- **No ledger screen ships yet.** Sign-in reaches the framed shell only — the ledger access
-  layer, pass-through endpoint and component kit exist, but no screen wires them together.
+- **An accounts list is browsed and opened, never summed or exported.** No footer, no total row,
+  no export control.
+- **The account detail screen's postings list carries no running balance.** Each row shows its own
+  amount; no column carries the account's balance after that posting.
+- **Directory consent for `accounts.write` and `postings.write` is not granted yet.** Every ledger
+  write — including opening an account — fails against a real tenant until an administrator
+  grants it (see *Entra app registration* above).
 - **A blank tenant or client ID is not an error.** The console starts and serves the
   not-configured page rather than failing — see *Sign-in not configured* above.
 - **A missing `CONSOLE_TOKEN_ENCRYPTION_KEY` is an error.** The console refuses to start rather
   than cache a token unencrypted.
 - **Fonts and every other visual asset are self-hosted at build** — no runtime request to a
   third-party host from a page.
-- **`accounts.write` and `postings.write` need directory consent the API app registration
-  doesn't have yet.** Until an administrator grants it, every ledger write refuses against a real
-  tenant regardless of what the console's UI allows on screen.
 
 ## 🔗 Related docs
 

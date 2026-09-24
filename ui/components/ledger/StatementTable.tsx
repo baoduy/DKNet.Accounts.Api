@@ -26,6 +26,9 @@ export interface StatementTableProps {
   onSelectRow?: (row: StatementRowShape) => void;
   postingHref?: (row: StatementRowShape) => string;
   emptyMessage?: ReactNode;
+  /** `false` drops the running-balance column, header and cell — some screens (the account
+   * detail screen's posting list, DRK-1696 §3 row 1) forbid it entirely. */
+  showBalanceAfter?: boolean;
   style?: CSSProperties;
 }
 
@@ -36,6 +39,7 @@ export function StatementTable({
   onSelectRow,
   postingHref,
   emptyMessage = 'No postings recorded on this account.',
+  showBalanceAfter = true,
   style,
 }: StatementTableProps): JSX.Element {
   if (rows.length === 0) {
@@ -50,7 +54,7 @@ export function StatementTable({
           <TableHead>Posting</TableHead>
           <TableHead>Description</TableHead>
           <TableHead className="text-right">Amount</TableHead>
-          <TableHead className="text-right">Balance after</TableHead>
+          {showBalanceAfter ? <TableHead className="text-right">Balance after</TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -72,9 +76,11 @@ export function StatementTable({
               <TableCell className="text-right">
                 <Money amount={row.signedAmount} decimalPlaces={decimalPlaces} signed align="right" struck={reversed} />
               </TableCell>
-              <TableCell className={cn('text-right tabular-nums', reversed && 'text-muted-foreground')}>
-                {formatAmount(row.balanceAfter, decimalPlaces)}
-              </TableCell>
+              {showBalanceAfter ? (
+                <TableCell className={cn('text-right tabular-nums', reversed && 'text-muted-foreground')}>
+                  {formatAmount(row.balanceAfter, decimalPlaces)}
+                </TableCell>
+              ) : null}
             </TableRow>
           );
         })}
