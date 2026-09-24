@@ -23,8 +23,8 @@ test('Mai creates a group owned by a third-party system', async ({ page, baseURL
   await page.getByRole('button', { name: 'New group' }).click();
   await page.getByLabel('Code').fill('TRSY');
   await page.getByLabel('Name').fill('Treasury');
-  await page.getByLabel('Owner').fill('partner-bank-01');
-  await page.getByLabel('Type').selectOption('Customer');
+  await page.getByLabel('Owner', { exact: true }).fill('partner-bank-01');
+  await page.getByLabel('Type', { exact: true }).selectOption('Customer');
   await page.getByRole('button', { name: 'Create group' }).click();
 
   await expect(page.getByTestId('detail-panel')).toBeVisible();
@@ -32,7 +32,7 @@ test('Mai creates a group owned by a third-party system', async ({ page, baseURL
 
   await page.getByRole('button', { name: 'Edit group' }).click();
   await expect(page.getByLabel('Code')).toBeDisabled();
-  await expect(page.getByLabel('Owner')).toBeDisabled();
+  await expect(page.getByLabel('Owner', { exact: true })).toBeDisabled();
   await expect(page.getByLabel('Code')).toHaveValue('TRSY');
-  await expect(page.getByLabel('Owner')).toHaveValue('partner-bank-01');
+  await expect(page.getByLabel('Owner', { exact: true })).toHaveValue('partner-bank-01');
 });

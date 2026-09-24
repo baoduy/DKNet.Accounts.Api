@@ -27,8 +27,8 @@ test('A code already in use is refused on the code field — a group', async ({ 
   await page.getByRole('button', { name: 'New group' }).click();
   await page.getByLabel('Code').fill('TRSY');
   await page.getByLabel('Name').fill('Treasury Two');
-  await page.getByLabel('Owner').fill('default-owner');
-  await page.getByLabel('Type').selectOption('Customer');
+  await page.getByLabel('Owner', { exact: true }).fill('default-owner');
+  await page.getByLabel('Type', { exact: true }).selectOption('Customer');
   await page.getByRole('button', { name: 'Create group' }).click();
 
   await expect(page.getByText('DUPLICATE_GROUP_CODE')).toBeVisible();

@@ -68,9 +68,10 @@ export async function setPeriod(page: Page, from: string, to: string): Promise<v
   await page.getByLabel('From', { exact: true }).fill(from);
 }
 
-/** The Records screen's table body rows. */
+/** The Records screen's posting rows — never the full-width row an empty list states itself in
+ * (a single cell spanning every column, DRK-1729 spec 140). */
 export function recordRows(page: Page): Locator {
-  return page.getByRole('main').locator('tbody tr');
+  return page.getByRole('main').locator('tbody tr:not(:has(> td[colspan]))');
 }
 
 export function recordRow(page: Page, postingNumber: string): Locator {
