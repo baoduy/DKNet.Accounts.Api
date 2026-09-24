@@ -217,7 +217,7 @@
         "summary": "List the reference currency set.",
         "security": [{ "bearer": ["accounts.read"] }],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } } } } }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedCurrencyResponse" } } } }
         }
       },
       "post": {
@@ -490,7 +490,7 @@
         "required": ["accountId", "direction", "amount", "currency", "category"],
         "properties": {
           "accountId": { "type": "string", "format": "uuid" },
-          "direction": { "type": "string", "enum": ["Debit", "Credit"] },
+          "direction": { "type": "string", "enum": ["debit", "credit"] },
           "amount": { "type": "string" },
           "currency": { "type": "string" },
           "category": { "type": "string" },
@@ -527,8 +527,8 @@
           "accountNumber": { "type": "string" },
           "name": { "type": "string" },
           "currency": { "type": "string" },
-          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
-          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "classification": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
+          "status": { "type": "string", "enum": ["active", "frozen", "dormant", "closed"] },
           "balance": { "type": "string" },
           "availableBalance": { "type": "string" },
           "heldAmount": { "type": "string" },
@@ -562,7 +562,7 @@
           "groupId": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "currency": { "type": "string" },
-          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "classification": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
           "permittedToGoNegative": { "type": "boolean" },
           "overdraftLimit": { "type": "string" },
           "minimumBalance": { "type": "string" },
@@ -580,7 +580,7 @@
       "PatchAccountRequest": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "status": { "type": "string", "enum": ["active", "frozen", "dormant", "closed"] },
           "overdraftLimit": { "type": "string" },
           "minimumBalance": { "type": "string" },
           "permittedToGoNegative": { "type": "boolean" }
@@ -595,11 +595,11 @@
       },
       "AccountGroupType": {
         "type": "string",
-        "enum": ["Customer", "Merchant", "Internal", "Suspense", "Settlement"]
+        "enum": ["customer", "merchant", "internal", "suspense", "settlement"]
       },
       "AccountGroupStatus": {
         "type": "string",
-        "enum": ["Active", "Closed"]
+        "enum": ["active", "closed"]
       },
       "AccountGroupDto": {
         "type": "object",
@@ -643,6 +643,19 @@
           "balance": { "type": "string" },
           "available": { "type": "string" },
           "held": { "type": "string" }
+        }
+      },
+      "PagedCurrencyResponse": {
+        "type": "object",
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } },
+          "pageNumber": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
         }
       },
       "PagedAccountGroupResponse": {

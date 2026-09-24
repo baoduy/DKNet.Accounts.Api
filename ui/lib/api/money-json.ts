@@ -57,14 +57,48 @@ function markNumberLiterals(text: string): string {
 }
 
 /**
+ * DRK-1732 §3 row 11 — the service writes every enum value camelCase (`SharedConsts.cs:47`,
+ * `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`): `"credit"`, `"reversed"`. The app
+ * spells them as the service's enums declare them (`'Credit'`, `'Reversed'`), so a read maps
+ * each back by its field name. Only a value that is exactly a member's camelCase form is
+ * mapped; anything else (a status count's `"ACTIVE"`, a refusal's `type`) stays as sent.
+ */
+const ENUM_MEMBERS: Record<string, readonly string[]> = {
+  direction: ['Credit', 'Debit'],
+  category: ['Transfer', 'Payment', 'Fee', 'Interest', 'Adjustment', 'Refund', 'Reversal', 'OpeningBalance'],
+  // Posting, account and account-group statuses share the field name.
+  status: ['Posted', 'Reversed', 'Active', 'Frozen', 'Dormant', 'Closed'],
+  classification: ['Asset', 'Liability', 'Equity', 'Income', 'Expense'],
+  type: ['Customer', 'Merchant', 'Internal', 'Suspense', 'Settlement'],
+};
+
+const APP_ENUM_VALUES = new Map(
+  Object.entries(ENUM_MEMBERS).flatMap(([field, members]) => members.map((member) => [`${field}:${member[0].toLowerCase()}${member.slice(1)}`, member])),
+);
+
+/** What a read hands back for a wire type: every enum member spelled the app's way. */
+export type AsRead<T> = T extends string
+  ? string extends T
+    ? T
+    : Capitalize<T>
+  : T extends readonly (infer Item)[]
+    ? AsRead<Item>[]
+    : T extends object
+      ? { [K in keyof T]: AsRead<T[K]> }
+      : T;
+
+/**
  * Parses `text` (a JSON document read verbatim from the ledger response) into a value where
  * every JSON number becomes a string holding its exact source digits — never routed through
- * `JSON.parse`'s own numeric coercion, which silently drops precision past 2^53.
+ * `JSON.parse`'s own numeric coercion, which silently drops precision past 2^53 — and every
+ * enum value is spelled the app's way (`ENUM_MEMBERS`).
  */
 export function parseLedgerJsonPreservingNumbers(text: string): unknown {
-  return JSON.parse(markNumberLiterals(text), (_key, value) =>
-    typeof value === 'string' && value.startsWith(NUMBER_MARKER) ? value.slice(NUMBER_MARKER.length) : value,
-  );
+  return JSON.parse(markNumberLiterals(text), (key, value) => {
+    if (typeof value !== 'string') return value;
+    if (value.startsWith(NUMBER_MARKER)) return value.slice(NUMBER_MARKER.length);
+    return APP_ENUM_VALUES.get(`${key}:${value}`) ?? value;
+  });
 }
 
 /**

@@ -8,6 +8,7 @@
 
 import { keepPreviousData, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { parseLedgerJson } from '@/lib/api/json';
+import type { AsRead } from '@/lib/api/money-json';
 import { refusalError } from '@/lib/api/refusal';
 import { fetchCurrencies, type Currency } from '@/lib/query/currencies';
 import type { components } from '@/lib/api/schema';
@@ -16,12 +17,12 @@ import type { ListViewState } from '@/lib/url-state';
 import { toAccountsQuery } from './filters';
 import { toPostingsQuery, type PostingsFilterState } from './postings-filter';
 
-export type AccountDto = components['schemas']['AccountDto'];
-export type AccountGroupDto = components['schemas']['AccountGroupDto'];
-export type AccountBalanceDto = components['schemas']['AccountBalanceDto'];
-export type PostingDto = components['schemas']['PostingDto'];
-export type PagedAccountResponse = components['schemas']['PagedAccountResponse'];
-export type PagedPostingResponse = components['schemas']['PagedPostingResponse'];
+export type AccountDto = AsRead<components['schemas']['AccountDto']>;
+export type AccountGroupDto = AsRead<components['schemas']['AccountGroupDto']>;
+export type AccountBalanceDto = AsRead<components['schemas']['AccountBalanceDto']>;
+export type PostingDto = AsRead<components['schemas']['PostingDto']>;
+export type PagedAccountResponse = AsRead<components['schemas']['PagedAccountResponse']>;
+export type PagedPostingResponse = AsRead<components['schemas']['PagedPostingResponse']>;
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -35,7 +35,10 @@ export async function fetchCurrencies(): Promise<Currency[]> {
   const response = await fetch('/api/ledger/currencies');
   const body = await readLedgerJson(response);
   if (!response.ok) throw refusalError(body);
-  return (body as unknown[]).map(toCurrency);
+  // DRK-1732 §3 row 10: the service answers with a page (`PagedCurrencyResponse`). A bare list
+  // is still read, because the component tests (`components/**`, not this cycle's to change)
+  // stub the old shape.
+  return (Array.isArray(body) ? body : (body as { items: unknown[] }).items).map(toCurrency);
 }
 
 export async function fetchCurrency(currencyId: string): Promise<Currency> {

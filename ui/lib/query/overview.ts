@@ -4,7 +4,7 @@
  * free-text search. Every figure is the service's own count (R1): a posting count is one read of
  * `pageSize=1` whose `totalItemCount` is taken as the figure, never a count of listed rows.
  */
-import { readLedgerJson } from '@/lib/api/money-json';
+import { type AsRead, readLedgerJson } from '@/lib/api/money-json';
 import { LedgerRefusalError, refusalError } from '@/lib/api/refusal';
 import type { components } from '@/lib/api/schema';
 
@@ -88,9 +88,9 @@ export async function lookupRecord<T>(path: string): Promise<LedgerRecordLookup<
   return { state: 'found', record: body as T };
 }
 
-export type AccountDto = components['schemas']['AccountDto'];
-export type AccountGroupDto = components['schemas']['AccountGroupDto'];
-export type PostingDto = components['schemas']['PostingDto'];
+export type AccountDto = AsRead<components['schemas']['AccountDto']>;
+export type AccountGroupDto = AsRead<components['schemas']['AccountGroupDto']>;
+export type PostingDto = AsRead<components['schemas']['PostingDto']>;
 
 export interface SearchMatches<T> {
   items: T[];

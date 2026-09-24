@@ -850,7 +850,16 @@ async function handle(request: Request): Promise<Response> {
   // --- Currencies (DRK-1697 §3a) --------------------------------------------------------
 
   if (segments[1] === 'currencies' && segments.length === 2 && request.method === 'GET') {
-    return Response.json(currencies.map(currencyDto));
+    // A page, as the service's generated list route answers (`PagedCurrencyResponse`).
+    return Response.json({
+      items: currencies.map(currencyDto),
+      pageNumber: 1,
+      pageSize: 1000,
+      pageCount: 1,
+      totalItemCount: currencies.length,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    });
   }
 
   if (segments[1] === 'currencies' && segments.length === 2 && request.method === 'POST') {
@@ -1234,6 +1243,18 @@ async function handle(request: Request): Promise<Response> {
   return refusal(404, [{ message: 'Not found.' }]);
 }
 
+/**
+ * DRK-1732 §3 row 12 — the service writes every enum value camelCase (`SharedConsts.cs:47`), so
+ * this stand-in does too, on the wire only: fixtures, seeds and filters keep the enums' own
+ * spelling. Only a value that is exactly an enum member is rewritten.
+ */
+const WIRE_ENUM_VALUE =
+  /"(direction|category|status|classification|type)":"(Credit|Debit|Transfer|Payment|Fee|Interest|Adjustment|Refund|Reversal|OpeningBalance|Posted|Reversed|Active|Frozen|Dormant|Closed|Asset|Liability|Equity|Income|Expense|Customer|Merchant|Internal|Suspense|Settlement)"/g;
+
+function onTheWire(json: string): string {
+  return json.replace(WIRE_ENUM_VALUE, (_match, field: string, member: string) => `"${field}":"${member[0].toLowerCase()}${member.slice(1)}"`);
+}
+
 const server = createServer((req, res) => {
   const chunks: Buffer[] = [];
   req.on('data', (chunk) => chunks.push(chunk));
@@ -1265,7 +1286,9 @@ const server = createServer((req, res) => {
         return;
       }
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(Buffer.from(await response.arrayBuffer()));
+      // The service's own routes only: the `/__…` hooks report what the console sent, as sent.
+      const serviceJson = req.url?.startsWith('/v1/') && response.headers.get('content-type')?.includes('application/json');
+      res.end(serviceJson ? onTheWire(await response.text()) : Buffer.from(await response.arrayBuffer()));
     } catch (error) {
       res.writeHead(500, { 'content-type': 'text/plain' });
       res.end(String(error));

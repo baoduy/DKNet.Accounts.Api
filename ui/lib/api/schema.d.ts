@@ -387,7 +387,7 @@ export interface components {
             /** Format: uuid */
             accountId: string;
             /** @enum {string} */
-            direction: "Debit" | "Credit";
+            direction: "debit" | "credit";
             amount: string;
             currency: string;
             category: string;
@@ -417,9 +417,9 @@ export interface components {
             name: string;
             currency: string;
             /** @enum {string} */
-            classification: "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+            classification: "asset" | "liability" | "equity" | "income" | "expense";
             /** @enum {string} */
-            status: "Active" | "Frozen" | "Dormant" | "Closed";
+            status: "active" | "frozen" | "dormant" | "closed";
             balance: string;
             availableBalance: string;
             heldAmount: string;
@@ -451,7 +451,7 @@ export interface components {
             name: string;
             currency: string;
             /** @enum {string} */
-            classification: "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+            classification: "asset" | "liability" | "equity" | "income" | "expense";
             permittedToGoNegative: boolean;
             overdraftLimit?: string;
             minimumBalance?: string;
@@ -468,7 +468,7 @@ export interface components {
         };
         PatchAccountRequest: {
             /** @enum {string} */
-            status?: "Active" | "Frozen" | "Dormant" | "Closed";
+            status?: "active" | "frozen" | "dormant" | "closed";
             overdraftLimit?: string;
             minimumBalance?: string;
             permittedToGoNegative?: boolean;
@@ -477,9 +477,9 @@ export interface components {
             name: string;
         };
         /** @enum {string} */
-        AccountGroupType: "Customer" | "Merchant" | "Internal" | "Suspense" | "Settlement";
+        AccountGroupType: "customer" | "merchant" | "internal" | "suspense" | "settlement";
         /** @enum {string} */
-        AccountGroupStatus: "Active" | "Closed";
+        AccountGroupStatus: "active" | "closed";
         AccountGroupDto: {
             /** Format: uuid */
             id: string;
@@ -515,6 +515,15 @@ export interface components {
             balance: string;
             available: string;
             held: string;
+        };
+        PagedCurrencyResponse: {
+            items: components["schemas"]["CurrencyDto"][];
+            pageNumber: number;
+            pageSize: number;
+            pageCount: number;
+            totalItemCount: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
         };
         PagedAccountGroupResponse: {
             items: components["schemas"]["AccountGroupDto"][];
@@ -1002,7 +1011,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CurrencyDto"][];
+                    "application/json": components["schemas"]["PagedCurrencyResponse"];
                 };
             };
         };
