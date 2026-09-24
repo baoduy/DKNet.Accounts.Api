@@ -61,7 +61,7 @@ test('The access token never reaches the browser', async ({ page, baseURL }) => 
 
   // The browser's own request targeted the console's own origin, never the ledger service.
   expect(requestUrls.some((url) => url.startsWith(`${baseURL}/api/ledger/`))).toBe(true);
-  expect(requestUrls.every((url) => !url.includes(String(FAKE_LEDGER_PORT)))).toBe(true);
+  expect(requestUrls.every((url) => !url.includes(`:${FAKE_LEDGER_PORT}`))).toBe(true);
 
   expect(result.status).toBe(200);
   expect(result.body).not.toContain(CANARY_ACCESS_TOKEN);
