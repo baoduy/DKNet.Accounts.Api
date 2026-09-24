@@ -58,9 +58,14 @@ early enough.
 
 Bound by ASP.NET Core's own `AddJwtBearer()` configuration binding, which reads
 `Authentication:Schemes:<SchemeName>`. `DKNet.Accounts.Api/Configs/Auth/AuthConfig.cs` calls
-`AddAuthentication().AddJwtBearer()` with no inline options, so this section is the whole
-configuration surface for token validation. The block is registered only when
+`AddAuthentication().AddJwtBearer()` with no inline options beyond claim mapping, so this section is
+the whole *configurable* surface for token validation. The block is registered only when
 `FeatureManagement:RequireAuthorization` is `true`.
+
+`AddJwtBearer` is also called with `MapInboundClaims = false` and `NameClaimType = "name"`, so the
+principal's claims keep the names the token was issued with (`scp`, `oid`, `email`, `name`) instead
+of being remapped to the long `schemas.xmlsoap.org`/`schemas.microsoft.com` claim type URIs ASP.NET
+Core's default inbound mapping would otherwise substitute.
 
 | Key | Type | Shipped default | Effect |
 |---|---|---|---|
