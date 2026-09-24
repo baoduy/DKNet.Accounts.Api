@@ -22,14 +22,14 @@ test('A refusal naming a field is marked on that field', async ({ page, baseURL 
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
-  await page.getByLabel('Name').fill('a'.repeat(250));
+  await page.getByLabel('Name', { exact: true }).fill('a'.repeat(250));
   await page.getByRole('button', { name: 'Save' }).click();
 
-  const nameField = page.getByLabel('Name');
+  const nameField = page.getByLabel('Name', { exact: true });
   await expect(nameField).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByText('Name must be at most 200 characters.')).toBeVisible();
   // Scoped to the edit form that owns the Name field — `<main>` alone is not enough, since
   // the detail screen also draws the account's currency code ("SGD") in its balance tiles.
-  const editForm = page.locator('form', { has: page.getByLabel('Name') });
+  const editForm = page.locator('form', { has: page.getByLabel('Name', { exact: true }) });
   await expect(editForm.getByText(/^[A-Z_]+$/)).not.toBeVisible();
 });

@@ -26,7 +26,7 @@ test('A reversal needs a reason and refreshes the values', async ({ page, baseUR
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByTestId('postings-panel').getByText('PST0000000001').click();
   await page.getByRole('button', { name: /reverse/i }).click();
-  await page.getByLabel('Reason').fill('duplicate of the morning batch');
+  await page.getByLabel('Reason', { exact: true }).fill('duplicate of the morning batch');
   await page.getByRole('button', { name: 'Confirm' }).click();
 
   await expect

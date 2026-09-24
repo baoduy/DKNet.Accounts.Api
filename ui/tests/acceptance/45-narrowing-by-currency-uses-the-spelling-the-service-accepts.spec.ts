@@ -23,7 +23,7 @@ test('Narrowing by currency uses the spelling the service accepts', async ({ pag
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
 
   await page.goto(`${baseURL}/accounts`);
-  await page.getByLabel('Currency filter').selectOption('SGD');
+  await page.getByLabel('Currency filter', { exact: true }).selectOption('SGD');
 
   await expect(page.getByRole('row', { name: /ACME-000001/ })).toBeVisible();
   await expect(page.getByRole('row', { name: /ACME-000002/ })).not.toBeVisible();

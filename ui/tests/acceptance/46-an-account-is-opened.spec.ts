@@ -20,18 +20,18 @@ test('An account is opened', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/accounts`);
   await page.getByRole('button', { name: 'Open account' }).click();
 
-  await page.getByLabel('Name').fill('Operating account');
-  await page.getByLabel('Group').selectOption({ label: 'ACME' });
-  await page.getByLabel('Currency').selectOption('SGD');
-  await page.getByLabel('Accounting classification').selectOption('Liability');
-  await page.getByLabel('Permitted to go negative').uncheck();
+  await page.getByLabel('Name', { exact: true }).fill('Operating account');
+  await page.getByLabel('Group', { exact: true }).selectOption({ label: 'ACME' });
+  await page.getByLabel('Currency', { exact: true }).selectOption('SGD');
+  await page.getByLabel('Accounting classification', { exact: true }).selectOption('Liability');
+  await page.getByLabel('Permitted to go negative', { exact: true }).uncheck();
   await page.getByRole('button', { name: 'Open' }).click();
 
   await expect(page.getByText('Operating account')).toBeVisible();
   await expect(page.getByText('0.00 SGD')).toBeVisible();
 
-  const groupOptions = await page.getByLabel('Group').locator('option').allTextContents();
+  const groupOptions = await page.getByLabel('Group', { exact: true }).locator('option').allTextContents();
   expect(groupOptions).toContain('ACME');
-  const currencyOptions = await page.getByLabel('Currency').locator('option').allTextContents();
+  const currencyOptions = await page.getByLabel('Currency', { exact: true }).locator('option').allTextContents();
   expect(currencyOptions).toContain('SGD');
 });

@@ -37,9 +37,9 @@ test('The values on screen follow a write', async ({ page, baseURL }) => {
 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByRole('button', { name: 'Record posting' }).click();
-  await page.getByLabel('Direction').selectOption('Credit');
-  await page.getByLabel('Amount').fill('500.00');
-  await page.getByLabel('Category').selectOption('Transfer');
+  await page.getByLabel('Direction', { exact: true }).selectOption('Credit');
+  await page.getByLabel('Amount', { exact: true }).fill('500.00');
+  await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record' }).click();
 
   // While the write is still in flight: the control is unavailable and the balance unchanged.

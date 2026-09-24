@@ -19,7 +19,7 @@ test('An operator finds an account and reads its balance', async ({ page, baseUR
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
 
   await page.goto(`${baseURL}/accounts`);
-  await page.getByLabel('Search accounts').fill('ACME-000123');
+  await page.getByLabel('Search accounts', { exact: true }).fill('ACME-000123');
 
   const row = page.getByRole('row', { name: /ACME-000123/ });
   await expect(row).toBeVisible();

@@ -24,12 +24,12 @@ test('A posting is recorded against the account on screen', async ({ page, baseU
 
   await expect(page.getByLabel('Account', { exact: true })).toBeDisabled();
   await expect(page.getByLabel('Account', { exact: true })).toHaveValue('ACME-000123');
-  await expect(page.getByLabel('Currency')).toBeDisabled();
-  await expect(page.getByLabel('Currency')).toHaveValue('SGD');
+  await expect(page.getByLabel('Currency', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Currency', { exact: true })).toHaveValue('SGD');
 
-  await page.getByLabel('Direction').selectOption('Credit');
-  await page.getByLabel('Amount').fill('500.00');
-  await page.getByLabel('Category').selectOption('Transfer');
+  await page.getByLabel('Direction', { exact: true }).selectOption('Credit');
+  await page.getByLabel('Amount', { exact: true }).fill('500.00');
+  await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record', exact: true }).click();
 
   await expect

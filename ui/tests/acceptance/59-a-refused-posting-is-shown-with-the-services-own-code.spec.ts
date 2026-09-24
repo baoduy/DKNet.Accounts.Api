@@ -21,9 +21,9 @@ test("A refused posting is shown with the service's own code", async ({ page, ba
 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByRole('button', { name: 'Record posting' }).click();
-  await page.getByLabel('Direction').selectOption('Debit');
-  await page.getByLabel('Amount').fill('20000.00');
-  await page.getByLabel('Category').selectOption('Transfer');
+  await page.getByLabel('Direction', { exact: true }).selectOption('Debit');
+  await page.getByLabel('Amount', { exact: true }).fill('20000.00');
+  await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record' }).click();
 
   await expect(page.getByText('INSUFFICIENT_FUNDS')).toBeVisible();

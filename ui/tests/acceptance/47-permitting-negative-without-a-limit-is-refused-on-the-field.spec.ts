@@ -23,8 +23,8 @@ test('Permitting an account to go negative without a limit is refused on the fie
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
-  await page.getByLabel('Permitted to go negative').check();
-  await page.getByLabel('Overdraft limit').fill('');
+  await page.getByLabel('Permitted to go negative', { exact: true }).check();
+  await page.getByLabel('Overdraft limit', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Save' }).click();
 
   const floorSettings = page.getByTestId('floor-settings');

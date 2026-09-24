@@ -28,14 +28,14 @@ test('A view is shared as a link', async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
 
   await page.goto(`${baseURL}/accounts`);
-  await page.getByLabel('Currency filter').selectOption('SGD');
+  await page.getByLabel('Currency filter', { exact: true }).selectOption('SGD');
   await page.getByRole('columnheader', { name: 'Name' }).click();
   await page.getByRole('button', { name: 'Page 2' }).click();
 
   const sharedUrl = page.url();
   await page.goto(sharedUrl);
 
-  await expect(page.getByLabel('Currency filter')).toHaveValue('SGD');
+  await expect(page.getByLabel('Currency filter', { exact: true })).toHaveValue('SGD');
   await expect(page.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
   const params = new URL(sharedUrl).searchParams;
   expect(params.get('sort')).toBe('name');

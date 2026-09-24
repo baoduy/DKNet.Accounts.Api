@@ -30,7 +30,7 @@ for (const status of ['Frozen', 'Dormant', 'Closed']) {
     await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
 
     await page.goto(`${baseURL}/accounts/ACME-000123`);
-    await page.getByLabel('Status').selectOption(status);
+    await page.getByLabel('Status', { exact: true }).selectOption(status);
     await page.getByRole('button', { name: 'Save' }).click();
 
     const calls = (await ledgerRequests()).filter((r) => r.method === 'PATCH' && r.path === '/v1/accounts/ACME-000123');
