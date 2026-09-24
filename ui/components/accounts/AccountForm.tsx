@@ -42,14 +42,8 @@ export const ACCOUNT_CLASSIFICATIONS: AccountFormOption[] = [
 ];
 
 /** README.md: the account status enum — all 4 are offered, not only the 2 close/reopen sets
- * (decision log, "All 4 account statuses are offered, not only the 2 that close and reopen").
- * `Active`/`Closed` are relabelled on screen only — the value submitted is still the literal
- * enum word — because a closed `<select>` keeps every `<option>`'s text matchable by a
- * page-wide text search, and the status badge elsewhere on this same screen already states
- * the literal word `Active`/`Closed` (DRK-1696 §5 "An emptied account is closed" / "A closed
- * account is reopened" — a bare, unscoped check for exactly that word). */
+ * (decision log, "All 4 account statuses are offered, not only the 2 that close and reopen"). */
 export const ACCOUNT_STATUSES = ['Active', 'Frozen', 'Dormant', 'Closed'];
-const ACCOUNT_STATUS_LABELS: Record<string, string> = { Active: 'Open', Closed: 'Shut' };
 
 export interface AccountFormValues {
   name: string;
@@ -201,7 +195,7 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
             </option>
             {ACCOUNT_STATUSES.map((value) => (
               <option key={value} value={value}>
-                {ACCOUNT_STATUS_LABELS[value] ?? value}
+                {value}
               </option>
             ))}
           </select>
