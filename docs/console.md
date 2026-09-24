@@ -81,8 +81,8 @@ another:
   exchange-rate source, so currencies are never added together (needs `accounts.read`).
 - **Accounts by status** and **Groups by status** — the service's own count per status, never a
   count of rows the browser lists (needs `accounts.read`).
-- **Postings per week** — the last 13 weeks, oldest first, each a UTC Monday-to-Sunday window
-  ending today's week (needs `postings.read`).
+- **Postings per week** — the last 13 windows of 7 days, in UTC, oldest first, the latest ending
+  today (needs `postings.read`).
 - **Accounts opened per month** — the current UTC month and the 11 before it, each split by the
   four account statuses (needs `accounts.read`).
 - **Recently viewed** — the records this operator opened, kept in this browser only, keyed to
