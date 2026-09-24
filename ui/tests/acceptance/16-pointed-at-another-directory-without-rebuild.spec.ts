@@ -6,11 +6,11 @@
  *       restarted
  *     Then sign-in goes to the other directory
  */
-import { expect, test } from '@playwright/test';
-import { defaultConsoleEnv, TENANT_OTHER_DIRECTORY } from '../support/fixtures';
+import { expect, test } from '../support/test';
+import { defaultConsoleEnv, OWN_CONSOLE_PORT, TENANT_OTHER_DIRECTORY } from '../support/fixtures';
 import { startConsole, stopConsole } from '../support/console-process';
 
-const PORT = 3204;
+const PORT = OWN_CONSOLE_PORT;
 const BASE = `http://127.0.0.1:${PORT}`;
 
 test('The console is pointed at another directory without a rebuild', async ({ page }) => {

@@ -7,7 +7,7 @@ function env(vars: Record<string, string | undefined>): NodeJS.ProcessEnv {
 }
 
 const BASE_ENV = {
-  CONSOLE_BASE_URL: 'http://127.0.0.1:3100',
+  CONSOLE_BASE_URL: 'http://console.test',
   CONSOLE_REDIS_URL: 'redis://127.0.0.1:6379',
   CONSOLE_SESSION_SECRET: 'session-secret',
   CONSOLE_TOKEN_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef',
@@ -33,7 +33,7 @@ describe('loadConfig', () => {
       entraClientSecret: 'secret',
       entraScopes: ['accounts.read', 'postings.read'],
       apiBaseUrl: 'http://127.0.0.1:8080',
-      baseUrl: 'http://127.0.0.1:3100',
+      baseUrl: 'http://console.test',
       redisUrl: 'redis://127.0.0.1:6379',
       redisKeyPrefix: 'console:',
       sessionSecret: 'session-secret',
@@ -90,6 +90,6 @@ describe('entraIssuerBaseUrl', () => {
   });
 
   it('is overridable, e.g. by the acceptance suite pointing at the fake issuer', () => {
-    expect(entraIssuerBaseUrl(env({ CONSOLE_ENTRA_ISSUER_BASE_URL: 'http://127.0.0.1:4488' }))).toBe('http://127.0.0.1:4488');
+    expect(entraIssuerBaseUrl(env({ CONSOLE_ENTRA_ISSUER_BASE_URL: 'http://sign-in.test' }))).toBe('http://sign-in.test');
   });
 });

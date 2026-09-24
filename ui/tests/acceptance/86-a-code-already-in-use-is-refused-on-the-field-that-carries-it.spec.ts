@@ -14,7 +14,7 @@
  * 11-12), so neither create form nor its field-routed refusal (`routeRefusal`, already built)
  * exists yet.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

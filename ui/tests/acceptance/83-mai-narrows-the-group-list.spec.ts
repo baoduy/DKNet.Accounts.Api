@@ -17,7 +17,7 @@
  * input narrow the list; a `Name` column header sorts it (`LedgerTable`'s existing sortable
  * column convention).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

@@ -16,7 +16,7 @@
  * 11-12), so neither the disabled action nor its reason+code exist yet. R5: the action stays
  * on screen, disabled — never hidden.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedCurrencies, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

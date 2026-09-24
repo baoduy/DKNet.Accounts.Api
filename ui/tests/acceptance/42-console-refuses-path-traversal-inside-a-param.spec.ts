@@ -8,7 +8,7 @@
  * refuses any segment carrying its own `/` or `\` before the allowlist and the outbound path
  * is built from the matched segments, re-encoded.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { ledgerRequests } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

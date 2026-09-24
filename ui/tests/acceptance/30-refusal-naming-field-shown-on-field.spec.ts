@@ -10,7 +10,7 @@
  * `routeRefusal` (row 10) must route a field-carrying entry away from the block-level
  * `RefusalAlert`. Both are stubs — RED on the first assertion.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

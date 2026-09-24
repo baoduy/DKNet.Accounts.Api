@@ -11,7 +11,7 @@
  * `AccountGroupsScreen` is a stub that throws (row 11), so the group's balances never reach
  * `CurrencyBalanceList`.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

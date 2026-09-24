@@ -11,7 +11,7 @@
  * Proved with a real CSS `filter: grayscale(1)` rendering (DRK-1682 §7 slice note), not
  * a `data-*` attribute stand-in for colour.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('A postings table reads correctly with all colour removed', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/kit-harness-internal`);

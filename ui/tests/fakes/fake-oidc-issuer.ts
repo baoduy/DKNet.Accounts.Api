@@ -20,7 +20,9 @@ import { createServer } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 
-const PORT = Number(process.env.FAKE_OIDC_PORT ?? 4488);
+// The run's own port, always passed in by `playwright.config.ts` (DRK-1726 R1) — never a default.
+const PORT = Number(process.env.FAKE_OIDC_PORT);
+if (!Number.isInteger(PORT) || PORT <= 0) throw new Error('FAKE_OIDC_PORT is not set to a port');
 
 const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName: string; scopes: string[] }> = {
   // DRK-1696 §3 row 11: `MAI`, `MAI_MISSING_REVERSE_SCOPE` and `MAI_WITH_WRITE` are three

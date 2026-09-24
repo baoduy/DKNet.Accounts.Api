@@ -57,7 +57,9 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
-const PORT = Number(process.env.FAKE_LEDGER_PORT ?? 4499);
+// The run's own port, always passed in by `playwright.config.ts` (DRK-1726 R1) — never a default.
+const PORT = Number(process.env.FAKE_LEDGER_PORT);
+if (!Number.isInteger(PORT) || PORT <= 0) throw new Error('FAKE_LEDGER_PORT is not set to a port');
 
 interface AccountFixture {
   id: string;

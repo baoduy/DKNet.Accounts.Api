@@ -12,7 +12,7 @@
  * `Owner`, `Type`, `Description`); `Create group` submits it; re-opening the created row and
  * clicking `Edit group` shows `Code` and `Owner` as disabled fields (R3).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

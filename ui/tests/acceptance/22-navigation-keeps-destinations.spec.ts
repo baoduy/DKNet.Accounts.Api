@@ -10,7 +10,7 @@
  * every `Sidebar` nav link (`ui/components/shell/Sidebar.tsx:87-108`) carries a large
  * inline `style` object. A shadcn-based link is styled by class name, not `style`.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

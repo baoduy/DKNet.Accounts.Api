@@ -80,14 +80,31 @@ export interface CurrencyFixture {
   isActive?: boolean;
 }
 
+/**
+ * Calls one of the fake ledger's routes; a refused request or an answer outside 2xx throws,
+ * naming the stand-in, the route and the status (DRK-1726 §3 row 7) — a seed or reset that did
+ * not land never lets the check go on against the wrong data.
+ */
+async function ledgerFetch(route: string, init: RequestInit = {}): Promise<Response> {
+  const method = init.method ?? 'GET';
+  let response: Response;
+  try {
+    response = await fetch(`${FAKE_LEDGER_BASE}${route}`, init);
+  } catch (error) {
+    throw new Error(`stand-in ledger did not answer ${method} ${route}: ${(error as Error).message}`);
+  }
+  if (!response.ok) throw new Error(`stand-in ledger answered ${method} ${route} with ${response.status}: ${await response.text()}`);
+  return response;
+}
+
 /** Resets `fake-ledger-service.ts` to an empty dataset. */
 export async function resetLedger(): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__reset`, { method: 'POST' });
+  await ledgerFetch('/__reset', { method: 'POST' });
 }
 
 /** Seeds accounts into `fake-ledger-service.ts` (upsert by `accountNumber`). */
 export async function seedLedgerAccounts(accounts: LedgerAccountFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -118,7 +135,7 @@ export async function seedLedgerAccounts(accounts: LedgerAccountFixture[]): Prom
 
 /** Seeds account groups into `fake-ledger-service.ts` (upsert by `id`). */
 export async function seedLedgerAccountGroups(groups: LedgerAccountGroupFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accountGroups: groups.map((group) => ({ status: 'Active', ...group })) }),
@@ -127,7 +144,7 @@ export async function seedLedgerAccountGroups(groups: LedgerAccountGroupFixture[
 
 /** Seeds postings into `fake-ledger-service.ts`, appended to the existing stream. */
 export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ postings: postings.map((posting) => ({ status: 'Posted', ...posting })) }),
@@ -136,7 +153,7 @@ export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Prom
 
 /** DRK-1697 §3 row 15 — seeds account groups into `fake-ledger-service.ts` (upsert by `code`). */
 export async function seedAccountGroups(groups: AccountGroupFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accountGroups: groups }),
@@ -145,7 +162,7 @@ export async function seedAccountGroups(groups: AccountGroupFixture[]): Promise<
 
 /** DRK-1697 §3 row 15 — seeds currencies into `fake-ledger-service.ts` (upsert by `code`). */
 export async function seedCurrencies(currencies: CurrencyFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ currencies }),
@@ -154,13 +171,13 @@ export async function seedCurrencies(currencies: CurrencyFixture[]): Promise<voi
 
 /** Every request `fake-ledger-service.ts` has received since the last reset. */
 export async function ledgerRequests(): Promise<Array<{ method: string; path: string }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
+  const response = await ledgerFetch('/__requests');
   return (await response.json()) as Array<{ method: string; path: string }>;
 }
 
 /** DRK-1713 §3 row 2 — every posting the fake ledger holds, recorded or seeded. */
 export async function ledgerPostings(): Promise<Array<{ id: string; postingNumber: string; accountId: string; direction: string; amount: string; currency: string; status: string; category: string; description: string | null; effectiveDate: string | null; reversesPostingId: string | null; reversedByPostingId: string | null }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__postings`);
+  const response = await ledgerFetch('/__postings');
   // Amounts arrive as raw numeric literals — kept as their exact text, never through `Number`.
   const text = (await response.text()).replace(/"(amount|signedAmount|balanceAfter)":(-?[0-9.]+)/g, '"$1":"$2"');
   return JSON.parse(text);
@@ -168,18 +185,18 @@ export async function ledgerPostings(): Promise<Array<{ id: string; postingNumbe
 
 /** DRK-1713 "Controlled clock" — the day the fake writes a reversal (or an undated recording) on. */
 export async function setLedgerClock(today: string | null): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__clock`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ today }) });
+  await ledgerFetch('/__clock', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ today }) });
 }
 
 /** DRK-1713 — the next recording is written, but its answer never reaches the console. */
 export async function dropNextPostingAnswer(): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__drop-next-answer`, { method: 'POST' });
+  await ledgerFetch('/__drop-next-answer', { method: 'POST' });
 }
 
 /** Every recording (`POST /v1/postings`) the fake has received since the last reset, with the
  * idempotency key it carried and its body as sent. */
 export async function recordingRequests(): Promise<Array<{ idempotencyKey: string | undefined; body: Record<string, unknown> }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
+  const response = await ledgerFetch('/__requests');
   const log = (await response.json()) as Array<{ method: string; path: string; headers: Record<string, string>; body?: Record<string, unknown> }>;
   return log
     .filter((entry) => entry.method === 'POST' && entry.path === '/v1/postings')

@@ -19,7 +19,7 @@
  * invariant mechanism in the new routes' context, not new behaviour this slice adds. See the
  * completion report's per-scenario table for why this is expected, not a smell.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { ledgerRequests } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

@@ -23,7 +23,10 @@ test('The posting list opens on the last 30 days', async ({ page, baseURL }) => 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await expect(page.getByTestId('postings-panel')).toBeVisible();
 
-  const calls = (await ledgerRequests()).filter((r) => r.method === 'GET' && r.path.startsWith('/v1/postings?'));
+  const postingListCalls = async () => (await ledgerRequests()).filter((r) => r.method === 'GET' && r.path.startsWith('/v1/postings?'));
+  // The panel shows before its first read of the posting list has reached the ledger.
+  await expect.poll(async () => (await postingListCalls()).length).toBeGreaterThan(0);
+  const calls = await postingListCalls();
   const last = calls.at(-1)!;
   const params = new URLSearchParams(last.path.split('?')[1]);
   const from = new Date(params.get('from')!);

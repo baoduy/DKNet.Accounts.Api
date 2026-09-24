@@ -8,7 +8,7 @@
  *     And the menu lists accounts.read and postings.read as held
  *     And the menu lists postings.reverse as not held, with what Mai cannot do without it
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI_MISSING_REVERSE_SCOPE } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

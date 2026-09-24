@@ -12,13 +12,13 @@
  * throws (row 11). R4: no code from the service means the console invents none, showing the
  * service's own wording and the `traceId` instead.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
 test('A refusal that carries no code still shows what the service said', async ({ page, baseURL }) => {
-  await seedAccountGroups([{ code: 'TRSY', name: 'Treasury', ownerId: 'default-owner' }]);
+  await seedAccountGroups([{ id: 'grp-trsy-no-code', code: 'TRSY', name: 'Treasury', ownerId: 'default-owner' }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
 

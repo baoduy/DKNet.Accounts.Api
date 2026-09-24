@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { parse as parseYaml } from 'yaml';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');

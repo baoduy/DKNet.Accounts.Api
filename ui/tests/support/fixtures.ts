@@ -1,20 +1,31 @@
 /**
  * Shared test fixtures for the acceptance-test harness. These values are the harness's
- * own test data — not the spec's literals — except where a comment says otherwise.
+ * own test data — not the spec's literals — except where a comment says otherwise. Ports and
+ * names are this run's own (`run.ts`).
  */
+import { currentRun } from './run';
 
-export const FAKE_OIDC_PORT = 4488;
+const RUN = currentRun();
+
+/** This run's own id — names what the run creates outside this process (container, image tag). */
+export const RUN_ID = RUN.id;
+
+export const FAKE_OIDC_PORT = RUN.signInPort;
 export const FAKE_OIDC_BASE = `http://127.0.0.1:${FAKE_OIDC_PORT}`;
 
-export const FAKE_REDIS_PORT = 16532;
+export const FAKE_REDIS_PORT = RUN.cachePort;
 export const FAKE_REDIS_URL = `redis://127.0.0.1:${FAKE_REDIS_PORT}`;
+export const FAKE_REDIS_CONTAINER = `console-acceptance-cache-${RUN_ID}`;
 
 /** DRK-1684 §3 row 15 — the fake standing in for the ledger service itself. */
-export const FAKE_LEDGER_PORT = 4499;
+export const FAKE_LEDGER_PORT = RUN.ledgerPort;
 export const FAKE_LEDGER_BASE = `http://127.0.0.1:${FAKE_LEDGER_PORT}`;
 
-export const DEFAULT_CONSOLE_PORT = 3100;
+export const DEFAULT_CONSOLE_PORT = RUN.consolePort;
 export const DEFAULT_CONSOLE_BASE = `http://127.0.0.1:${DEFAULT_CONSOLE_PORT}`;
+
+/** The console specs 08, 15, 16 and 17 start, restart and stop themselves. */
+export const OWN_CONSOLE_PORT = RUN.ownConsolePort;
 
 export const TENANT_DRUNK_CODING = 'drunk-coding-tenant';
 export const TENANT_OTHER_DIRECTORY = 'other-directory-tenant';

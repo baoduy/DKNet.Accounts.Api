@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import type { LedgerAccountFixture, LedgerPostingFixture } from './ledger';
 
 /**
- * DRK-1713 — how the acceptance specs 63 onward drive the Records screen (`/records`). The
+ * DRK-1713 — how the acceptance specs 64 to 82 and 96 drive the Records screen (`/records`). The
  * names below are the screen's contract with these specs; every one follows a control the
  * account detail screen (`PostingsPanel`, `RecordPostingForm`, `ReversePostingForm`) or the
  * accounts screen (`AccountsScreen`) already names the same way:
@@ -40,6 +40,11 @@ export function account(accountNumber: string, id: string, overrides: Partial<Le
 }
 
 let postingSequence = 0;
+
+/** Called before every check by `test.ts`, so a check's stream positions never depend on the checks before it. */
+export function resetPostingSequence(): void {
+  postingSequence = 0;
+}
 
 /** A posting fixture; `amount` is the magnitude, `signedAmount` follows the direction. */
 export function posting(fixture: Omit<LedgerPostingFixture, 'streamPosition' | 'signedAmount' | 'balanceAfter'> & Partial<LedgerPostingFixture>): LedgerPostingFixture {

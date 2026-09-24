@@ -13,7 +13,7 @@
  * size 10, per `Design/ui_kits/account-groups-crud/AccountGroups.jsx`'s own default) —
  * 12 closed groups seeded here so page 2 holds the last 2.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

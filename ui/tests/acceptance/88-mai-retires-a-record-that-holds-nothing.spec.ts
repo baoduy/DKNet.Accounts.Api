@@ -14,7 +14,7 @@
  * Drives `/groups` and `/currencies`. RED today: both screens are stubs that throw (rows
  * 11-12).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedCurrencies, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
@@ -43,7 +43,7 @@ test('Mai closes a group that holds no account with a balance', async ({ page, b
 });
 
 test('Mai deletes a group that holds no account', async ({ page, baseURL }) => {
-  await seedAccountGroups([{ code: 'SUSP', name: 'Suspense', ownerId: 'default-owner' }]);
+  await seedAccountGroups([{ id: 'grp-susp-delete', code: 'SUSP', name: 'Suspense', ownerId: 'default-owner' }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
 

@@ -18,7 +18,7 @@
  * etc.) onto the `role="menu"` element itself, so a real shadcn dropdown menu still carries
  * a `style` attribute — just never a background/color/border/box-shadow/padding value.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { KNOWN_SCOPES, SCOPE_CONSEQUENCES } from '../../lib/scopes';
 import { signInAs } from '../support/sign-in';
 

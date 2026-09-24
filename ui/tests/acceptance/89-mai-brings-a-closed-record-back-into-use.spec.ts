@@ -13,7 +13,7 @@
  * Drives `/groups` and `/currencies`. RED today: both screens are stubs that throw (rows
  * 11-12).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedCurrencies } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

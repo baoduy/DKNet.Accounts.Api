@@ -13,7 +13,7 @@
  * `data-testid="currency-worked-example"`, computed from the in-progress `Decimal places`
  * field before the currency is saved.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

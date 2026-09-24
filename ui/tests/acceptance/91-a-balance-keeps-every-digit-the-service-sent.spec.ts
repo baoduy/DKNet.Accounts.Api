@@ -19,7 +19,7 @@
  * anything routes it through a JS `number` (2^53 ≈ 9.007199254740992×10^15) — the guard R1
  * exists to prove.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedCurrencies, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
