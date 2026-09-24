@@ -29,8 +29,10 @@ test('A reversal needs a reason and refreshes the values', async ({ page, baseUR
   await page.getByLabel('Reason').fill('duplicate of the morning batch');
   await page.getByRole('button', { name: 'Confirm' }).click();
 
+  await expect
+    .poll(async () => (await ledgerRequests()).filter((r) => r.method === 'POST' && r.path.includes('/reverse')))
+    .toHaveLength(1);
   const calls = (await ledgerRequests()).filter((r) => r.method === 'POST' && r.path.includes('/reverse'));
-  expect(calls).toHaveLength(1);
   const body = calls[0] as unknown as { body: { reason: string } };
   expect(body.body.reason).toBe('duplicate of the morning batch');
 

@@ -22,18 +22,20 @@ test('A posting is recorded against the account on screen', async ({ page, baseU
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByRole('button', { name: 'Record posting' }).click();
 
-  await expect(page.getByLabel('Account')).toBeDisabled();
-  await expect(page.getByLabel('Account')).toHaveValue('ACME-000123');
+  await expect(page.getByLabel('Account', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Account', { exact: true })).toHaveValue('ACME-000123');
   await expect(page.getByLabel('Currency')).toBeDisabled();
   await expect(page.getByLabel('Currency')).toHaveValue('SGD');
 
   await page.getByLabel('Direction').selectOption('Credit');
   await page.getByLabel('Amount').fill('500.00');
   await page.getByLabel('Category').selectOption('Transfer');
-  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
 
+  await expect
+    .poll(async () => (await ledgerRequests()).filter((r) => r.method === 'POST' && r.path === '/v1/postings'))
+    .toHaveLength(1);
   const calls = (await ledgerRequests()).filter((r) => r.method === 'POST' && r.path === '/v1/postings');
-  expect(calls).toHaveLength(1);
   const body = calls[0] as unknown as { body: { accountId: string; currency: string } };
   expect(body.body.accountId).toBe('ACME-000123');
   expect(body.body.currency).toBe('SGD');

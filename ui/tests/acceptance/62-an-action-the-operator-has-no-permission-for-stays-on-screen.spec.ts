@@ -28,5 +28,6 @@ test('An action the operator has no permission for stays on screen', async ({ pa
   const reverseButton = page.getByRole('button', { name: /reverse/i });
   await expect(reverseButton).toBeVisible();
   await expect(reverseButton).toBeDisabled();
-  await expect(page.getByText(/postings\.reverse/)).toBeVisible();
+  // Scoped to the screen content — the user menu's own missing-scope badge is a separate surface.
+  await expect(page.getByRole('main').getByText(/postings\.reverse/)).toBeVisible();
 });
