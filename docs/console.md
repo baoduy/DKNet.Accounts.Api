@@ -1,9 +1,9 @@
 # DKNet Accounts Console
 
 A Next.js operations console that signs an operator into `DKNet.Accounts.Api` with Microsoft
-Entra ID, and reads and writes the ledger through its own pass-through endpoint. No ledger
-*screen* ships yet (`ui/app/page.tsx` still renders the frame with no data), but the access
-layer, the endpoint and the ledger component kit do.
+Entra ID, and reads and writes the ledger through its own pass-through endpoint. The accounts
+screen is the first ledger screen to ship (`ui/app/page.tsx`'s own frame still renders no data);
+no other ledger screen ships yet.
 
 ## ✨ Why use it?
 
@@ -35,10 +35,8 @@ This starts `postgres`, `redis`, the API and the console together
 publishes on `${CONSOLE_PORT:-3000}` — check `.env.sample` on this branch for the current port
 mapping.
 
-> **No ledger screen ships yet.** Signing in reaches the framed shell — sidebar, page header,
-> identity menu — with no ledger or administration screen behind it (`ui/app/page.tsx`). The
-> ledger access layer, the pass-through endpoint and the ledger component kit this screen will
-> be built from already ship — see *Features* below.
+> **The accounts screen ships; the account detail screen does not yet.** Signing in reaches the
+> accounts list at `/accounts` — the root frame at `/` still shows no data. See *Features* below.
 
 ## 🧩 Features
 
@@ -69,6 +67,23 @@ known-scope set is the ledger contract's five: `accounts.read`, `accounts.write`
 reversing a posting, and `accounts.write`/`postings.write` gate every ledger write
 (`ui/lib/scopes.ts`).
 
+### Accounts screen
+
+`/accounts` lists accounts: search (2 characters minimum — a shorter term is never sent), a
+currency filter, sortable columns, and paging. The whole view — filter, sort and page — round-trips
+through the page address, so a copied link reproduces the same view. Each row's account number
+links to `/accounts/<account-number>`; that destination is the account detail screen, which does
+not ship yet — see *Gotchas & limits*. A row's status is one of the account's four:
+`Active`, `Frozen`, `Dormant`, `Closed`.
+
+Opening an account (`accounts.write`) is the one write this screen offers: group, currency and
+accounting classification (`Asset`, `Liability`, `Equity`, `Income`, `Expense`) are chosen from
+lists the service itself supplies, never typed; the account number is assigned by the service.
+Floor settings — permitted to go negative, overdraft limit, smallest permitted balance — are
+always answered, never left at a silent default. Permitting negative with no overdraft limit is
+refused as `OVERDRAFT_LIMIT_REQUIRED`; an unsupported currency is refused as
+`UNSUPPORTED_CURRENCY`.
+
 ### Ledger pass-through endpoint
 
 `ui/app/api/ledger/[...route]/route.ts` proxies `GET`/`POST`/`PATCH`/`DELETE` under `/api/ledger/…`
@@ -76,9 +91,11 @@ to `DKNet.Accounts.Api`: it resolves the operator's session, decrypts her access
 server-side, forwards the caller's `Idempotency-Key`, and returns the ledger service's answer
 unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
 (`ui/lib/api/routes.ts`) — the set of routes the generated OpenAPI contract declares — and refused
-before any outbound call if the route isn't in it. The token never crosses back to the browser —
-the service still checks every permission itself, so a control disabled on screen for a missing
-scope is convenience only, not the enforcement point.
+before any outbound call if the route isn't in it. This cycle widens that set with the account
+operations the accounts screen needs: opening an account, listing accounts, reading one, updating
+its name/metadata, changing its status/floor controls, and listing account groups. The token never
+crosses back to the browser — the service still checks every permission itself, so a control
+disabled on screen for a missing scope is convenience only, not the enforcement point.
 
 ### Typed access layer and contract drift check
 
@@ -143,8 +160,15 @@ the secret server-side, never in the browser):
 
 ## ⚠️ Gotchas & limits
 
-- **No ledger screen ships yet.** Sign-in reaches the framed shell only — the ledger access
-  layer, pass-through endpoint and component kit exist, but no screen wires them together.
+- **The account detail screen does not ship yet.** An account number on the accounts screen links
+  to it, but the route doesn't exist. Editing an account and closing/reopening it are that
+  screen's job, so neither is reachable in the console yet, even though the service and the
+  pass-through both already accept them.
+- **An accounts list is browsed and opened, never summed or exported.** No footer, no total row,
+  no export control.
+- **Directory consent for `accounts.write` and `postings.write` is not granted yet.** Every ledger
+  write — including opening an account — fails against a real tenant until an administrator
+  grants it (see *Entra app registration* above).
 - **A blank tenant or client ID is not an error.** The console starts and serves the
   not-configured page rather than failing — see *Sign-in not configured* above.
 - **A missing `CONSOLE_TOKEN_ENCRYPTION_KEY` is an error.** The console refuses to start rather
