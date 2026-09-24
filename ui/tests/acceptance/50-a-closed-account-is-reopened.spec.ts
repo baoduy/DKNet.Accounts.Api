@@ -31,5 +31,5 @@ test('A closed account is reopened', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/accounts/ACME-000123`);
   await page.getByRole('button', { name: /reopen/i }).click();
 
-  await expect(page.getByText('Active')).toBeVisible();
+  await expect(page.getByTestId('account-status')).toHaveText('Active');
 });

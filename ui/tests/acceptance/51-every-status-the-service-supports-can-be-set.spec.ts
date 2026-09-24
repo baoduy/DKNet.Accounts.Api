@@ -33,8 +33,10 @@ for (const status of ['Frozen', 'Dormant', 'Closed']) {
     await page.getByLabel('Status', { exact: true }).selectOption(status);
     await page.getByRole('button', { name: 'Save' }).click();
 
+    await expect
+      .poll(async () => (await ledgerRequests()).filter((r) => r.method === 'PATCH' && r.path === '/v1/accounts/ACME-000123'))
+      .toHaveLength(1);
     const calls = (await ledgerRequests()).filter((r) => r.method === 'PATCH' && r.path === '/v1/accounts/ACME-000123');
-    expect(calls).toHaveLength(1);
     const body = calls[0] as unknown as { body: { status: string } };
     expect(body.body.status).toBe(status);
 

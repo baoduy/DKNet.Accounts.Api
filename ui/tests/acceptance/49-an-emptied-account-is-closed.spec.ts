@@ -24,6 +24,6 @@ test('An emptied account is closed', async ({ page, baseURL }) => {
   await expect(control).toBeEnabled();
   await control.click();
 
-  await expect(page.getByText('Closed')).toBeVisible();
+  await expect(page.getByTestId('account-status')).toHaveText('Closed');
   await expect(page.getByRole('button', { name: /reopen/i })).toBeVisible();
 });
