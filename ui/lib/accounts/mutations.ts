@@ -7,7 +7,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
 import { readLedgerJson } from '@/lib/api/money-json';
-import { accountKey, accountsListKey } from '@/lib/query/keys';
+import { accountKeyPrefix, accountsListKey } from '@/lib/query/keys';
 import type { AccountDto } from './query';
 
 export interface AccountWriteResult {
@@ -72,9 +72,9 @@ export function useChangeAccountDetails(): { mutate: (input: ChangeAccountDetail
       });
       return readAccountResult(response);
     },
-    onSuccess: (result, variables) => {
+    onSuccess: (result) => {
       if (!result.ok) return;
-      queryClient.invalidateQueries({ queryKey: accountKey(variables.accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeyPrefix() });
       queryClient.invalidateQueries({ queryKey: accountsListKey({}) });
     },
   });
@@ -105,9 +105,9 @@ export function useSetAccountControls(): { mutate: (input: SetAccountControlsInp
       });
       return readAccountResult(response);
     },
-    onSuccess: (result, variables) => {
+    onSuccess: (result) => {
       if (!result.ok) return;
-      queryClient.invalidateQueries({ queryKey: accountKey(variables.accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeyPrefix() });
       queryClient.invalidateQueries({ queryKey: accountsListKey({}) });
     },
   });

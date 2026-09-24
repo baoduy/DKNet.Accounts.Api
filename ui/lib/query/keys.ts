@@ -22,6 +22,11 @@ export function accountKey(idOrNumber: string): readonly unknown[] {
   return ['ledger', 'account', idOrNumber] as const;
 }
 
+/** Every single-account read — the detail screen keys it by number, a write knows only the guid. */
+export function accountKeyPrefix(): readonly unknown[] {
+  return ['ledger', 'account'] as const;
+}
+
 export function accountGroupsKey(): readonly unknown[] {
   return ['ledger', 'account-groups'] as const;
 }

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { accountKey, accountsListKey } from '@/lib/query/keys';
+import { accountKeyPrefix, accountsListKey } from '@/lib/query/keys';
 import { useChangeAccountDetails, useOpenAccount, useSetAccountControls } from './mutations';
 
 function wrapper(queryClient: QueryClient) {
@@ -81,7 +81,7 @@ describe('useChangeAccountDetails', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'New name', metadata: undefined }),
     });
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountKey('ACME-000123') }));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountKeyPrefix() }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountsListKey({}) });
   });
 
@@ -140,7 +140,7 @@ describe('useSetAccountControls', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ status: 'Closed', overdraftLimit: undefined, minimumBalance: undefined, permittedToGoNegative: undefined }),
     });
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountKey('ACME-000123') }));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountKeyPrefix() }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: accountsListKey({}) });
   });
 

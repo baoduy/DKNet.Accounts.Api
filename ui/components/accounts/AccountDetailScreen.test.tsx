@@ -381,3 +381,67 @@ describe('AccountDetailScreen', () => {
     expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { source: 'core-banking', region: 'SG', notes: 'Closed for audit' } });
   });
 });
+
+describe('AccountDetailScreen — a write refreshes the lookup keyed by account number (review round 3)', () => {
+  const GUID = '0f8fad5b-d9cb-469f-a165-70867728950e';
+
+  function statefulLedger(): { fetchMock: ReturnType<typeof vi.fn>; lookups: () => number } {
+    let account: Omit<typeof ACCOUNT, 'metadata'> & { metadata: Record<string, string> } = { ...ACCOUNT, id: GUID, balance: '0.00', availableBalance: '0.00', heldAmount: '0.00', status: 'Active' };
+    let lookupCount = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        const body = JSON.parse(init.body as string) as { status?: string };
+        account = { ...account, status: body.status ?? account.status };
+        return Promise.resolve(jsonResponse(account));
+      }
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(init.body as string) as { metadata?: Record<string, string> };
+        account = { ...account, metadata: body.metadata ?? account.metadata };
+        return Promise.resolve(jsonResponse(account));
+      }
+      if (url.includes('/accounts?filter=')) {
+        lookupCount += 1;
+        return Promise.resolve(jsonResponse({ items: [account] }));
+      }
+      if (url.includes('/balance')) return Promise.resolve(jsonResponse({ ...BALANCE, balance: '0.00', availableBalance: '0.00' }));
+      return dispatch(true)(url);
+    });
+    return { fetchMock, lookups: () => lookupCount };
+  }
+
+  function renderWritable(fetchMock: ReturnType<typeof vi.fn>): void {
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: ['accounts.write'] })));
+  }
+
+  it('re-reads the account after Close, so the badge reads Closed and the control reads Reopen', async () => {
+    const { fetchMock, lookups } = statefulLedger();
+    const user = userEvent.setup();
+    renderWritable(fetchMock);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled());
+    expect(lookups()).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/ledger/accounts/${GUID}`, expect.objectContaining({ method: 'PATCH' })));
+    await waitFor(() => expect(lookups()).toBeGreaterThan(1));
+    await waitFor(() => expect(screen.getByTestId('account-status')).toHaveTextContent('Closed'));
+    expect(screen.getByRole('button', { name: 'Reopen' })).toBeInTheDocument();
+  });
+
+  it('re-reads the account after a notes save', async () => {
+    const { fetchMock, lookups } = statefulLedger();
+    const user = userEvent.setup();
+    renderWritable(fetchMock);
+
+    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue('Reconciled monthly'));
+    expect(lookups()).toBe(1);
+    await user.clear(screen.getByLabelText('Free-form notes'));
+    await user.type(screen.getByLabelText('Free-form notes'), 'Closed for audit');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/ledger/accounts/${GUID}`, expect.objectContaining({ method: 'PUT' })));
+    await waitFor(() => expect(lookups()).toBeGreaterThan(1));
+  });
+});

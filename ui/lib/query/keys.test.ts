@@ -6,6 +6,7 @@ import {
   accountGroupsKey,
   accountGroupsListKey,
   accountKey,
+  accountKeyPrefix,
   accountsListKey,
   currenciesKey,
   currenciesQueryOptions,
@@ -45,6 +46,13 @@ describe('query keys', () => {
   it('keys a single account by its id or account number, sharable across every caller', () => {
     expect(accountKey('ACME-000123')).toEqual(accountKey('ACME-000123'));
     expect(accountKey('ACME-000123')).not.toEqual(accountKey('ACME-000456'));
+  });
+
+  it('prefixes every single-account key, number or guid, and never the accounts list', () => {
+    expect(accountKeyPrefix()).toEqual(['ledger', 'account']);
+    expect(accountKey('ACME-000123').slice(0, 2)).toEqual(accountKeyPrefix());
+    expect(accountKey('0f8fad5b-d9cb-469f-a165-70867728950e').slice(0, 2)).toEqual(accountKeyPrefix());
+    expect(accountsListKey({}).slice(0, 2)).not.toEqual(accountKeyPrefix());
   });
 
   it('gives the account groups list one fixed key', () => {
