@@ -2,8 +2,8 @@
 
 A Next.js operations console that signs an operator into `DKNet.Accounts.Api` with Microsoft
 Entra ID, and reads and writes the ledger through its own pass-through endpoint. The accounts
-screen is the first ledger screen to ship (`ui/app/page.tsx`'s own frame still renders no data);
-no other ledger screen ships yet.
+screen and the account detail screen are the ledger screens that ship (`ui/app/page.tsx`'s own
+frame still renders no data).
 
 ## ✨ Why use it?
 
@@ -35,8 +35,9 @@ This starts `postgres`, `redis`, the API and the console together
 publishes on `${CONSOLE_PORT:-3000}` — check `.env.sample` on this branch for the current port
 mapping.
 
-> **The accounts screen ships; the account detail screen does not yet.** Signing in reaches the
-> accounts list at `/accounts` — the root frame at `/` still shows no data. See *Features* below.
+> **The accounts screen and the account detail screen ship.** Signing in reaches the accounts list
+> at `/accounts`; opening an account reaches its detail at `/accounts/<account-number>`. The root
+> frame at `/` still shows no data. See *Features* below.
 
 ## 🧩 Features
 
@@ -72,9 +73,8 @@ reversing a posting, and `accounts.write`/`postings.write` gate every ledger wri
 `/accounts` lists accounts: search (2 characters minimum — a shorter term is never sent), a
 currency filter, sortable columns, and paging. The whole view — filter, sort and page — round-trips
 through the page address, so a copied link reproduces the same view. Each row's account number
-links to `/accounts/<account-number>`; that destination is the account detail screen, which does
-not ship yet — see *Gotchas & limits*. A row's status is one of the account's four:
-`Active`, `Frozen`, `Dormant`, `Closed`.
+links to `/accounts/<account-number>` — the account detail screen, below. A row's status is one of
+the account's four: `Active`, `Frozen`, `Dormant`, `Closed`.
 
 Opening an account (`accounts.write`) is the one write this screen offers: group, currency and
 accounting classification (`Asset`, `Liability`, `Equity`, `Income`, `Expense`) are chosen from
@@ -82,7 +82,26 @@ lists the service itself supplies, never typed; the account number is assigned b
 Floor settings — permitted to go negative, overdraft limit, smallest permitted balance — are
 always answered, never left at a silent default. Permitting negative with no overdraft limit is
 refused as `OVERDRAFT_LIMIT_REQUIRED`; an unsupported currency is refused as
-`UNSUPPORTED_CURRENCY`.
+`UNSUPPORTED_CURRENCY`. The one close/reopen control lives on the detail screen, not here.
+
+### Account detail screen
+
+`/accounts/<account-number>` shows one account: its balance, available balance and held amount,
+and the floor the service states for it (permitted to go negative, overdraft limit, smallest
+permitted balance). An address matching no account renders a not-found message alone — never
+another account's data.
+
+Its status is one of the same four values, next to a quick close/reopen control: closing is
+disabled with the held figure and `ACCOUNT_HOLDS_BALANCE` while the account still holds money;
+reopening has no such condition. A separate status setting (in the account's edit form, alongside
+its name and floor) can set any of the four directly, not only close/reopen.
+
+Below that, the postings list opens on the last 30 days — the service requires a period and
+refuses one over 90 days, so a wider span is never sent — and narrows by direction, category and
+status. Recording a posting (`postings.write`) is against this account only: the account and its
+currency are locked, not choosable. Reversing a posting (`postings.reverse`) needs a reason;
+without the permission the reverse action stays visible and disabled, stating that it needs
+`postings.reverse`.
 
 ### Ledger pass-through endpoint
 
@@ -160,12 +179,10 @@ the secret server-side, never in the browser):
 
 ## ⚠️ Gotchas & limits
 
-- **The account detail screen does not ship yet.** An account number on the accounts screen links
-  to it, but the route doesn't exist. Editing an account and closing/reopening it are that
-  screen's job, so neither is reachable in the console yet, even though the service and the
-  pass-through both already accept them.
 - **An accounts list is browsed and opened, never summed or exported.** No footer, no total row,
   no export control.
+- **The account detail screen's postings list carries no running balance.** Each row shows its own
+  amount; no column carries the account's balance after that posting.
 - **Directory consent for `accounts.write` and `postings.write` is not granted yet.** Every ledger
   write — including opening an account — fails against a real tenant until an administrator
   grants it (see *Entra app registration* above).
