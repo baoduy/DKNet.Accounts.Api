@@ -12,6 +12,38 @@ import { FAKE_LEDGER_PORT } from '../support/fixtures';
 import { resetLedger, seedCurrencies } from '../support/ledger';
 import { UI_ROOT, runThrowawaySpecs } from './playwright-throwaway';
 
+/** Writes into `argv[2]` every 5 ms while the console on port `argv[1]` answers; exits once it does not. */
+const WRITER = `
+const net = require('node:net');
+const fs = require('node:fs');
+const path = require('node:path');
+const [port, dir] = process.argv.slice(1);
+let n = 0;
+const tick = () => {
+  const socket = net.connect(Number(port), '127.0.0.1');
+  socket.once('connect', () => {
+    socket.destroy();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'chunk-' + (n++ % 50)), 'x');
+    setTimeout(tick, 5);
+  });
+  socket.once('error', () => process.exit(0));
+};
+tick();`;
+
+async function waitForExit(pid: number, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    if (Date.now() > deadline) throw new Error(`process ${pid} still running after ${timeoutMs}ms`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 describe('the acceptance run', () => {
   test('a stand-in that stops ends the run: the checks after it never start', async () => {
     const run = await runThrowawaySpecs(
@@ -76,6 +108,37 @@ test('names what the run started', async () => {
     expect(run.markers.container).toMatch(/^console-acceptance-cache-[0-9a-f]{8}$/);
     const containers = execFileSync('docker', ['ps', '-a', '-q', '--filter', `name=^${run.markers.container}$`], { encoding: 'utf8' });
     expect(containers.trim()).toBe('');
+    expect(fs.existsSync(path.join(UI_ROOT, `.next-${run.markers['console-port']}`))).toBe(false);
+  }, 300_000);
+
+  test('a console build folder written to until the console stops is still removed', async () => {
+    // DRK-1734 B2: `next dev` writes into its build folder for as long as it runs, and the
+    // shared console is a `webServer`, stopped only after the global teardown. This writer
+    // stands in for it: it writes into the folder until the console stops answering, so a
+    // cleanup that ran while the console was still up would meet a folder still filling.
+    const run = await runThrowawaySpecs(
+      (markerDir) => ({
+        'console-keeps-writing.spec.ts': `import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from '../support/test';
+import { DEFAULT_CONSOLE_PORT } from '../support/fixtures';
+import { UI_ROOT } from '../support/run';
+
+test('something writes into the console build folder until the console stops', async () => {
+  const dir = path.join(UI_ROOT, \`.next-\${DEFAULT_CONSOLE_PORT}\`, 'drk1734-writer');
+  const writer = spawn(process.execPath, ['-e', ${JSON.stringify(WRITER)}, String(DEFAULT_CONSOLE_PORT), dir], { detached: true, stdio: 'ignore' });
+  writer.unref();
+  writeFileSync(${JSON.stringify(`${markerDir}/console-port`)}, String(DEFAULT_CONSOLE_PORT));
+  writeFileSync(${JSON.stringify(`${markerDir}/writer`)}, String(writer.pid));
+});
+`,
+      }),
+      { timeoutMs: 240_000 },
+    );
+
+    await waitForExit(Number(run.markers.writer));
+    expect(run.code, run.output).toBe(0);
     expect(fs.existsSync(path.join(UI_ROOT, `.next-${run.markers['console-port']}`))).toBe(false);
   }, 300_000);
 });

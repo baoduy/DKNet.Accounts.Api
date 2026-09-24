@@ -1,6 +1,7 @@
 /**
  * Runs in the Playwright runner, after the `webServer` stand-ins are up and before the first
  * check; the function it returns runs after the last check, before the stand-ins are stopped.
+ * The runner's `exit` comes after the stand-ins are stopped.
  *
  * - DRK-1726 R3: watches every stand-in for the whole run. The first one that stops is named
  *   ("stand-in sign-in server stopped") and the run is interrupted — the runner's own Ctrl-C
@@ -9,7 +10,9 @@
  *   running fails with the same name.
  * - DRK-1726 R2: removes only what this run started — its own cache container (the `webServer`
  *   stop ends the `docker run` client, not the container) and its consoles' build folders —
- *   and puts back the `tsconfig.json` its consoles rewrote (§9 Q3).
+ *   and puts back the `tsconfig.json` its consoles rewrote (§9 Q3). The build folders and
+ *   `tsconfig.json` wait for the runner's `exit`: the console is a `webServer`, still running
+ *   — and still writing into its folder — while the returned teardown runs (DRK-1734 B2).
  */
 import { execFileSync } from 'node:child_process';
 import { DEFAULT_CONSOLE_PORT, FAKE_REDIS_CONTAINER, OWN_CONSOLE_PORT } from './fixtures';
@@ -33,6 +36,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   };
   await watch();
 
+  // `restoreCheckout` is synchronous, as an `exit` handler must be.
+  process.once('exit', () => restoreCheckout(currentRun().tsconfig, [DEFAULT_CONSOLE_PORT, OWN_CONSOLE_PORT]));
+
   return async () => {
     watching = false;
     clearTimeout(timer);
@@ -41,6 +47,5 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     } catch {
       // Already gone — `--rm` removed it when it stopped.
     }
-    restoreCheckout(currentRun().tsconfig, [DEFAULT_CONSOLE_PORT, OWN_CONSOLE_PORT]);
   };
 }
