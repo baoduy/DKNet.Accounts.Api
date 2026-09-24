@@ -1,7 +1,10 @@
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.AppServices.Currencies.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
@@ -25,6 +28,38 @@ public sealed record UpdateAccountRequest : Fluents.Requests.IWitResponse<Accoun
 
     /// <summary>Left out means unchanged, same as its sibling floor controls (DRK-1659 §5 surface 3 R2).</summary>
     public bool? PermittedToGoNegative { get; set; }
+}
+
+internal sealed class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountRequest>
+{
+    public UpdateAccountCommandValidator(IRepositorySpec repository, IHttpContextAccessor httpContextAccessor)
+    {
+        RuleFor(r => r.OverdraftLimit).LedgerLimit(DecimalPlacesOf);
+        RuleFor(r => r.MinimumBalance).LedgerLimit(DecimalPlacesOf);
+        return;
+
+        // A missing account yields null (no places to check against) — the handler answers that 404 itself.
+        async Task<int?> DecimalPlacesOf(UpdateAccountRequest request, CancellationToken ct)
+        {
+            var currencyCode = await repository.Query(new SpecGetAccount(AccountIdOf(request)))
+                .Select(a => a.CurrencyCode)
+                .FirstOrDefaultAsync(ct);
+            return currencyCode is null
+                ? null
+                : await repository.Query(new SpecGetCurrency(byCode: currencyCode))
+                    .Select(c => (int?)c.DecimalPlaces)
+                    .FirstOrDefaultAsync(ct);
+        }
+
+        // PATCH /accounts/{id} binds only the body, and the endpoint validation runs before the route's id is
+        // copied onto the request — so until then the id is the route's.
+        Guid AccountIdOf(UpdateAccountRequest request) =>
+            request.Id != Guid.Empty
+                ? request.Id
+                : Guid.TryParse(httpContextAccessor.HttpContext?.Request.RouteValues["id"] as string, out var routeId)
+                    ? routeId
+                    : Guid.Empty;
+    }
 }
 
 internal sealed class UpdateAccountCommandHandler(

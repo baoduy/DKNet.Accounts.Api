@@ -31,10 +31,10 @@ internal sealed class PostingConfigs : DefaultEntityTypeConfiguration<Posting>
         builder.Property(p => p.Category).HasConversion<string>();
         builder.Property(p => p.Status).HasConversion<string>();
 
-        builder.Property(p => p.Currency).HasMaxLength(3).IsRequired();
-        builder.Property(p => p.Amount).HasPrecision(18, 2);
-        builder.Property(p => p.SignedValue).HasPrecision(18, 2);
-        builder.Property(p => p.BalanceAfter).HasPrecision(18, 2);
+        builder.Property(p => p.Currency).HasMaxLength(10).IsRequired();
+        builder.Property(p => p.Amount).HasPrecision(18, 6);
+        builder.Property(p => p.SignedValue).HasPrecision(18, 6);
+        builder.Property(p => p.BalanceAfter).HasPrecision(18, 6);
 
         builder.Property(p => p.CounterpartyReference).HasMaxLength(200).IsRequired(false);
         builder.Property(p => p.CallingSystem).HasMaxLength(100).IsRequired();

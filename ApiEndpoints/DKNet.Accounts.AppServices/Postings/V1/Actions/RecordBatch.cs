@@ -65,7 +65,7 @@ internal sealed class RecordPostingBatchCommandValidator : AbstractValidator<Rec
         {
             movement.RuleFor(m => m.AccountId).NotEmpty();
             movement.RuleFor(m => m.Direction).IsInEnum();
-            movement.RuleFor(m => m.Currency).NotEmpty().Length(3);
+            movement.RuleFor(m => m.Currency).NotEmpty().Length(3, 10);
             movement.RuleFor(m => m.Category).IsInEnum();
         });
     }
@@ -110,7 +110,9 @@ internal sealed class RecordPostingBatchCommandHandler(
                 cancellationToken);
             if (existing is not null)
             {
-                if (existing.IdempotencySignature != signature)
+                // A batch recorded before DRK-1719 carries the as-written signature (see Record.cs).
+                if (existing.IdempotencySignature != signature
+                    && existing.IdempotencySignature != ComputeBatchSignature(request.Movements, recordingDate, asWritten: true))
                 {
                     return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
                         LedgerErrors.IdempotencyKeyConflict,
@@ -266,8 +268,13 @@ internal sealed class RecordPostingBatchCommandHandler(
     // at 2+ legs (129 chars for 2) — Postgres rejects the insert outright. Re-hashing the joined string keeps
     // the stored value a canonical 64-char digest regardless of leg count, and — as a side effect — makes a
     // 1-leg batch's signature differ from that same leg's bare single-posting signature (DRK-1247 B3).
-    private static string ComputeBatchSignature(IReadOnlyCollection<PostingBatchMovement> movements, DateOnly recordingDate) =>
-        PostingSignature.Hash(string.Join('|', movements.Select(m => PostingSignature.Compute(
-            m.AccountId, m.Direction, m.Amount, m.Currency, m.Category, m.EffectiveDate ?? recordingDate,
-            m.Description, m.CounterpartyAccountId, m.CounterpartyReference, m.ExternalReference, m.Metadata))));
+    private static string ComputeBatchSignature(
+        IReadOnlyCollection<PostingBatchMovement> movements, DateOnly recordingDate, bool asWritten = false) =>
+        PostingSignature.Hash(string.Join('|', movements.Select(m => asWritten
+            ? PostingSignature.ComputeAsWritten(
+                m.AccountId, m.Direction, m.Amount, m.Currency, m.Category, m.EffectiveDate ?? recordingDate,
+                m.Description, m.CounterpartyAccountId, m.CounterpartyReference, m.ExternalReference, m.Metadata)
+            : PostingSignature.Compute(
+                m.AccountId, m.Direction, m.Amount, m.Currency, m.Category, m.EffectiveDate ?? recordingDate,
+                m.Description, m.CounterpartyAccountId, m.CounterpartyReference, m.ExternalReference, m.Metadata))));
 }

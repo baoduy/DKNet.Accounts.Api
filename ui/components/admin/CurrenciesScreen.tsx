@@ -34,9 +34,9 @@ interface CurrencyDraft {
 
 const BLANK_DRAFT: CurrencyDraft = { code: '', name: '', decimalPlaces: '' };
 
-/** A currency's `decimalPlaces` is a single digit 0-4 (§6 R3: fixed for its whole lifetime, so it must be right on entry). */
+/** A currency's `decimalPlaces` is a single digit 0-6 (§6 R3: fixed for its whole lifetime, so it must be right on entry). */
 function isValidDecimalPlaces(value: string): boolean {
-  return /^[0-4]$/.test(value);
+  return /^[0-6]$/.test(value);
 }
 
 export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.Element {

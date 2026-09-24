@@ -54,7 +54,7 @@ internal sealed class RecordPostingCommandValidator : AbstractValidator<RecordPo
     {
         RuleFor(r => r.AccountId).NotEmpty();
         RuleFor(r => r.Direction).IsInEnum();
-        RuleFor(r => r.Currency).NotEmpty().Length(3);
+        RuleFor(r => r.Currency).NotEmpty().Length(3, 10);
         RuleFor(r => r.Category).IsInEnum();
     }
 }
@@ -123,7 +123,14 @@ internal sealed class RecordPostingCommandHandler(
                 cancellationToken);
             if (existing is not null)
             {
-                return existing.IdempotencySignature == signature
+                // A posting recorded before DRK-1719 carries the as-written signature, which a resend of
+                // exactly the same request still matches.
+                var isReplay = existing.IdempotencySignature == signature
+                    || existing.IdempotencySignature == PostingSignature.ComputeAsWritten(
+                        request.AccountId, request.Direction, request.Amount, currency.Code, request.Category,
+                        effectiveDate, request.Description, request.CounterpartyAccountId,
+                        request.CounterpartyReference, request.ExternalReference, request.Metadata);
+                return isReplay
                     ? LedgerErrors.Replayed(mapper.Map<PostingDto>(existing))
                     : Result.Fail<PostingDto>(LedgerErrors.Error(
                         LedgerErrors.IdempotencyKeyConflict,

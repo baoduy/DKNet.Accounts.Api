@@ -10,7 +10,7 @@ internal sealed class CurrencyConfigs : DefaultEntityTypeConfiguration<Currency>
     {
         base.Configure(builder);
 
-        builder.Property(c => c.Code).HasMaxLength(3).IsRequired();
+        builder.Property(c => c.Code).HasMaxLength(10).IsRequired();
         builder.HasIndex(c => c.Code).IsUnique();
 
         builder.Property(c => c.Name).HasMaxLength(100).IsRequired();
