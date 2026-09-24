@@ -233,6 +233,8 @@ export function AccountDetail({
           currency={selectedPosting.currency}
           decimalPlaces={selectedPosting.decimalPlaces}
           direction={selectedPosting.direction === 'Debit' ? 'Debit' : 'Credit'}
+          reversedByPostingId={selectedPosting.reversedByPostingId}
+          reversesPostingId={selectedPosting.reversesPostingId}
           granted={grantedScopes.includes('postings.reverse')}
         />
       ) : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LedgerRefusalError, ledgerErrorTraceId, refusalError, routeRefusal, toLedgerError } from './refusal';
+import { LedgerRefusalError, RECORD_POSTING_CODE_FIELDS, ledgerErrorTraceId, refusalError, routeRefusal, toLedgerError } from './refusal';
 
 describe('routeRefusal', () => {
   it('routes an entry with a field to fieldErrors, keyed by that field', () => {
@@ -93,5 +93,28 @@ describe('ledgerErrorTraceId', () => {
 
   it('is undefined for a plain Error', () => {
     expect(ledgerErrorTraceId(new Error('Network down.'))).toBeUndefined();
+  });
+});
+
+describe('routeRefusal — the record form\'s codes (DRK-1713 §3 row 13)', () => {
+  it.each([
+    ['ACCOUNT_FROZEN', 'accountId'],
+    ['ACCOUNT_CLOSED', 'accountId'],
+    ['ACCOUNT_DORMANT_DEBIT_REFUSED', 'accountId'],
+    ['INSUFFICIENT_FUNDS', 'amount'],
+    ['INVALID_POSTING_AMOUNT', 'amount'],
+  ])('routes a field-less %s onto %s', (code, field) => {
+    const error = { message: 'Refused.', code };
+    expect(routeRefusal([error], RECORD_POSTING_CODE_FIELDS)).toEqual({ fieldErrors: { [field]: error }, alertErrors: [] });
+  });
+
+  it('keeps a code the map does not name, and a field-less entry with no code, in the alert', () => {
+    const errors = [{ message: 'Busy.', code: 'LOCK_TIMEOUT' }, { message: 'Failed.' }];
+    expect(routeRefusal(errors, RECORD_POSTING_CODE_FIELDS)).toEqual({ fieldErrors: {}, alertErrors: errors });
+  });
+
+  it('prefers the entry\'s own field over its code', () => {
+    const error = { message: 'Too precise.', code: 'INVALID_POSTING_AMOUNT', field: 'Currency' };
+    expect(routeRefusal([error], RECORD_POSTING_CODE_FIELDS).fieldErrors).toEqual({ currency: error });
   });
 });

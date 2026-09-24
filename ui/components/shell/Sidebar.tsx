@@ -25,7 +25,7 @@ export const CONSOLE_NAV: NavSection[] = [
       { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: '/' },
       { id: 'groups', label: 'Account groups', icon: 'folder', href: '/groups' },
       { id: 'accounts', label: 'Accounts', icon: 'wallet', href: '/accounts' },
-      { id: 'record', label: 'Record posting', icon: 'arrow-left-right', href: '/postings/new' },
+      { id: 'records', label: 'Records', icon: 'arrow-left-right', href: '/records' },
     ],
   },
   {

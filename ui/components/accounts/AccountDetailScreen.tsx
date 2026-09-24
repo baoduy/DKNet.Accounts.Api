@@ -85,6 +85,8 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
     status: posting.status,
     description: posting.description ?? '',
     effectiveDate: posting.effectiveDate ?? '',
+    reversedByPostingId: posting.reversedByPostingId,
+    reversesPostingId: posting.reversesPostingId,
   }));
 
   return (

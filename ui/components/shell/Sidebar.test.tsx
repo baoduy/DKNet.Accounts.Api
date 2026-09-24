@@ -27,4 +27,13 @@ describe('Sidebar', () => {
     screen.getByRole('link', { name: /Accounts/ }).click();
     expect(navigated).toBe('accounts');
   });
+
+  it('offers Records at /records, marked current on that screen, and no Record posting entry (DRK-1713 §3 row 9)', () => {
+    render(createElement(Sidebar, { active: 'records' }));
+    const records = screen.getByRole('link', { name: 'Records' });
+    expect(records).toHaveAttribute('href', '/records');
+    expect(records).toHaveAttribute('aria-current', 'page');
+    expect(records.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByRole('link', { name: 'Record posting' })).toBeNull();
+  });
 });

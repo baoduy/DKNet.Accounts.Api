@@ -41,6 +41,8 @@ test('The values on screen follow a write', async ({ page, baseURL }) => {
   await page.getByLabel('Amount', { exact: true }).fill('500.00');
   await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record' }).click();
+  // DRK-1713 §3 row 10 — recording is confirmed before anything is sent.
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
 
   // While the write is still in flight: the control is unavailable and the balance unchanged.
   await expect(page.getByRole('button', { name: 'Record posting' })).toBeDisabled();

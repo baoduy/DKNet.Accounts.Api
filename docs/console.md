@@ -2,8 +2,8 @@
 
 A Next.js operations console that signs an operator into `DKNet.Accounts.Api` with Microsoft
 Entra ID, and reads and writes the ledger through its own pass-through endpoint. The accounts
-screen and the account detail screen are the ledger screens that ship (`ui/app/page.tsx`'s own
-frame still renders no data).
+screen, the account detail screen and the Records screen are the ledger screens that ship
+(`ui/app/page.tsx`'s own frame still renders no data).
 
 ## ✨ Why use it?
 
@@ -35,9 +35,10 @@ This starts `postgres`, `redis`, the API and the console together
 publishes on `${CONSOLE_PORT:-3000}` — check `.env.sample` on this branch for the current port
 mapping.
 
-> **The accounts screen and the account detail screen ship.** Signing in reaches the accounts list
-> at `/accounts`; opening an account reaches its detail at `/accounts/<account-number>`. The root
-> frame at `/` still shows no data. See *Features* below.
+> **The accounts screen, the account detail screen and the Records screen ship.** Signing in
+> reaches the accounts list at `/accounts`; opening an account reaches its detail at
+> `/accounts/<account-number>`; `/records` lists postings across every account. The root frame at
+> `/` still shows no data. See *Features* below.
 
 ## 🧩 Features
 
@@ -101,8 +102,45 @@ to) plus 7/30/90-day presets. An empty or unparseable period, one with the end b
 or one over 90 days is refused on screen with its own message and never sent to the service.
 Narrows further by direction, category and status. Recording a posting (`postings.write`) is
 against this account only: the account and its currency are locked, not choosable. Reversing a
-posting (`postings.reverse`) needs a reason; without the permission the reverse action stays
-visible and disabled, stating that it needs `postings.reverse`.
+posting (`postings.reverse`) needs a reason of at most 500 characters; without the permission the
+reverse action stays visible and disabled, stating that it needs `postings.reverse`.
+
+The record and reverse forms here are shared with the Records screen, below: recording asks for
+confirmation — restating direction, amount, currency and account — before anything is sent, and
+`Reverse` stays on screen but disabled, with its reason, on a posting that is already reversed
+(`POSTING_ALREADY_REVERSED`) or on a posting that is itself a reversal (no code; the service has
+none) (`ui/components/accounts/RecordPostingForm.tsx`, `ui/components/accounts/ReversePostingForm.tsx`).
+
+### Records screen
+
+`/records` lists postings across every account in a paged table, most recently recorded first,
+opening on the last 30 days. Each row shows the posting number, the account number (linking to
+that account's detail screen), the direction, the category, the amount with its currency, the
+effective date and the status — no running balance column. The list narrows by period, direction,
+category and status: the period is always set, its last day at most 90 days after its first, and
+a wider period is refused on screen with no request sent. It also searches by posting number,
+counterparty reference and description — no other field is promised, and a term under 2 characters
+is never sent. Only the posting number, the amount and the effective date carry a sort control.
+The period, narrowing, search, sort, page and the open posting all live in the page address, so a
+copied link reopens the same view. The screen offers no export action
+(`ui/app/records/page.tsx`, `ui/components/records/RecordsScreen.tsx`).
+
+Choosing a row opens that posting's details beside the list: a posting is never edited or deleted
+— reversing records an opposing posting and marks this one reversed, and both stay on the account.
+A reversed posting shows which posting reversed it and that reversal's reason; a reversal shows
+which posting it reverses and its own reason (`ui/components/records/PostingDetails.tsx`).
+
+Recording chooses the account by searching accounts by number or name; once chosen, its currency
+is shown and locked, and the amount is sent exactly as typed — the service checks its decimal
+places, not the form. Reversing states a reason of at most 500 characters; a missing or
+over-length reason is refused on screen and nothing is reversed. Both actions confirm before
+anything is sent, and after a success the list shows the result before the operator acts again:
+the new posting for a recording, or both the new opposing posting and the original marked reversed
+for a reversal (`ui/components/accounts/RecordPostingForm.tsx`,
+`ui/components/accounts/ReversePostingForm.tsx`). Recording a posting needs `postings.write`;
+reversing needs the separate `postings.reverse`; an operator missing either sees that action on
+screen, disabled, naming the permission it needs (`ui/components/accounts/RecordPostingForm.tsx`,
+`ui/components/accounts/ReversePostingForm.tsx`).
 
 ### Ledger pass-through endpoint
 
@@ -113,9 +151,10 @@ unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
 (`ui/lib/api/routes.ts`) — the set of routes the generated OpenAPI contract declares — and refused
 before any outbound call if the route isn't in it. This cycle widens that set with the account
 operations the accounts screen needs: opening an account, listing accounts, reading one, updating
-its name/metadata, and changing its status/floor controls. The token never crosses back to the
-browser — the service still checks every permission itself, so a control disabled on screen for a
-missing scope is convenience only, not the enforcement point.
+its name/metadata, and changing its status/floor controls. It also gains `GET /postings/{id}`,
+which the Records screen uses to follow a reversal link to the other posting (`ui/contract/openapi.json`). The
+token never crosses back to the browser — the service still checks every permission itself, so a
+control disabled on screen for a missing scope is convenience only, not the enforcement point.
 
 ### Typed access layer and contract drift check
 
@@ -204,19 +243,22 @@ the secret server-side, never in the browser):
 
 - Redirect URI: `<CONSOLE_BASE_URL>/signin/callback`
 - Grant it the scopes you list in `CONSOLE_ENTRA_SCOPES`
-- `accounts.write` and `postings.write` need a directory administrator's consent. Until it's
-  granted, the console still asks for them at sign-in, and every ledger write fails against a
-  real tenant regardless of what the console's UI allows on screen.
+- `accounts.write`, `postings.write` and `postings.reverse` need a directory administrator's
+  consent. Until it's granted, the console still asks for them at sign-in, and every ledger write
+  — including recording and reversing a posting — fails against a real tenant regardless of what
+  the console's UI allows on screen.
 
 ## ⚠️ Gotchas & limits
 
 - **An accounts list is browsed and opened, never summed or exported.** No footer, no total row,
   no export control.
-- **The account detail screen's postings list carries no running balance.** Each row shows its own
-  amount; no column carries the account's balance after that posting.
-- **Directory consent for `accounts.write` and `postings.write` is not granted yet.** Every ledger
-  write — including opening an account — fails against a real tenant until an administrator
-  grants it (see *Entra app registration* above).
+- **Neither the account detail screen's nor the Records screen's postings list carries a running
+  balance.** Each row shows its own amount; no column carries the account's balance after that
+  posting, and no total is worked out in the browser over a list.
+- **Directory consent for `accounts.write`, `postings.write` and `postings.reverse` is not granted
+  yet.** Every ledger write — including opening an account, recording a posting and reversing one
+  — fails against a real tenant until an administrator grants it (see *Entra app registration*
+  above).
 - **A blank tenant or client ID is not an error.** The console starts and serves the
   not-configured page rather than failing — see *Sign-in not configured* above.
 - **A missing `CONSOLE_TOKEN_ENCRYPTION_KEY` is an error.** The console refuses to start rather

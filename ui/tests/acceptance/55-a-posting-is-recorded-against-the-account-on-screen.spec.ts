@@ -31,6 +31,8 @@ test('A posting is recorded against the account on screen', async ({ page, baseU
   await page.getByLabel('Amount', { exact: true }).fill('500.00');
   await page.getByLabel('Category', { exact: true }).selectOption('Transfer');
   await page.getByRole('button', { name: 'Record', exact: true }).click();
+  // DRK-1713 §3 row 10 — recording is confirmed before anything is sent.
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
 
   await expect
     .poll(async () => (await ledgerRequests()).filter((r) => r.method === 'POST' && r.path === '/v1/postings'))

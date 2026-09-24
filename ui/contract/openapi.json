@@ -162,6 +162,18 @@
         }
       }
     },
+    "/postings/{id}": {
+      "get": {
+        "operationId": "getPosting",
+        "summary": "Read one posting.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
     "/postings/{id}/reverse": {
       "post": {
         "operationId": "reversePosting",
@@ -408,7 +420,9 @@
           "status": { "type": "string" },
           "category": { "type": "string" },
           "description": { "type": "string" },
-          "effectiveDate": { "type": "string", "format": "date" }
+          "effectiveDate": { "type": "string", "format": "date" },
+          "reversesPostingId": { "type": "string", "format": "uuid" },
+          "reversedByPostingId": { "type": "string", "format": "uuid" }
         }
       },
       "PagedPostingResponse": {

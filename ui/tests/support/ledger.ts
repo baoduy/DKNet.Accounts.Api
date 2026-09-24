@@ -46,7 +46,16 @@ export interface LedgerPostingFixture {
   status?: 'Posted' | 'Reversed';
   category: string;
   description?: string;
+  /** DRK-1713 §3 row 2 — one of the 3 fields the service's posting search covers. */
+  counterpartyReference?: string;
+  /** Defaults to today on the fake's clock. */
   effectiveDate?: string;
+  /** Defaults to the moment the fake is seeded. */
+  recordedAt?: string;
+  /** DRK-1713 §3a — set on a reversal, naming the original it reverses. */
+  reversesPostingId?: string;
+  /** DRK-1713 §3a — set on an original once reversed, naming the reversal. */
+  reversedByPostingId?: string;
 }
 
 export type AccountGroupType = 'Customer' | 'Merchant' | 'Internal' | 'Suspense' | 'Settlement';
@@ -147,4 +156,32 @@ export async function seedCurrencies(currencies: CurrencyFixture[]): Promise<voi
 export async function ledgerRequests(): Promise<Array<{ method: string; path: string }>> {
   const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
   return (await response.json()) as Array<{ method: string; path: string }>;
+}
+
+/** DRK-1713 §3 row 2 — every posting the fake ledger holds, recorded or seeded. */
+export async function ledgerPostings(): Promise<Array<{ id: string; postingNumber: string; accountId: string; direction: string; amount: string; currency: string; status: string; category: string; description: string | null; effectiveDate: string | null; reversesPostingId: string | null; reversedByPostingId: string | null }>> {
+  const response = await fetch(`${FAKE_LEDGER_BASE}/__postings`);
+  // Amounts arrive as raw numeric literals — kept as their exact text, never through `Number`.
+  const text = (await response.text()).replace(/"(amount|signedAmount|balanceAfter)":(-?[0-9.]+)/g, '"$1":"$2"');
+  return JSON.parse(text);
+}
+
+/** DRK-1713 "Controlled clock" — the day the fake writes a reversal (or an undated recording) on. */
+export async function setLedgerClock(today: string | null): Promise<void> {
+  await fetch(`${FAKE_LEDGER_BASE}/__clock`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ today }) });
+}
+
+/** DRK-1713 — the next recording is written, but its answer never reaches the console. */
+export async function dropNextPostingAnswer(): Promise<void> {
+  await fetch(`${FAKE_LEDGER_BASE}/__drop-next-answer`, { method: 'POST' });
+}
+
+/** Every recording (`POST /v1/postings`) the fake has received since the last reset, with the
+ * idempotency key it carried and its body as sent. */
+export async function recordingRequests(): Promise<Array<{ idempotencyKey: string | undefined; body: Record<string, unknown> }>> {
+  const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
+  const log = (await response.json()) as Array<{ method: string; path: string; headers: Record<string, string>; body?: Record<string, unknown> }>;
+  return log
+    .filter((entry) => entry.method === 'POST' && entry.path === '/v1/postings')
+    .map((entry) => ({ idempotencyKey: entry.headers['idempotency-key'], body: entry.body ?? {} }));
 }
