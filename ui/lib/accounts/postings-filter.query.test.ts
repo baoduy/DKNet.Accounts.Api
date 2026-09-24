@@ -69,6 +69,10 @@ describe('postingPeriodError — unset, unparseable and inverted periods (DRK-17
     expect(postingPeriodError('2026-01-01', '')).toBe('A period must be set.');
   });
 
+  it('refuses both from and to empty (kills the && / || logical-operator mutant)', () => {
+    expect(postingPeriodError('', '')).toBe('A period must be set.');
+  });
+
   it('refuses an unparseable date', () => {
     expect(postingPeriodError('not-a-date', '2026-01-31')).toBe('A period must be set.');
   });

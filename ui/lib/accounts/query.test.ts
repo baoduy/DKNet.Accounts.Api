@@ -45,9 +45,13 @@ describe('useAccounts', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
-    renderHook(() => useAccounts({ filters: { search: 'a' } }), { wrapper: wrapper(queryClient) });
+    const { result } = renderHook(() => useAccounts({ filters: { search: 'a' } }), { wrapper: wrapper(queryClient) });
 
     expect(fetchMock).not.toHaveBeenCalled();
+    // `fetchStatus` (not just "fetch was never called") — an `enabled: true` mutant still
+    // never reaches `fetch` (it throws on `null!.toString()` first), so it alone can't tell
+    // a truly disabled query from one that crashed before the network call.
+    expect(result.current.fetchStatus).toBe('idle');
   });
 });
 
@@ -154,11 +158,39 @@ describe('usePostings', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
-    renderHook(() => usePostings('a1', { from: '2026-01-01', to: '2026-06-01', direction: '', category: '', status: '' }), {
+    const { result } = renderHook(() => usePostings('a1', { from: '2026-01-01', to: '2026-06-01', direction: '', category: '', status: '' }), {
       wrapper: wrapper(queryClient),
     });
 
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('makes no call for an empty account id, even with an acceptable period', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const filter = defaultPostingsFilter(new Date('2026-09-24'));
+    const { result } = renderHook(() => usePostings('', filter), { wrapper: wrapper(queryClient) });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('keys two different filters into two distinct cache entries, never one shared {}', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(jsonResponse({ items: [{ id: url.includes('Credit') ? 'credit' : 'debit' }], pageIndex: 0, pageSize: 1, pageCount: 1, hasNextPage: false })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const filter = defaultPostingsFilter(new Date('2026-09-24'));
+    const { result: creditResult } = renderHook(() => usePostings('a1', { ...filter, direction: 'Credit' }), { wrapper: wrapper(queryClient) });
+    const { result: debitResult } = renderHook(() => usePostings('a1', { ...filter, direction: 'Debit' }), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(creditResult.current.data?.items[0]).toEqual({ id: 'credit' }));
+    await waitFor(() => expect(debitResult.current.data?.items[0]).toEqual({ id: 'debit' }));
   });
 });
 

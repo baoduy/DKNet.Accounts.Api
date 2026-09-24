@@ -39,6 +39,14 @@ describe('toAccountsQuery', () => {
   it('carries an explicit page number', () => {
     expect(toAccountsQuery({ filters: {}, page: 2 })!.get('pageNumber')).toBe('2');
   });
+
+  it('omits pageSize when not passed (kills the undefined-check-removed mutant)', () => {
+    expect(toAccountsQuery({ filters: {} })!.has('pageSize')).toBe(false);
+  });
+
+  it('skips an empty filter value instead of emitting an empty filter triple', () => {
+    expect(toAccountsQuery({ filters: { currency: '' } })!.has('filter')).toBe(false);
+  });
 });
 
 describe('ACCOUNT_COLUMNS', () => {

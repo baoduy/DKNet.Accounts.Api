@@ -65,6 +65,107 @@ describe('AccountDetail — the write surfaces it composes', () => {
     expect(screen.getByRole('button', { name: 'Reverse' })).toBeInTheDocument();
   });
 
+  it('deselects a posting (and hides Reverse again) on a second click of the same row', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(within(screen.getByTestId('postings-panel')).getByText('PST0000000001'));
+    expect(screen.getByRole('button', { name: 'Reverse' })).toBeInTheDocument();
+    await user.click(within(screen.getByTestId('postings-panel')).getByText('PST0000000001'));
+    expect(screen.queryByRole('button', { name: 'Reverse' })).toBeNull();
+  });
+
+  it("passes the selected posting's own direction to ReversePostingForm, Debit included", async () => {
+    const debitPosting: PostingsPanelRow = { ...POSTING, id: 'p2', postingNumber: 'PST0000000002', direction: 'Debit' };
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AccountDetail, { account: ACCOUNT, accountId: 'a1', postings: [POSTING, debitPosting], grantedScopes: ['postings.reverse'] }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    await user.click(within(screen.getByTestId('postings-panel')).getByText('PST0000000002'));
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    // `ConfirmMovement` renders the direction in its own confirmation sentence.
+    expect(within(screen.getByRole('dialog')).getByText('debit', { exact: false })).toBeInTheDocument();
+  });
+
+  it('gates Record posting on postings.write and Reverse on postings.reverse independently', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AccountDetail, { account: ACCOUNT, accountId: 'a1', postings: [POSTING], grantedScopes: ['postings.write'] }),
+      ),
+    );
+
+    expect(screen.getByRole('button', { name: 'Record posting' })).toBeEnabled();
+    await user.click(within(screen.getByTestId('postings-panel')).getByText('PST0000000001'));
+    expect(screen.getByRole('button', { name: 'Reverse' })).toBeDisabled();
+  });
+
+  it('computes the floor locally from the floor policy when the service has not stated one', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AccountDetail, {
+          account: { ...ACCOUNT, floor: undefined, permittedToGoNegative: true, overdraftLimit: '500.00', minimumBalance: null },
+          accountId: 'a1',
+        }),
+      ),
+    );
+    expect(screen.getByTestId('account-floor')).toHaveTextContent('500.00');
+  });
+
+  it('renders every optional account field as blank rather than "undefined" when absent', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AccountDetail, {
+          account: { ...ACCOUNT, groupName: undefined, classification: undefined, externalReference: undefined, notes: undefined },
+          accountId: 'a1',
+        }),
+      ),
+    );
+    expect(screen.getByLabelText('Group')).toHaveValue('');
+    expect(screen.getByLabelText('Free-form notes')).toHaveValue('');
+    expect(screen.getByLabelText('Outside reference')).toHaveValue('');
+    expect(screen.getByLabelText('Accounting classification')).toHaveValue('');
+    expect(screen.queryByText('undefined')).toBeNull();
+  });
+
+  it('shows no refusal on first render, before any save (kills the bogus-initial-array mutants)', () => {
+    renderDetail(['accounts.write']);
+    expect(screen.getByRole('button', { name: 'Save' }).closest('form')!.querySelector('[data-slot="card"]')).toBeNull();
+  });
+
+  it("shows the reversal form for the selected posting's own Credit direction, not always Debit", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(within(screen.getByTestId('postings-panel')).getByText('PST0000000001'));
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    expect(within(screen.getByRole('dialog')).getByText('credit', { exact: false })).toBeInTheDocument();
+  });
+
+  it('defaults grantedScopes, postingsFrom and postingsTo when the caller supplies none', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetail, { account: ACCOUNT, accountId: 'a1' })));
+
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    expect(screen.getByLabelText('From')).toHaveValue('');
+    expect(screen.getByLabelText('To')).toHaveValue('');
+  });
+
   it('renders a plain not-found message for an address naming no account', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetail, { account: null })));
@@ -88,5 +189,102 @@ describe('AccountDetail — saving the edit form (DRK-1704 finding 4)', () => {
     const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT')!;
     const body = JSON.parse((putCall[1] as RequestInit).body as string);
     expect(body.metadata).toEqual({ notes: 'Reconciled monthly' });
+  });
+
+  it('skips the PUT entirely when neither the name nor the notes changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1', status: 'Active' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts/a1', expect.objectContaining({ method: 'PATCH' })));
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit)?.method === 'PUT')).toBe(false);
+  });
+
+  it('sends the new name in the PUT body when only the name changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.clear(screen.getByLabelText('Name', { exact: true }));
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'Renamed account');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT')!);
+    const body = JSON.parse((putCall[1] as RequestInit).body as string);
+    expect(body.name).toBe('Renamed account');
+  });
+
+  it('shows the PUT refusal even when the PATCH that follows succeeds', async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) =>
+      init.method === 'PUT'
+        ? Promise.resolve({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'Name too long.' }] }) })
+        : Promise.resolve({ ok: true, text: async () => JSON.stringify({ id: 'a1' }) }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.clear(screen.getByLabelText('Name', { exact: true }));
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'x'.repeat(300));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('Name too long.')).toBeInTheDocument());
+  });
+
+  it('shows the PATCH refusal for a floor-only change', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'An overdraft limit is required.', code: 'OVERDRAFT_LIMIT_REQUIRED' }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.click(screen.getByLabelText('Permitted to go negative'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('An overdraft limit is required.')).toBeInTheDocument());
+  });
+
+  it('sends name as undefined in the PUT body when only the notes changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.type(screen.getByLabelText('Free-form notes'), 'a note');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT')!);
+    const body = JSON.parse((putCall[1] as RequestInit).body as string);
+    expect(body.name).toBeUndefined();
+  });
+
+  it('never throws, and clears to no refusal, on a PUT failure carrying no errors array', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.clear(screen.getByLabelText('Name', { exact: true }));
+    await user.type(screen.getByLabelText('Name', { exact: true }), 'Renamed');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Save' }).closest('form')!.querySelector('[data-slot="card"]')).toBeNull();
+  });
+
+  it('never throws, and clears to no refusal, on a PATCH failure carrying no errors array', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderDetail(['accounts.write']);
+
+    await user.click(screen.getByLabelText('Permitted to go negative'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Save' }).closest('form')!.querySelector('[data-slot="card"]')).toBeNull();
   });
 });

@@ -164,4 +164,14 @@ describe('useSetAccountControls', () => {
     });
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
+
+  it('reports no errors and no traceId, never throwing, on a failure with an empty body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useSetAccountControls(), { wrapper: wrapper(new QueryClient()) });
+    const response = await result.current.mutate({ accountId: 'ACME-000123', status: 'Closed' });
+
+    expect(response).toEqual({ ok: false, errors: undefined, traceId: undefined });
+  });
 });

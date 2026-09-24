@@ -91,4 +91,68 @@ describe('AccountStatusControl', () => {
     await waitFor(() => expect(screen.getAllByText('ACCOUNT_HOLDS_BALANCE').length).toBeGreaterThan(0));
     expect(screen.getByText('The account holds 50.00 SGD and cannot be closed.')).toBeInTheDocument();
   });
+
+  it('disables the button while the mutation is pending, and re-enables it once settled', async () => {
+    let resolveFetch!: (value: unknown) => void;
+    const fetchMock = vi.fn().mockReturnValue(new Promise((resolve) => (resolveFetch = resolve)));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderControl();
+
+    const button = screen.getByRole('button', { name: 'Close' });
+    await user.click(button);
+    expect(button).toBeDisabled();
+
+    resolveFetch({ ok: true, text: async () => JSON.stringify({ id: 'a1', status: 'Closed' }) });
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it('shows no refusal on first render, before any click (kills the bogus-initial-array mutant)', () => {
+    const { container } = renderControl();
+    expect(container.querySelector('[data-slot="card"]')).toBeNull();
+  });
+
+  it('reopens through a PATCH carrying status Active, not Closed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1', status: 'Active' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderControl({ status: 'Closed', balance: '0.00' });
+
+    await user.click(screen.getByRole('button', { name: 'Reopen' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.status).toBe('Active');
+  });
+
+  it('never throws, and shows no refusal, on a failure carrying no errors array', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const { container } = renderControl();
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(container.querySelector('[data-slot="card"]')).toBeNull();
+  });
+
+  it('clears a prior refusal once a later attempt succeeds', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'The account holds a balance.', code: 'ACCOUNT_HOLDS_BALANCE' }] }) })
+      .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'a1', status: 'Closed' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const { container } = renderControl();
+
+    const button = screen.getByRole('button', { name: 'Close' });
+    await user.click(button);
+    await waitFor(() => expect(screen.getByText('The account holds a balance.')).toBeInTheDocument());
+
+    await user.click(button);
+    await waitFor(() => expect(screen.queryByText('The account holds a balance.')).toBeNull());
+    // Not merely gone as text — no refusal card remains at all (kills the bogus-clear mutant).
+    expect(container.querySelector('[data-slot="card"]')).toBeNull();
+  });
 });

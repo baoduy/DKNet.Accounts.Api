@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountDetailScreen } from './AccountDetailScreen';
@@ -17,7 +18,10 @@ const ACCOUNT = {
   balance: '100.00',
   availableBalance: '100.00',
   heldAmount: '0.00',
-  permittedToGoNegative: false,
+  permittedToGoNegative: true,
+  overdraftLimit: '500.00',
+  minimumBalance: '10.00',
+  externalReference: 'PO-9911',
   groupId: 'g1',
   metadata: { notes: 'Reconciled monthly' },
 };
@@ -102,5 +106,234 @@ describe('AccountDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Not signed in.')).toBeInTheDocument());
     expect(screen.queryByText(/not found/i)).toBeNull();
+  });
+
+  it('shows a loading state before the account lookup settles', () => {
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  it('makes no balance or postings call before the account has resolved an id (kills the accountId fallback mutant)', async () => {
+    const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls.some(([url]: any[]) => url.includes('/balance'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]: any[]) => url.includes('/postings'))).toBe(false);
+  });
+
+  it('resolves decimalPlaces from the matching currency, not the interface default of 2', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse([{ code: 'SGD', decimalPlaces: 4 }]));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.0000'));
+  });
+
+  it("carries the account's own overdraft limit and minimum balance through, never nulled (DRK-1704)", async () => {
+    renderScreen(true);
+    await waitFor(() => expect(screen.getByLabelText('Smallest permitted balance')).toHaveValue('10.00'));
+    expect(screen.getByLabelText('Overdraft limit')).toHaveValue('500.00');
+  });
+
+  it('shows the external reference the account actually carries, not blanked to empty', async () => {
+    renderScreen(true);
+    await waitFor(() => expect(screen.getByLabelText('Outside reference')).toHaveValue('PO-9911'));
+  });
+
+  it('shows a blank outside reference, not "Stryker was here!", when the account carries none', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [{ ...ACCOUNT, externalReference: undefined }] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse(CURRENCIES));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Outside reference')).toHaveValue(''));
+  });
+
+  it('never throws, and shows notes blank, for an account with no metadata at all', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [{ ...ACCOUNT, metadata: undefined }] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse(CURRENCIES));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue(''));
+  });
+
+  it("shows a posting's own description and effective date, not blanked to empty", async () => {
+    renderScreen(true);
+    await waitFor(() => expect(screen.getByText('Opening deposit')).toBeInTheDocument());
+    expect(screen.getByText('2026-09-01')).toBeInTheDocument();
+  });
+
+  it('shows a blank description and effective date, not "Stryker was here!", when the posting carries none', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse(CURRENCIES));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse({ ...POSTINGS_PAGE, items: [{ ...POSTING, description: undefined, effectiveDate: undefined }] }));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByText('PST0000000001')).toBeInTheDocument());
+    expect(screen.queryByText('Stryker was here!')).toBeNull();
+    expect(screen.queryByText('undefined')).toBeNull();
+  });
+
+  it('never crashes on a currency with no match, falling back to a decimal default of 2', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse([{ code: 'USD', decimalPlaces: 4 }]));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+  });
+
+  it("finds the account's own currency by code, not merely the first one offered", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: GROUPS }));
+        if (url.includes('/currencies'))
+          return Promise.resolve(
+            jsonResponse([
+              { code: 'USD', decimalPlaces: 4 },
+              { code: 'SGD', decimalPlaces: 2 },
+            ]),
+          );
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+  });
+
+  it('never crashes on a group with no match, falling back to a blank group name', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return Promise.resolve(jsonResponse({ items: [{ id: 'g9', code: 'OTHER', name: 'Other Group' }] }));
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse(CURRENCIES));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Group')).toHaveValue(''));
+  });
+
+  it("finds the account's own group by id, not merely the first one offered", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups'))
+          return Promise.resolve(
+            jsonResponse({
+              items: [
+                { id: 'gX', code: 'WRONG', name: 'Wrong Group' },
+                { id: 'g1', code: 'ACME', name: 'ACME Group' },
+              ],
+            }),
+          );
+        if (url.includes('/currencies')) return Promise.resolve(jsonResponse(CURRENCIES));
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Group')).toHaveValue('ACME Group'));
+  });
+
+  it('never crashes when the currency and group lists are still loading once the account resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+        if (url.includes('/balance')) return Promise.resolve(jsonResponse(BALANCE));
+        if (url.includes('/account-groups')) return new Promise(() => {});
+        if (url.includes('/currencies')) return new Promise(() => {});
+        if (url.includes('/postings')) return Promise.resolve(jsonResponse(POSTINGS_PAGE));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+    expect(screen.getByLabelText('Group')).toHaveValue('');
+  });
+
+  it('keeps the direction filter set while the operator changes the period, and vice versa (kills the spread-clearing mutants)', async () => {
+    renderScreen(true);
+    await waitFor(() => expect(screen.getByText('PST0000000001')).toBeInTheDocument());
+
+    await userEvent.selectOptions(screen.getByLabelText('Direction filter'), 'Debit');
+    expect(screen.getByLabelText('Direction filter')).toHaveValue('Debit');
+
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-09-10' } });
+    // The direction filter picked a moment ago must survive the period update — a mutant that
+    // replaces the setFilter merge with `{}` would wipe it back to the default.
+    expect(screen.getByLabelText('Direction filter')).toHaveValue('Debit');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-09-10');
   });
 });

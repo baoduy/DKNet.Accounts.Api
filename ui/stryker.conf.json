@@ -3,7 +3,7 @@
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
-  "reporters": ["clear-text", "html"],
+  "reporters": ["clear-text", "html", "json"],
   "coverageAnalysis": "perTest",
   "mutate": [
     "lib/**/*.ts",

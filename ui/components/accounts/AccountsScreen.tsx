@@ -19,8 +19,8 @@ import { useAccountGroups, useAccounts, useCurrencies } from '@/lib/accounts/que
 import { useOpenAccount } from '@/lib/accounts/mutations';
 import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
 
-/** ponytail: small enough to keep the paging control exercised against a small fixture; raise once a real operator's account count calls for it. */
-const ACCOUNTS_PAGE_SIZE = 2;
+/** The design kit's list page size — matches the groups screen's own `ACCOUNT_GROUPS_PAGE_SIZE`. */
+const ACCOUNTS_PAGE_SIZE = 10;
 
 export interface AccountsScreenProps {
   grantedScopes: string[];
