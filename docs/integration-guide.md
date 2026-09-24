@@ -54,11 +54,13 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/currencies"
 [
   { "code": "SGD", "decimalPlaces": 2 },
   { "code": "USD", "decimalPlaces": 2 },
-  { "code": "JPY", "decimalPlaces": 0 }
+  { "code": "JPY", "decimalPlaces": 0 },
+  { "code": "USDT", "decimalPlaces": 6 }
 ]
 ```
 
-JPY is denominated to zero places — `¥100.50` is not a posting amount.
+That's 4 of the 26 seeded currencies. JPY is denominated to zero places — `¥100.50` is not a posting
+amount; USDT is denominated to six — `1.500000 USDT` is, `1.5000001 USDT` is not.
 
 ## 2. Create an account group
 

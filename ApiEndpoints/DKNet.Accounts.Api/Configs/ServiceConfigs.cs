@@ -69,6 +69,12 @@ internal static class ServiceConfigs
                 op.SerializerOptions.UseRoleAwareSensitiveData(
                     sp.GetRequiredService<ISensitiveDataPrincipalAccessor>())));
 
+        // Same factory route, for the same reason: every amount is written at its currency's decimal places
+        // (DRK-1719), which needs the currency lookup from DI.
+        services.AddSingleton<IConfigureOptions<JsonOptions>>(sp =>
+            new ConfigureOptions<JsonOptions>(op =>
+                op.SerializerOptions.UseCurrencyScale(sp.GetRequiredService<CurrencyDecimalPlaces>().Of)));
+
         return services;
     }
 

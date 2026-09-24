@@ -17,13 +17,13 @@ internal sealed class CreateCurrencyCommandValidator : AbstractValidator<CreateC
         RuleFor(r => r.Code)
             .Cascade(CascadeMode.Stop)
             .NotEmpty()
-            .Matches("^[A-Za-z]{3}$")
+            .Matches("^[A-Za-z]{3,10}$")
             .MustAsync(async (code, ct) => !await repository.AnyAsync(
                 new SpecGetCurrency(byCode: code.ToUpperInvariant()), ct))
             .WithErrorCode(LedgerErrors.DuplicateCurrencyCode)
             .WithMessage(r => $"A currency with code '{r.Code}' already exists.");
         RuleFor(r => r.Name).NotEmpty().MaximumLength(100);
-        // ISO-4217 tops out at 4 decimal places.
-        RuleFor(r => r.DecimalPlaces).InclusiveBetween(0, 4);
+        // Every money column stores 6 decimal places (DRK-1719), so a currency can never be finer than that.
+        RuleFor(r => r.DecimalPlaces).InclusiveBetween(0, 6);
     }
 }

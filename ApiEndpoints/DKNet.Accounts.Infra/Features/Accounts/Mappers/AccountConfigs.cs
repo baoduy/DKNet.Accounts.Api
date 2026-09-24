@@ -18,16 +18,16 @@ internal sealed class AccountConfigs : DefaultEntityTypeConfiguration<Account>
         builder.HasIndex(a => a.GroupId);
 
         builder.Property(a => a.Name).HasMaxLength(200).IsRequired();
-        builder.Property(a => a.CurrencyCode).HasMaxLength(3).IsRequired();
+        builder.Property(a => a.CurrencyCode).HasMaxLength(10).IsRequired();
         builder.Property(a => a.ExternalReference).HasMaxLength(200).IsRequired(false);
 
         builder.Property(a => a.Classification).HasConversion<string>();
         builder.Property(a => a.Status).HasConversion<string>();
 
-        builder.Property(a => a.Balance).HasPrecision(18, 2);
-        builder.Property(a => a.HeldAmount).HasPrecision(18, 2);
-        builder.Property(a => a.OverdraftLimit).HasPrecision(18, 2);
-        builder.Property(a => a.MinimumBalance).HasPrecision(18, 2);
+        builder.Property(a => a.Balance).HasPrecision(18, 6);
+        builder.Property(a => a.HeldAmount).HasPrecision(18, 6);
+        builder.Property(a => a.OverdraftLimit).HasPrecision(18, 6);
+        builder.Property(a => a.MinimumBalance).HasPrecision(18, 6);
 
         builder.Property(a => a.Metadata)
             .HasConversion(MetadataConversion.Converter)

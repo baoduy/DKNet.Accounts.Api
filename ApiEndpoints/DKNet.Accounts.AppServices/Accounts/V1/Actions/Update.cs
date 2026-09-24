@@ -1,7 +1,10 @@
 using DKNet.EfCore.Specifications.Extensions;
 using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.Accounts.V1.Specs;
+using DKNet.Accounts.AppServices.Currencies.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
@@ -15,6 +18,9 @@ namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 /// </summary>
 public sealed record UpdateAccountRequest : Fluents.Requests.IWitResponse<AccountDto>
 {
+    /// <summary>Always the route's <c>{id}</c>, set by the endpoint — never read from the body, so a caller
+    /// cannot have the request validated against one account and applied to another (DRK-1723).</summary>
+    [JsonIgnore]
     public Guid Id { get; set; }
 
     public AccountStatus? Status { get; set; }
@@ -25,6 +31,39 @@ public sealed record UpdateAccountRequest : Fluents.Requests.IWitResponse<Accoun
 
     /// <summary>Left out means unchanged, same as its sibling floor controls (DRK-1659 §5 surface 3 R2).</summary>
     public bool? PermittedToGoNegative { get; set; }
+}
+
+internal sealed class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountRequest>
+{
+    public UpdateAccountCommandValidator(IRepositorySpec repository, IHttpContextAccessor httpContextAccessor)
+    {
+        RuleFor(r => r.OverdraftLimit).LedgerLimit(DecimalPlacesOf);
+        RuleFor(r => r.MinimumBalance).LedgerLimit(DecimalPlacesOf);
+        return;
+
+        // A missing account yields null (no places to check against) — the handler answers that 404 itself.
+        async Task<int?> DecimalPlacesOf(UpdateAccountRequest request, CancellationToken ct)
+        {
+            var currencyCode = await repository.Query(new SpecGetAccount(AccountIdOf(request)))
+                .Select(a => a.CurrencyCode)
+                .FirstOrDefaultAsync(ct);
+            return currencyCode is null
+                ? null
+                : await repository.Query(new SpecGetCurrency(byCode: currencyCode))
+                    .Select(c => (int?)c.DecimalPlaces)
+                    .FirstOrDefaultAsync(ct);
+        }
+
+        // The endpoint validates the body before it copies the route's id onto the request, and the body can
+        // never carry one (Id is [JsonIgnore]) — so over HTTP the id is the route's. A caller that builds the
+        // request itself (a direct send) sets Id.
+        Guid AccountIdOf(UpdateAccountRequest request) =>
+            request.Id != Guid.Empty
+                ? request.Id
+                : Guid.TryParse(httpContextAccessor.HttpContext?.Request.RouteValues["id"] as string, out var routeId)
+                    ? routeId
+                    : Guid.Empty;
+    }
 }
 
 internal sealed class UpdateAccountCommandHandler(

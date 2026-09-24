@@ -184,8 +184,9 @@ public sealed class Account : AggregateRoot
     /// classification produce, advances <see cref="Balance"/> and <see cref="LastPostedOn"/>. Enforces the
     /// status gate (frozen/closed refuse everything; dormant refuses a debit only) and, unless
     /// <paramref name="isReversal"/>, the floor (R1/R2/R3) — a reversal is exempt from the floor check only,
-    /// never from the status gate. Returns a failed <see cref="PostingApplication"/> (no state change) when
-    /// either guard refuses; callers must not call this more than once per posting.
+    /// never from the status gate or the <see cref="PostingAmount.Ceiling"/>. Returns a failed
+    /// <see cref="PostingApplication"/> (no state change) when any guard refuses; callers must not call this
+    /// more than once per posting.
     /// </summary>
     public PostingApplication TryApplyPosting(bool isDebit, decimal amount, DateTimeOffset postedAt, bool isReversal = false)
     {
@@ -195,8 +196,19 @@ public sealed class Account : AggregateRoot
             return new PostingApplication(false, refusal, 0, 0, Balance);
         }
 
+        // R2 (DRK-1719): checked before the balance is projected, so an absurd amount can never overflow the
+        // sum, and for reversals too — the ceiling is a storage limit, not a policy a reversal is exempt from.
+        if (PostingAmount.ExceedsCeiling(amount))
+        {
+            return new PostingApplication(false, PostingRefusalReason.AmountOutOfRange, 0, 0, Balance);
+        }
+
         var signedValue = AccountPostingPolicy.SignedValue(Classification, isDebit, amount);
         var projectedBalance = Balance + signedValue;
+        if (PostingAmount.ExceedsCeiling(projectedBalance))
+        {
+            return new PostingApplication(false, PostingRefusalReason.AmountOutOfRange, 0, 0, Balance);
+        }
 
         if (!isReversal)
         {
@@ -225,7 +237,10 @@ public enum PostingRefusalReason
     AccountClosed,
     AccountFrozen,
     AccountDormantDebitRefused,
-    BelowFloor
+    BelowFloor,
+
+    /// <summary>The amount, or the balance it would leave, is beyond <see cref="PostingAmount.Ceiling"/>.</summary>
+    AmountOutOfRange
 }
 
 /// <summary>The outcome of <see cref="Account.TryApplyPosting"/>: on success, the position/signed value/

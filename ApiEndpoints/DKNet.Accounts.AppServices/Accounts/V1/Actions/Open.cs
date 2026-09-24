@@ -3,6 +3,7 @@ using DKNet.EfCore.Specifications.Repositories;
 using DKNet.Accounts.AppServices.AccountGroups.V1.Specs;
 using DKNet.Accounts.AppServices.Currencies.V1.Specs;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace DKNet.Accounts.AppServices.Accounts.V1.Actions;
 
@@ -40,7 +41,7 @@ public sealed record OpenAccountRequest : Fluents.Requests.IWitResponse<AccountD
 
 internal sealed class OpenAccountCommandValidator : AbstractValidator<OpenAccountRequest>
 {
-    public OpenAccountCommandValidator()
+    public OpenAccountCommandValidator(IRepositorySpec repository)
     {
         // Only the suffix is validated here — the group-code prefix is composed by the handler, which is
         // also where the group is read, so its length is already guaranteed by the group's own 3-5 rule.
@@ -48,8 +49,18 @@ internal sealed class OpenAccountCommandValidator : AbstractValidator<OpenAccoun
             .Length(3, 10)
             .When(r => !string.IsNullOrEmpty(r.AccountNumber));
         RuleFor(r => r.Name).NotEmpty().MaximumLength(200);
-        RuleFor(r => r.Currency).NotEmpty().Length(3);
+        RuleFor(r => r.Currency).NotEmpty().Length(3, 10);
         RuleFor(r => r.Classification).IsInEnum();
+        RuleFor(r => r.OverdraftLimit).LedgerLimit(DecimalPlacesOf);
+        RuleFor(r => r.MinimumBalance).LedgerLimit(DecimalPlacesOf);
+        return;
+
+        async Task<int?> DecimalPlacesOf(OpenAccountRequest request, CancellationToken ct) =>
+            string.IsNullOrEmpty(request.Currency)
+                ? null
+                : await repository.Query(new SpecGetCurrency(byCode: request.Currency.ToUpperInvariant()))
+                    .Select(c => (int?)c.DecimalPlaces)
+                    .FirstOrDefaultAsync(ct);
     }
 }
 

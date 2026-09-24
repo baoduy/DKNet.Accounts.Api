@@ -222,7 +222,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         }
     }
 
-    [Given(@"PayHub holds an? ([A-Z]{3}) account$")]
+    [Given(@"PayHub holds an? ([A-Z]{3,10}) account$")]
     public async Task GivenPayHubHoldsACurrencyAccount(string currency)
     {
         var accountId = await OpenAccountAsync(currency);

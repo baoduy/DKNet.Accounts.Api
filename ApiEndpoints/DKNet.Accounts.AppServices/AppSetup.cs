@@ -51,7 +51,8 @@ public static class AppSetup
 
         services
             .AddSingleton(TypeAdapterConfig.GlobalSettings)
-            .AddScoped<IMapper, ServiceMapper>();
+            .AddScoped<IMapper, ServiceMapper>()
+            .AddSingleton<CurrencyDecimalPlaces>();
 
         // The generic list endpoints (DKNet.AspCore.Extensions' MapGetList, DRK-1277 §11/§12) default to a
         // 3-month "recent activity" window on audited entities when a caller supplies neither fromDate nor

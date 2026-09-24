@@ -272,3 +272,49 @@ describe('CurrenciesScreen', () => {
     expect(await screen.findByRole('button', { name: 'New currency' })).toBeDisabled();
   });
 });
+
+// DRK-1719 §5 (@unit): Scenario Outline: The console's new-currency form accepts up to 6 decimal places
+//   Given treasury-ops is registering "Loyalty Points" as LOYALTYPTS in the console
+//   When treasury-ops enters <places> decimal places
+//   Then the console <outcome> the registration
+//   Examples: | places | outcome | 6 | allows | 7 | blocks |
+describe("The console's new-currency form accepts up to 6 decimal places", () => {
+  async function registerLoyaltyPointsWith(places: string) {
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? jsonResponse(201, { id: 'c9', code: 'LOYALTYPTS', name: 'Loyalty Points', decimalPlaces: Number(places), isActive: true })
+        : jsonResponse(200, []),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: 'New currency' }));
+    await userEvent.type(screen.getByLabelText('Code'), 'LOYALTYPTS');
+    await userEvent.type(screen.getByLabelText('Name'), 'Loyalty Points');
+    await userEvent.type(screen.getByLabelText('Decimal places'), places);
+    return fetchMock;
+  }
+
+  const posts = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+
+  it('places 6: the console allows the registration', async () => {
+    const fetchMock = await registerLoyaltyPointsWith('6');
+
+    expect(screen.getByTestId('currency-worked-example')).toHaveTextContent(/^1,250\.000000 LOYALTYPTS$/);
+    expect(screen.getByRole('button', { name: 'Register currency' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Register currency' }));
+
+    await waitFor(() => expect(posts(fetchMock)).toHaveLength(1));
+    expect(JSON.parse((posts(fetchMock)[0]?.[1] as RequestInit | undefined)?.body as string)).toEqual({ code: 'LOYALTYPTS', name: 'Loyalty Points', decimalPlaces: 6 });
+  });
+
+  it('places 7: the console blocks the registration', async () => {
+    const fetchMock = await registerLoyaltyPointsWith('7');
+
+    expect(screen.queryByTestId('currency-worked-example')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Register currency' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Register currency' }));
+
+    expect(posts(fetchMock)).toHaveLength(0);
+  });
+});
