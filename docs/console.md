@@ -1,9 +1,9 @@
 # DKNet Accounts Console
 
 A Next.js operations console that signs an operator into `DKNet.Accounts.Api` with Microsoft
-Entra ID, and reads and writes the ledger through its own pass-through endpoint. The accounts
-screen, the account detail screen and the Records screen are the ledger screens that ship
-(`ui/app/page.tsx`'s own frame still renders no data).
+Entra ID, and reads and writes the ledger through its own pass-through endpoint. The Overview
+screen, the accounts screen, the account detail screen and the Records screen are the ledger
+screens that ship.
 
 ## ✨ Why use it?
 
@@ -35,10 +35,10 @@ This starts `postgres`, `redis`, the API and the console together
 publishes on `${CONSOLE_PORT:-3000}` — check `.env.sample` on this branch for the current port
 mapping.
 
-> **The accounts screen, the account detail screen and the Records screen ship.** Signing in
-> reaches the accounts list at `/accounts`; opening an account reaches its detail at
-> `/accounts/<account-number>`; `/records` lists postings across every account. The root frame at
-> `/` still shows no data. See *Features* below.
+> **The Overview screen, the accounts screen, the account detail screen and the Records screen
+> ship.** Signing in reaches `/`, the Overview screen; the accounts list is at `/accounts`;
+> opening an account reaches its detail at `/accounts/<account-number>`; `/records` lists
+> postings across every account. See *Features* below.
 
 ## 🧩 Features
 
@@ -68,6 +68,41 @@ known-scope set is the ledger contract's five: `accounts.read`, `accounts.write`
 `accounts.read`/`postings.read` gate viewing accounts/postings, `postings.reverse` gates
 reversing a posting, and `accounts.write`/`postings.write` gate every ledger write
 (`ui/lib/scopes.ts`).
+
+### Overview screen
+
+`/` is the Overview screen — where signing in lands. It draws its own full-width search (see
+*Search from every screen* below) and six read-only panels, each stating in place when the
+operator lacks the permission it needs rather than hiding; one panel's failed read never blanks
+another:
+
+- **Position by currency** — each currency's balance, available amount and held amount, with a
+  per-row bar of available against held. No total across currencies: the service has no
+  exchange-rate source, so currencies are never added together (needs `accounts.read`).
+- **Accounts by status** and **Groups by status** — the service's own count per status, never a
+  count of rows the browser lists (needs `accounts.read`).
+- **Postings per week** — the last 13 weeks, oldest first, each a UTC Monday-to-Sunday window
+  ending today's week (needs `postings.read`).
+- **Accounts opened per month** — the current UTC month and the 11 before it, each split by the
+  four account statuses (needs `accounts.read`).
+- **Recently viewed** — the records this operator opened, kept in this browser only, keyed to
+  their directory object id. Only the kind and id are stored, never a name, number or amount:
+  Overview looks each record up again to draw it (`ui/lib/recent/store.ts`).
+
+A seventh panel, **Not shown**, states in place why no combined total across currencies is drawn,
+rather than leaving the absence unexplained.
+
+(`ui/components/overview/OverviewScreen.tsx`, `ui/lib/query/overview.ts`.)
+
+### Search from every screen
+
+Every screen carries the same search, in the top bar everywhere except Overview, where it is the
+page's own full-width field instead (one search landmark per screen). `⌘K` on a Mac or `Ctrl+K`
+elsewhere focuses it from anywhere. Before anything is sent, a caption under the field states
+which of three routes the typed text will take: an identifier (a UUID) is looked up as an
+account, then a group, then a posting; text matching an account number's shape (`ABC-12345`)
+narrows the accounts list; anything else searches accounts and groups together. Under 2
+characters, nothing is sent (`ui/components/shell/TopBarSearch.tsx`, `ui/lib/search/classify.ts`).
 
 ### Accounts screen
 
@@ -163,6 +198,19 @@ control disabled on screen for a missing scope is convenience only, not the enfo
 TypeScript shape. `pnpm run verify:contract` (`ui/scripts/verify-contract.ts`) re-derives the
 OpenAPI document from the live service and fails, naming the drifted route, when the committed
 contract no longer matches it; CI runs it ahead of `typecheck` (`.github/workflows/build.yml:85`).
+
+### End-to-end check
+
+`pnpm run test:e2e` (`ui/playwright.e2e.config.ts`) runs the console against the real stack from
+this checkout — Postgres, Redis and `DKNet.Accounts.Api` itself, with its permission checks on —
+standing in only for Entra ID, so a check runs with no real tenant. It starts its own Docker
+Compose project (`dknet-e2e-<run id>`) on free ports with empty volumes, and removes it —
+containers, volumes and networks — when the run ends, pass or fail, so it never touches a stack a
+developer already has running (`ui/tests/e2e/support/stack.ts`). It runs in CI on every pull
+request.
+
+What this check cannot reach — a real Entra ID tenant and a real directory token — is covered by
+hand instead: see [Manual verification](manual-verification.md).
 
 ### Ledger data caching
 
