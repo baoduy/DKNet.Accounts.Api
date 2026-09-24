@@ -465,8 +465,10 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
             accounts.ShouldContain(a => a.GetProperty("id").GetGuid() == Guid.Parse(opened));
         }
 
-        accounts.ShouldNotContain(a =>
-            a.GetProperty(property).ValueKind == JsonValueKind.Number && a.GetProperty(property).GetDecimal() == Amount(amount));
+        // The API omits a null limit from the body (SharedConsts WhenWritingNull), so an absent member is "holds no limit".
+        accounts.Where(a =>
+            a.TryGetProperty(property, out var v) && v.ValueKind == JsonValueKind.Number && v.GetDecimal() == Amount(amount))
+            .ShouldBeEmpty();
     }
 
     #endregion
