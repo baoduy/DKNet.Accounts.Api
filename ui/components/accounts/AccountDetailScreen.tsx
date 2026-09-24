@@ -6,20 +6,23 @@
  */
 'use client';
 
-import { useState, type JSX } from 'react';
+import { useLayoutEffect, useState, type JSX } from 'react';
 import { RefusalAlert } from '@/components/feedback/RefusalAlert';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
 import type { PostingsPanelRow } from './PostingsPanel';
 import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import { useAccount, useAccountBalance, useAccountGroups, useCurrencies, usePostings } from '@/lib/accounts/query';
 import { defaultPostingsFilter, type PostingsFilterState } from '@/lib/accounts/postings-filter';
+import { pushRecent } from '@/lib/recent/store';
 
 export interface AccountDetailScreenProps {
   accountNumber: string;
   grantedScopes: string[];
+  /** Keys the operator's recently viewed list (DRK-1728 §3 row 8); unset, nothing is kept. */
+  directoryObjectId?: string;
 }
 
-export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDetailScreenProps): JSX.Element {
+export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObjectId }: AccountDetailScreenProps): JSX.Element {
   const [filter, setFilter] = useState<PostingsFilterState>(() => defaultPostingsFilter());
 
   const accountQuery = useAccount(accountNumber);
@@ -30,6 +33,12 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
   const currenciesQuery = useCurrencies();
   const groupsQuery = useAccountGroups();
   const postingsQuery = usePostings(accountId, filter);
+
+  // Kept as the detail is drawn — before paint, so an operator who moves straight on still has it.
+  const openedId = accountQuery.data?.found ? accountId : '';
+  useLayoutEffect(() => {
+    if (directoryObjectId && openedId) pushRecent(directoryObjectId, 'Account', openedId);
+  }, [directoryObjectId, openedId]);
 
   if (accountQuery.isPending) {
     return <p>Loading…</p>;

@@ -94,6 +94,24 @@
         }
       }
     },
+    "/accounts/status-counts": {
+      "get": {
+        "operationId": "getAccountStatusCounts",
+        "summary": "Count accounts per status — every status, a status nothing holds with 0. Only the created-on window narrows it.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StatusCount" } } } }
+          },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
     "/accounts/{id}/balance": {
       "get": {
         "operationId": "getAccountBalance",
@@ -302,6 +320,24 @@
         }
       }
     },
+    "/account-groups/status-counts": {
+      "get": {
+        "operationId": "getAccountGroupStatusCounts",
+        "summary": "Count groups per status — every status, a status nothing holds with 0. Only the created-on window narrows it.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StatusCount" } } } }
+          },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
     "/account-groups/{id}": {
       "get": {
         "operationId": "getAccountGroup",
@@ -388,10 +424,21 @@
     "schemas": {
       "LedgerBalanceLineDto": {
         "type": "object",
-        "required": ["currency", "balance"],
+        "required": ["currency", "balance", "available", "held"],
         "properties": {
           "currency": { "type": "string" },
-          "balance": { "type": "string" }
+          "balance": { "type": "string" },
+          "available": { "type": "string" },
+          "held": { "type": "string" }
+        }
+      },
+      "StatusCount": {
+        "type": "object",
+        "required": ["type", "status", "count"],
+        "properties": {
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "count": { "type": "integer" }
         }
       },
       "AccountBalanceDto": {
@@ -427,13 +474,15 @@
       },
       "PagedPostingResponse": {
         "type": "object",
-        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/PostingDto" } },
-          "pageIndex": { "type": "integer" },
+          "pageNumber": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "pageCount": { "type": "integer" },
-          "hasNextPage": { "type": "boolean" }
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
         }
       },
       "RecordPostingRequest": {
@@ -598,13 +647,15 @@
       },
       "PagedAccountGroupResponse": {
         "type": "object",
-        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
-          "pageIndex": { "type": "integer" },
+          "pageNumber": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "pageCount": { "type": "integer" },
-          "hasNextPage": { "type": "boolean" }
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
         }
       },
       "ErrorItem": {

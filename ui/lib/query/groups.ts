@@ -32,17 +32,18 @@ export interface AccountGroupBalance {
 
 export interface PagedAccountGroups {
   items: AccountGroup[];
-  pageIndex: number;
+  pageNumber: number;
   pageSize: number;
   pageCount: number;
+  totalItemCount: number;
   hasNextPage: boolean;
 }
 
 /**
- * The page size `44-mai-shares-the-exact-view-she-is-looking-at` assumes
+ * The page size `84-mai-shares-the-exact-view-she-is-looking-at` assumes
  * (`Design/ui_kits/account-groups-crud/AccountGroups.jsx`'s own default) — sent only once the
  * operator engages pagination (`ListViewState.pageSize` set). An ordinary narrowed view sends
- * no `pageSize` at all, so `43-mai-narrows-the-group-list`'s 12-row match is never truncated
+ * no `pageSize` at all, so `83-mai-narrows-the-group-list`'s 12-row match is never truncated
  * by a page size nobody asked for; the generic list surface's own default (`README.md`'s
  * `pageSize`: default `1000`) applies instead.
  */
@@ -56,7 +57,11 @@ function toFilterField(field: string): string {
 function buildGroupsSearchParams(state: ListViewState): URLSearchParams {
   const params = new URLSearchParams();
   for (const [field, value] of Object.entries(state.filters)) {
-    if (value) params.append('filter', `${toFilterField(field)}:Equal:${value}`);
+    // `?search=` (the search's "show all" link, DRK-1728 §3 row 9) is the service's own free-text
+    // `search`, never a `Search:Equal:` filter.
+    if (!value) continue;
+    if (field === 'search') params.set('search', value);
+    else params.append('filter', `${toFilterField(field)}:Equal:${value}`);
   }
   if (state.sort) {
     params.set('orderBy', toFilterField(state.sort.field));
@@ -68,18 +73,19 @@ function buildGroupsSearchParams(state: ListViewState): URLSearchParams {
 }
 
 /**
- * `pageIndex`/`pageSize`/`pageCount` are paging counters, not monetary amounts —
+ * `pageNumber`/`pageSize`/`pageCount`/`totalItemCount` are paging counters, not monetary amounts —
  * `readLedgerJson` turned them into digit strings along with every other number in the body
  * (row 7 draws no field-by-field distinction), so it is safe, and necessary, to route them
  * back through `Number` here.
  */
 function toPagedAccountGroups(raw: unknown): PagedAccountGroups {
-  const body = raw as { items: AccountGroup[]; pageIndex: string; pageSize: string; pageCount: string; hasNextPage: boolean };
+  const body = raw as { items: AccountGroup[]; pageNumber: string; pageSize: string; pageCount: string; totalItemCount: string; hasNextPage: boolean };
   return {
     items: body.items,
-    pageIndex: Number(body.pageIndex),
+    pageNumber: Number(body.pageNumber),
     pageSize: Number(body.pageSize),
     pageCount: Number(body.pageCount),
+    totalItemCount: Number(body.totalItemCount),
     hasNextPage: body.hasNextPage,
   };
 }

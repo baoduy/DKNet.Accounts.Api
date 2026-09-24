@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ import { accountGroupBalancesKey, accountGroupKey, accountGroupsListKey } from '
 import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups, ACCOUNT_GROUPS_PAGE_SIZE } from '@/lib/query/groups';
 import type { AccountGroup, AccountGroupType } from '@/lib/query/groups';
 import { useActivateAccountGroup, useCloseAccountGroup, useCreateAccountGroup, useDeleteAccountGroup, useUpdateAccountGroup } from '@/lib/query/mutations';
+import { pushRecent } from '@/lib/recent/store';
 import { parseListViewState, toListViewSearchParams } from '@/lib/url-state';
 import type { ListViewState } from '@/lib/url-state';
 
@@ -28,6 +29,8 @@ import type { ListViewState } from '@/lib/url-state';
  */
 export interface AccountGroupsScreenProps {
   grantedScopes: string[];
+  /** Keys the operator's recently viewed list (DRK-1728 §3 row 8); unset, nothing is kept. */
+  directoryObjectId?: string;
 }
 
 export function AccountGroupsScreen(props: AccountGroupsScreenProps): JSX.Element {
@@ -68,7 +71,7 @@ function metadataToRecord(entries: MetadataEntry[]): Record<string, string> | un
   return nonEmpty.length === 0 ? undefined : Object.fromEntries(nonEmpty.map((entry) => [entry.key, entry.value]));
 }
 
-function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps): JSX.Element {
+function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: AccountGroupsScreenProps): JSX.Element {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // The list's filters/sort/page live in local state, seeded once from the address a fresh
@@ -99,8 +102,9 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     updateState({ filters, page: undefined, pageSize: undefined });
   }
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelMode, setPanelMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  // `?open=<id>` (the search, a recently viewed entry) opens that group's panel on arrival.
+  const [selectedId, setSelectedId] = useState<string | null>(state.openRecordId ?? null);
+  const [panelMode, setPanelMode] = useState<'view' | 'edit' | 'create' | null>(state.openRecordId ? 'view' : null);
   const [draft, setDraft] = useState<GroupDraft>(BLANK_DRAFT);
   const [editOriginal, setEditOriginal] = useState<GroupEditSnapshot>({ name: '', description: '', metadata: [] });
   const [fieldErrors, setFieldErrors] = useState<Record<string, LedgerError>>({});
@@ -127,6 +131,11 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
   const balances = balancesQuery.data ?? [];
   const holdsBalance = balances.some((line) => !isZeroAmount(line.balance));
   const holdsAccount = balances.length > 0;
+
+  // Kept as the group's panel is drawn — before paint, so an operator who moves straight on still has it.
+  useLayoutEffect(() => {
+    if (directoryObjectId && selectedId) pushRecent(directoryObjectId, 'AccountGroup', selectedId);
+  }, [directoryObjectId, selectedId]);
 
   const createGroup = useCreateAccountGroup();
   const updateGroup = useUpdateAccountGroup();
@@ -164,6 +173,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
   function closePanel(): void {
     setSelectedId(null);
     setPanelMode(null);
+    if (state.openRecordId) updateState({ openRecordId: undefined });
     resetFormState();
   }
 

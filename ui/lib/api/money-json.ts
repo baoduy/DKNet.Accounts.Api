@@ -81,3 +81,33 @@ export async function readLedgerJson(response: Response): Promise<unknown> {
 export function isZeroAmount(amount: string): boolean {
   return /^[-+]?0(\.0+)?$/.test(amount);
 }
+
+/** A decimal-string amount as an integer count of `10^-scale` units — exact, never via `Number`. */
+function toScaledUnits(amount: string, scale: number): bigint {
+  const negative = amount.startsWith('-');
+  const [intPart, fracPart = ''] = amount.replace(/^[-+]/, '').split('.');
+  // `BigInt('')` is 0n, so a missing whole part (`.5`) or fraction reads as 0.
+  const units = BigInt(intPart) * 10n ** BigInt(scale) + BigInt(fracPart.padEnd(scale, '0'));
+  return negative ? -units : units;
+}
+
+/** How many digits follow the decimal point in `amount`'s text. */
+export function fractionDigitsOf(amount: string): number {
+  const dot = amount.indexOf('.');
+  return dot < 0 ? 0 : amount.length - dot - 1;
+}
+
+/**
+ * DRK-1728 §3 row 6 — `part`'s share of `part + rest`, in basis points (0 to 10000, rounded
+ * down), worked out on the exact decimal text so neither amount passes through `Number` (R2);
+ * only the resulting proportion does. A negative amount counts as 0; `null` when nothing is
+ * left to share.
+ */
+export function shareBasisPoints(part: string, rest: string): number | null {
+  const scale = Math.max(fractionDigitsOf(part), fractionDigitsOf(rest));
+  const partUnits = toScaledUnits(part, scale);
+  const restUnits = toScaledUnits(rest, scale);
+  const p = partUnits > 0n ? partUnits : 0n;
+  const whole = p + (restUnits > 0n ? restUnits : 0n);
+  return whole === 0n ? null : Number((p * 10000n) / whole);
+}

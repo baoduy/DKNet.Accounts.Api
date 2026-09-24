@@ -870,9 +870,9 @@ async function handle(request: Request): Promise<Response> {
     }
     records = sortRecords(records, orderBy, desc);
     const paged = pageOf(records as unknown as AccountGroupFixture[], pageNumber, pageSize);
-    // The service's own paging fields (`pageNumber`, `totalItemCount`) beside the `pageIndex`
-    // the console reads today (DRK-1727 §3 row 2).
-    return Response.json({ ...paged, pageNumber: paged.pageIndex + 1, totalItemCount: records.length, items: paged.items.map(accountGroupDto) });
+    // The service's own paging fields (`pageNumber`, `totalItemCount`), as `PagedAccountGroupResponse` declares them.
+    const { pageIndex, ...paging } = paged;
+    return Response.json({ ...paging, pageNumber: pageIndex + 1, totalItemCount: records.length, hasPreviousPage: pageIndex > 0, items: paged.items.map(accountGroupDto) });
   }
 
   if (segments[1] === 'account-groups' && segments.length === 2 && request.method === 'POST') {

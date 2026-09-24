@@ -12,7 +12,10 @@ import {
   currenciesQueryOptions,
   currencyKey,
   ledgerBalancesKey,
+  postingCountKey,
   postingsListKey,
+  recentRecordKey,
+  statusCountsKey,
 } from './keys';
 
 describe('query keys', () => {
@@ -92,5 +95,21 @@ describe('query keys', () => {
 
   it('gives the ledger-wide balances one fixed key', () => {
     expect(ledgerBalancesKey()).toEqual(['ledger', 'accounts', 'balances']);
+  });
+
+  it('keys status counts by resource and window, overall apart from any window', () => {
+    const september = { from: '2026-09-01T00:00:00.000Z', to: '2026-09-30T23:59:59.999Z' };
+    expect(statusCountsKey('accounts')).toEqual(['ledger', 'accounts', 'status-counts', null]);
+    expect(statusCountsKey('accounts', september)).toEqual(['ledger', 'accounts', 'status-counts', september]);
+    expect(statusCountsKey('account-groups')).not.toEqual(statusCountsKey('accounts'));
+  });
+
+  it('keys a posting count by its window, under the postings key a write refreshes', () => {
+    const week = { from: '2026-09-18', to: '2026-09-24' };
+    expect(postingCountKey(week)).toEqual(['ledger', 'postings', 'count', week]);
+  });
+
+  it('keys a recently viewed record by kind and id', () => {
+    expect(recentRecordKey('Posting', 'p1')).toEqual(['ledger', 'recent', 'Posting', 'p1']);
   });
 });

@@ -48,7 +48,7 @@ export function currencyKey(currencyId: string): readonly unknown[] {
   return ['ledger', 'currency', currencyId] as const;
 }
 
-/** The ledger-wide per-currency totals (`GET /v1/accounts/balances`) — used only to tell whether a currency still holds a balance. */
+/** The ledger-wide per-currency totals (`GET /v1/accounts/balances`) — whether a currency still holds a balance, and Overview's position by currency. */
 export function ledgerBalancesKey(): readonly unknown[] {
   return ['ledger', 'accounts', 'balances'] as const;
 }
@@ -61,4 +61,19 @@ export function ledgerBalancesKey(): readonly unknown[] {
  */
 export function currenciesQueryOptions(): { queryKey: readonly unknown[]; staleTime: number; refetchOnMount: false; refetchOnWindowFocus: false } {
   return { queryKey: currenciesKey(), staleTime: Infinity, refetchOnMount: false, refetchOnWindowFocus: false };
+}
+
+/** DRK-1728 §3 row 10 — the service's count per status, overall or within a created-on window. */
+export function statusCountsKey(resource: string, window?: { from: string; to: string }): readonly unknown[] {
+  return ['ledger', resource, 'status-counts', window ?? null] as const;
+}
+
+/** DRK-1728 §3 row 10 — how many postings took effect in one window (a page of 1's `totalItemCount`). */
+export function postingCountKey(window: { from: string; to: string }): readonly unknown[] {
+  return ['ledger', 'postings', 'count', window] as const;
+}
+
+/** DRK-1728 §3 row 7 — one recently viewed record, read again under the operator's own permissions. */
+export function recentRecordKey(kind: string, id: string): readonly unknown[] {
+  return ['ledger', 'recent', kind, id] as const;
 }

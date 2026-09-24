@@ -53,6 +53,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/status-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count accounts per status — every status, a status nothing holds with 0. Only the created-on window narrows it. */
+        get: operations["getAccountStatusCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{id}/balance": {
         parameters: {
             query?: never;
@@ -227,6 +244,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account-groups/status-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count groups per status — every status, a status nothing holds with 0. Only the created-on window narrows it. */
+        get: operations["getAccountGroupStatusCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account-groups/{id}": {
         parameters: {
             query?: never;
@@ -304,6 +338,13 @@ export interface components {
         LedgerBalanceLineDto: {
             currency: string;
             balance: string;
+            available: string;
+            held: string;
+        };
+        StatusCount: {
+            type: string;
+            status: string;
+            count: number;
         };
         AccountBalanceDto: {
             currency: string;
@@ -335,10 +376,12 @@ export interface components {
         };
         PagedPostingResponse: {
             items: components["schemas"]["PostingDto"][];
-            pageIndex: number;
+            pageNumber: number;
             pageSize: number;
             pageCount: number;
+            totalItemCount: number;
             hasNextPage: boolean;
+            hasPreviousPage: boolean;
         };
         RecordPostingRequest: {
             /** Format: uuid */
@@ -475,10 +518,12 @@ export interface components {
         };
         PagedAccountGroupResponse: {
             items: components["schemas"]["AccountGroupDto"][];
-            pageIndex: number;
+            pageNumber: number;
             pageSize: number;
             pageCount: number;
+            totalItemCount: number;
             hasNextPage: boolean;
+            hasPreviousPage: boolean;
         };
         ErrorItem: {
             message: string;
@@ -697,6 +742,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LedgerBalanceLineDto"][];
+                };
+            };
+        };
+    };
+    getAccountStatusCounts: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusCount"][];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
                 };
             };
         };
@@ -1163,6 +1240,38 @@ export interface operations {
             };
             /** @description Refused */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    getAccountGroupStatusCounts: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusCount"][];
+                };
+            };
+            /** @description Refused */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -8,13 +8,14 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useId, useState, type JSX } from 'react';
+import { useId, useLayoutEffect, useState, type JSX } from 'react';
 import { RecordPostingForm } from '@/components/accounts/RecordPostingForm';
 import { RefusalAlert } from '@/components/feedback/RefusalAlert';
 import { Input } from '@/components/ui/input';
 import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import { useAccountsById, useCurrencies, usePosting, useRecords } from '@/lib/accounts/query';
 import { POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES, defaultPostingsFilter, postingPeriodError, type PostingsFilterState } from '@/lib/accounts/postings-filter';
+import { pushRecent } from '@/lib/recent/store';
 import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
 import { PostingDetails } from './PostingDetails';
 import { RecordsTable, type RecordsTableRow } from './RecordsTable';
@@ -25,6 +26,8 @@ const DEFAULT_ORDER = { field: 'RecordedAt', desc: true };
 
 export interface RecordsScreenProps {
   grantedScopes: string[];
+  /** Keys the operator's recently viewed list (DRK-1728 §3 row 8); unset, nothing is kept. */
+  directoryObjectId?: string;
 }
 
 /** A narrowing left empty is dropped; a period bound is kept even when empty, so an unset
@@ -36,7 +39,7 @@ function setFilter(state: ListViewState, key: string, value: string): ListViewSt
   return { ...state, filters, page: undefined };
 }
 
-export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Element {
+export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScreenProps): JSX.Element {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ListViewState>(() => parseListViewState(searchParams));
   const [defaults] = useState(() => defaultPostingsFilter());
@@ -70,6 +73,12 @@ export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Elemen
   const openPosting = items.find((posting) => posting.id === state.openRecordId) ?? openQuery.data;
   const accountIds = [...new Set([...items.map((posting) => posting.accountId), ...(openPosting ? [openPosting.accountId] : [])])];
   const accountQueries = useAccountsById(accountIds);
+
+  // Kept as the posting's details are drawn — before paint, so moving straight on still keeps it.
+  const openedId = openPosting?.id ?? '';
+  useLayoutEffect(() => {
+    if (directoryObjectId && openedId) pushRecent(directoryObjectId, 'Posting', openedId);
+  }, [directoryObjectId, openedId]);
 
   const accountNumbers = new Map<string, string>();
   for (const query of accountQueries) {
