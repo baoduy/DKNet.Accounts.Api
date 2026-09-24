@@ -17,7 +17,7 @@
  * (the `PATCH` body) and that the *stored* value is what a fresh read shows, via the status
  * badge — a control distinct from the select the operator just touched.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI_WITH_WRITE } from '../support/fixtures';
 import { ledgerRequests, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

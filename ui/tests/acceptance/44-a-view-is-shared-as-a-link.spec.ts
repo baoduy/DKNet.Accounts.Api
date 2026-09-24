@@ -7,7 +7,7 @@
  *
  * RED today: no `/accounts` route exists yet.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

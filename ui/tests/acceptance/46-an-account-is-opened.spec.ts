@@ -8,7 +8,7 @@
  *
  * RED today: no `/accounts` route, no `POST /v1/accounts` in the contract's allowlist.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

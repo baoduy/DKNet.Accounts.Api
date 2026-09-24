@@ -15,7 +15,7 @@
  * state is observable: the control must be disabled and the balance still 12,400.00 while
  * the write is pending, only becoming available once the refreshed 12,900.00 is on screen.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

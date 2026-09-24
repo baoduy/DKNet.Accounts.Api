@@ -9,7 +9,7 @@
  * RED today: no `/accounts/{account}` route, no `POST /v1/postings/{id}/reverse` in the
  * pass-through's allowlist for a non-balance-route caller.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI_WITH_WRITE } from '../support/fixtures';
 import { ledgerRequests, seedLedgerAccounts, seedLedgerPostings } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
