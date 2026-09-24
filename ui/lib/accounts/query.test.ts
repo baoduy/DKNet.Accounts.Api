@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useAccount, useAccountGroups, useAccounts, useCurrencies } from './query';
+import { useAccount, useAccountBalance, useAccountGroups, useAccounts, useCurrencies, usePostings } from './query';
+import { defaultPostingsFilter } from './postings-filter';
 
 function wrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -107,6 +108,57 @@ describe('useAccountGroups', () => {
 
     await waitFor(() => expect(result.current.data).toEqual(groups));
     expect(fetchMock).toHaveBeenCalledWith('/api/ledger/account-groups');
+  });
+});
+
+describe('useAccountBalance', () => {
+  it('fetches the account balance, keyed for the write hooks to invalidate', async () => {
+    const balance = { currency: 'SGD', balance: '100.00', availableBalance: '100.00', heldAmount: '0.00', floor: '0.00' };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(balance));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const { result } = renderHook(() => useAccountBalance('a1'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual(balance));
+    expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts/a1/balance');
+  });
+
+  it('makes no call for an empty account id', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    renderHook(() => useAccountBalance(''), { wrapper: wrapper(queryClient) });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePostings', () => {
+  it('narrows postings to the account and the period', async () => {
+    const page = { items: [{ id: 'p1', postingNumber: 'PST0000000001' }], pageIndex: 0, pageSize: 20, pageCount: 1, hasNextPage: false };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    const filter = defaultPostingsFilter(new Date('2026-09-24'));
+    const { result } = renderHook(() => usePostings('a1', filter), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.data).toEqual({ ...page, pageIndex: '0', pageSize: '20', pageCount: '1' }));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/ledger/postings?accountId=a1'));
+  });
+
+  it('makes no call for a period over 90 days', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient();
+    renderHook(() => usePostings('a1', { from: '2026-01-01', to: '2026-06-01', direction: '', category: '', status: '' }), {
+      wrapper: wrapper(queryClient),
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

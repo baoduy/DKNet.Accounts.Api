@@ -22,22 +22,11 @@ export interface RecordPostingFormProps {
   accountNumber: string;
   currency: string;
   granted?: boolean;
-  /** The account's own `Account`/`Currency`/`Direction`/`Category` fields, once open, would
-   * otherwise collide (Playwright `getByLabel` matches by substring) with the postings
-   * panel's narrowing selects and the edit form's locked fields — both stay on screen
-   * throughout. `AccountDetail` hides them while this form is open so each label resolves to
-   * exactly one control again. */
-  onOpenChange?: (open: boolean) => void;
   style?: CSSProperties;
 }
 
-export function RecordPostingForm({ accountId, accountNumber, currency, granted = true, onOpenChange, style }: RecordPostingFormProps): JSX.Element {
-  const [open, setOpenState] = useState(false);
-
-  function setOpen(next: boolean): void {
-    setOpenState(next);
-    onOpenChange?.(next);
-  }
+export function RecordPostingForm({ accountId, accountNumber, currency, granted = true, style }: RecordPostingFormProps): JSX.Element {
+  const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [direction, setDirection] = useState<'Credit' | 'Debit'>('Credit');
   const [amount, setAmount] = useState('');
@@ -96,8 +85,11 @@ export function RecordPostingForm({ accountId, accountNumber, currency, granted 
           </label>
 
           <label className="flex flex-col gap-1">
-            Currency
-            <Input aria-label="Currency" value={currency} disabled readOnly />
+            Posting currency
+            {/* Not labeled bare "Currency": the edit form's own locked Currency select
+                (`AccountForm.tsx`) already carries that exact name, and both show the same
+                locked, disabled value — no separate control for the operator to distinguish. */}
+            <Input aria-label="Posting currency" value={currency} disabled readOnly />
           </label>
 
           <label className="flex flex-col gap-1">

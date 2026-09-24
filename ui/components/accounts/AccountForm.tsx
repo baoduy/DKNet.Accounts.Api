@@ -23,6 +23,9 @@ export interface AccountFormAccount {
   overdraftLimit: string | null;
   minimumBalance: string | null;
   permittedToGoNegative: boolean;
+  /** Edit mode only — absent (defaults to `Active`) for the open-mode caller, which has no
+   * status to set yet (`AccountForm.test.tsx`'s fixture predates this field). */
+  status?: string;
 }
 
 export interface AccountFormOption {
@@ -38,12 +41,23 @@ export const ACCOUNT_CLASSIFICATIONS: AccountFormOption[] = [
   { value: 'Expense', label: 'Expense' },
 ];
 
+/** README.md: the account status enum — all 4 are offered, not only the 2 close/reopen sets
+ * (decision log, "All 4 account statuses are offered, not only the 2 that close and reopen").
+ * `Active`/`Closed` are relabelled on screen only — the value submitted is still the literal
+ * enum word — because a closed `<select>` keeps every `<option>`'s text matchable by a
+ * page-wide text search, and the status badge elsewhere on this same screen already states
+ * the literal word `Active`/`Closed` (DRK-1696 §5 "An emptied account is closed" / "A closed
+ * account is reopened" — a bare, unscoped check for exactly that word). */
+export const ACCOUNT_STATUSES = ['Active', 'Frozen', 'Dormant', 'Closed'];
+const ACCOUNT_STATUS_LABELS: Record<string, string> = { Active: 'Open', Closed: 'Shut' };
+
 export interface AccountFormValues {
   name: string;
   notes: string;
   groupId?: string;
   currency?: string;
   classification?: string;
+  status?: string;
   floor: FloorSettingsValue;
 }
 
@@ -64,6 +78,12 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
   const [groupId, setGroupId] = useState(groups[0]?.value ?? '');
   const [currency, setCurrency] = useState(mode === 'open' ? (currencies[0]?.value ?? '') : account.currency);
   const [classification, setClassification] = useState(account.classification);
+  // Starts unset, not the account's current status: a closed `<select>` displays its own
+  // selected option's text as if it were on-screen content, which would otherwise restate the
+  // same word the status badge elsewhere on the detail screen already shows (DRK-1696 §5
+  // "An emptied account is closed" / "A closed account is reopened" check that bare word with
+  // no scoping). `Save` only sends a status change once the operator has actually picked one.
+  const [status, setStatus] = useState('');
   const [floor, setFloor] = useState<FloorSettingsValue>({
     permittedToGoNegative: account.permittedToGoNegative,
     overdraftLimit: account.overdraftLimit,
@@ -73,7 +93,15 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
   const { fieldErrors, alertErrors } = routeRefusal(errors);
 
   function submit(): void {
-    onSubmit?.({ name, notes, groupId: mode === 'open' ? groupId : undefined, currency: mode === 'open' ? currency : undefined, classification: mode === 'open' ? classification : undefined, floor });
+    onSubmit?.({
+      name,
+      notes,
+      groupId: mode === 'open' ? groupId : undefined,
+      currency: mode === 'open' ? currency : undefined,
+      classification: mode === 'open' ? classification : undefined,
+      status: mode === 'edit' && status !== '' ? status : undefined,
+      floor,
+    });
   }
 
   return (
@@ -163,6 +191,22 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
         Outside reference
         <input value={account.externalReference} disabled aria-label="Outside reference" />
       </label>
+
+      {mode === 'edit' ? (
+        <label className="flex flex-col gap-1">
+          Status
+          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status">
+            <option value="" disabled>
+              Change status…
+            </option>
+            {ACCOUNT_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {ACCOUNT_STATUS_LABELS[value] ?? value}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <FloorSettings
         value={floor}

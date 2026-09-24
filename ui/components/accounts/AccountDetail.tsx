@@ -16,9 +16,11 @@
 import { useState, type CSSProperties, type JSX } from 'react';
 import { FloorLine } from '@/components/ledger/FloorLine';
 import { Money } from '@/components/ledger/Money';
+import { StatusBadge } from '@/components/ledger/StatusBadge';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
-import { useChangeAccountDetails } from '@/lib/accounts/mutations';
+import { useChangeAccountDetails, useSetAccountControls } from '@/lib/accounts/mutations';
 import { AccountForm, type AccountFormValues } from './AccountForm';
+import { AccountStatusControl } from './AccountStatusControl';
 import { PostingsPanel, type PostingsPanelFilter, type PostingsPanelRow } from './PostingsPanel';
 import { RecordPostingForm } from './RecordPostingForm';
 import { ReversePostingForm } from './ReversePostingForm';
@@ -60,10 +62,26 @@ export interface AccountDetailProps {
 function AccountEditPanel({ accountId, account }: { accountId: string; account: AccountDetailAccount }): JSX.Element {
   const [errors, setErrors] = useState<LedgerError[]>([]);
   const changeDetails = useChangeAccountDetails();
+  const setControls = useSetAccountControls();
 
   async function handleSubmit(values: AccountFormValues): Promise<void> {
-    const result = await changeDetails.mutate({ accountId, name: values.name });
-    setErrors(result.ok ? [] : (result.errors ?? []));
+    // Only the endpoint the changed field actually belongs to is called — `PUT` accepts
+    // just `name`/`metadata`, `PATCH` just `status`/floor settings (README.md) — never both
+    // concurrently when only one half of the form changed.
+    const errors: LedgerError[] = [];
+    if (values.name !== account.name) {
+      const nameResult = await changeDetails.mutate({ accountId, name: values.name });
+      if (!nameResult.ok) errors.push(...(nameResult.errors ?? []));
+    }
+    const controlsResult = await setControls.mutate({
+      accountId,
+      status: values.status,
+      overdraftLimit: values.floor.overdraftLimit,
+      minimumBalance: values.floor.minimumBalance,
+      permittedToGoNegative: values.floor.permittedToGoNegative,
+    });
+    if (!controlsResult.ok) errors.push(...(controlsResult.errors ?? []));
+    setErrors(errors);
   }
 
   return (
@@ -80,6 +98,7 @@ function AccountEditPanel({ accountId, account }: { accountId: string; account: 
         overdraftLimit: account.overdraftLimit ?? null,
         minimumBalance: account.minimumBalance ?? null,
         permittedToGoNegative: account.permittedToGoNegative,
+        status: account.status,
       }}
       errors={errors}
       onSubmit={handleSubmit}
@@ -99,12 +118,6 @@ export function AccountDetail({
   style,
 }: AccountDetailProps): JSX.Element {
   const [selectedPostingId, setSelectedPostingId] = useState<string | null>(null);
-  // While the record form is open, its own locked `Account`/`Currency`/`Direction`/`Category`
-  // fields would otherwise collide with the edit form's locked fields and the postings
-  // panel's narrowing selects (Playwright `getByLabel` matches by substring, e.g. `Direction`
-  // matches `Direction filter` too, and a plain `hidden` attribute does not remove a control
-  // from that match set) — unmounted, not just hidden, while the record form is open.
-  const [recordFormOpen, setRecordFormOpen] = useState(false);
 
   if (!account) {
     return (
@@ -148,19 +161,33 @@ export function AccountDetail({
         />
       </div>
 
-      {accountId && !recordFormOpen ? <AccountEditPanel accountId={accountId} account={account} /> : null}
+      <div className="flex items-center gap-3">
+        <span data-testid="account-status">
+          <StatusBadge status={account.status} />
+        </span>
+        {accountId ? (
+          <AccountStatusControl
+            accountId={accountId}
+            status={account.status}
+            balance={account.balance}
+            currency={account.currency}
+            decimalPlaces={decimalPlaces}
+            granted={grantedScopes.includes('accounts.write')}
+          />
+        ) : null}
+      </div>
 
-      {!recordFormOpen ? (
-        <PostingsPanel
-          rows={postings}
-          from={postingsFrom}
-          to={postingsTo}
-          filter={postingsFilter}
-          onFilterChange={onPostingsFilterChange}
-          selectedId={selectedPostingId}
-          onSelectRow={(row) => setSelectedPostingId(row.id === selectedPostingId ? null : row.id)}
-        />
-      ) : null}
+      {accountId ? <AccountEditPanel accountId={accountId} account={account} /> : null}
+
+      <PostingsPanel
+        rows={postings}
+        from={postingsFrom}
+        to={postingsTo}
+        filter={postingsFilter}
+        onFilterChange={onPostingsFilterChange}
+        selectedId={selectedPostingId}
+        onSelectRow={(row) => setSelectedPostingId(row.id === selectedPostingId ? null : row.id)}
+      />
 
       {accountId ? (
         <RecordPostingForm
@@ -168,7 +195,6 @@ export function AccountDetail({
           accountNumber={account.accountNumber}
           currency={account.currency}
           granted={grantedScopes.includes('postings.write')}
-          onOpenChange={setRecordFormOpen}
         />
       ) : null}
 
