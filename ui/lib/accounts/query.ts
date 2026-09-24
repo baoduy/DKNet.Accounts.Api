@@ -9,14 +9,18 @@
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { parseLedgerJson } from '@/lib/api/json';
 import type { components } from '@/lib/api/schema';
-import { accountGroupsKey, accountKey, accountsListKey, currenciesQueryOptions } from '@/lib/query/keys';
+import { accountBalanceKey, accountGroupsKey, accountKey, accountsListKey, currenciesQueryOptions, postingsListKey } from '@/lib/query/keys';
 import type { ListViewState } from '@/lib/url-state';
 import { toAccountsQuery } from './filters';
+import { toPostingsQuery, type PostingsFilterState } from './postings-filter';
 
 export type AccountDto = components['schemas']['AccountDto'];
 export type AccountGroupDto = components['schemas']['AccountGroupDto'];
+export type AccountBalanceDto = components['schemas']['AccountBalanceDto'];
+export type PostingDto = components['schemas']['PostingDto'];
 export type CurrencyDto = components['schemas']['CurrencyDto'];
 export type PagedAccountResponse = components['schemas']['PagedAccountResponse'];
+export type PagedPostingResponse = components['schemas']['PagedPostingResponse'];
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -56,6 +60,28 @@ export function useAccount(idOrNumber: string): UseQueryResult<AccountLookup> {
       const account = page.items[0];
       return account ? { found: true, account } : { found: false };
     },
+  });
+}
+
+/** DRK-1696 §3 row 3 — `GET /accounts/{id}/balance`, keyed so a reversal or a record on this
+ * account (`lib/query/mutations.ts`) invalidates the same cached copy the detail screen reads. */
+export function useAccountBalance(accountId: string): UseQueryResult<AccountBalanceDto> {
+  return useQuery({
+    queryKey: accountBalanceKey(accountId),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/accounts/${accountId}/balance`)) as AccountBalanceDto,
+    enabled: accountId.length > 0,
+  });
+}
+
+/** DRK-1696 §3 row 3 — `GET /postings`, narrowed to this account and the operator's period +
+ * direction/category/status filter. A period the service would refuse produces no call. */
+export function usePostings(accountId: string, filter: PostingsFilterState, pageSize?: number): UseQueryResult<PagedPostingResponse> {
+  const query = toPostingsQuery(accountId, filter, pageSize);
+  return useQuery({
+    queryKey: postingsListKey({ accountId, ...filter, pageSize }),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/postings?${query!.toString()}`)) as PagedPostingResponse,
+    enabled: query !== null && accountId.length > 0,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -291,8 +291,17 @@ async function handle(request: Request): Promise<Response> {
       accountGroups.set(group.id, group);
     }
     for (const posting of seed.postings ?? []) {
-      postings.push(posting);
-      postingCounter += 1;
+      // Upsert by `id`, mirroring the `accounts`/`accountGroups` maps above — a scenario
+      // re-seeding the same posting id (e.g. a reset racing the next test's own seed call,
+      // since Playwright reporters cannot block a worker's test body) replaces it in place
+      // instead of appending a second copy that never existed on the wire.
+      const index = postings.findIndex((existing) => existing.id === posting.id);
+      if (index >= 0) {
+        postings[index] = posting;
+      } else {
+        postings.push(posting);
+        postingCounter += 1;
+      }
     }
     if (seed.currencies) currencies = seed.currencies;
     return jsonResponse({ ok: true });

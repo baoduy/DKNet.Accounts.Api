@@ -87,7 +87,12 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
     >
       <label className="flex flex-col gap-1">
         Name
-        <input value={name} onChange={(event) => setName(event.target.value)} aria-label="Name" />
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          aria-label="Name"
+          aria-invalid={fieldErrors.name ? 'true' : undefined}
+        />
         {fieldErrors.name ? <span role="alert">{fieldErrors.name.message}</span> : null}
       </label>
 

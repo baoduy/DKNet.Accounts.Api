@@ -45,15 +45,21 @@ export const MAI: FixtureUser = {
   scopes: ['accounts.read', 'postings.read', 'postings.reverse'],
 };
 
-/** Same operator, a token missing `postings.reverse` — DRK-1669 §5 identity-menu scenario. */
+/** Same operator, a token missing `postings.reverse` — DRK-1669 §5 identity-menu scenario.
+ * Its own address (DRK-1696 §3 row 11): sharing `mai@drunkcoding.net` with `MAI`/`MAI_WITH_WRITE`
+ * would leave whichever of the three grants the issuer's fixture last for that address, not
+ * the scopes below. */
 export const MAI_MISSING_REVERSE_SCOPE: FixtureUser = {
   ...MAI,
+  email: 'mai-partial@drunkcoding.net',
   scopes: ['accounts.read', 'postings.read'],
 };
 
-/** Same operator, granted `accounts.write` and `postings.write` too — DRK-1696 §5: opening, editing and recording. */
+/** Same operator, granted `accounts.write` and `postings.write` too — DRK-1696 §5: opening,
+ * editing and recording. Its own address, for the same reason as `MAI_MISSING_REVERSE_SCOPE`. */
 export const MAI_WITH_WRITE: FixtureUser = {
   ...MAI,
+  email: 'mai-write@drunkcoding.net',
   scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'],
 };
 
