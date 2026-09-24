@@ -8,7 +8,7 @@
  */
 'use client';
 
-import { useState, type CSSProperties, type JSX } from 'react';
+import { useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IdempotencyKeyField } from '@/components/forms/IdempotencyKeyField';
@@ -16,7 +16,7 @@ import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
-import { NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
+import { isUnreachable, NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
 import { POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
 import { useAccounts } from '@/lib/accounts/query';
 import { useRecordPosting } from '@/lib/query/mutations';
@@ -76,6 +76,8 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [errors, setErrors] = useState<LedgerError[]>([]);
+  const recordPostingRef = useRef<HTMLButtonElement>(null);
+  const dismissedRef = useRef(false);
 
   const idempotency = useIdempotencyKey();
   const record = useRecordPosting();
@@ -110,7 +112,8 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
         setAmount('');
         setCategory('');
       } else {
-        setErrors(result.errors ?? []);
+        // The pass-through's unreachable answer means the service never answered this write.
+        setErrors(isUnreachable(result.errors) ? [NO_ANSWER_ERROR] : (result.errors ?? []));
         setOpen(true);
       }
     } catch {
@@ -127,7 +130,7 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
           by substring, so `{ name: 'Record' }` would otherwise resolve to both. */}
       {!open ? (
         <ScopeGate scope="postings.write" granted={granted}>
-          <Button type="button" disabled={pending} onClick={() => setOpen(true)}>
+          <Button ref={recordPostingRef} type="button" disabled={pending} onClick={() => setOpen(true)}>
             Record posting
           </Button>
         </ScopeGate>
@@ -210,6 +213,19 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
         accountNumber={account?.accountNumber}
         category={category || undefined}
         onBack={() => setConfirming(false)}
+        onDismiss={() => {
+          // Escape leaves the whole recording: nothing is recorded, the form closes and focus goes
+          // back to `Record posting`, the control that started it (DRK-1725 §3 row 7, brief Q3).
+          dismissedRef.current = true;
+          setConfirming(false);
+          setOpen(false);
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!dismissedRef.current) return;
+          dismissedRef.current = false;
+          event.preventDefault();
+          recordPostingRef.current?.focus();
+        }}
         onConfirm={handleConfirm}
       />
     </div>

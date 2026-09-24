@@ -28,6 +28,10 @@ export interface ConfirmMovementProps {
   legs?: MovementLeg[];
   consequence?: ReactNode;
   onBack?: () => void;
+  /** Escape or a click outside closes the dialog (DRK-1725 §3 row 7); defaults to `onBack`. */
+  onDismiss?: () => void;
+  /** Where focus goes once the dialog has closed; call `event.preventDefault()` to place it yourself. */
+  onCloseAutoFocus?: (event: Event) => void;
   onConfirm?: () => void;
   confirmLabel?: string;
 }
@@ -45,12 +49,14 @@ export function ConfirmMovement({
   legs,
   consequence,
   onBack,
+  onDismiss = onBack,
+  onCloseAutoFocus,
   onConfirm,
   confirmLabel = 'Confirm',
 }: ConfirmMovementProps): JSX.Element {
   return (
-    <Dialog open={open}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onDismiss?.())}>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogTitle>Confirm this movement</DialogTitle>
 
         {legs && legs.length > 0 ? (

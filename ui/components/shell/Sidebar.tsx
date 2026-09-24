@@ -46,7 +46,9 @@ export function Sidebar({ sections = CONSOLE_NAV, active, onNavigate, style }: S
   return (
     <nav
       style={style}
-      className="flex w-(--sidebar-width) flex-none flex-col border-r border-sidebar-border bg-sidebar p-2 text-sidebar-foreground"
+      // The height of the viewport, not of the page: ADMINISTRATION sits at the foot of the screen
+      // whatever the content below holds, and never moves when a screen's data arrives (DRK-1725 R1).
+      className="sticky top-0 flex h-dvh w-(--sidebar-width) flex-none flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-2 text-sidebar-foreground"
     >
       <div className="px-2 pt-1 pb-2.5 text-[length:var(--text-panel-title-size)] font-extrabold tracking-[var(--tracking-title)]">
         Accounts

@@ -24,7 +24,7 @@ a:hover { text-decoration: underline }
    focus ring. --focus-ring is the accessible alias: the theme's slate in light, the lime
    in dark. shadcn primitives that reach for --ring directly need the same override. */
 a:focus-visible, button:focus-visible, input:focus-visible,
-select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);

@@ -55,10 +55,12 @@ export interface RecordsTableProps {
   onSort?: (field: string) => void;
   selectedId?: string | null;
   onSelectRow?: (row: RecordsTableRow) => void;
+  loading?: boolean;
+  emptyMessage: string;
   style?: CSSProperties;
 }
 
-export function RecordsTable({ rows, orderBy, desc, onSort, selectedId, onSelectRow, style }: RecordsTableProps): JSX.Element {
+export function RecordsTable({ rows, orderBy, desc, onSort, selectedId, onSelectRow, loading, emptyMessage, style }: RecordsTableProps): JSX.Element {
   return (
     <LedgerTable<RecordsTableRow>
       columns={RECORD_COLUMNS}
@@ -69,7 +71,8 @@ export function RecordsTable({ rows, orderBy, desc, onSort, selectedId, onSelect
       onSort={onSort}
       selectedId={selectedId}
       onSelectRow={onSelectRow}
-      emptyMessage="No postings in this view."
+      loading={loading}
+      emptyMessage={emptyMessage}
       style={style}
     />
   );

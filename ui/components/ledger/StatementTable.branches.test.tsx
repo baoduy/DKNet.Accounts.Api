@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { StatementTable } from './StatementTable';
@@ -79,5 +79,38 @@ describe('StatementTable — the reversed row and empty/select states', () => {
   it('links a posting to its href when postingHref is given', () => {
     render(createElement(StatementTable, { rows: [REVERSED_ROW], postingHref: (row) => `/postings/${row.id}` }));
     expect(screen.getByRole('link', { name: /PST-000004/ })).toHaveAttribute('href', '/postings/p4');
+  });
+
+  it('keeps its 5 headings over placeholder rows while loading, drawing no row (DRK-1725 R1)', () => {
+    const { container } = render(createElement(StatementTable, { rows: [POSTED_ROW], loading: true, placeholderRows: 2 }));
+    expect(container.querySelector('table')).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelectorAll('thead th')).toHaveLength(5);
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(container.querySelectorAll('tbody tr:first-child td [data-slot="skeleton"]')).toHaveLength(5);
+    expect(screen.queryByText('PST-000001')).toBeNull();
+    expect(screen.queryByText('No postings recorded on this account.')).toBeNull();
+  });
+
+  it('stands ten placeholder rows of 4 cells in by default when the running balance is off', () => {
+    const { container } = render(createElement(StatementTable, { rows: [], loading: true, showBalanceAfter: false }));
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(10);
+    expect(container.querySelectorAll('tbody tr:first-child td')).toHaveLength(4);
+    expect(container.querySelector('table')!.style.minWidth).toBe('calc(4 * var(--spacing) * 24)');
+  });
+
+  it('states an empty statement in one body row across every column, under its headings', () => {
+    render(createElement(StatementTable, { rows: [], emptyMessage: 'No more postings.' }));
+    expect(screen.getByRole('cell', { name: 'No more postings.' })).toHaveAttribute('colspan', '5');
+    expect(screen.getAllByRole('columnheader')).toHaveLength(5);
+    expect(screen.getByRole('table')).toHaveClass('table-fixed');
+  });
+
+  it('opens a row with Enter, as a click does', () => {
+    const onSelectRow = vi.fn();
+    render(createElement(StatementTable, { rows: [POSTED_ROW, REVERSED_ROW], onSelectRow }));
+    const row = screen.getAllByRole('row')[2];
+    expect(row).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onSelectRow).toHaveBeenCalledWith(REVERSED_ROW);
   });
 });

@@ -7,7 +7,7 @@ export function Input({ className, type, ...props }: ComponentProps<'input'>): J
       type={type}
       data-slot="input"
       className={cn(
-        'h-9 w-full min-w-0 rounded-md border border-border-control bg-card px-3 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]',
+        'h-9 w-full min-w-0 rounded-md border border-border-control bg-card px-3 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:border-surface-disabled disabled:bg-surface-disabled disabled:text-text-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
         className,
       )}
       {...props}

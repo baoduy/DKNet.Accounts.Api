@@ -7,8 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { AccountsTable } from './AccountsTable';
 
 describe('AccountsTable — the default empty message', () => {
-  it('shows "No accounts found." when there are no rows', () => {
+  it('shows "No accounts yet." in a full-width row under its headings when there are no rows', () => {
     render(createElement(AccountsTable, { rows: [] }));
-    expect(screen.getByText('No accounts found.')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'No accounts yet.' })).toHaveAttribute('colspan', '7');
+    expect(screen.getAllByRole('columnheader')).toHaveLength(7);
   });
 });

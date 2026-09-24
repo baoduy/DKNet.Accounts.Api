@@ -2,16 +2,16 @@
 
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useId, useMemo, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
-import { RefusalAlert } from '@/components/feedback/RefusalAlert';
+import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
 import { Money } from '@/components/ledger/Money';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TablePlaceholderRows, TableRow, fixedLayout, loadingTableProps } from '@/components/ui/table';
 import { useCurrencies } from '@/lib/accounts/query';
 import { fractionDigitsOf, shareBasisPoints } from '@/lib/api/money-json';
-import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import { fetchLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
 import { ledgerBalancesKey, postingCountKey, recentRecordKey, statusCountsKey } from '@/lib/query/keys';
 import {
@@ -44,6 +44,8 @@ export interface OverviewScreenProps {
 
 const ACCOUNT_STATUSES = ['Active', 'Frozen', 'Dormant', 'Closed'];
 const GROUP_STATUSES = ['Active', 'Closed'];
+/** The ledger's currency count is unknown until it answers; the stand-in and a fresh ledger carry 3. */
+const POSITION_PLACEHOLDER_ROWS = 3;
 
 function formatCount(count: number): string {
   return count.toLocaleString('en-US');
@@ -75,13 +77,25 @@ function MissingScope({ scope }: { scope: string }): JSX.Element {
   );
 }
 
-/** Draws `draw()` once every read has answered — so `draw` may take each read's data as present;
- * a refused read is stated in its place. */
-function Loaded({ results, draw }: { results: UseQueryResult[]; draw: () => ReactNode }): JSX.Element {
-  const failed = results.find((result) => result.isError);
-  if (failed) return <RefusalAlert errors={[toLedgerError(failed.error)]} traceId={ledgerErrorTraceId(failed.error)} />;
-  if (results.some((result) => result.isPending)) return <p className="text-muted-foreground">Loading…</p>;
-  return <>{draw()}</>;
+/**
+ * A panel's table: its headings always, and its body once every read has answered — so `body`
+ * may take each read's data as present. Until then `rows` placeholder rows stand in (DRK-1725
+ * R1); a refused read is stated in the table's place with a way to try again, in this panel only.
+ */
+function Loaded({ results, head, columns, rows, body }: { results: UseQueryResult[]; head: ReactNode; columns: number; rows: number; body: () => ReactNode }): JSX.Element {
+  const failed = results.filter((result) => result.isError);
+  if (failed.length > 0) {
+    return <FailedRead error={failed[0].error} onRetry={() => failed.forEach((result) => void result.refetch())} />;
+  }
+  const loading = results.some((result) => result.isPending);
+  return (
+    <Table {...fixedLayout(columns)} {...loadingTableProps(loading)}>
+      <TableHeader>
+        <TableRow>{head}</TableRow>
+      </TableHeader>
+      <TableBody>{loading ? <TablePlaceholderRows columns={columns} count={rows} /> : body()}</TableBody>
+    </Table>
+  );
 }
 
 export function OverviewScreen({ grantedScopes, directoryObjectId }: OverviewScreenProps): JSX.Element {
@@ -140,38 +154,34 @@ function PositionPanel({ granted }: { granted: boolean }): JSX.Element {
       {granted ? (
         <Loaded
           results={[balances, currencies]}
-          draw={() => {
+          columns={5}
+          rows={POSITION_PLACEHOLDER_ROWS}
+          head={
+            <>
+              <TableHead>Currency</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Available</TableHead>
+              <TableHead className="text-right">Held</TableHead>
+              <TableHead className="w-1/4">Available and held</TableHead>
+            </>
+          }
+          body={() => {
             const decimals = new Map(currencies.data!.map((currency) => [currency.code, currency.decimalPlaces]));
             // Drawn at the currency's own scale; a currency the list does not know keeps the service's digits.
             const money = (line: LedgerBalanceLine, amount: string): JSX.Element => (
               <Money amount={amount} decimalPlaces={decimals.get(line.currency) ?? fractionDigitsOf(amount)} />
             );
-            return (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Currency</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right">Available</TableHead>
-                    <TableHead className="text-right">Held</TableHead>
-                    <TableHead>Available and held</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {balances.data!.map((line) => (
-                    <TableRow key={line.currency}>
-                      <TableCell className="font-semibold">{line.currency}</TableCell>
-                      <TableCell className="text-right">{money(line, line.balance)}</TableCell>
-                      <TableCell className="text-right">{money(line, line.available)}</TableCell>
-                      <TableCell className="text-right">{money(line, line.held)}</TableCell>
-                      <TableCell className="w-1/4">
-                        <PositionBar line={line} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            );
+            return balances.data!.map((line) => (
+              <TableRow key={line.currency}>
+                <TableCell className="font-semibold">{line.currency}</TableCell>
+                <TableCell className="text-right">{money(line, line.balance)}</TableCell>
+                <TableCell className="text-right">{money(line, line.available)}</TableCell>
+                <TableCell className="text-right">{money(line, line.held)}</TableCell>
+                <TableCell>
+                  <PositionBar line={line} />
+                </TableCell>
+              </TableRow>
+            ));
           }}
         />
       ) : (
@@ -198,27 +208,25 @@ function StatusPanel({ title, resource, noun, statuses, granted }: StatusPanelPr
       {granted ? (
         <Loaded
           results={[counts]}
-          draw={() => (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">{noun}</TableHead>
+          columns={2}
+          rows={statuses.length}
+          head={
+            <>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">{noun}</TableHead>
+            </>
+          }
+          body={() =>
+            statuses.map((status) => {
+              const count = countOf(counts.data!, status);
+              return (
+                <TableRow key={status}>
+                  <TableCell>{status}</TableCell>
+                  <TableCell className="text-right tabular-nums">{count === undefined ? '—' : formatCount(count)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {statuses.map((status) => {
-                  const count = countOf(counts.data!, status);
-                  return (
-                    <TableRow key={status}>
-                      <TableCell>{status}</TableCell>
-                      <TableCell className="text-right tabular-nums">{count === undefined ? '—' : formatCount(count)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              );
+            })
+          }
         />
       ) : (
         <MissingScope scope="accounts.read" />
@@ -243,34 +251,30 @@ function PostingsPerWeekPanel({ granted, now }: { granted: boolean; now: Date })
       {granted ? (
         <Loaded
           results={counts}
-          draw={() => {
+          columns={2}
+          rows={weeks.length}
+          head={
+            <>
+              <TableHead>Week (UTC)</TableHead>
+              <TableHead className="w-1/2">Postings</TableHead>
+            </>
+          }
+          body={() => {
             const max = Math.max(...counts.map((result) => result.data!));
-            return (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Week (UTC)</TableHead>
-                    <TableHead>Postings</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {weeks.map((week, index) => {
-                    const count = counts[index].data!;
-                    return (
-                      <TableRow key={week.from}>
-                        <TableCell className="whitespace-nowrap">{`${week.from} to ${week.to}`}</TableCell>
-                        <TableCell className="w-1/2">
-                          <div className="flex items-center gap-2">
-                            <CountBar count={count} max={max} className="bg-chart-1" />
-                            <span className="tabular-nums">{formatCount(count)}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            );
+            return weeks.map((week, index) => {
+              const count = counts[index].data!;
+              return (
+                <TableRow key={week.from}>
+                  <TableCell className="whitespace-nowrap">{`${week.from} to ${week.to}`}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <CountBar count={count} max={max} className="bg-chart-1" />
+                      <span className="tabular-nums">{formatCount(count)}</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            });
           }}
         />
       ) : (
@@ -296,50 +300,46 @@ function AccountsOpenedPanel({ granted, now }: { granted: boolean; now: Date }):
       {granted ? (
         <Loaded
           results={counts}
-          draw={() => {
+          columns={ACCOUNT_STATUSES.length + 2}
+          rows={months.length}
+          head={
+            <>
+              <TableHead>Month (UTC)</TableHead>
+              {ACCOUNT_STATUSES.map((status) => (
+                <TableHead key={status} className="text-right">
+                  {status}
+                </TableHead>
+              ))}
+              <TableHead className="w-1/4">By status</TableHead>
+            </>
+          }
+          body={() => {
             // Each segment is scaled to a quarter of the largest single count, so the stacked bar's
             // length follows the month's total without the browser adding the service's counts up.
             const max = Math.max(...counts.flatMap((result) => result.data!.map((line) => line.count)));
-            return (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Month (UTC)</TableHead>
-                    {ACCOUNT_STATUSES.map((status) => (
-                      <TableHead key={status} className="text-right">
-                        {status}
-                      </TableHead>
-                    ))}
-                    <TableHead>By status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {months.map((month, index) => {
-                    const monthCounts = counts[index].data!;
+            return months.map((month, index) => {
+              const monthCounts = counts[index].data!;
+              return (
+                <TableRow key={month.from}>
+                  <TableCell className="whitespace-nowrap">{month.label}</TableCell>
+                  {ACCOUNT_STATUSES.map((status) => {
+                    const count = countOf(monthCounts, status);
                     return (
-                      <TableRow key={month.from}>
-                        <TableCell className="whitespace-nowrap">{month.label}</TableCell>
-                        {ACCOUNT_STATUSES.map((status) => {
-                          const count = countOf(monthCounts, status);
-                          return (
-                            <TableCell key={status} className="text-right tabular-nums">
-                              {count === undefined ? '—' : formatCount(count)}
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className="w-1/4">
-                          <div className="flex">
-                            {ACCOUNT_STATUSES.map((status) => (
-                              <CountBar key={status} count={countOf(monthCounts, status) ?? 0} max={max * ACCOUNT_STATUSES.length} className={STATUS_BAR_CLASSES[status]} />
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <TableCell key={status} className="text-right tabular-nums">
+                        {count === undefined ? '—' : formatCount(count)}
+                      </TableCell>
                     );
                   })}
-                </TableBody>
-              </Table>
-            );
+                  <TableCell>
+                    <div className="flex">
+                      {ACCOUNT_STATUSES.map((status) => (
+                        <CountBar key={status} count={countOf(monthCounts, status) ?? 0} max={max * ACCOUNT_STATUSES.length} className={STATUS_BAR_CLASSES[status]} />
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            });
           }}
         />
       ) : (
@@ -394,8 +394,8 @@ function RecentEntryLine({ entry, lookup, granted }: { entry: RecentEntry; looku
       </>
     );
   }
-  if (lookup.isError) return <RefusalAlert errors={[toLedgerError(lookup.error)]} traceId={ledgerErrorTraceId(lookup.error)} />;
-  if (lookup.isPending) return <span className="text-muted-foreground">Loading…</span>;
+  if (lookup.isError) return <FailedRead error={lookup.error} onRetry={() => void lookup.refetch()} />;
+  if (lookup.isPending) return <Skeleton className="w-48" />;
   if (lookup.data.state === 'notFound') return <span>{`This ${noun} can no longer be found.`}</span>;
   const record = lookup.data.record;
   if (entry.kind === 'Account') {

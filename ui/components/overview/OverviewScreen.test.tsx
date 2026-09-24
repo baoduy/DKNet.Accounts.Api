@@ -4,7 +4,7 @@
  * state a recently viewed entry can be in.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OverviewScreen } from './OverviewScreen';
@@ -71,6 +71,15 @@ function panel(name: string): HTMLElement {
   return screen.getByRole('region', { name });
 }
 
+/** The region's table once its data is drawn — while loading it holds placeholder rows (DRK-1725 R1). */
+async function loadedTable(region: HTMLElement): Promise<HTMLElement> {
+  return waitFor(() => {
+    const table = within(region).getByRole('table');
+    expect(table.querySelector('[data-slot="skeleton"]')).toBeNull();
+    return table;
+  });
+}
+
 function fetched(fetchMock: ReturnType<typeof vi.fn>): string[] {
   return fetchMock.mock.calls.map(([url]) => url as string);
 }
@@ -116,7 +125,36 @@ describe('a read', () => {
 
     expect(await within(panel('Groups by status')).findByText('LOCK_TIMEOUT')).toBeInTheDocument();
     expect(within(panel('Groups by status')).getByText('Trace: t-9')).toBeInTheDocument();
-    expect(await within(panel('Accounts by status')).findByRole('table')).toBeInTheDocument();
+    expect(await loadedTable(panel('Accounts by status'))).toBeInTheDocument();
+  });
+
+  it('stands a placeholder cell in under every heading of a chart still being read', () => {
+    stubLedger({ '/api/ledger/accounts/status-counts': () => new Promise<Response>(() => {}) });
+    renderOverview();
+    const table = within(panel('Accounts opened per month')).getByRole('table', { hidden: true });
+    expect(table.querySelectorAll('thead th')).toHaveLength(6);
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(12);
+    expect(table.querySelectorAll('tbody tr:first-child td [data-slot="skeleton"]')).toHaveLength(6);
+  });
+
+  it('tries only the failed reads again on Retry, and draws the panel once they answer', async () => {
+    let groupsFail = true;
+    const fetchMock = stubLedger({
+      '/api/ledger/account-groups/status-counts': () =>
+        Promise.resolve(groupsFail ? new Response('{"errors":[{"message":"Ledger store unavailable"}]}', { status: 503 }) : new Response('[{"status":"ACTIVE","count":2}]')),
+    });
+
+    renderOverview();
+    const groups = panel('Groups by status');
+    expect(await within(groups).findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+    const accountCountReads = (): number => fetched(fetchMock).filter((url) => url === '/api/ledger/accounts/status-counts').length;
+    await waitFor(() => expect(accountCountReads()).toBe(1));
+
+    groupsFail = false;
+    fireEvent.click(within(groups).getByRole('button', { name: 'Retry' }));
+    const table = await loadedTable(groups);
+    expect(within(table).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Active', '2', 'Closed', '—']);
+    expect(accountCountReads()).toBe(1);
   });
 
   it('that has not answered yet keeps the panel loading while its other read has answered', async () => {
@@ -127,8 +165,15 @@ describe('a read', () => {
     await waitFor(() => expect(fetched(fetchMock)).toContain('/api/ledger/currencies'));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(within(panel('Position by currency')).getByText('Loading…')).toBeInTheDocument();
-    expect(within(panel('Position by currency')).queryByRole('table')).toBeNull();
+    // Its table keeps its headings over placeholder rows, and no loading line (DRK-1725 R1).
+    const table = within(panel('Position by currency')).getByRole('table', { hidden: true });
+    // A placeholder, not data: hidden from assistive technology and inert until the rows arrive.
+    expect(table).toHaveAttribute('aria-hidden', 'true');
+    expect(table).toHaveAttribute('inert');
+    expect(within(table).getAllByRole('columnheader', { hidden: true }).map((header) => header.textContent)).toEqual(['Currency', 'Balance', 'Available', 'Held', 'Available and held']);
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(3);
+    expect(table.querySelectorAll('tbody [data-slot="skeleton"]')).toHaveLength(15);
+    expect(within(panel('Position by currency')).queryByText(/^Loading/)).toBeNull();
   });
 });
 
@@ -138,7 +183,7 @@ describe('status counts', () => {
 
     renderOverview();
 
-    const table = await within(panel('Accounts by status')).findByRole('table');
+    const table = await loadedTable(panel('Accounts by status'));
     const rows = [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent));
     expect(rows).toEqual([
       ['Active', '1,200'],
@@ -153,7 +198,7 @@ describe('status counts', () => {
 
     renderOverview();
 
-    const table = await within(panel('Groups by status')).findByRole('table');
+    const table = await loadedTable(panel('Groups by status'));
     const rows = [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent));
     expect(rows).toEqual([
       ['Active', '1,200'],
@@ -168,7 +213,7 @@ describe('the position', () => {
 
     renderOverview();
 
-    const table = await within(panel('Position by currency')).findByRole('table');
+    const table = await loadedTable(panel('Position by currency'));
     const cells = [...table.querySelectorAll('tbody td')].map((cell) => cell.textContent);
     expect(cells.slice(0, 4)).toEqual(['XAU', '1.2345', '1.2', '0.0345']);
   });
@@ -178,7 +223,7 @@ describe('the position', () => {
 
     renderOverview();
 
-    const table = await within(panel('Position by currency')).findByRole('table');
+    const table = await loadedTable(panel('Position by currency'));
     const cells = [...table.querySelectorAll('tbody td')].map((cell) => cell.textContent);
     expect(cells.slice(0, 4)).toEqual(['SGD', '100.00', '99.50', '0.50']);
   });
@@ -222,7 +267,7 @@ describe('the activity charts', () => {
 
     renderOverview();
 
-    const widths = barWidths(await within(panel('Postings per week')).findByRole('table'));
+    const widths = barWidths(await loadedTable(panel('Postings per week')));
     vi.useRealTimers();
     expect(widths.at(-1)).toEqual(['100%']);
     expect(widths.at(-2)).toEqual(['25%']);
@@ -242,7 +287,7 @@ describe('the activity charts', () => {
 
     renderOverview();
 
-    const table = await within(panel('Accounts opened per month')).findByRole('table');
+    const table = await loadedTable(panel('Accounts opened per month'));
     vi.useRealTimers();
     expect([...table.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Month (UTC)', 'Active', 'Frozen', 'Dormant', 'Closed', 'By status']);
     expect(barWidths(table).at(-1)).toEqual(['25%', '0%', '0%', `${(1 / 12) * 100}%`]);
@@ -255,7 +300,7 @@ describe('the activity charts', () => {
 
     renderOverview();
 
-    const widths = barWidths(await within(panel('Postings per week')).findByRole('table'));
+    const widths = barWidths(await loadedTable(panel('Postings per week')));
     expect(new Set(widths.flat())).toEqual(new Set(['0%']));
   });
 
@@ -264,15 +309,36 @@ describe('the activity charts', () => {
 
     renderOverview();
 
-    const weeks = await within(panel('Postings per week')).findByRole('table');
+    const weeks = await loadedTable(panel('Postings per week'));
     expect(weeks.querySelectorAll('tbody tr')).toHaveLength(13);
-    const months = await within(panel('Accounts opened per month')).findByRole('table');
+    const months = await loadedTable(panel('Accounts opened per month'));
     const firstMonth = [...months.querySelectorAll('tbody tr')[0].querySelectorAll('td')].map((cell) => cell.textContent);
     expect(firstMonth.slice(1, 5)).toEqual(['0', '—', '—', '—']);
   });
 });
 
 describe('recently viewed', () => {
+  it('states an entry it could not read in its own line, and reads it again on Retry', async () => {
+    storeRecent([{ kind: 'Account', id: ACCOUNT_ID }]);
+    let fail = true;
+    stubLedger({
+      [`/api/ledger/accounts/${ACCOUNT_ID}`]: () =>
+        Promise.resolve(
+          fail
+            ? new Response('{"errors":[{"message":"Ledger store unavailable"}]}', { status: 503 })
+            : new Response(`{"id":"${ACCOUNT_ID}","accountNumber":"ACME-000123","name":"Acme Treasury"}`),
+        ),
+    });
+
+    renderOverview();
+    const entry = await waitFor(() => within(panel('Recently viewed')).getByRole('listitem'));
+    expect(await within(entry).findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+
+    fail = false;
+    fireEvent.click(within(entry).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(within(panel('Recently viewed')).getByRole('listitem')).toHaveTextContent('ACME-000123Acme Treasury'));
+  });
+
   it('reads each record again and shows it as it is now, linked to where it opens', async () => {
     storeRecent([
       { kind: 'Account', id: ACCOUNT_ID },
@@ -350,7 +416,9 @@ describe('recently viewed', () => {
 
     renderOverview();
 
-    expect(within(within(panel('Recently viewed')).getByRole('listitem')).getByText('Loading…')).toBeInTheDocument();
+    const entry = within(panel('Recently viewed')).getByRole('listitem');
+    expect(entry.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    expect(entry).toHaveTextContent(/^$/);
   });
 
   it('draws no list on the server, which cannot see the browser', () => {

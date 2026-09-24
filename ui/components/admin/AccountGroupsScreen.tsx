@@ -5,7 +5,9 @@ import type { JSX } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DetailList, DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
-import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { emptyMessage, GROUPS_EMPTY } from '@/components/feedback/empty';
+import { FailedRead, RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { usePanelFocus } from '@/components/feedback/use-panel-focus';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { MetadataEditor, type MetadataEntry } from '@/components/forms/MetadataEditor';
 import { CurrencyBalanceList } from '@/components/ledger/CurrencyBalanceList';
@@ -13,8 +15,9 @@ import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable'
 import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { isZeroAmount } from '@/lib/api/money-json';
-import { ledgerErrorTraceId, routeRefusal, toLedgerError } from '@/lib/api/refusal';
+import { routeRefusal } from '@/lib/api/refusal';
 import { accountGroupBalancesKey, accountGroupKey, accountGroupsListKey } from '@/lib/query/keys';
 import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups, ACCOUNT_GROUPS_PAGE_SIZE } from '@/lib/query/groups';
 import type { AccountGroup, AccountGroupType } from '@/lib/query/groups';
@@ -131,6 +134,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
   const balances = balancesQuery.data ?? [];
   const holdsBalance = balances.some((line) => !isZeroAmount(line.balance));
   const holdsAccount = balances.length > 0;
+  const panelRef = usePanelFocus<HTMLDivElement>(panelMode !== null);
 
   // Kept as the group's panel is drawn — before paint, so an operator who moves straight on still has it.
   useLayoutEffect(() => {
@@ -296,7 +300,9 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
           </Button>
         </ScopeGate>
 
-        {panelMode === null ? (
+        {/* Hidden only while the panel's own form is open: its `Type` and `Owner` fields would
+            otherwise share their names' start with these filters. */}
+        {panelMode === null || panelMode === 'view' ? (
           <div className="flex items-end gap-4">
             <label className="flex flex-col gap-1">
               Status filter
@@ -307,6 +313,17 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
               </select>
             </label>
             <label className="flex flex-col gap-1">
+              Type filter
+              <select aria-label="Type filter" value={state.filters.type ?? ''} onChange={(event) => setFilter('type', event.target.value)}>
+                <option value="">Any</option>
+                {GROUP_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
               Owner filter
               <Input aria-label="Owner filter" value={state.filters.ownerId ?? ''} onChange={(event) => setFilter('ownerId', event.target.value)} />
             </label>
@@ -314,7 +331,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
         ) : null}
 
         {listQuery.isError ? (
-          <RefusalAlert errors={[toLedgerError(listQuery.error)]} traceId={ledgerErrorTraceId(listQuery.error)} />
+          <FailedRead error={listQuery.error} onRetry={() => void listQuery.refetch()} />
         ) : (
           <LedgerTable
             columns={columns}
@@ -325,7 +342,8 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
             orderBy={state.sort?.field}
             desc={state.sort?.desc}
             onSort={(field) => updateState({ sort: { field, desc: state.sort?.field === field && !state.sort.desc } })}
-            emptyMessage="No groups match this filter."
+            loading={listQuery.isPending}
+            emptyMessage={emptyMessage(GROUPS_EMPTY, { total: listQuery.data?.totalItemCount ?? 0, page: currentPage, filtered: Object.values(state.filters).some(Boolean) })}
           />
         )}
 
@@ -345,7 +363,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
       </div>
 
       {panelMode !== null ? (
-        <div data-testid="detail-panel" className="w-96 flex-none">
+        <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="w-96 flex-none">
           <DetailPanel
             title={panelTitle}
             onClose={closePanel}
@@ -427,7 +445,9 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
                 ) : null}
                 <DetailSection>Balances</DetailSection>
                 {balancesQuery.isError ? (
-                  <RefusalAlert errors={[toLedgerError(balancesQuery.error)]} traceId={ledgerErrorTraceId(balancesQuery.error)} />
+                  <FailedRead error={balancesQuery.error} onRetry={() => void balancesQuery.refetch()} />
+                ) : balancesQuery.isPending ? (
+                  <Skeleton className="w-full" />
                 ) : (
                   <CurrencyBalanceList
                     balances={balances.map((line) => ({ currency: line.currency, amount: line.balance, decimalPlaces: fractionDigits(line.balance) }))}
@@ -437,7 +457,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
                 {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
             ) : panelMode === 'view' && viewQuery.isError ? (
-              <RefusalAlert errors={[toLedgerError(viewQuery.error)]} traceId={ledgerErrorTraceId(viewQuery.error)} />
+              <FailedRead error={viewQuery.error} onRetry={() => void viewQuery.refetch()} />
             ) : panelMode === 'edit' || panelMode === 'create' ? (
               <>
                 <label className="flex flex-col gap-1">

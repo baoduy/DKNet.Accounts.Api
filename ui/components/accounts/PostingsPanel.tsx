@@ -4,6 +4,7 @@
  * so this renders with no query provider (`AccountDetailScreen` owns the fetching).
  */
 import type { CSSProperties, JSX } from 'react';
+import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { DateRangeFilter, type DatePreset } from '@/components/forms/DateRangeFilter';
 import { StatementTable, type StatementRowShape } from '@/components/ledger/StatementTable';
 import { MAX_POSTING_PERIOD_DAYS, POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES, postingPeriodError } from '@/lib/accounts/postings-filter';
@@ -53,12 +54,37 @@ export interface PostingsPanelProps {
   onPeriodChange?: (from: string, to: string) => void;
   selectedId?: string | null;
   onSelectRow?: (row: PostingsPanelRow) => void;
+  /** The statement is still being read: the table keeps its headings over placeholder rows. */
+  loading?: boolean;
+  /** The statement read failed — stated in place of the table; the filters stay usable (DRK-1725 R2). */
+  failure?: { error: unknown; onRetry: () => void };
+  emptyMessage?: string;
+  /** The statement's page, and how many the service counts; page links show past one page. */
+  page?: number;
+  pageCount?: number;
+  onPageChange?: (page: number) => void;
   style?: CSSProperties;
 }
 
 const EMPTY_FILTER: PostingsPanelFilter = { direction: '', category: '', status: '' };
 
-export function PostingsPanel({ rows, from, to, filter = EMPTY_FILTER, onFilterChange, onPeriodChange, selectedId, onSelectRow, style }: PostingsPanelProps): JSX.Element {
+export function PostingsPanel({
+  rows,
+  from,
+  to,
+  filter = EMPTY_FILTER,
+  onFilterChange,
+  onPeriodChange,
+  selectedId,
+  onSelectRow,
+  loading = false,
+  failure,
+  emptyMessage,
+  page = 1,
+  pageCount = 1,
+  onPageChange,
+  style,
+}: PostingsPanelProps): JSX.Element {
   function setFilter(patch: Partial<PostingsPanelFilter>): void {
     onFilterChange?.({ ...filter, ...patch });
   }
@@ -140,13 +166,29 @@ export function PostingsPanel({ rows, from, to, filter = EMPTY_FILTER, onFilterC
         </label>
       </div>
 
-      <StatementTable
-        rows={statementRows}
-        decimalPlaces={rows[0]?.decimalPlaces}
-        showBalanceAfter={false}
-        selectedId={selectedId}
-        onSelectRow={onSelectRow ? (row) => onSelectRow(rows.find((candidate) => candidate.id === row.id)!) : undefined}
-      />
+      {failure ? (
+        <FailedRead error={failure.error} onRetry={failure.onRetry} />
+      ) : (
+        <StatementTable
+          rows={statementRows}
+          decimalPlaces={rows[0]?.decimalPlaces}
+          showBalanceAfter={false}
+          selectedId={selectedId}
+          onSelectRow={onSelectRow ? (row) => onSelectRow(rows.find((candidate) => candidate.id === row.id)!) : undefined}
+          loading={loading}
+          emptyMessage={emptyMessage}
+        />
+      )}
+
+      {pageCount > 1 ? (
+        <div className="flex items-center gap-2">
+          {Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => (
+            <button key={number} type="button" aria-current={number === page ? 'page' : undefined} onClick={() => onPageChange?.(number)}>
+              Page {number}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

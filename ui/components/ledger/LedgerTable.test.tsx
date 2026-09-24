@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { LedgerTable } from './LedgerTable';
@@ -127,5 +127,81 @@ describe('LedgerTable', () => {
     render(createElement(TypedLedgerTable, { columns: COLUMNS, rows, rowKey: 'id' }));
     const row = screen.getAllByRole('row')[1];
     expect(row).not.toHaveAttribute('data-state', 'selected');
+  });
+
+  it('keeps its headings over placeholder rows while loading, as a table hidden from assistive technology (DRK-1725 R1)', () => {
+    const { container } = render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id', loading: true, placeholderRows: 3, emptyMessage: 'No rows.' }));
+    const table = container.querySelector('table')!;
+    expect(table).toHaveAttribute('aria-hidden', 'true');
+    expect(table).toHaveAttribute('inert');
+    expect([...table.querySelectorAll('thead th')].map((th) => th.textContent)).toEqual(['Name', 'Id']);
+    const bodyRows = table.querySelectorAll('tbody tr');
+    expect(bodyRows).toHaveLength(3);
+    for (const row of bodyRows) expect(row.querySelectorAll('td [data-slot="skeleton"]')).toHaveLength(2);
+    expect(screen.queryByText('Alpha')).toBeNull();
+    expect(screen.queryByText('No rows.')).toBeNull();
+  });
+
+  it('stands ten placeholder rows in by default, the list page size', () => {
+    const { container } = render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: [], loading: true }));
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(10);
+  });
+
+  it('is an ordinary, reachable table once loaded', () => {
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id' }));
+    const table = screen.getByRole('table');
+    expect(table).not.toHaveAttribute('aria-hidden');
+    expect(table).not.toHaveAttribute('inert');
+  });
+
+  it('keeps its headings when empty and states why in one full-width body row', () => {
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: [], emptyMessage: 'No groups yet.' }));
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Name', 'Id']);
+    const cell = screen.getByRole('cell', { name: 'No groups yet.' });
+    expect(cell).toHaveAttribute('colspan', '2');
+    expect(cell.closest('tbody')).not.toBeNull();
+  });
+
+  it('lays itself out from its headings alone, at least 24 spacing units a column', () => {
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id', style: { marginTop: '1em' } }));
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-fixed');
+    expect(table.style.minWidth).toBe('calc(2 * var(--spacing) * 24)');
+    expect(table.style.marginTop).toBe('1em');
+  });
+
+  it('makes a row that opens something a tab stop that Enter and Space open', () => {
+    const onSelectRow = vi.fn();
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id', onSelectRow }));
+    const [first, second] = screen.getAllByRole('row').slice(1);
+    expect(first).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(first, { key: 'Enter' });
+    expect(onSelectRow).toHaveBeenLastCalledWith(ROWS[0]);
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(onSelectRow).toHaveBeenLastCalledWith(ROWS[1]);
+    expect(onSelectRow).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps Space from scrolling the page when it opens a row', () => {
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id', onSelectRow: vi.fn() }));
+    const row = screen.getAllByRole('row')[1];
+    expect(fireEvent.keyDown(row, { key: ' ' })).toBe(false);
+    expect(fireEvent.keyDown(row, { key: 'a' })).toBe(true);
+  });
+
+  it('opens nothing on another key, or on a key pressed on a control inside the row', () => {
+    const onSelectRow = vi.fn();
+    const columns: LedgerColumn<Row>[] = [{ key: 'name', header: 'Name', render: (row) => createElement('a', { href: `#${row.id}` }, row.name) }];
+    render(createElement(TypedLedgerTable, { columns, rows: ROWS, rowKey: 'id', onSelectRow }));
+    const row = screen.getAllByRole('row')[1];
+    fireEvent.keyDown(row, { key: 'a' });
+    fireEvent.keyDown(screen.getByRole('link', { name: 'Alpha' }), { key: 'Enter' });
+    expect(onSelectRow).not.toHaveBeenCalled();
+  });
+
+  it('is no tab stop when no row opens anything', () => {
+    render(createElement(TypedLedgerTable, { columns: COLUMNS, rows: ROWS, rowKey: 'id' }));
+    expect(screen.getAllByRole('row')[1]).not.toHaveAttribute('tabindex');
   });
 });

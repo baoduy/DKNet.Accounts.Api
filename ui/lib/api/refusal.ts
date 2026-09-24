@@ -26,6 +26,22 @@ function normaliseFieldKey(field: string): string {
  * form keeps its idempotency key and a second confirm replays rather than applies twice (R5). */
 export const NO_ANSWER_ERROR: LedgerError = { message: 'The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.' };
 
+/** DRK-1725 §3 row 6 — what the operator reads when the ledger service cannot be reached: the
+ * pass-through's own 502 answer (`app/api/ledger/[...route]/route.ts`), or a browser `TypeError`
+ * when the console itself did not answer. */
+export const UNREACHABLE_MESSAGE = 'The ledger service cannot be reached.';
+
+/** The pass-through's answer when its call to the service got no answer at all. */
+export function unreachableBody(traceId: string): { status: number; errors: LedgerError[]; traceId: string } {
+  return { status: 502, errors: [{ message: UNREACHABLE_MESSAGE }], traceId };
+}
+
+/** A write refused with the pass-through's unreachable answer was never answered by the service —
+ * it may or may not have been applied, so the form treats it as {@link NO_ANSWER_ERROR}. */
+export function isUnreachable(errors: LedgerError[] | undefined): boolean {
+  return errors?.length === 1 && errors[0].message === UNREACHABLE_MESSAGE && !errors[0].code;
+}
+
 /**
  * DRK-1713 §3 row 13 — the record form's codes the service sends with no `field`: an account
  * status refusal belongs on the account control, an amount or floor refusal on the amount.
@@ -80,6 +96,8 @@ export function refusalError(body: unknown): LedgerRefusalError {
 /** A failed read's error, reshaped for `RefusalAlert`. */
 export function toLedgerError(error: unknown): LedgerError {
   if (error instanceof LedgerRefusalError) return { code: error.code, message: error.message };
+  // `fetch` rejects with a `TypeError` when nothing answered — the console itself is unreachable.
+  if (error instanceof TypeError) return { message: UNREACHABLE_MESSAGE };
   return { message: error instanceof Error ? error.message : 'Request failed.' };
 }
 

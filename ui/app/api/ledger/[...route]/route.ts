@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
+import { unreachableBody } from '@/lib/api/refusal';
 import { isLedgerRouteAllowed } from '@/lib/api/routes';
 import { loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
@@ -56,14 +57,18 @@ async function passThrough(request: NextRequest, context: RouteParams): Promise<
   const contentType = request.headers.get('content-type');
   if (contentType) outboundHeaders.set('content-type', contentType);
 
-  const hasBody = !['GET', 'HEAD'].includes(request.method);
-  const ledgerResponse = await fetch(targetUrl, {
-    method: request.method,
-    headers: outboundHeaders,
-    body: hasBody ? await request.text() : undefined,
-  });
+  const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.text();
+  let ledgerResponse: Response;
+  let responseBody: ArrayBuffer;
+  try {
+    ledgerResponse = await fetch(targetUrl, { method: request.method, headers: outboundHeaders, body });
+    responseBody = await ledgerResponse.arrayBuffer();
+  } catch {
+    // No answer at all (refused, reset or dropped connection): a refusal the console authors, in
+    // the service's own shape, instead of the framework's error page (DRK-1725 §3 row 6).
+    return Response.json(unreachableBody(randomUUID()), { status: 502 });
+  }
 
-  const responseBody = await ledgerResponse.arrayBuffer();
   const responseHeaders = new Headers(ledgerResponse.headers);
   responseHeaders.delete('content-encoding');
   responseHeaders.delete('content-length');

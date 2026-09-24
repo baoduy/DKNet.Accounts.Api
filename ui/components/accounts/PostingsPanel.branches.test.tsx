@@ -169,3 +169,34 @@ describe('PostingsPanel — never throws with no callback supplied', () => {
     expect(screen.getByLabelText('Direction filter')).toBeInTheDocument();
   });
 });
+
+describe('PostingsPanel — paging and failure (DRK-1725 §3)', () => {
+  it('draws no page links for a single page', () => {
+    render(createElement(PostingsPanel, { rows: [ROW], from: '2026-09-01', to: '2026-09-24', pageCount: 1 }));
+    expect(screen.queryByRole('button', { name: /^Page / })).toBeNull();
+  });
+
+  it('links every page past one, marking only the current one, and opens the one chosen', () => {
+    const onPageChange = vi.fn();
+    render(createElement(PostingsPanel, { rows: [ROW], from: '2026-09-01', to: '2026-09-24', page: 2, pageCount: 2, onPageChange }));
+    expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Page 1' })).not.toHaveAttribute('aria-current');
+    fireEvent.click(screen.getByRole('button', { name: 'Page 1' }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
+
+  it('opens nothing, and never breaks, on a page link with no handler', () => {
+    render(createElement(PostingsPanel, { rows: [ROW], from: '2026-09-01', to: '2026-09-24', pageCount: 2 }));
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Page 2' }))).not.toThrow();
+  });
+
+  it('states a failed statement read in place of the table, keeping the filters usable', () => {
+    const onRetry = vi.fn();
+    render(createElement(PostingsPanel, { rows: [], from: '2026-09-01', to: '2026-09-24', failure: { error: new TypeError('Failed to fetch'), onRetry } }));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('The ledger service cannot be reached.');
+    expect(screen.getByLabelText('From', { exact: true })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+});

@@ -4,7 +4,9 @@ import { useState } from 'react';
 import type { JSX } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DetailList, DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
-import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { CURRENCIES_EMPTY } from '@/components/feedback/empty';
+import { FailedRead, RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { usePanelFocus } from '@/components/feedback/use-panel-focus';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { formatAmount } from '@/components/ledger/Money';
 import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable';
@@ -12,7 +14,7 @@ import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { isZeroAmount } from '@/lib/api/money-json';
-import { ledgerErrorTraceId, routeRefusal, toLedgerError } from '@/lib/api/refusal';
+import { routeRefusal } from '@/lib/api/refusal';
 import { currenciesQueryOptions, ledgerBalancesKey } from '@/lib/query/keys';
 import { fetchCurrencies, fetchLedgerBalances } from '@/lib/query/currencies';
 import type { Currency } from '@/lib/query/currencies';
@@ -58,6 +60,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     enabled: panelMode === 'view' && selected != null,
   });
   const holdsBalance = selected != null && (balancesQuery.data ?? []).some((line) => line.currency === selected.code && !isZeroAmount(line.balance));
+  const panelRef = usePanelFocus<HTMLDivElement>(panelMode !== null);
 
   const registerCurrency = useRegisterCurrency();
   const renameCurrency = useRenameCurrency();
@@ -179,14 +182,22 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
         </ScopeGate>
 
         {listQuery.isError ? (
-          <RefusalAlert errors={[toLedgerError(listQuery.error)]} traceId={ledgerErrorTraceId(listQuery.error)} />
+          <FailedRead error={listQuery.error} onRetry={() => void listQuery.refetch()} />
         ) : (
-          <LedgerTable columns={columns} rows={listQuery.data ?? []} rowKey="id" selectedId={selectedId} onSelectRow={openView} emptyMessage="No currencies registered." />
+          <LedgerTable
+            columns={columns}
+            rows={listQuery.data ?? []}
+            rowKey="id"
+            selectedId={selectedId}
+            onSelectRow={openView}
+            loading={listQuery.isPending}
+            emptyMessage={CURRENCIES_EMPTY}
+          />
         )}
       </div>
 
       {panelMode !== null ? (
-        <div data-testid="detail-panel" className="w-96 flex-none">
+        <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="w-96 flex-none">
           <DetailPanel
             title={panelTitle}
             onClose={closePanel}
@@ -252,6 +263,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     { label: 'Status', value: <StatusBadge status={selected.isActive ? 'Active' : 'Inactive'} /> },
                   ]}
                 />
+                {balancesQuery.isError ? <FailedRead error={balancesQuery.error} onRetry={() => void balancesQuery.refetch()} /> : null}
                 {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
             ) : panelMode === 'edit' || panelMode === 'create' ? (

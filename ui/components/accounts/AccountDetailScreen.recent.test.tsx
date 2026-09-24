@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readRecent } from '@/lib/recent/store';
 import { AccountDetailScreen } from './AccountDetailScreen';
 
+let mockSearch = '';
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(mockSearch),
+}));
+
 const MAI = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT = { id: 'a1', accountNumber: 'ACME-000123', name: 'Operating', currency: 'SGD', status: 'Active', balance: '1.00', availableBalance: '1.00', heldAmount: '0.00', permittedToGoNegative: false };
 
@@ -42,7 +47,8 @@ describe('AccountDetailScreen — recently viewed', () => {
   it('keeps the account by its id once its detail is drawn', async () => {
     renderScreen('ACME-000123', MAI);
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toBeInTheDocument());
+    // The balance tile is drawn as a placeholder while the account is read; its status badge only once it is.
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
     expect(readRecent(MAI).map((entry) => [entry.kind, entry.id])).toEqual([['Account', 'a1']]);
   });
 
@@ -56,7 +62,7 @@ describe('AccountDetailScreen — recently viewed', () => {
   it('keeps nothing when no operator is named', async () => {
     renderScreen('ACME-000123');
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
     expect(localStorage.getItem(`recently-viewed:${MAI}`)).toBeNull();
     expect(localStorage.getItem('recently-viewed:undefined')).toBeNull();
   });

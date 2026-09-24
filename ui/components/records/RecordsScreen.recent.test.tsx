@@ -60,7 +60,7 @@ describe('RecordsScreen — recently viewed', () => {
   it('keeps nothing while no posting is open', async () => {
     renderScreen(MAI);
 
-    await waitFor(() => expect(screen.getByText('No postings in this view.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/^No postings between /)).toBeInTheDocument());
     expect(readRecent(MAI)).toEqual([]);
   });
 
