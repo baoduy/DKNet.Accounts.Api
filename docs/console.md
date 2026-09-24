@@ -105,7 +105,7 @@ without the permission the reverse action stays visible and disabled, stating th
 
 ### Ledger pass-through endpoint
 
-`ui/app/api/ledger/[...route]/route.ts` proxies `GET`/`POST`/`PATCH`/`DELETE` under `/api/ledger/…`
+`ui/app/api/ledger/[...route]/route.ts` proxies `GET`/`POST`/`PUT`/`PATCH`/`DELETE` under `/api/ledger/…`
 to `DKNet.Accounts.Api`: it resolves the operator's session, decrypts her access token
 server-side, forwards the caller's `Idempotency-Key`, and returns the ledger service's answer
 unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
@@ -140,6 +140,36 @@ layer above: `Money`, `Currency`, `StatusBadge`, `AccountNumber`/`PostingNumber`
 (`ui/components/feedback/`); and `DateRangeFilter`, `IdempotencyKeyField`, `MetadataEditor`
 (`ui/components/forms/`). `ScopeGate` disables its child and states the missing scope when the
 session lacks it — again convenience only, since the service still enforces the permission.
+
+### Account groups
+
+`/groups` lists, creates, edits, deletes, closes and reactivates account groups, and reads a
+group's balances, forwarding to `DKNet.Accounts.Api`'s `/account-groups` routes
+(`AccountGroupsV1Endpoint.cs`): `GET` to list (narrowed by status and owner, sorted by name,
+paged) and to read one or its balances need `accounts.read`; `POST` to create, `PUT {id}` to edit
+name/description/metadata, `DELETE {id}`, and `POST {id}/close`/`{id}/activate` all need
+`accounts.write`.
+
+An operator can meet three refusals here, each staying on screen disabled with its reason and
+code shown beside it: creating with a code already in use answers `DUPLICATE_GROUP_CODE` on the
+code field; deleting a group that still holds an account answers `GROUP_NOT_EMPTY`; closing a
+group whose account still carries a balance answers `GROUP_HOLDS_BALANCE`. A group's balances are
+listed one line per currency and never totalled — the panel states amounts in different
+currencies are not added, and shows no combined figure. A group's code and owner are fixed once
+the record exists; only its name, description and metadata can change after.
+
+### Currencies
+
+`/currencies` lists, registers, renames, activates and deactivates reference currencies,
+forwarding to `/currencies` routes (`CurrenciesV1Endpoint.cs`): `GET` to list and to read one need
+`accounts.read`; `POST` to register (the form shows a live worked example of an amount at the
+entered decimal places before the currency is saved), `PUT {id}` to rename, and
+`POST {id}/activate`/`{id}/deactivate` all need `accounts.write`.
+
+Two refusals: registering a code already in use answers `DUPLICATE_CURRENCY_CODE` on the code
+field; deactivating a currency an account still holds a balance in answers
+`CURRENCY_HOLDS_BALANCE`, staying on screen disabled with its code shown beside it. A currency's
+code and decimal places are fixed once the record exists; only its name can change after.
 
 ## ⚙️ Configuration reference
 
@@ -192,6 +222,9 @@ the secret server-side, never in the browser):
   than cache a token unencrypted.
 - **Fonts and every other visual asset are self-hosted at build** — no runtime request to a
   third-party host from a page.
+- **`accounts.write` and `postings.write` need directory consent the API app registration
+  doesn't have yet.** Until an administrator grants it, every ledger write refuses against a real
+  tenant regardless of what the console's UI allows on screen.
 
 ## 🔗 Related docs
 

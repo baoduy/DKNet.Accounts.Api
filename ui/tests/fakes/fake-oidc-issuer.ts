@@ -31,7 +31,7 @@ const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName
     name: 'Mai Nguyen',
     objectId: '11111111-1111-4111-8111-111111111111',
     tenantName: 'Drunk Coding',
-    scopes: ['accounts.read', 'postings.read', 'postings.reverse'],
+    scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.reverse'],
   },
   'mai-partial@drunkcoding.net': {
     name: 'Mai Nguyen',

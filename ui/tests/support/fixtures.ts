@@ -35,14 +35,18 @@ export interface FixtureUser {
   scopes: string[];
 }
 
-/** DRK-1669 §5 Scenario "The identity menu states the provider..." grants exactly these two. */
+/**
+ * DRK-1669 §5 Scenario "The identity menu states the provider..." grants the first three;
+ * `accounts.write` (DRK-1697 §3a) is what lets Mai create, close, reopen and delete account
+ * groups and currencies.
+ */
 export const MAI: FixtureUser = {
   email: 'mai@drunkcoding.net',
   name: 'Mai Nguyen',
   objectId: '11111111-1111-4111-8111-111111111111',
   tenantId: TENANT_DRUNK_CODING,
   tenantName: 'Drunk Coding',
-  scopes: ['accounts.read', 'postings.read', 'postings.reverse'],
+  scopes: ['accounts.read', 'accounts.write', 'postings.read', 'postings.reverse'],
 };
 
 /** Same operator, a token missing `postings.reverse` — DRK-1669 §5 identity-menu scenario.

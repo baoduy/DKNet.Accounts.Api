@@ -36,23 +36,6 @@ export interface paths {
         patch: operations["setAccountControls"];
         trace?: never;
     };
-    "/account-groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List account groups. Shares the generic list query surface with /accounts. */
-        get: operations["listAccountGroups"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/accounts/balances": {
         parameters: {
             query?: never;
@@ -149,6 +132,147 @@ export interface paths {
         /** List the reference currency set. */
         get: operations["listCurrencies"];
         put?: never;
+        /** Register a currency. */
+        post: operations["registerCurrency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/currencies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one currency. */
+        get: operations["getCurrency"];
+        /** Correct a currency's name. */
+        put: operations["updateCurrency"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/currencies/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate a currency. */
+        post: operations["activateCurrency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/currencies/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate a currency, so it is no longer offered for new accounts. */
+        post: operations["deactivateCurrency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List account groups, narrowed, sorted and paged. */
+        get: operations["listAccountGroups"];
+        put?: never;
+        /** Create a group. */
+        post: operations["createAccountGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account-groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one group. */
+        get: operations["getAccountGroup"];
+        /** Change a group's name, description or metadata. */
+        put: operations["updateAccountGroup"];
+        post?: never;
+        /** Delete a group that holds no account. */
+        delete: operations["deleteAccountGroup"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account-groups/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close a group. */
+        post: operations["closeAccountGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account-groups/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen a closed group. */
+        post: operations["activateAccountGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account-groups/{id}/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a group's balances, one line per currency. */
+        get: operations["getAccountGroupBalances"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -208,7 +332,16 @@ export interface components {
             effectiveDate?: string;
         };
         CurrencyDto: {
+            /** Format: uuid */
+            id: string;
             code: string;
+            name: string;
+            decimalPlaces: number;
+            isActive: boolean;
+        };
+        CreateCurrencyRequest: {
+            code: string;
+            name: string;
             decimalPlaces: number;
         };
         AccountDto: {
@@ -276,29 +409,55 @@ export interface components {
             minimumBalance?: string;
             permittedToGoNegative?: boolean;
         };
+        UpdateCurrencyRequest: {
+            name: string;
+        };
+        /** @enum {string} */
+        AccountGroupType: "Customer" | "Merchant" | "Internal" | "Suspense" | "Settlement";
+        /** @enum {string} */
+        AccountGroupStatus: "Active" | "Closed";
         AccountGroupDto: {
             /** Format: uuid */
             id: string;
             code: string;
             name: string;
             description?: string;
-            /** @enum {string} */
-            type: "Customer" | "Merchant" | "Internal" | "Suspense" | "Settlement";
-            /** @enum {string} */
-            status: "Active" | "Closed";
+            type: components["schemas"]["AccountGroupType"];
+            status: components["schemas"]["AccountGroupStatus"];
             ownerId: string;
             metadata?: {
                 [key: string]: string;
             };
         };
+        CreateAccountGroupRequest: {
+            code: string;
+            name: string;
+            description?: string;
+            type: components["schemas"]["AccountGroupType"];
+            ownerId: string;
+            metadata?: {
+                [key: string]: string;
+            };
+        };
+        UpdateAccountGroupRequest: {
+            name?: string;
+            description?: string;
+            metadata?: {
+                [key: string]: string;
+            };
+        };
+        AccountGroupBalanceLineDto: {
+            currency: string;
+            balance: string;
+            available: string;
+            held: string;
+        };
         PagedAccountGroupResponse: {
             items: components["schemas"]["AccountGroupDto"][];
-            pageNumber: number;
+            pageIndex: number;
             pageSize: number;
             pageCount: number;
-            totalItemCount: number;
             hasNextPage: boolean;
-            hasPreviousPage: boolean;
         };
         ErrorItem: {
             message: string;
@@ -492,42 +651,6 @@ export interface operations {
             };
             /** @description Refused */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RefusalBody"];
-                };
-            };
-        };
-    };
-    listAccountGroups: {
-        parameters: {
-            query?: {
-                filter?: string[];
-                search?: string;
-                orderBy?: string;
-                desc?: boolean;
-                pageNumber?: number;
-                pageSize?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PagedAccountGroupResponse"];
-                };
-            };
-            /** @description Refused */
-            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -754,6 +877,451 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CurrencyDto"][];
                 };
+            };
+        };
+    };
+    registerCurrency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCurrencyRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyDto"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    getCurrency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateCurrency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCurrencyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyDto"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activateCurrency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deactivateCurrency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencyDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    listAccountGroups: {
+        parameters: {
+            query?: {
+                filter?: string[];
+                search?: string;
+                orderBy?: string;
+                desc?: boolean;
+                pageNumber?: number;
+                pageSize?: number;
+                fromDate?: string;
+                toDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedAccountGroupResponse"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    createAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAccountGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupDto"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    getAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupDto"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    closeAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    activateAccountGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAccountGroupBalances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupBalanceLineDto"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

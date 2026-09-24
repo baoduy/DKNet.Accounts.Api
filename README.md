@@ -191,6 +191,10 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | Method | Route | What it does | Scope | Refused when |
 |---|---|---|---|---|
 | `GET` | `/v1/currencies` | List supported currencies and their decimal places | `accounts.read` | — |
+| `POST` | `/v1/currencies` | Register a currency. Body: `code`, `name`, `decimalPlaces`. Returns `201` + the currency | `accounts.write` | `code` already used (`DUPLICATE_CURRENCY_CODE`); a malformed body → `400` |
+| `GET` | `/v1/currencies/{id}` | Read one currency | `accounts.read` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/currencies/{id}` | Rename a currency. Body: `name`. Returns `200` + the currency | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `POST` | `/v1/currencies/{id}/activate` | Reactivate a deactivated currency. No request body. Returns `200` + the currency | `accounts.write` | Malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/currencies/{id}/deactivate` | Deactivate a currency, so it is no longer offered for new accounts. No request body. Returns `200` + the currency | `accounts.write` | An account in that currency still holds a balance (`CURRENCY_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`); a malformed body → `400` |
 | `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |

@@ -17,8 +17,28 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts/{id}' });
     expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/accounts/{id}' });
     expect(routes).toContainEqual({ method: 'PATCH', pathTemplate: '/accounts/{id}' });
+    // DRK-1697 — the groups/currencies screens' own widening of the allowlist.
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/currencies/{id}' });
+    expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/currencies/{id}' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies/{id}/activate' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/currencies/{id}/deactivate' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups' });
-    expect(routes).toHaveLength(13);
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'PUT', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'DELETE', pathTemplate: '/account-groups/{id}' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/close' });
+    expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/activate' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}/balances' });
+    expect(routes).toHaveLength(25);
+  });
+});
+
+describe('PUT support (DRK-1697 §3 row 4)', () => {
+  it('accepts PUT as a declared route method', () => {
+    expect(isLedgerRouteAllowed('PUT', ['account-groups', '11111111-1111-4111-8111-111111111111'])).toBe(true);
+    expect(isLedgerRouteAllowed('put', ['currencies', '11111111-1111-4111-8111-111111111111'])).toBe(true);
   });
 });
 
@@ -43,7 +63,9 @@ describe('isLedgerRouteAllowed', () => {
 
   it('refuses a path with the wrong segment count, even as a prefix or suffix match', () => {
     expect(isLedgerRouteAllowed('GET', ['accounts', 'ACME-000123', 'balance', 'extra'])).toBe(false);
-    expect(isLedgerRouteAllowed('GET', ['currencies', 'extra'])).toBe(false);
+    // Not `/currencies/extra` — DRK-1697 §3a's `GET /currencies/{id}` legitimately matches any
+    // 2-segment `currencies/*` path now. `/postings` has no `{id}`-shaped GET at all.
+    expect(isLedgerRouteAllowed('GET', ['postings', 'extra'])).toBe(false);
   });
 
   it('requires every segment to match, not merely one of them', () => {
