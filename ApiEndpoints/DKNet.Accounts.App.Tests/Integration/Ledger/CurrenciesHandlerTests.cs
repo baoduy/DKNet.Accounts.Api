@@ -32,8 +32,9 @@ public sealed class CurrenciesHandlerTests(LedgerApiFixture fixture) : IClassFix
         return request;
     }
 
-    // Distinct, purely alphabetic 3-letter codes (the validator's regex is ^[A-Za-z]{3}$, so a Guid-derived
-    // code with digits would never pass) that stay well clear of the seeded SGD/USD/JPY.
+    // Distinct, purely alphabetic 3-letter codes (the validator accepts letters only, so a Guid-derived code
+    // with digits would never pass) that stay well clear of the seeded set: "AAB" onwards sorts before the
+    // first seeded code, AED, for the first 106 codes handed out.
     private static int _codeCounter;
 
     private static string NextCode()
@@ -129,14 +130,14 @@ public sealed class CurrenciesHandlerTests(LedgerApiFixture fixture) : IClassFix
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, CurrenciesPath, new
         {
-            code = "chf",
-            name = "Swiss Franc",
+            code = "nok",
+            name = "Norwegian Krone",
             decimalPlaces = 2
         }));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().ShouldBe("CHF");
+        body.GetProperty("code").GetString().ShouldBe("NOK");
     }
 
     [Fact]
@@ -177,12 +178,12 @@ public sealed class CurrenciesHandlerTests(LedgerApiFixture fixture) : IClassFix
 
     [Theory]
     [InlineData("AB")]
-    [InlineData("ABCD")]
+    [InlineData("ABCDEFGHIJK")]
     [InlineData("US1")]
     public async Task Creating_WithAnInvalidCode_IsRefused(string code)
     {
         // Forwarded DataAnnotations are not enforced on this generated route — the hand-written validator's
-        // Matches("^[A-Za-z]{3}$") rule is the only real guard, hence this test.
+        // letters-only, 3-10 character rule (DRK-1719 §3) is the only real guard, hence this test.
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, CurrenciesPath, new
         {
             code,
@@ -199,7 +200,7 @@ public sealed class CurrenciesHandlerTests(LedgerApiFixture fixture) : IClassFix
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(5)]
+    [InlineData(7)]
     public async Task Creating_WithDecimalPlacesOutOfRange_IsRefused(int decimalPlaces)
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, CurrenciesPath, new

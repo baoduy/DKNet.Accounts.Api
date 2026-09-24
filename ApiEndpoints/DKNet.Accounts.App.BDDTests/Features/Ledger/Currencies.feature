@@ -6,9 +6,9 @@ Feature: Currencies are a persisted, manageable reference data set
 
   @new @integration
   Scenario: A new currency is created and appears in the list
-    When PayHub creates the currency "EUR" named "Euro" with 2 decimal places
+    When PayHub creates the currency "NOK" named "Norwegian Krone" with 2 decimal places
     Then the request succeeds
-    And "EUR" appears in the currency list as active with 2 decimal places
+    And "NOK" appears in the currency list as active with 2 decimal places
 
   @new @integration
   Scenario: Creating a currency with a code already in use is refused
@@ -33,10 +33,10 @@ Feature: Currencies are a persisted, manageable reference data set
 
   @new @integration
   Scenario: Renaming a currency changes its name but not its code or decimal places
-    Given PayHub has created the currency "CHF" named "Swiss Franc" with 2 decimal places
-    When PayHub renames the currency "CHF" to "Confederation Franc"
+    Given PayHub has created the currency "SEK" named "Swedish Krona" with 2 decimal places
+    When PayHub renames the currency "SEK" to "Swedish Crown"
     Then the request succeeds
-    And the currency "CHF" is now named "Confederation Franc", still coded "CHF" with 2 decimal places
+    And the currency "SEK" is now named "Swedish Crown", still coded "SEK" with 2 decimal places
 
   @new @integration
   Scenario: Opening an account in a deactivated currency is refused
