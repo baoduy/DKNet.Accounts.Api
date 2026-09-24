@@ -300,35 +300,31 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
           </Button>
         </ScopeGate>
 
-        {/* Hidden only while the panel's own form is open: its `Type` and `Owner` fields would
-            otherwise share their names' start with these filters. */}
-        {panelMode === null || panelMode === 'view' ? (
-          <div className="flex items-end gap-4">
-            <label className="flex flex-col gap-1">
-              Status filter
-              <select aria-label="Status filter" value={state.filters.status ?? ''} onChange={(event) => setFilter('status', event.target.value)}>
-                <option value="">Any</option>
-                <option value="Active">Active</option>
-                <option value="Closed">Closed</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              Type filter
-              <select aria-label="Type filter" value={state.filters.type ?? ''} onChange={(event) => setFilter('type', event.target.value)}>
-                <option value="">Any</option>
-                {GROUP_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              Owner filter
-              <Input aria-label="Owner filter" value={state.filters.ownerId ?? ''} onChange={(event) => setFilter('ownerId', event.target.value)} />
-            </label>
-          </div>
-        ) : null}
+        <div className="flex items-end gap-4">
+          <label className="flex flex-col gap-1">
+            Status filter
+            <select aria-label="Status filter" value={state.filters.status ?? ''} onChange={(event) => setFilter('status', event.target.value)}>
+              <option value="">Any</option>
+              <option value="Active">Active</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            Type filter
+            <select aria-label="Type filter" value={state.filters.type ?? ''} onChange={(event) => setFilter('type', event.target.value)}>
+              <option value="">Any</option>
+              {GROUP_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            Owner filter
+            <Input aria-label="Owner filter" value={state.filters.ownerId ?? ''} onChange={(event) => setFilter('ownerId', event.target.value)} />
+          </label>
+        </div>
 
         {listQuery.isError ? (
           <FailedRead error={listQuery.error} onRetry={() => void listQuery.refetch()} />

@@ -469,6 +469,12 @@ describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
     ]);
   });
 
+  it('starts its Owner filter blank', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
+    renderScreen();
+    expect(await screen.findByLabelText('Owner filter')).toHaveValue('');
+  });
+
   it('starts its Type filter on any type', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
     renderScreen();
@@ -542,7 +548,7 @@ describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
     expect(row).toHaveFocus();
   });
 
-  it("hides the filters while the panel's own form is open, and draws a placeholder until the balances answer", async () => {
+  it("keeps the filters on screen while the panel's own form is open, and draws a placeholder until the balances answer", async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string) => {
@@ -560,8 +566,8 @@ describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
     expect(within(panel).queryByText('This group holds no account.')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'New group' }));
-    expect(screen.queryByLabelText('Type filter')).toBeNull();
-    expect(screen.queryByLabelText('Owner filter')).toBeNull();
+    expect(screen.getByLabelText('Type', { exact: true })).toBeInTheDocument();
+    for (const label of ['Status filter', 'Type filter', 'Owner filter']) expect(screen.getByLabelText(label, { exact: true })).toBeEnabled();
   });
 
   it('offers Retry on a failed group read in the panel', async () => {
