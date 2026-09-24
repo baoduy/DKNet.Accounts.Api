@@ -257,7 +257,10 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toBeInTheDocument());
+    // Exact match, not a substring one — SGD's own 2 decimal places, never USD's 4 (which
+    // would also contain the substring "100.00").
+    expect(screen.getByTestId('account-balance').textContent).toMatch(/100\.00(?!\d)/);
   });
 
   it('never crashes on a group with no match, falling back to a blank group name', async () => {

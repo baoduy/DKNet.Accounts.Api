@@ -14,8 +14,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(mockSearch),
 }));
 
-function jsonResponse(body: unknown, status = 200): { status: number; text: () => Promise<string>; json: () => Promise<unknown> } {
-  return { status, text: async () => JSON.stringify(body), json: async () => body };
+function jsonResponse(body: unknown, status = 200): { status: number; ok: boolean; text: () => Promise<string>; json: () => Promise<unknown> } {
+  return { status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body), json: async () => body };
 }
 
 const ACCOUNTS_PAGE = {
@@ -216,12 +216,12 @@ describe('AccountsScreen — the Open account dialog defaults', () => {
   it('shows no refusal right after opening, before any submit (kills the bogus-initial-array mutant)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => Promise.resolve(fetchDispatcher(url))));
     const user = userEvent.setup();
-    const { container } = renderScreen();
+    renderScreen();
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open account' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Open account' }));
 
-    expect(container.querySelector('[data-slot="card"]')).toBeNull();
+    expect(document.body.querySelector('[data-slot="card"]')).toBeNull();
   });
 
   it('offers no bogus group or currency option while those lists are still loading', async () => {
@@ -309,6 +309,8 @@ describe('AccountsScreen — a refused open', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Open' }));
     await waitFor(() => expect(screen.queryAllByText('The group is archived.')).toHaveLength(0));
+    // Not merely gone as text — no refusal card remains at all (kills the bogus-clear mutant).
+    expect(document.body.querySelector('[data-slot="card"]')).toBeNull();
   });
 
   it('never throws, and shows no refusal, on a failure with no errors array', async () => {
@@ -320,7 +322,7 @@ describe('AccountsScreen — a refused open', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    const { container } = renderScreen();
+    renderScreen();
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open account' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Open account' }));
@@ -328,7 +330,7 @@ describe('AccountsScreen — a refused open', () => {
     await user.click(screen.getByRole('button', { name: 'Open' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts', expect.objectContaining({ method: 'POST' })));
-    expect(container.querySelector('[data-slot="card"]')).toBeNull();
+    expect(document.body.querySelector('[data-slot="card"]')).toBeNull();
   });
 
   it('keeps a field-named refusal off the general alert, and drains the general alert once the filter runs (kills the identity/never-filter mutants)', async () => {

@@ -114,11 +114,11 @@ describe('AccountForm — the dead fieldErrors.OVERDRAFT_LIMIT_REQUIRED branch i
 
 describe('AccountForm — defaults when groups, currencies and errors are all omitted', () => {
   it('renders no bogus option and no bogus alert (kills the default-parameter mutants)', () => {
-    render(createElement(AccountForm, { mode: 'open', account: { ...ACCOUNT, name: '', groupName: '', currency: '', classification: '' } }));
+    const { container } = render(createElement(AccountForm, { mode: 'open', account: { ...ACCOUNT, name: '', groupName: '', currency: '', classification: '' } }));
 
     expect(within(screen.getByLabelText('Group')).queryAllByRole('option')).toHaveLength(0);
     expect(within(screen.getByLabelText('Currency')).queryAllByRole('option')).toHaveLength(0);
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.querySelector('[data-slot="card"]')).toBeNull();
   });
 
   it('submits a blank groupId and currency, never a placeholder string, when no lists were offered', async () => {
