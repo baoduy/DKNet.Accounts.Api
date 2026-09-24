@@ -58,14 +58,15 @@ early enough.
 
 Bound by ASP.NET Core's own `AddJwtBearer()` configuration binding, which reads
 `Authentication:Schemes:<SchemeName>`. `DKNet.Accounts.Api/Configs/Auth/AuthConfig.cs` calls
-`AddAuthentication().AddJwtBearer()` with no inline options beyond claim mapping, so this section is
+`AddAuthentication().AddJwtBearer()` with two inline options, `MapInboundClaims = false` and
+`NameClaimType = "name"` (below) — everything else comes from configuration, so this section is
 the whole *configurable* surface for token validation. The block is registered only when
 `FeatureManagement:RequireAuthorization` is `true`.
 
-`AddJwtBearer` is also called with `MapInboundClaims = false` and `NameClaimType = "name"`, so the
-principal's claims keep the names the token was issued with (`scp`, `oid`, `email`, `name`) instead
-of being remapped to the long `schemas.xmlsoap.org`/`schemas.microsoft.com` claim type URIs ASP.NET
-Core's default inbound mapping would otherwise substitute.
+`MapInboundClaims = false` and `NameClaimType = "name"` keep the principal's claims named the way the
+token was issued (`scp`, `oid`, `email`, `name`) instead of being remapped to the long
+`schemas.xmlsoap.org`/`schemas.microsoft.com` claim type URIs ASP.NET Core's default inbound mapping
+would otherwise substitute.
 
 | Key | Type | Shipped default | Effect |
 |---|---|---|---|
@@ -77,11 +78,16 @@ Core's default inbound mapping would otherwise substitute.
 Signature validation is never disabled — `DKNet.Accounts.App.Tests/Architecture/JwtSignatureValidationTests.cs`
 fails the build if the API source ever turns it off.
 
-Two extension seams sit next to this section and are registered with it, both marked `TODO` in
-source and both meant to be replaced:
-`DKNet.Accounts.Api/Configs/Auth/SampleClaimsTransformation.cs` (an `IClaimsTransformation`) and the
-`SampleScopePolicy` policy backed by `HasScopeRequirement`/`HasScopeHandler`. Neither is applied to
-any shipped route. See [`extension-points.md`](extension-points.md#authorization-and-claims).
+One extension seam sits next to this section and is registered with it, marked `TODO` in source and
+meant to be replaced: `DKNet.Accounts.Api/Configs/Auth/SampleClaimsTransformation.cs` (an
+`IClaimsTransformation`), applied to no shipped route.
+
+The scope side is not a sample: `AuthConfig` registers one authorization policy per scope in
+`ScopeNames.All`, each named after its scope string and evaluated by `HasScopeHandler` against the
+`HasScopeRequirement` it carries. Every route group applies one of these policies —
+`AccountsV1Endpoint`/`AccountGroupsV1Endpoint`/`CurrenciesV1Endpoint` via `[EndpointGroupScope]`,
+`PostingsV1Endpoint` via `.RequireScope(...)`. See
+[`extension-points.md`](extension-points.md#authorization-and-claims).
 
 ## `Cors`
 
