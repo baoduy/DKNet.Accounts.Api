@@ -92,16 +92,17 @@ permitted balance). An address matching no account renders a not-found message a
 another account's data.
 
 Its status is one of the same four values, next to a quick close/reopen control: closing is
-disabled with the held figure and `ACCOUNT_HOLDS_BALANCE` while the account still holds money;
-reopening has no such condition. A separate status setting (in the account's edit form, alongside
-its name and floor) can set any of the four directly, not only close/reopen.
+disabled with the held figure and `ACCOUNT_HOLDS_BALANCE` while the account still holds a balance
+or a held amount; reopening has no such condition. A separate status setting (in the account's
+edit form, alongside its name and floor) can set any of the four directly, not only close/reopen.
 
-Below that, the postings list opens on the last 30 days — the service requires a period and
-refuses one over 90 days, so a wider span is never sent — and narrows by direction, category and
-status. Recording a posting (`postings.write`) is against this account only: the account and its
-currency are locked, not choosable. Reversing a posting (`postings.reverse`) needs a reason;
-without the permission the reverse action stays visible and disabled, stating that it needs
-`postings.reverse`.
+Below that, the postings list opens on the last 30 days, editable through two date inputs (from,
+to) plus 7/30/90-day presets. An empty or unparseable period, one with the end before the start,
+or one over 90 days is refused on screen with its own message and never sent to the service.
+Narrows further by direction, category and status. Recording a posting (`postings.write`) is
+against this account only: the account and its currency are locked, not choosable. Reversing a
+posting (`postings.reverse`) needs a reason; without the permission the reverse action stays
+visible and disabled, stating that it needs `postings.reverse`.
 
 ### Ledger pass-through endpoint
 
@@ -112,9 +113,9 @@ unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
 (`ui/lib/api/routes.ts`) — the set of routes the generated OpenAPI contract declares — and refused
 before any outbound call if the route isn't in it. This cycle widens that set with the account
 operations the accounts screen needs: opening an account, listing accounts, reading one, updating
-its name/metadata, changing its status/floor controls, and listing account groups. The token never
-crosses back to the browser — the service still checks every permission itself, so a control
-disabled on screen for a missing scope is convenience only, not the enforcement point.
+its name/metadata, and changing its status/floor controls. The token never crosses back to the
+browser — the service still checks every permission itself, so a control disabled on screen for a
+missing scope is convenience only, not the enforcement point.
 
 ### Typed access layer and contract drift check
 
@@ -222,9 +223,6 @@ the secret server-side, never in the browser):
   than cache a token unencrypted.
 - **Fonts and every other visual asset are self-hosted at build** — no runtime request to a
   third-party host from a page.
-- **`accounts.write` and `postings.write` need directory consent the API app registration
-  doesn't have yet.** Until an administrator grants it, every ledger write refuses against a real
-  tenant regardless of what the console's UI allows on screen.
 
 ## 🔗 Related docs
 
