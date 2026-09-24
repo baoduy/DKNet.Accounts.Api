@@ -24,7 +24,9 @@
  *   GET    /v1/accounts/balances
  *   GET    /v1/accounts/:accountNumber/statement
  *   GET    /v1/account-groups
- *   GET    /v1/postings                 (?search=, ?accountId=, ?from=, ?to=, ?direction=, ?category=, ?status=)
+ *   GET    /v1/postings                 (?from=, ?to= required; ?accountId=, ?direction=, ?category=, ?status=, ?search=,
+ *                                        ?orderBy=, ?desc=, ?pageNumber=, ?pageSize=)
+ *   GET    /v1/postings/:id
  *   POST   /v1/postings                 (header: Idempotency-Key)
  *   POST   /v1/postings/:id/reverse     (header: Idempotency-Key, body: reason)
  *   GET    /v1/currencies
@@ -46,6 +48,11 @@
  *   POST   /__seed    — replaces the in-memory dataset
  *   POST   /__reset   — clears the dataset and the request log
  *   GET    /__requests — every request this instance has received since the last reset
+ *   GET    /__postings — every posting the fake holds, recorded or seeded (DRK-1713 §3 row 2)
+ *   POST   /__clock   — `{ today: 'YYYY-MM-DD' }`: the day a reversal or an undated recording is
+ *                       written on, until the next reset (DRK-1713 "Controlled clock")
+ *   POST   /__drop-next-answer — the next `POST /v1/postings` is recorded, then its connection is
+ *                       dropped before any answer is written ("its answer never reached her")
  */
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -109,7 +116,9 @@ interface PostingRecord {
   status: 'Posted' | 'Reversed';
   category: string;
   description?: string;
+  counterpartyReference?: string;
   effectiveDate?: string;
+  recordedAt?: string;
   reversesPostingId?: string;
   reversedByPostingId?: string;
 }
@@ -144,6 +153,18 @@ let accountCounter = 0;
 const idempotencyResponses = new Map<string, { bodyHash: string; status: number; body: unknown }>();
 const reverseIdempotencyResponses = new Map<string, { bodyHash: string; status: number; body: unknown }>();
 let requestLog: RequestLogEntry[] = [];
+/** `null` — the real day. Set through `POST /__clock`. */
+let clockToday: string | null = null;
+let dropNextPostingAnswer = false;
+
+function today(): string {
+  return clockToday ?? new Date().toISOString().slice(0, 10);
+}
+
+/** Mirrors the real service's timestamp for a write: the clock's day when one is set, now otherwise. */
+function recordedNow(): string {
+  return clockToday ? `${clockToday}T12:00:00.000Z` : new Date().toISOString();
+}
 
 function reset(): void {
   accounts = new Map();
@@ -155,6 +176,8 @@ function reset(): void {
   idempotencyResponses.clear();
   reverseIdempotencyResponses.clear();
   requestLog = [];
+  clockToday = null;
+  dropNextPostingAnswer = false;
 }
 
 /** Marks a value to be embedded as a raw, unquoted JSON numeric literal — never routed through `Number`. */
@@ -247,7 +270,9 @@ function postingDto(posting: PostingRecord): unknown {
     status: posting.status,
     category: posting.category,
     description: posting.description ?? null,
+    counterpartyReference: posting.counterpartyReference ?? null,
     effectiveDate: posting.effectiveDate ?? null,
+    recordedAt: posting.recordedAt ?? null,
     reversesPostingId: posting.reversesPostingId ?? null,
     reversedByPostingId: posting.reversedByPostingId ?? null,
   };
@@ -394,6 +419,39 @@ function pageOf<T>(records: T[], pageNumber: number, pageSize: number): { items:
   return { items, pageIndex, pageSize: clampedPageSize, pageCount, hasNextPage: pageIndex + 1 < pageCount };
 }
 
+/** `PostingListOrderFields` (`SpecGetPosting.cs`) — the only columns the service orders postings by. */
+const POSTING_ORDER_FIELDS: Record<string, 'postingNumber' | 'amount' | 'effectiveDate' | 'recordedAt' | 'streamPosition'> = {
+  postingnumber: 'postingNumber',
+  amount: 'amount',
+  effectivedate: 'effectiveDate',
+  recordedat: 'recordedAt',
+  streamposition: 'streamPosition',
+};
+
+const POSTING_CATEGORY_VALUES = ['transfer', 'payment', 'fee', 'interest', 'adjustment', 'refund', 'reversal', 'openingbalance'];
+
+/** Stable: equal keys keep the order written. Amounts compare as decimals (this is the fake's
+ * own arithmetic, never the console's — R3 binds the browser, not the stand-in service). */
+function sortPostings(items: PostingRecord[], field: (typeof POSTING_ORDER_FIELDS)[string], desc: boolean): PostingRecord[] {
+  const indexed = items.map((posting, index) => ({ posting, index }));
+  indexed.sort((a, b) => {
+    const x = a.posting[field];
+    const y = b.posting[field];
+    let diff: number;
+    if (field === 'amount' || field === 'streamPosition') diff = Number(x) - Number(y);
+    else diff = String(x ?? '').localeCompare(String(y ?? ''));
+    if (desc) diff = -diff;
+    return diff !== 0 ? diff : a.index - b.index;
+  });
+  return indexed.map(({ posting }) => posting);
+}
+
+/** Decimal places of an amount as typed — counted on the text, never through `Number`. */
+function decimalPlacesOf(amount: string): number {
+  const dot = amount.indexOf('.');
+  return dot < 0 ? 0 : amount.length - dot - 1;
+}
+
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const segments = url.pathname.split('/').filter(Boolean);
@@ -405,6 +463,21 @@ async function handle(request: Request): Promise<Response> {
 
   if (segments[0] === '__requests' && request.method === 'GET') {
     return jsonResponse(requestLog);
+  }
+
+  if (segments[0] === '__postings' && request.method === 'GET') {
+    return jsonResponse(postings.map(postingDto));
+  }
+
+  if (segments[0] === '__clock' && request.method === 'POST') {
+    const body = (await request.json()) as { today?: string | null };
+    clockToday = body.today ?? null;
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__drop-next-answer' && request.method === 'POST') {
+    dropNextPostingAnswer = true;
+    return jsonResponse({ ok: true });
   }
 
   if (segments[0] === '__seed' && request.method === 'POST') {
@@ -426,7 +499,10 @@ async function handle(request: Request): Promise<Response> {
     for (const account of seed.accounts ?? []) {
       accounts.set(account.accountNumber, account);
     }
-    for (const posting of seed.postings ?? []) {
+    for (const seeded of seed.postings ?? []) {
+      // The real service always dates a posting — a seed that names no day is taken as
+      // recorded and effective today, so the period every list now requires still reaches it.
+      const posting: PostingRecord = { ...seeded, effectiveDate: seeded.effectiveDate ?? today(), recordedAt: seeded.recordedAt ?? recordedNow() };
       // Upsert by `id`, mirroring the `accounts`/`accountGroups` maps above — a scenario
       // re-seeding the same posting id (e.g. a reset racing the next test's own seed call,
       // since Playwright reporters cannot block a worker's test body) replaces it in place
@@ -828,34 +904,58 @@ async function handle(request: Request): Promise<Response> {
   }
 
   if (segments[1] === 'postings' && segments.length === 2 && request.method === 'GET') {
+    // Mirrors `ListPostingsQueryValidator` (`ListPostingsQuery.cs`): both bounds required, `to`
+    // on or after `from`, at most 90 days apart (INVALID_DATE_RANGE, 422); a search under 2
+    // characters or an unknown orderBy/direction/category/status refused with no code (400).
+    // The search rule answers first, in the wording spec 29 pins.
     const search = url.searchParams.get('search');
     if (search !== null && search.length < 2) {
       return refusal(400, [{ message: 'Search term must be at least 2 characters.' }]);
     }
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
-    if (from || to) {
-      if (!from || !to) {
-        return refusal(422, [{ message: 'Both from and to are required.', code: 'INVALID_DATE_RANGE' }]);
-      }
-      const spanDays = (Date.parse(to) - Date.parse(from)) / 86_400_000;
-      if (spanDays > 90) {
-        return refusal(422, [{ message: 'The date range may span at most 90 days.', code: 'INVALID_DATE_RANGE' }]);
-      }
+    if (!from || !to || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || to < from || (Date.parse(to) - Date.parse(from)) / 86_400_000 > 90) {
+      return refusal(422, [{ message: "The effective-date window must carry both bounds, with 'to' on or after 'from' and at most 90 days apart.", code: 'INVALID_DATE_RANGE' }]);
+    }
+    const orderByRaw = url.searchParams.get('orderBy');
+    const orderBy = orderByRaw ? POSTING_ORDER_FIELDS[orderByRaw.toLowerCase()] : undefined;
+    if (orderByRaw && !orderBy) {
+      return refusal(400, [{ message: `'${orderByRaw}' is not a field postings can be ordered by.`, field: 'OrderBy' }]);
+    }
+    const direction = url.searchParams.get('direction');
+    if (direction !== null && !['credit', 'debit'].includes(direction.toLowerCase())) {
+      return refusal(400, [{ message: `'${direction}' is not a known posting direction.`, field: 'Direction' }]);
+    }
+    const category = url.searchParams.get('category');
+    if (category !== null && !POSTING_CATEGORY_VALUES.includes(category.toLowerCase())) {
+      return refusal(400, [{ message: `'${category}' is not a known posting category.`, field: 'Category' }]);
+    }
+    const status = url.searchParams.get('status');
+    if (status !== null && !['posted', 'reversed'].includes(status.toLowerCase())) {
+      return refusal(400, [{ message: `'${status}' is not a known posting status.`, field: 'Status' }]);
     }
 
     const accountId = url.searchParams.get('accountId');
     const account = accountId ? findAccount(accountId) : undefined;
     let items = accountId ? postings.filter((posting) => posting.accountId === (account?.id ?? accountId)) : postings;
+    items = items.filter((posting) => posting.effectiveDate !== undefined && posting.effectiveDate >= from && posting.effectiveDate <= to);
+    if (direction) items = items.filter((posting) => posting.direction.toLowerCase() === direction.toLowerCase());
+    if (category) items = items.filter((posting) => posting.category.toLowerCase() === category.toLowerCase());
+    if (status) items = items.filter((posting) => posting.status.toLowerCase() === status.toLowerCase());
+    if (search) {
+      // The service searches exactly these 3 columns (`SpecListPostings`) — never the account,
+      // amount, category or anything else.
+      const term = search.toLowerCase();
+      items = items.filter((posting) =>
+        [posting.postingNumber, posting.counterpartyReference, posting.description].some((value) => value !== undefined && value.toLowerCase().includes(term)),
+      );
+    }
+    // Default order is the stream position (the order written), exactly as the service's own —
+    // never recency: a screen wanting "most recently recorded first" must ask for it.
+    const ordered = orderBy ? sortPostings(items, orderBy, url.searchParams.get('desc') === 'true') : items;
 
-    const direction = url.searchParams.get('direction');
-    if (direction) items = items.filter((posting) => posting.direction === direction);
-    const category = url.searchParams.get('category');
-    if (category) items = items.filter((posting) => posting.category === category);
-    const status = url.searchParams.get('status');
-    if (status) items = items.filter((posting) => posting.status === status);
-
-    return jsonResponse({ items: items.map(postingDto), pageIndex: 0, pageSize: items.length, pageCount: 1, hasNextPage: false });
+    const page = pageOf(ordered, Number(url.searchParams.get('pageNumber') ?? '1'), Number(url.searchParams.get('pageSize') ?? '1000'));
+    return jsonResponse({ items: page.items.map(postingDto), pageIndex: page.pageIndex, pageSize: page.pageSize, pageCount: page.pageCount, hasNextPage: page.hasNextPage });
   }
 
   if (segments[1] === 'postings' && segments.length === 2 && request.method === 'POST') {
@@ -872,31 +972,44 @@ async function handle(request: Request): Promise<Response> {
       description?: string;
       effectiveDate?: string;
     };
+    // Order mirrors `RecordPostingCommandHandler` (`Record.cs`): the amount against the
+    // currency's precision, then the replay lookup, then the account's own status and floor. A
+    // refusal stores nothing under its key (DRK-1713 §3 row 2) — only a recorded posting is
+    // ever replayed, so the same key sent again after a refusal is judged afresh.
+    const postingCurrency = currencies.find((currency) => currency.code === String(body.currency).toUpperCase());
+    const amountText = String(body.amount);
+    if (!/^\d+(\.\d+)?$/.test(amountText) || /^0+(\.0+)?$/.test(amountText) || (postingCurrency && decimalPlacesOf(amountText) > postingCurrency.decimalPlaces)) {
+      return refusal(422, [{ message: "The amount must be positive and match the currency's precision.", code: 'INVALID_POSTING_AMOUNT' }]);
+    }
+
     const bodyHash = JSON.stringify(body);
     const replay = idempotencyResponses.get(idempotencyKey);
     if (replay) {
       if (replay.bodyHash !== bodyHash) {
         return refusal(409, [{ message: 'Idempotency key reused with different content.', code: 'IDEMPOTENCY_KEY_CONFLICT' }]);
       }
-      return jsonResponse(replay.body, replay.status);
+      return jsonResponse(replay.body, 200);
     }
 
     const account = findAccount(body.accountId);
     if (!account) return refusal(404, [{ message: 'Account not found.' }]);
 
-    if (body.effectiveDate && body.effectiveDate > new Date().toISOString().slice(0, 10)) {
-      const errors = [{ message: 'Effective date is later than the recording date.', code: 'EFFECTIVE_DATE_IN_FUTURE', field: 'effectiveDate' }];
-      idempotencyResponses.set(idempotencyKey, { bodyHash, status: 422, body: { status: 422, errors, traceId: randomUUID() } });
-      return refusal(422, errors);
+    if (body.effectiveDate && body.effectiveDate > today()) {
+      return refusal(422, [{ message: 'Effective date is later than the recording date.', code: 'EFFECTIVE_DATE_IN_FUTURE', field: 'effectiveDate' }]);
+    }
+
+    // `Account.TryApplyPosting` (`Account.cs`) → `PostingRefusalMapping.cs`'s own wording.
+    if (account.status === 'Closed') return refusal(422, [{ message: 'The account is closed.', code: 'ACCOUNT_CLOSED' }]);
+    if (account.status === 'Frozen') return refusal(422, [{ message: 'The account is frozen.', code: 'ACCOUNT_FROZEN' }]);
+    if (account.status === 'Dormant' && body.direction === 'Debit') {
+      return refusal(422, [{ message: 'A dormant account refuses a debit.', code: 'ACCOUNT_DORMANT_DEBIT_REFUSED' }]);
     }
 
     const signedAmount = body.direction === 'Debit' ? -Number(body.amount) : Number(body.amount);
     const balanceAfter = Number(account.balance) + signedAmount;
     const floor = computeFloor(account);
     if (body.direction === 'Debit' && floor !== null && balanceAfter < floor) {
-      const errors = [{ message: 'The debit would take the account past its floor.', code: 'INSUFFICIENT_FUNDS' }];
-      idempotencyResponses.set(idempotencyKey, { bodyHash, status: 422, body: { status: 422, errors, traceId: randomUUID() } });
-      return refusal(422, errors);
+      return refusal(422, [{ message: 'The debit would take the account past its floor.', code: 'INSUFFICIENT_FUNDS' }]);
     }
 
     account.balance = String(balanceAfter);
@@ -916,7 +1029,8 @@ async function handle(request: Request): Promise<Response> {
       status: 'Posted',
       category: body.category,
       description: body.description,
-      effectiveDate: body.effectiveDate,
+      effectiveDate: body.effectiveDate ?? today(),
+      recordedAt: recordedNow(),
     };
     postings.push(posting);
     const responseBody = postingDto(posting);
@@ -974,6 +1088,9 @@ async function handle(request: Request): Promise<Response> {
       status: 'Posted',
       category: 'Reversal',
       description: body.reason,
+      // The service dates a reversal on the day it is written (`Reverse.cs`) — the fake's clock.
+      effectiveDate: today(),
+      recordedAt: recordedNow(),
       reversesPostingId: posting.id,
     };
     posting.status = 'Reversed';
@@ -1004,7 +1121,14 @@ const server = createServer((req, res) => {
       body: ['GET', 'HEAD'].includes(req.method ?? 'GET') || body.length === 0 ? undefined : body,
     });
     try {
+      const dropAnswer = dropNextPostingAnswer && req.method === 'POST' && req.url === '/v1/postings';
       const response = await handle(request);
+      if (dropAnswer) {
+        // Recorded (the handler above ran to completion), but the caller never hears back.
+        dropNextPostingAnswer = false;
+        req.socket.destroy();
+        return;
+      }
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
