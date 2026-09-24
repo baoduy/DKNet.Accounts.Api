@@ -50,6 +50,7 @@ test.describe('A repeat from the same form counts once until the first attempt s
     await confirmMovement(page);
     await expect.poll(async () => (await recordingRequests()).length).toBe(1);
     expect(await creditsOnAcme()).toBe(1);
+    await expect(page.getByText('The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.')).toBeVisible();
 
     await confirmAgain(page);
 
