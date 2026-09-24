@@ -1,0 +1,4 @@
+# Host build output must not reach an image build: a copied obj/project.assets.json carries
+# host paths and breaks the in-container restore of ApiEndpoints/DKNet.Accounts.Api/Dockerfile.
+**/bin/
+**/obj/
