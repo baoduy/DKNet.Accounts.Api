@@ -14,7 +14,7 @@ import { signInAs } from '../support/sign-in';
 
 test('A view is shared as a link', async ({ page, baseURL }) => {
   await seedLedgerAccounts(
-    Array.from({ length: 3 }, (_, index) => ({
+    Array.from({ length: 12 }, (_, index) => ({
       accountNumber: `ACME-${String(index + 1).padStart(6, '0')}`,
       name: `Account ${index + 1}`,
       currency: 'SGD',
