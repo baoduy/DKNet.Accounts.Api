@@ -55,6 +55,14 @@
  *                       written on, until the next reset (DRK-1713 "Controlled clock")
  *   POST   /__drop-next-answer — the next `POST /v1/postings` is recorded, then its connection is
  *                       dropped before any answer is written ("its answer never reached her")
+ *   POST   /__fail    — `{ method, path, unreachable: true }` or `{ method, path, status, errors }`:
+ *                       every request whose method matches and whose pathname matches `path` (a
+ *                       regular expression, anchored at both ends) is either dropped with no answer
+ *                       ("the service cannot be reached") or answered with that refusal, until
+ *                       `POST /__fail/clear` or the next reset (DRK-1729 "A failed read is stated
+ *                       where it happened")
+ *   POST   /__fail/clear — lifts every `/__fail` rule
+ *   POST   /__clear-currencies — the ledger holds no currency at all, until the next reset
  */
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -163,6 +171,21 @@ let requestLog: RequestLogEntry[] = [];
 let clockToday: string | null = null;
 let dropNextPostingAnswer = false;
 
+/** DRK-1729 — a read the test has made fail, set through `POST /__fail`. */
+interface FailureRule {
+  method: string;
+  path: RegExp;
+  unreachable: boolean;
+  status: number;
+  errors: ErrorItem[];
+}
+
+let failureRules: FailureRule[] = [];
+
+function failureFor(method: string | undefined, pathname: string): FailureRule | undefined {
+  return failureRules.find((rule) => rule.method === method && rule.path.test(pathname));
+}
+
 function today(): string {
   return clockToday ?? new Date().toISOString().slice(0, 10);
 }
@@ -184,6 +207,7 @@ function reset(): void {
   requestLog = [];
   clockToday = null;
   dropNextPostingAnswer = false;
+  failureRules = [];
 }
 
 /** Marks a value to be embedded as a raw, unquoted JSON numeric literal — never routed through `Number`. */
@@ -420,7 +444,9 @@ function pageOf<T>(records: T[], pageNumber: number, pageSize: number): { items:
   const clampedPageNumber = Math.max(1, pageNumber);
   const clampedPageSize = Math.min(1000, Math.max(1, pageSize));
   const pageCount = Math.max(1, Math.ceil(records.length / clampedPageSize));
-  const pageIndex = Math.min(clampedPageNumber, pageCount) - 1;
+  // A page past the last one is an empty page, never the last page again — README.md "Statement
+  // paging": "Reading past the end returns an empty page with 200, never an error" (DRK-1729).
+  const pageIndex = clampedPageNumber - 1;
   const items = records.slice(pageIndex * clampedPageSize, (pageIndex + 1) * clampedPageSize);
   return { items, pageIndex, pageSize: clampedPageSize, pageCount, hasNextPage: pageIndex + 1 < pageCount };
 }
@@ -526,6 +552,28 @@ async function handle(request: Request): Promise<Response> {
 
   if (segments[0] === '__drop-next-answer' && request.method === 'POST') {
     dropNextPostingAnswer = true;
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__fail' && segments[1] === 'clear' && request.method === 'POST') {
+    failureRules = [];
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__fail' && segments.length === 1 && request.method === 'POST') {
+    const body = (await request.json()) as { method?: string; path: string; unreachable?: boolean; status?: number; errors?: ErrorItem[] };
+    failureRules.push({
+      method: body.method ?? 'GET',
+      path: new RegExp(`^${body.path}$`),
+      unreachable: body.unreachable === true,
+      status: body.status ?? 500,
+      errors: body.errors ?? [],
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__clear-currencies' && request.method === 'POST') {
+    currencies = [];
     return jsonResponse({ ok: true });
   }
 
@@ -1197,6 +1245,17 @@ const server = createServer((req, res) => {
       body: ['GET', 'HEAD'].includes(req.method ?? 'GET') || body.length === 0 ? undefined : body,
     });
     try {
+      const failure = failureFor(req.method, new URL(request.url).pathname);
+      if (failure?.unreachable) {
+        // No answer at all: the caller's connection ends before a status line is written.
+        req.socket.destroy();
+        return;
+      }
+      if (failure) {
+        res.writeHead(failure.status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ status: failure.status, errors: failure.errors, traceId: randomUUID() }));
+        return;
+      }
       const dropAnswer = dropNextPostingAnswer && req.method === 'POST' && req.url === '/v1/postings';
       const response = await handle(request);
       if (dropAnswer) {

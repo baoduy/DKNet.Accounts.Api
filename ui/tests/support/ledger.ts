@@ -212,3 +212,30 @@ export async function recordingRequests(): Promise<Array<{ idempotencyKey: strin
 export async function deleteLedgerAccountGroup(id: string): Promise<void> {
   await ledgerFetch(`/v1/account-groups/${id}`, { method: 'DELETE' });
 }
+
+/** DRK-1729 — how a read fails: the service cannot be reached, or it answers with a refusal. */
+export type LedgerFailure = { unreachable: true } | { status: number; message: string; code?: string };
+
+/**
+ * DRK-1729 "A failed read is stated where it happened" — every `method` request to the fake whose
+ * path matches `path` (a regular expression over the service's own path, e.g. `/v1/accounts`,
+ * anchored at both ends) fails as `failure` says, until `clearLedgerFailures()` or the next reset.
+ * The failure happens at the service, behind the console's own pass-through.
+ */
+export async function failLedgerRead(path: string, failure: LedgerFailure, method = 'GET'): Promise<void> {
+  const rule =
+    'unreachable' in failure
+      ? { method, path, unreachable: true }
+      : { method, path, status: failure.status, errors: [{ message: failure.message, ...(failure.code ? { code: failure.code } : {}) }] };
+  await ledgerFetch('/__fail', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rule) });
+}
+
+/** Lifts every failure `failLedgerRead` set: the service answers again. */
+export async function clearLedgerFailures(): Promise<void> {
+  await ledgerFetch('/__fail/clear', { method: 'POST' });
+}
+
+/** DRK-1729 — the ledger holds no currency at all (the fake otherwise always carries SGD, JPY, BHD). */
+export async function clearLedgerCurrencies(): Promise<void> {
+  await ledgerFetch('/__clear-currencies', { method: 'POST' });
+}
