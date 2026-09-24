@@ -13,7 +13,8 @@ import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable'
 import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { routeRefusal } from '@/lib/api/refusal';
+import { isZeroAmount } from '@/lib/api/money-json';
+import { ledgerErrorTraceId, routeRefusal, toLedgerError } from '@/lib/api/refusal';
 import { accountGroupBalancesKey, accountGroupKey, accountGroupsListKey } from '@/lib/query/keys';
 import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups, ACCOUNT_GROUPS_PAGE_SIZE } from '@/lib/query/groups';
 import type { AccountGroup, AccountGroupType } from '@/lib/query/groups';
@@ -56,11 +57,6 @@ interface GroupEditSnapshot {
 function fractionDigits(amount: string): number {
   const dotIndex = amount.indexOf('.');
   return dotIndex === -1 ? 0 : amount.length - dotIndex - 1;
-}
-
-/** Whether a decimal-string amount is exactly zero — never routed through `Number` (R1). */
-function isZeroAmount(amount: string): boolean {
-  return /^[-+]?0(\.0+)?$/.test(amount);
 }
 
 function recordToMetadataEntries(record: Record<string, string> | undefined): MetadataEntry[] {
@@ -178,6 +174,16 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     setTraceId(refusalTraceId);
   }
 
+  /**
+   * View-mode actions (Close/Reopen/Delete) have no form field of their own to attach a field
+   * error to, so every entry — field or not — goes to the alert (B2, DRK-1700 review).
+   */
+  function applyViewRefusal(errors: LedgerError[] | undefined, refusalTraceId: string | undefined): void {
+    setFieldErrors({});
+    setAlertErrors(errors ?? []);
+    setTraceId(refusalTraceId);
+  }
+
   async function handleCreate(): Promise<void> {
     resetFormState();
     const result = await createGroup.mutate({
@@ -222,7 +228,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     resetFormState();
     const result = await closeGroup.mutate({ groupId: selectedId });
     if (!result.ok) {
-      applyRefusal(result.errors, result.traceId);
+      applyViewRefusal(result.errors, result.traceId);
       return;
     }
     if (result.group) queryClient.setQueryData(accountGroupKey(result.group.id), result.group);
@@ -233,7 +239,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     resetFormState();
     const result = await activateGroup.mutate({ groupId: selectedId });
     if (!result.ok) {
-      applyRefusal(result.errors, result.traceId);
+      applyViewRefusal(result.errors, result.traceId);
       return;
     }
     if (result.group) queryClient.setQueryData(accountGroupKey(result.group.id), result.group);
@@ -244,7 +250,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     resetFormState();
     const result = await deleteGroup.mutate({ groupId: selectedId });
     if (!result.ok) {
-      applyRefusal(result.errors, result.traceId);
+      applyViewRefusal(result.errors, result.traceId);
       return;
     }
     closePanel();
@@ -263,8 +269,9 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     state.pageSize !== undefined ? Boolean(listQuery.data?.hasNextPage) : (listQuery.data?.items.length ?? 0) > ACCOUNT_GROUPS_PAGE_SIZE;
 
   // Never `${code} · ${name}` here: the panel body's own Code/Owner rows already show that
-  // exact text, and Playwright's `getByText` substring-matches a title containing it too,
-  // turning an unambiguous single match into a strict-mode violation (47-mai-corrects-...).
+  // exact text, and the title would otherwise repeat it — a screen reader announcing the
+  // panel would say the same code twice, and any text match against the title would collide
+  // with the identical text in the body below it.
   const panelTitle = panelMode === 'create' ? 'New account group' : panelMode === 'edit' ? `Edit ${draft.code || 'group'}` : 'Account group details';
 
   return (
@@ -293,17 +300,21 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
           </div>
         ) : null}
 
-        <LedgerTable
-          columns={columns}
-          rows={listQuery.data?.items ?? []}
-          rowKey="id"
-          selectedId={selectedId}
-          onSelectRow={openView}
-          orderBy={state.sort?.field}
-          desc={state.sort?.desc}
-          onSort={(field) => updateState({ sort: { field, desc: state.sort?.field === field && !state.sort.desc } })}
-          emptyMessage="No groups match this filter."
-        />
+        {listQuery.isError ? (
+          <RefusalAlert errors={[toLedgerError(listQuery.error)]} traceId={ledgerErrorTraceId(listQuery.error)} />
+        ) : (
+          <LedgerTable
+            columns={columns}
+            rows={listQuery.data?.items ?? []}
+            rowKey="id"
+            selectedId={selectedId}
+            onSelectRow={openView}
+            orderBy={state.sort?.field}
+            desc={state.sort?.desc}
+            onSort={(field) => updateState({ sort: { field, desc: state.sort?.field === field && !state.sort.desc } })}
+            emptyMessage="No groups match this filter."
+          />
+        )}
 
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" onClick={() => updateState({ page: Math.max(1, currentPage - 1), pageSize: state.pageSize ?? ACCOUNT_GROUPS_PAGE_SIZE })} disabled={currentPage <= 1}>
@@ -346,7 +357,11 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                           Close group
                         </Button>
                       </ScopeGate>
-                      {holdsBalance ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">GROUP_HOLDS_BALANCE</span> : null}
+                      {holdsBalance ? (
+                        <span className="text-[length:var(--text-caption-size)] text-muted-foreground">
+                          This group holds an account with a balance. <span className="font-mono">GROUP_HOLDS_BALANCE</span>
+                        </span>
+                      ) : null}
                     </span>
                   )}
                   <span className="inline-flex items-center gap-2">
@@ -355,7 +370,11 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                         Delete group
                       </Button>
                     </ScopeGate>
-                    {holdsAccount ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">GROUP_NOT_EMPTY</span> : null}
+                    {holdsAccount ? (
+                      <span className="text-[length:var(--text-caption-size)] text-muted-foreground">
+                        This group still holds an account. <span className="font-mono">GROUP_NOT_EMPTY</span>
+                      </span>
+                    ) : null}
                   </span>
                 </>
               ) : panelMode === 'edit' || panelMode === 'create' ? (
@@ -398,7 +417,10 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                   balances={balances.map((line) => ({ currency: line.currency, amount: line.balance, decimalPlaces: fractionDigits(line.balance) }))}
                   emptyMessage="This group holds no account."
                 />
+                {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
+            ) : panelMode === 'view' && viewQuery.isError ? (
+              <RefusalAlert errors={[toLedgerError(viewQuery.error)]} traceId={ledgerErrorTraceId(viewQuery.error)} />
             ) : panelMode === 'edit' || panelMode === 'create' ? (
               <>
                 <label className="flex flex-col gap-1">
@@ -440,9 +462,19 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                   {panelMode === 'edit' ? (
                     <Input aria-label="Owner" value={draft.ownerId} disabled />
                   ) : (
-                    <Input aria-label="Owner" value={draft.ownerId} onChange={(event) => setDraft((current) => ({ ...current, ownerId: event.target.value }))} />
+                    <Input
+                      aria-label="Owner"
+                      value={draft.ownerId}
+                      aria-invalid={fieldErrors.ownerId ? 'true' : undefined}
+                      onChange={(event) => setDraft((current) => ({ ...current, ownerId: event.target.value }))}
+                    />
                   )}
                 </label>
+                {fieldErrors.ownerId ? (
+                  <p role="alert">
+                    {fieldErrors.ownerId.code} {fieldErrors.ownerId.message}
+                  </p>
+                ) : null}
 
                 {panelMode === 'create' ? (
                   <label className="flex flex-col gap-1">

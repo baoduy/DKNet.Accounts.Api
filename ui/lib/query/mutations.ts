@@ -11,7 +11,7 @@ import type { LedgerError } from '@/components/feedback/RefusalAlert';
 import { readLedgerJson } from '@/lib/api/money-json';
 import type { Currency } from './currencies';
 import { toCurrency } from './currencies';
-import type { AccountGroup } from './groups';
+import type { AccountGroup, AccountGroupType } from './groups';
 import { accountBalanceKey, accountGroupBalancesKey, accountGroupKey, accountGroupsListKey, currenciesKey, currencyKey, postingsListKey } from './keys';
 
 export interface RecordPostingInput {
@@ -127,8 +127,6 @@ export function useReversePosting(): { mutate: (input: ReversePostingInput) => P
  * settable only at creation/registration — absent from every input below that acts on an
  * existing record.
  */
-export type AccountGroupType = 'Customer' | 'Merchant' | 'Internal' | 'Suspense' | 'Settlement';
-
 export interface LedgerMutationResult {
   ok: boolean;
   errors?: LedgerError[];

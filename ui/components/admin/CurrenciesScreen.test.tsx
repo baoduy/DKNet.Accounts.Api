@@ -72,7 +72,7 @@ describe('CurrenciesScreen', () => {
   it('a duplicate-code refusal marks the Code field invalid and shows the code', async () => {
     const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
-        return jsonResponse(422, { errors: [{ message: 'Code SGD is already registered.', code: 'DUPLICATE_CURRENCY_CODE', field: 'code' }], traceId: 't-1' });
+        return jsonResponse(422, { errors: [{ message: 'Code SGD is already registered.', code: 'DUPLICATE_CURRENCY_CODE', field: 'Code' }], traceId: 't-1' });
       }
       return jsonResponse(200, []);
     });
@@ -135,6 +135,72 @@ describe('CurrenciesScreen', () => {
     const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
     await waitFor(() => expect(deactivateButton).toBeDisabled());
     expect(screen.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
+    expect(screen.getByText(/still holds a balance in this currency/)).toBeInTheDocument();
+  });
+
+  it('a blank Decimal places sends no POST (DRK-1700 review I1)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: 'New currency' }));
+    await userEvent.type(screen.getByLabelText('Code'), 'vnd');
+    await userEvent.type(screen.getByLabelText('Name'), 'Vietnamese Dong');
+
+    expect(screen.queryByTestId('currency-worked-example')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Register currency' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Register currency' }));
+
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST')).toBe(false);
+  });
+
+  it('a refusal naming the DecimalPlaces field is visible on screen (DRK-1700 review B1)', async () => {
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return jsonResponse(400, { errors: [{ message: 'Decimal places must be 0-4.', field: 'DecimalPlaces' }], traceId: 't-dp' });
+      }
+      return jsonResponse(200, []);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: 'New currency' }));
+    await userEvent.type(screen.getByLabelText('Code'), 'vnd');
+    await userEvent.type(screen.getByLabelText('Name'), 'Vietnamese Dong');
+    await userEvent.type(screen.getByLabelText('Decimal places'), '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Register currency' }));
+
+    expect(await screen.findByText('Decimal places must be 0-4.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Decimal places')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('a refused Deactivate in view mode shows the message and code (DRK-1700 review B2)', async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/deactivate') && init?.method === 'POST') {
+        return jsonResponse(422, { errors: [{ message: 'An account in SGD still holds a balance.', code: 'CURRENCY_HOLDS_BALANCE' }], traceId: 't-deact' });
+      }
+      if (url.includes('/accounts/balances')) return new Response('[]', { status: 200 });
+      return jsonResponse(200, [CURRENCY]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
+    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
+    await waitFor(() => expect(deactivateButton).toBeEnabled());
+
+    await userEvent.click(deactivateButton);
+
+    const panel = within(await screen.findByTestId('detail-panel'));
+    expect(await panel.findByText(/An account in SGD still holds a balance\./)).toBeInTheDocument();
+    expect(panel.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
+  });
+
+  it('a failed list read shows the service code instead of the empty-list text (DRK-1700 review I2)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(401, { errors: [{ message: 'Session expired.', code: 'UNAUTHENTICATED' }], traceId: 't-auth' })));
+    renderScreen();
+
+    expect(await screen.findByText('Session expired.')).toBeInTheDocument();
+    expect(screen.getByText('UNAUTHENTICATED')).toBeInTheDocument();
+    expect(screen.queryByText('No currencies registered.')).not.toBeInTheDocument();
   });
 
   it('deactivates a currency that holds no balance and shows it inactive', async () => {

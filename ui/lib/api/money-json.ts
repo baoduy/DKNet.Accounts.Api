@@ -76,3 +76,8 @@ export async function readLedgerJson(response: Response): Promise<unknown> {
   const text = await response.text();
   return text.length === 0 ? null : parseLedgerJsonPreservingNumbers(text);
 }
+
+/** Whether a decimal-string amount is exactly zero — never routed through `Number` (R1). */
+export function isZeroAmount(amount: string): boolean {
+  return /^[-+]?0(\.0+)?$/.test(amount);
+}

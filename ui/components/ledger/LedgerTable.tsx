@@ -65,8 +65,9 @@ export function LedgerTable<T = unknown>({
                 {column.sortable && onSort ? (
                   // `w-full`: a header label is often narrower than its column's row content
                   // (e.g. "Name" heading over "Shared 001" cells) — an inline button sized to
-                  // its own text leaves the rest of the `<th>` unclickable, so a click at the
-                  // cell's center (Playwright's default) misses the button entirely.
+                  // its own text leaves the rest of the `<th>` unclickable, so a click
+                  // anywhere in the header cell, not just directly on the label text, misses
+                  // the button entirely.
                   <button
                     type="button"
                     onClick={() => onSort(field)}

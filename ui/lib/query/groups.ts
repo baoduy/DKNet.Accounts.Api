@@ -5,6 +5,7 @@
  * through a JS `number`.
  */
 import { readLedgerJson } from '@/lib/api/money-json';
+import { refusalError } from '@/lib/api/refusal';
 import type { ListViewState } from '@/lib/url-state';
 
 export type AccountGroupType = 'Customer' | 'Merchant' | 'Internal' | 'Suspense' | 'Settlement';
@@ -66,11 +67,6 @@ function buildGroupsSearchParams(state: ListViewState): URLSearchParams {
   return params;
 }
 
-function refusalMessage(body: unknown): string {
-  const errors = (body as { errors?: Array<{ message: string }> } | null)?.errors;
-  return errors?.[0]?.message ?? 'Request failed.';
-}
-
 /**
  * `pageIndex`/`pageSize`/`pageCount` are paging counters, not monetary amounts —
  * `readLedgerJson` turned them into digit strings along with every other number in the body
@@ -91,20 +87,20 @@ function toPagedAccountGroups(raw: unknown): PagedAccountGroups {
 export async function fetchAccountGroups(state: ListViewState): Promise<PagedAccountGroups> {
   const response = await fetch(`/api/ledger/account-groups?${buildGroupsSearchParams(state).toString()}`);
   const body = await readLedgerJson(response);
-  if (!response.ok) throw new Error(refusalMessage(body));
+  if (!response.ok) throw refusalError(body);
   return toPagedAccountGroups(body);
 }
 
 export async function fetchAccountGroup(groupId: string): Promise<AccountGroup> {
   const response = await fetch(`/api/ledger/account-groups/${encodeURIComponent(groupId)}`);
   const body = await readLedgerJson(response);
-  if (!response.ok) throw new Error(refusalMessage(body));
+  if (!response.ok) throw refusalError(body);
   return body as AccountGroup;
 }
 
 export async function fetchAccountGroupBalances(groupId: string): Promise<AccountGroupBalance[]> {
   const response = await fetch(`/api/ledger/account-groups/${encodeURIComponent(groupId)}/balances`);
   const body = await readLedgerJson(response);
-  if (!response.ok) throw new Error(refusalMessage(body));
+  if (!response.ok) throw refusalError(body);
   return body as AccountGroupBalance[];
 }

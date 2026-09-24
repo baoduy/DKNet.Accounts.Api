@@ -175,7 +175,7 @@ describe('AccountGroupsScreen', () => {
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
       const url = String(input);
       if (init?.method === 'POST' && url.endsWith('/account-groups')) {
-        return jsonResponse(422, { errors: [{ message: 'Code TRSY is already used.', code: 'DUPLICATE_GROUP_CODE', field: 'code' }], traceId: 't-1' });
+        return jsonResponse(422, { errors: [{ message: 'Code TRSY is already used.', code: 'DUPLICATE_GROUP_CODE', field: 'Code' }], traceId: 't-1' });
       }
       return pagedResponse([]);
     });
@@ -190,6 +190,57 @@ describe('AccountGroupsScreen', () => {
     expect(await screen.findByText(/DUPLICATE_GROUP_CODE/)).toBeInTheDocument();
     expect(screen.getByLabelText('Code')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: 'Create group' })).toBeInTheDocument();
+  });
+
+  it('a refusal naming the OwnerId field is visible on screen (DRK-1700 review B1)', async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/account-groups')) {
+        return jsonResponse(400, { errors: [{ message: 'Owner is required.', field: 'OwnerId' }], traceId: 't-owner' });
+      }
+      return pagedResponse([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: 'New group' }));
+    await userEvent.type(screen.getByLabelText('Code'), 'NEWG');
+    await userEvent.type(screen.getByLabelText('Name'), 'New Group');
+    await userEvent.click(screen.getByRole('button', { name: 'Create group' }));
+
+    expect(await screen.findByText('Owner is required.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Owner')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('a refused Close in view mode shows the message and code (DRK-1700 review B2)', async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/close') && init?.method === 'POST') {
+        return jsonResponse(422, { errors: [{ message: 'Group TRSY holds an account with a balance.', code: 'GROUP_HOLDS_BALANCE' }], traceId: 't-close' });
+      }
+      if (url.includes('/balances')) return new Response('[]', { status: 200 });
+      if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+      return pagedResponse([GROUP]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('row', { name: /TRSY/ }));
+    const closeButton = await screen.findByRole('button', { name: 'Close group' });
+    await waitFor(() => expect(closeButton).toBeEnabled());
+
+    await userEvent.click(closeButton);
+
+    const panel = within(await screen.findByTestId('detail-panel'));
+    expect(await panel.findByText(/Group TRSY holds an account with a balance\./)).toBeInTheDocument();
+    expect(panel.getByText('GROUP_HOLDS_BALANCE')).toBeInTheDocument();
+  });
+
+  it('a failed list read shows the service code instead of the empty-list text (DRK-1700 review I2)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(403, { errors: [{ message: 'Not permitted.', code: 'FORBIDDEN' }], traceId: 't-list' })));
+    renderScreen();
+
+    expect(await screen.findByText('Not permitted.')).toBeInTheDocument();
+    expect(screen.getByText('FORBIDDEN')).toBeInTheDocument();
+    expect(screen.queryByText('No groups match this filter.')).not.toBeInTheDocument();
   });
 
   it('editing shows Code and Owner disabled, and saving with nothing changed surfaces the no-code refusal verbatim', async () => {
@@ -255,6 +306,7 @@ describe('AccountGroupsScreen', () => {
     const closeButton = await screen.findByRole('button', { name: 'Close group' });
     await waitFor(() => expect(closeButton).toBeDisabled());
     expect(screen.getByText('GROUP_HOLDS_BALANCE')).toBeInTheDocument();
+    expect(screen.getByText(/holds an account with a balance/)).toBeInTheDocument();
   });
 
   it('Delete group stays disabled with GROUP_NOT_EMPTY beside it when the group holds an account', async () => {
@@ -271,6 +323,7 @@ describe('AccountGroupsScreen', () => {
     const deleteButton = await screen.findByRole('button', { name: 'Delete group' });
     await waitFor(() => expect(deleteButton).toBeDisabled());
     expect(screen.getByText('GROUP_NOT_EMPTY')).toBeInTheDocument();
+    expect(screen.getByText(/still holds an account/)).toBeInTheDocument();
     const closeButton = screen.getByRole('button', { name: 'Close group' });
     expect(closeButton).toBeEnabled();
   });

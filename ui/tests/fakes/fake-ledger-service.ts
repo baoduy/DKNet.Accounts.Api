@@ -361,7 +361,7 @@ async function handle(request: Request): Promise<Response> {
   if (segments[1] === 'currencies' && segments.length === 2 && request.method === 'POST') {
     const body = (await request.json()) as { code: string; name: string; decimalPlaces: number };
     if (currencies.some((c) => c.code === body.code)) {
-      return refusal(422, [{ message: `Code ${body.code} is already registered.`, code: 'DUPLICATE_CURRENCY_CODE', field: 'code' }]);
+      return refusal(422, [{ message: `Code ${body.code} is already registered.`, code: 'DUPLICATE_CURRENCY_CODE', field: 'Code' }]);
     }
     const created: CurrencyFixture = { id: randomUUID(), code: body.code, name: body.name, decimalPlaces: body.decimalPlaces, isActive: true };
     currencies.push(created);
@@ -436,7 +436,7 @@ async function handle(request: Request): Promise<Response> {
       metadata?: Record<string, string>;
     };
     if ([...accountGroups.values()].some((g) => g.code === body.code)) {
-      return refusal(422, [{ message: `Code ${body.code} is already used by an existing group.`, code: 'DUPLICATE_GROUP_CODE', field: 'code' }]);
+      return refusal(422, [{ message: `Code ${body.code} is already used by an existing group.`, code: 'DUPLICATE_GROUP_CODE', field: 'Code' }]);
     }
     const created: AccountGroupFixture = {
       id: randomUUID(),
@@ -475,7 +475,7 @@ async function handle(request: Request): Promise<Response> {
     const group = accountGroups.get(segments[2]);
     if (!group) return refusal(404, [{ message: 'Account group not found.' }]);
     if (groupAccounts(group.id).length > 0) {
-      return refusal(422, [{ message: `Group ${group.code} still holds an account.`, code: 'GROUP_NOT_EMPTY' }]);
+      return refusal(422, [{ message: `Group ${group.code} still holds an account.`, code: 'GROUP_NOT_EMPTY', field: 'Id' }]);
     }
     accountGroups.delete(group.id);
     return new Response(null, { status: 204 });

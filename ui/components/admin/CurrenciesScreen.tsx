@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { DetailList, DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
@@ -11,8 +11,9 @@ import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable'
 import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { routeRefusal } from '@/lib/api/refusal';
-import { currenciesQueryOptions, currencyKey } from '@/lib/query/keys';
+import { isZeroAmount } from '@/lib/api/money-json';
+import { ledgerErrorTraceId, routeRefusal, toLedgerError } from '@/lib/api/refusal';
+import { currenciesQueryOptions, ledgerBalancesKey } from '@/lib/query/keys';
 import { fetchCurrencies, fetchLedgerBalances } from '@/lib/query/currencies';
 import type { Currency } from '@/lib/query/currencies';
 import { useActivateCurrency, useDeactivateCurrency, useRegisterCurrency, useRenameCurrency } from '@/lib/query/mutations';
@@ -33,15 +34,12 @@ interface CurrencyDraft {
 
 const BLANK_DRAFT: CurrencyDraft = { code: '', name: '', decimalPlaces: '' };
 
-const LEDGER_BALANCES_QUERY_KEY = ['ledger', 'accounts', 'balances'] as const;
-
-/** Whether a decimal-string amount is exactly zero — never routed through `Number` (R1). */
-function isZeroAmount(amount: string): boolean {
-  return /^[-+]?0(\.0+)?$/.test(amount);
+/** A currency's `decimalPlaces` is a single digit 0-4 (§6 R3: fixed for its whole lifetime, so it must be right on entry). */
+function isValidDecimalPlaces(value: string): boolean {
+  return /^[0-4]$/.test(value);
 }
 
 export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.Element {
-  const queryClient = useQueryClient();
   const canWrite = grantedScopes.includes('accounts.write');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -55,7 +53,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
   const selected = listQuery.data?.find((currency) => currency.id === selectedId) ?? null;
 
   const balancesQuery = useQuery({
-    queryKey: LEDGER_BALANCES_QUERY_KEY,
+    queryKey: ledgerBalancesKey(),
     queryFn: fetchLedgerBalances,
     enabled: panelMode === 'view' && selected != null,
   });
@@ -104,17 +102,25 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     setTraceId(refusalTraceId);
   }
 
+  /**
+   * View-mode actions (Activate/Deactivate) have no form field of their own to attach a field
+   * error to, so every entry — field or not — goes to the alert (B2, DRK-1700 review).
+   */
+  function applyViewRefusal(errors: LedgerError[] | undefined, refusalTraceId: string | undefined): void {
+    setFieldErrors({});
+    setAlertErrors(errors ?? []);
+    setTraceId(refusalTraceId);
+  }
+
   async function handleCreate(): Promise<void> {
+    if (!isValidDecimalPlaces(draft.decimalPlaces)) return;
     resetFormState();
     const result = await registerCurrency.mutate({ code: draft.code, name: draft.name, decimalPlaces: Number(draft.decimalPlaces) });
     if (!result.ok) {
       applyRefusal(result.errors, result.traceId);
       return;
     }
-    if (result.currency) {
-      queryClient.setQueryData(currencyKey(result.currency.id), result.currency);
-      setSelectedId(result.currency.id);
-    }
+    if (result.currency) setSelectedId(result.currency.id);
     setPanelMode('view');
   }
 
@@ -133,14 +139,14 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     if (!selectedId) return;
     resetFormState();
     const result = await activateCurrency.mutate({ currencyId: selectedId });
-    if (!result.ok) applyRefusal(result.errors, result.traceId);
+    if (!result.ok) applyViewRefusal(result.errors, result.traceId);
   }
 
   async function handleDeactivate(): Promise<void> {
     if (!selectedId) return;
     resetFormState();
     const result = await deactivateCurrency.mutate({ currencyId: selectedId });
-    if (!result.ok) applyRefusal(result.errors, result.traceId);
+    if (!result.ok) applyViewRefusal(result.errors, result.traceId);
   }
 
   const columns: LedgerColumn<Currency>[] = [
@@ -150,12 +156,14 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.isActive ? 'Active' : 'Inactive'} /> },
   ];
 
-  const workedExampleDecimalPlaces = /^\d+$/.test(draft.decimalPlaces) ? Number(draft.decimalPlaces) : 0;
-  const workedExample = `${formatAmount('1250', workedExampleDecimalPlaces)} ${draft.code || 'units'}`;
+  // No fallback to 0 decimal places (I1, DRK-1700 review): a blank or invalid entry has no
+  // worked example to show, rather than one implying 0 is what will be registered.
+  const workedExample = isValidDecimalPlaces(draft.decimalPlaces) ? `${formatAmount('1250', Number(draft.decimalPlaces))} ${draft.code || 'units'}` : null;
 
   // Never `${code} · ${name}` here: the panel body's own Code/Name rows already show that
-  // exact text, and Playwright's `getByText` substring-matches a title containing it too,
-  // turning an unambiguous single match into a strict-mode violation (47-mai-corrects-...).
+  // exact text, and the title would otherwise repeat it — a screen reader announcing the
+  // panel would say the same code twice, and any text match against the title would collide
+  // with the identical text in the body below it.
   const panelTitle = panelMode === 'create' ? 'New currency' : panelMode === 'edit' ? `Edit ${draft.code || 'currency'}` : 'Currency details';
 
   return (
@@ -167,7 +175,11 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
           </Button>
         </ScopeGate>
 
-        <LedgerTable columns={columns} rows={listQuery.data ?? []} rowKey="id" selectedId={selectedId} onSelectRow={openView} emptyMessage="No currencies registered." />
+        {listQuery.isError ? (
+          <RefusalAlert errors={[toLedgerError(listQuery.error)]} traceId={ledgerErrorTraceId(listQuery.error)} />
+        ) : (
+          <LedgerTable columns={columns} rows={listQuery.data ?? []} rowKey="id" selectedId={selectedId} onSelectRow={openView} emptyMessage="No currencies registered." />
+        )}
       </div>
 
       {panelMode !== null ? (
@@ -190,7 +202,11 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                           Deactivate currency
                         </Button>
                       </ScopeGate>
-                      {holdsBalance ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">CURRENCY_HOLDS_BALANCE</span> : null}
+                      {holdsBalance ? (
+                        <span className="text-[length:var(--text-caption-size)] text-muted-foreground">
+                          An account still holds a balance in this currency. <span className="font-mono">CURRENCY_HOLDS_BALANCE</span>
+                        </span>
+                      ) : null}
                     </span>
                   ) : (
                     <ScopeGate scope="accounts.write" granted={canWrite}>
@@ -206,7 +222,13 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     Cancel
                   </Button>
                   <ScopeGate scope="accounts.write" granted={canWrite}>
-                    <Button type="button" variant="primary" size="sm" onClick={panelMode === 'create' ? handleCreate : handleSave}>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      disabled={panelMode === 'create' && !isValidDecimalPlaces(draft.decimalPlaces)}
+                      onClick={panelMode === 'create' ? handleCreate : handleSave}
+                    >
                       {panelMode === 'create' ? 'Register currency' : 'Save changes'}
                     </Button>
                   </ScopeGate>
@@ -227,6 +249,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     { label: 'Status', value: <StatusBadge status={selected.isActive ? 'Active' : 'Inactive'} /> },
                   ]}
                 />
+                {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
             ) : panelMode === 'edit' || panelMode === 'create' ? (
               <>
@@ -277,8 +300,13 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     />
                   )}
                 </label>
+                {fieldErrors.decimalPlaces ? (
+                  <p role="alert">
+                    {fieldErrors.decimalPlaces.code} {fieldErrors.decimalPlaces.message}
+                  </p>
+                ) : null}
 
-                {panelMode === 'create' ? <p data-testid="currency-worked-example">{workedExample}</p> : null}
+                {panelMode === 'create' && workedExample ? <p data-testid="currency-worked-example">{workedExample}</p> : null}
 
                 {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>

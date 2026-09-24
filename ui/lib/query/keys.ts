@@ -35,6 +35,11 @@ export function currencyKey(currencyId: string): readonly unknown[] {
   return ['ledger', 'currency', currencyId] as const;
 }
 
+/** The ledger-wide per-currency totals (`GET /v1/accounts/balances`) — used only to tell whether a currency still holds a balance. */
+export function ledgerBalancesKey(): readonly unknown[] {
+  return ['ledger', 'accounts', 'balances'] as const;
+}
+
 /**
  * DRK-1684 row 7 / pr-reviewer finding 7 (DRK-1687): the currency list is reference data for
  * the session — held at `staleTime: Infinity`, opting out of the global `refetchOnMount:

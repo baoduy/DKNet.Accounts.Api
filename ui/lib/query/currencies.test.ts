@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LedgerRefusalError } from '@/lib/api/refusal';
 import { fetchCurrencies, fetchCurrency, fetchLedgerBalances } from './currencies';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -32,6 +33,18 @@ describe('fetchCurrencies', () => {
   it('falls back to a default message when the errors array is empty', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { errors: [] })));
     await expect(fetchCurrencies()).rejects.toThrow('Request failed.');
+  });
+
+  it('keeps the service code and traceId on the thrown error (DRK-1700 review I2)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(401, { errors: [{ message: 'Session expired.', code: 'UNAUTHENTICATED' }], traceId: 't-2' })));
+    try {
+      await fetchCurrencies();
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(LedgerRefusalError);
+      expect((error as LedgerRefusalError).code).toBe('UNAUTHENTICATED');
+      expect((error as LedgerRefusalError).traceId).toBe('t-2');
+    }
   });
 });
 

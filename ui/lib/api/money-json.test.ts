@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLedgerJsonPreservingNumbers, readLedgerJson } from './money-json';
+import { isZeroAmount, parseLedgerJsonPreservingNumbers, readLedgerJson } from './money-json';
 
 describe('parseLedgerJsonPreservingNumbers', () => {
   it('keeps every digit of a number past 2^53, as a string', () => {
@@ -63,6 +63,21 @@ describe('parseLedgerJsonPreservingNumbers', () => {
     expect(parseLedgerJsonPreservingNumbers('{"message":"She said \\"123\\" out loud"}')).toEqual({
       message: 'She said "123" out loud',
     });
+  });
+});
+
+describe('isZeroAmount', () => {
+  it('is true for zero, with or without a sign or a decimal tail of zeros', () => {
+    expect(isZeroAmount('0')).toBe(true);
+    expect(isZeroAmount('-0')).toBe(true);
+    expect(isZeroAmount('+0.0')).toBe(true);
+    expect(isZeroAmount('0.00')).toBe(true);
+  });
+
+  it('is false for a non-zero amount, including one that merely starts with 0', () => {
+    expect(isZeroAmount('0.01')).toBe(false);
+    expect(isZeroAmount('10')).toBe(false);
+    expect(isZeroAmount('01')).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LedgerRefusalError } from '@/lib/api/refusal';
 import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups } from './groups';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -72,6 +73,18 @@ describe('fetchAccountGroups', () => {
   it('throws the service refusal message on a non-ok response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(400, { errors: [{ message: 'Unknown filter field.' }] })));
     await expect(fetchAccountGroups({ filters: {} })).rejects.toThrow('Unknown filter field.');
+  });
+
+  it('keeps the service code and traceId on the thrown error (DRK-1700 review I2)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(403, { errors: [{ message: 'Not permitted.', code: 'FORBIDDEN' }], traceId: 't-1' })));
+    try {
+      await fetchAccountGroups({ filters: {} });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(LedgerRefusalError);
+      expect((error as LedgerRefusalError).code).toBe('FORBIDDEN');
+      expect((error as LedgerRefusalError).traceId).toBe('t-1');
+    }
   });
 
   it('falls back to a default message when a non-ok response carries a null body', async () => {
