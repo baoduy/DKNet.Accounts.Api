@@ -20,7 +20,7 @@
  * the detail screen's `Reverse` is always enabled (brief §2).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
@@ -107,7 +107,13 @@ describe('Reverse stays on screen but refused — detail screen of GLOBEX-000456
 
     await waitFor(() => expect(container).toHaveTextContent('This posting is a reversal of P-10042; record a new posting to correct it'));
     expect(screen.getByRole('button', { name: 'Reverse' })).toBeDisabled();
-    expect(screen.queryByText(/\b[A-Z]+(?:_[A-Z]+)+\b/)).toBeNull();
+    // Scoped to the reverse area — the smallest element holding both Reverse and its reason. The
+    // rest of the screen carries real codes of its own: GLOBEX holds 10.00, so Close shows
+    // ACCOUNT_HOLDS_BALANCE (`AccountStatusControl`, DRK-1696).
+    const reason = screen.getByText('This posting is a reversal of P-10042; record a new posting to correct it');
+    let reverseArea = screen.getByRole('button', { name: 'Reverse' }).parentElement!;
+    while (!reverseArea.contains(reason)) reverseArea = reverseArea.parentElement!;
+    expect(within(reverseArea).queryByText(/\b[A-Z]+(?:_[A-Z]+)+\b/)).toBeNull();
   });
 
   it('the presence half: an ordinary posting offers Reverse enabled', () => {
