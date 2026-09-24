@@ -22,6 +22,7 @@
  *   PATCH  /v1/accounts/:id
  *   GET    /v1/accounts/:accountNumber/balance
  *   GET    /v1/accounts/balances
+ *   GET    /v1/accounts/status-counts        (?from=, ?to= on the account's opened date — DRK-1727 §3 row 2)
  *   GET    /v1/accounts/:accountNumber/statement
  *   GET    /v1/account-groups
  *   GET    /v1/postings                 (?from=, ?to= required; ?accountId=, ?direction=, ?category=, ?status=, ?search=,
@@ -36,6 +37,7 @@
  *   POST   /v1/currencies/:id/activate
  *   POST   /v1/currencies/:id/deactivate
  *   GET    /v1/account-groups            (?filter=, ?search=, ?orderBy=, ?desc=, ?pageNumber=, ?pageSize=)
+ *   GET    /v1/account-groups/status-counts  (?from=, ?to= on the group's created date — DRK-1727 §3 row 2)
  *   POST   /v1/account-groups
  *   GET    /v1/account-groups/:id
  *   PUT    /v1/account-groups/:id
@@ -103,6 +105,8 @@ interface AccountGroupFixture {
   status: AccountGroupStatus;
   ownerId: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 §3 row 2 — the date the service windows a group status count on (`CreatedOn`). */
+  createdOn?: string;
 }
 
 interface PostingRecord {
@@ -454,6 +458,49 @@ function decimalPlacesOf(amount: string): number {
   return dot < 0 ? 0 : amount.length - dot - 1;
 }
 
+/** Per-currency lists of each account's balance, available and held text, in first-seen order. */
+function currencyTotals(records: AccountFixture[]): Map<string, { balance: string[]; available: string[]; held: string[] }> {
+  const byCurrency = new Map<string, { balance: string[]; available: string[]; held: string[] }>();
+  for (const account of records) {
+    const current = byCurrency.get(account.currency) ?? { balance: [], available: [], held: [] };
+    current.balance.push(account.balance);
+    current.available.push(account.availableBalance);
+    current.held.push(account.heldAmount);
+    byCurrency.set(account.currency, current);
+  }
+  return byCurrency;
+}
+
+const ACCOUNT_STATUSES = ['Active', 'Frozen', 'Dormant', 'Closed'];
+const GROUP_STATUSES = ['Active', 'Closed'];
+
+/**
+ * Mirrors `MapGetStatusCounts` (`StatusCountsEndpointMapperExtensions.cs`) and
+ * `GetStatusCounts` (`ModelSpecGenericStatusCounts.cs`): only `from`/`to` are accepted (any other
+ * key is refused with 400, `UnsupportedNarrowing`), both bounds inclusive on the record's created
+ * date, and every status of the enum is returned — a status no record holds with 0 — spelled
+ * upper-case, `type` naming the enum.
+ */
+function statusCounts(url: URL, type: string, statuses: string[], records: Array<{ status: string; createdOn: string }>): Response {
+  const unknownKeys = [...new Set(url.searchParams.keys())].filter((key) => !['from', 'to'].includes(key.toLowerCase()));
+  if (unknownKeys.length > 0) {
+    return jsonResponse(
+      { errors: [{ code: 'UnsupportedNarrowing', message: `Unsupported query parameter(s): ${unknownKeys.join(', ')}. Only 'from' and 'to' are accepted.` }] },
+      400,
+    );
+  }
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  if ((from !== null && Number.isNaN(Date.parse(from))) || (to !== null && Number.isNaN(Date.parse(to)))) {
+    return refusal(400, [{ message: 'The from/to window is not a date.' }]);
+  }
+  const inWindow = records.filter((record) => {
+    const created = Date.parse(record.createdOn);
+    return (from === null || created >= Date.parse(from)) && (to === null || created <= Date.parse(to));
+  });
+  return jsonResponse(statuses.map((status) => ({ type, status: status.toUpperCase(), count: inWindow.filter((record) => record.status === status).length })));
+}
+
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const segments = url.pathname.split('/').filter(Boolean);
@@ -496,6 +543,7 @@ async function handle(request: Request): Promise<Response> {
         status?: AccountGroupStatus;
         ownerId: string;
         metadata?: Record<string, string>;
+        createdOn?: string;
       }>;
     };
     for (const account of seed.accounts ?? []) {
@@ -543,6 +591,7 @@ async function handle(request: Request): Promise<Response> {
         status: group.status ?? existing?.status ?? 'Active',
         ownerId: group.ownerId,
         metadata: group.metadata,
+        createdOn: group.createdOn ?? existing?.createdOn ?? new Date(0).toISOString(),
       };
       accountGroups.set(merged.id, merged);
     }
@@ -571,11 +620,24 @@ async function handle(request: Request): Promise<Response> {
   }
 
   if (segments[1] === 'accounts' && segments[2] === 'balances' && request.method === 'GET') {
-    const lines = [...accounts.values()].reduce<Map<string, number>>((sum, account) => {
-      sum.set(account.currency, (sum.get(account.currency) ?? 0) + Number(account.balance));
-      return sum;
-    }, new Map());
-    return jsonResponse([...lines.entries()].map(([currency, balance]) => ({ currency, balance: money(String(balance)) })));
+    // `LedgerBalanceLineDto` (`GetLedgerBalances.cs`): one line per currency across every
+    // account, summed as exact decimal text (DRK-1727 §3 row 2) — never through `Number`.
+    return jsonResponse(
+      [...currencyTotals([...accounts.values()]).entries()].map(([currency, totals]) => ({
+        currency,
+        balance: money(addDecimalStrings(totals.balance)),
+        available: money(addDecimalStrings(totals.available)),
+        held: money(addDecimalStrings(totals.held)),
+      })),
+    );
+  }
+
+  if (segments[1] === 'accounts' && segments[2] === 'status-counts' && segments.length === 3 && request.method === 'GET') {
+    return statusCounts(url, 'AccountStatus', ACCOUNT_STATUSES, [...accounts.values()].map((account) => ({ status: account.status, createdOn: account.openedOn })));
+  }
+
+  if (segments[1] === 'account-groups' && segments[2] === 'status-counts' && segments.length === 3 && request.method === 'GET') {
+    return statusCounts(url, 'AccountGroupStatus', GROUP_STATUSES, [...accountGroups.values()].map((group) => ({ status: group.status, createdOn: group.createdOn ?? new Date(0).toISOString() })));
   }
 
   if (segments[1] === 'accounts' && segments[3] === 'balance' && request.method === 'GET') {
@@ -808,7 +870,9 @@ async function handle(request: Request): Promise<Response> {
     }
     records = sortRecords(records, orderBy, desc);
     const paged = pageOf(records as unknown as AccountGroupFixture[], pageNumber, pageSize);
-    return Response.json({ ...paged, items: paged.items.map(accountGroupDto) });
+    // The service's own paging fields (`pageNumber`, `totalItemCount`) beside the `pageIndex`
+    // the console reads today (DRK-1727 §3 row 2).
+    return Response.json({ ...paged, pageNumber: paged.pageIndex + 1, totalItemCount: records.length, items: paged.items.map(accountGroupDto) });
   }
 
   if (segments[1] === 'account-groups' && segments.length === 2 && request.method === 'POST') {
@@ -957,7 +1021,17 @@ async function handle(request: Request): Promise<Response> {
     const ordered = orderBy ? sortPostings(items, orderBy, url.searchParams.get('desc') === 'true') : items;
 
     const page = pageOf(ordered, Number(url.searchParams.get('pageNumber') ?? '1'), Number(url.searchParams.get('pageSize') ?? '1000'));
-    return jsonResponse({ items: page.items.map(postingDto), pageIndex: page.pageIndex, pageSize: page.pageSize, pageCount: page.pageCount, hasNextPage: page.hasNextPage });
+    // `totalItemCount` is the service's exact count for the whole window, whatever the page size
+    // (`ListPostings.cs`) — the only figure a per-week count may be read from (DRK-1727 R1).
+    return jsonResponse({
+      items: page.items.map(postingDto),
+      pageIndex: page.pageIndex,
+      pageNumber: page.pageIndex + 1,
+      pageSize: page.pageSize,
+      pageCount: page.pageCount,
+      totalItemCount: ordered.length,
+      hasNextPage: page.hasNextPage,
+    });
   }
 
   if (segments[1] === 'postings' && segments.length === 2 && request.method === 'POST') {

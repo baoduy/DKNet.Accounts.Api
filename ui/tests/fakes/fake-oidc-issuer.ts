@@ -53,6 +53,20 @@ const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName
     tenantName: 'Drunk Coding',
     scopes: ['accounts.read'],
   },
+  // DRK-1727: Nam before he lost the postings read permission (same object id), and Lan, who
+  // reads accounts and postings and may change nothing.
+  'nam-postings@drunkcoding.net': {
+    name: 'Nam Tran',
+    objectId: '22222222-2222-4222-8222-222222222222',
+    tenantName: 'Drunk Coding',
+    scopes: ['accounts.read', 'postings.read'],
+  },
+  'lan@drunkcoding.net': {
+    name: 'Lan Pham',
+    objectId: '33333333-3333-4333-8333-333333333333',
+    tenantName: 'Drunk Coding',
+    scopes: ['accounts.read', 'postings.read'],
+  },
 };
 
 interface PendingCode {

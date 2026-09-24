@@ -87,6 +87,26 @@ export const NAM: FixtureUser = {
   scopes: ['accounts.read'],
 };
 
+/** DRK-1727 §5 "A recent record that cannot be read says so in place" — Nam as he was before he
+ * lost the postings read permission: the same operator (same object id, so the same recently
+ * viewed list), his own address for the same reason as `MAI_MISSING_REVERSE_SCOPE`. */
+export const NAM_WITH_POSTINGS_READ: FixtureUser = {
+  ...NAM,
+  email: 'nam-postings@drunkcoding.net',
+  scopes: ['accounts.read', 'postings.read'],
+};
+
+/** DRK-1727 §5 "Overview works in full with the read permissions only" — reads accounts and
+ * postings, may change nothing. */
+export const LAN: FixtureUser = {
+  email: 'lan@drunkcoding.net',
+  name: 'Lan Pham',
+  objectId: '33333333-3333-4333-8333-333333333333',
+  tenantId: TENANT_DRUNK_CODING,
+  tenantName: 'Drunk Coding',
+  scopes: ['accounts.read', 'postings.read'],
+};
+
 /** The console-wide known scope set (DRK-1669 §9 Q2 default) — all 5 the service defines (DRK-1684 §3 row 11/12). */
 export const KNOWN_SCOPES = ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'];
 

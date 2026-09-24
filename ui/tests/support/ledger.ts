@@ -31,6 +31,8 @@ export interface LedgerAccountGroupFixture {
   ownerId?: string;
   description?: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 — the date a group status count windows on; defaults to the epoch. */
+  createdOn?: string;
 }
 
 export interface LedgerPostingFixture {
@@ -70,6 +72,8 @@ export interface AccountGroupFixture {
   status?: AccountGroupStatus;
   ownerId: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 — the date a group status count windows on; defaults to the epoch. */
+  createdOn?: string;
 }
 
 export interface CurrencyFixture {
@@ -201,4 +205,10 @@ export async function recordingRequests(): Promise<Array<{ idempotencyKey: strin
   return log
     .filter((entry) => entry.method === 'POST' && entry.path === '/v1/postings')
     .map((entry) => ({ idempotencyKey: entry.headers['idempotency-key'], body: entry.body ?? {} }));
+}
+
+/** DRK-1727 — removes a group from the fake ledger, the way the service's own delete does
+ * ("the group has since been deleted"). */
+export async function deleteLedgerAccountGroup(id: string): Promise<void> {
+  await ledgerFetch(`/v1/account-groups/${id}`, { method: 'DELETE' });
 }
