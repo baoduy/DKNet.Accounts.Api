@@ -20,13 +20,19 @@ internal static class AuthConfig
     ///     This method configures the application to use JWT (JSON Web Token) Bearer authentication.
     ///     The token signature is validated against the issuer metadata from the
     ///     <c>Authentication:Schemes:Bearer:MetadataAddress</c> configuration.
+    ///     Inbound claim mapping is off so claims keep the names they were issued with — <c>scp</c> must reach
+    ///     <see cref="HasScopeHandler" /> as <c>scp</c>, and <c>User.Identity.Name</c> reads the token's <c>name</c> claim.
     /// </remarks>
     public static IServiceCollection AddAuthConfig(this IServiceCollection services)
     {
         services.MarkConfigAdded(nameof(AuthConfig));
 
         services.AddAuthentication()
-            .AddJwtBearer();
+            .AddJwtBearer(options =>
+            {
+                options.MapInboundClaims = false;
+                options.TokenValidationParameters.NameClaimType = "name";
+            });
 
         services.AddAuthorization(options =>
         {
