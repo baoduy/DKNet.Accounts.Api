@@ -17,8 +17,8 @@ export interface ConfirmMovementProps {
   direction?: 'Credit' | 'Debit';
   amount?: number | string;
   currency?: string;
-  /** Unused by the single movement since DRK-1713 §3 row 11 — it restates the amount as typed,
-   * never re-scaled. Batch legs carry their own. */
+  /** A ledger amount's own scale: given, the amount is drawn at it; absent, the amount is restated
+   * exactly as typed (a form's input, DRK-1713 §3 row 11). Batch legs carry their own. */
   decimalPlaces?: number;
   accountNumber?: string;
   accountName?: string;
@@ -37,6 +37,7 @@ export function ConfirmMovement({
   direction,
   amount,
   currency,
+  decimalPlaces,
   accountNumber,
   accountName,
   effectiveDate,
@@ -68,10 +69,12 @@ export function ConfirmMovement({
           </div>
         ) : (
           <>
-            {/* DRK-1713 §3 row 11 — the movement restated with the amount exactly as typed: never
-                through `Money`, which would re-pad or regroup it. */}
+            {/* DRK-1713 §3 row 11 — a typed amount is restated exactly as typed, never through
+                `Money`, which would re-pad or regroup it; a ledger amount is drawn at its scale. */}
             <p>
-              {direction} {String(amount ?? '')} {currency} {direction === 'Debit' ? 'from' : 'to'} <AccountNumber value={accountNumber ?? ''} />
+              {direction}{' '}
+              {decimalPlaces === undefined ? `${String(amount ?? '')} ${currency ?? ''}` : <Money amount={amount ?? ''} currency={currency} decimalPlaces={decimalPlaces} showCurrency />}{' '}
+              {direction === 'Debit' ? 'from' : 'to'} <AccountNumber value={accountNumber ?? ''} />
             </p>
             {accountName || effectiveDate || category ? (
               <p className="text-muted-foreground">

@@ -224,4 +224,36 @@ describe('ReversePostingForm', () => {
     expect(screen.getByRole('button', { name: 'Reverse' })).toBeDisabled();
     expect(screen.getByText('This posting is a reversal of ; record a new posting to correct it')).toBeInTheDocument();
   });
+
+  it.each([
+    { amount: '500.00', currency: 'JPY', decimalPlaces: 0, movement: 'Credit 500 JPY to ACME-000123' },
+    { amount: '12400.00', currency: 'SGD', decimalPlaces: 2, movement: 'Credit 12,400.00 SGD to ACME-000123' },
+  ])('restates the stored $amount $currency at its currency\'s $decimalPlaces places (DRK-1717 F1)', async ({ amount, currency, decimalPlaces, movement }) => {
+    const user = userEvent.setup();
+    renderForm({ amount, currency, decimalPlaces });
+
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+
+    expect(screen.getByRole('dialog').querySelector('p')?.textContent).toBe(movement);
+  });
+
+  it('keeps the dialog and the idempotency key when the service never answers, and says so (DRK-1717 F2)', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p2' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    await user.type(screen.getByLabelText('Reason'), 'duplicate');
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Reason')).toHaveValue('duplicate');
+
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const keyOf = (call: number): string => ((fetchMock.mock.calls[call][1] as RequestInit).headers as Record<string, string>)['Idempotency-Key'];
+    expect(keyOf(1)).toBe(keyOf(0));
+    await waitFor(() => expect(screen.queryByLabelText('Reason')).toBeNull());
+  });
 });

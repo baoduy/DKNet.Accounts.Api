@@ -22,6 +22,10 @@ function normaliseFieldKey(field: string): string {
   return field.charAt(0).toLowerCase() + field.slice(1);
 }
 
+/** A write the pass-through never answered — the service may or may not have applied it, so the
+ * form keeps its idempotency key and a second confirm replays rather than applies twice (R5). */
+export const NO_ANSWER_ERROR: LedgerError = { message: 'The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.' };
+
 /**
  * DRK-1713 §3 row 13 — the record form's codes the service sends with no `field`: an account
  * status refusal belongs on the account control, an amount or floor refusal on the amount.

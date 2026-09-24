@@ -92,8 +92,8 @@ describe('PostingDetails', () => {
   });
 
   it.each([
-    { direction: 'Debit', restated: 'Debit 30 SGD from GLOBEX-000456' },
-    { direction: 'Credit', restated: 'Credit 30 SGD to GLOBEX-000456' },
+    { direction: 'Debit', restated: 'Debit 30.00 SGD from GLOBEX-000456' },
+    { direction: 'Credit', restated: 'Credit 30.00 SGD to GLOBEX-000456' },
   ])('hands the reverse form this posting\'s own direction ($direction)', async ({ direction, restated }) => {
     stubPostings();
     const user = userEvent.setup();

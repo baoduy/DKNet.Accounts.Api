@@ -14,7 +14,7 @@ import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
-import { routeRefusal } from '@/lib/api/refusal';
+import { NO_ANSWER_ERROR, routeRefusal } from '@/lib/api/refusal';
 import { usePosting } from '@/lib/accounts/query';
 import { useReversePosting } from '@/lib/query/mutations';
 
@@ -93,6 +93,8 @@ export function ReversePostingForm({
       } else {
         setErrors(result.errors ?? []);
       }
+    } catch {
+      setErrors([NO_ANSWER_ERROR]);
     } finally {
       setPending(false);
     }

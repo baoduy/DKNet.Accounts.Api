@@ -16,16 +16,12 @@ import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
-import { RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
+import { NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
 import { POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
 import { useAccounts } from '@/lib/accounts/query';
 import { useRecordPosting } from '@/lib/query/mutations';
 
 const ACCOUNT_OPTIONS_PAGE_SIZE = 10;
-
-/** Shown when the pass-through never answered — the service may or may not have recorded it,
- * so the key is kept and a second confirm replays rather than records twice (R5). */
-const NO_ANSWER: LedgerError = { message: 'The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.' };
 
 export interface RecordPostingFormProps {
   /** The account to record against, locked. Absent: the operator chooses one. */
@@ -118,7 +114,7 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
         setOpen(true);
       }
     } catch {
-      setErrors([NO_ANSWER]);
+      setErrors([NO_ANSWER_ERROR]);
       setOpen(true);
     } finally {
       setPending(false);
