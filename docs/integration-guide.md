@@ -54,11 +54,13 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/currencies"
 [
   { "code": "SGD", "decimalPlaces": 2 },
   { "code": "USD", "decimalPlaces": 2 },
-  { "code": "JPY", "decimalPlaces": 0 }
+  { "code": "JPY", "decimalPlaces": 0 },
+  { "code": "USDT", "decimalPlaces": 6 }
 ]
 ```
 
-JPY is denominated to zero places — `¥100.50` is not a posting amount.
+That's 4 of the 26 seeded currencies. JPY is denominated to zero places — `¥100.50` is not a posting
+amount; USDT is denominated to six — `1.500000 USDT` is, `1.5000001 USDT` is not.
 
 ## 2. Create an account group
 
@@ -428,6 +430,7 @@ an *opposing* posting and marks the original `reversed`.
 ```bash
 curl -X POST "$BASE/v1/postings/3f0b1e4c-6a2d-4f1a-9c33-5d7b21e9a401/reverse" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: reverse-INV-9001-1" \
   -d '{ "reason": "Invoice INV-9001 was settled twice" }'
 ```
 
@@ -452,18 +455,24 @@ HTTP/1.1 200 OK
   "status": "posted",
   "reversesPostingId": "a3b6f961-c181-40c9-97d0-8d9b84b9530f",
   "callingSystem": "PayHub",
-  "description": "Reversal of PST0000000006"
+  "description": "Invoice INV-9001 was settled twice"
 }
 ```
 
-The reversal is a debit of the identical `100.00`, `"category": "reversal"`, with `reversesPostingId`
-pointing at the original; the original's `status` becomes `reversed` and its `reversedByPostingId`
-names the reversal. Both stay readable forever. This needs `postings.reverse` — `postings.write` alone
-is not enough.
+Both the `reason` body field and the `Idempotency-Key` header are **required** — omitting either is a
+`400`. The reason is recorded as the reversal's `description`; there is nowhere else for it to go, since a
+posting is never edited. The lineage is carried structurally instead: `reversesPostingId` points at the
+original, whose `status` becomes `reversed` and whose `reversedByPostingId` names the reversal.
+
+The reversal is a debit of the identical `100.00`, `"category": "reversal"`. Both postings stay readable
+forever. This needs `postings.reverse` — `postings.write` alone is not enough.
 
 Three rules worth knowing before you rely on it:
 
-- **A posting can be reversed at most once.** A second attempt is `POSTING_ALREADY_REVERSED`.
+- **A posting can be reversed at most once.** A second attempt under a *new* key is
+  `POSTING_ALREADY_REVERSED`; a retry under the *same* key replays the reversal already written (`200`,
+  the same posting id), which is what makes a timed-out reversal safe to repeat. Reusing that key with a
+  different `reason` is `409 IDEMPOTENCY_KEY_CONFLICT`.
 - **A reversal is dated the day it is written**, not the date the original took effect.
 - **A reversal is never refused for want of funds, but is never exempt from account status.** It is the
   one movement exempt from the floor — if the account has since been spent down to `20.00`, reversing

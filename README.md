@@ -7,6 +7,8 @@ reconcile against.
 - **Full walkthrough:** [docs/integration-guide.md](docs/integration-guide.md) — authenticate, create a
   group, open an account, post, read the balance back, page a statement.
 - **Machine-readable contract:** `GET /openapi/v1.json` on a running instance.
+- **Operations console:** [docs/console.md](docs/console.md) — a Next.js console for signing in
+  with Entra ID and running the service locally alongside it. No screen ships yet.
 
 > **Delivery status at this commit.** Every route in [the API contract](#the-api-contract) is
 > implemented and exercised by the acceptance suite — reference currencies, account groups, accounts,
@@ -57,6 +59,9 @@ The acceptance suite starts its own `postgres:16-alpine` container through Testc
 must be running before `dotnet test` — the scenarios are asserted against the same relational provider
 a deployment uses, not an in-memory stand-in.
 
+`docker-compose.yml` runs the whole local stack instead — Postgres, Redis, this API and the
+[operations console](docs/console.md) — from a copy of `.env.sample`.
+
 The `Development` profile turns authorization off, turns OpenAPI on, and migrates the database on start
 (`ApiEndpoints/DKNet.Accounts.Api/appsettings.Development.json`). Health is on `/healthz`; the OpenAPI
 document is on `/openapi/v1.json`.
@@ -68,8 +73,10 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/v1/currencies
 ```
 
 ```json
-[{"code":"SGD","decimalPlaces":2},{"code":"USD","decimalPlaces":2},{"code":"JPY","decimalPlaces":0}]
+[{"code":"SGD","decimalPlaces":2},{"code":"USD","decimalPlaces":2},{"code":"JPY","decimalPlaces":0},{"code":"USDT","decimalPlaces":6}]
 ```
+
+That's 4 of the 26 seeded currencies — see below for the full set.
 
 Everything else starts at [docs/integration-guide.md](docs/integration-guide.md).
 
@@ -81,13 +88,18 @@ below — an integrator should never need to read the code to know what a field 
 ### Reference currencies — what the service can denominate
 
 The service knows which currencies it supports and how many decimal places each is legally denominated
-to. That precision is enforced on every posting amount. The set is fixed reference data, read through
-`GET /v1/currencies`.
+to. That precision is enforced on every posting amount. Currencies are stored records — created, renamed,
+activated and deactivated — not fixed reference data. List them through `GET /v1/currencies`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `code` | string | ISO 4217 alphabetic code — `SGD`, `USD`, `JPY` at this commit. |
-| `decimalPlaces` | integer | How many decimal places the currency legally has. An amount finer than this is refused. |
+| `code` | string | 3-10 upper-case letters — no longer required to be an ISO 4217 alphabetic code, so a non-fiat asset such as `USDT` registers the same way a fiat currency does. |
+| `decimalPlaces` | integer | How many decimal places the currency legally has, 0-6. An amount finer than this is refused. Fixed once the currency is registered — it never changes afterwards. |
+
+A fresh database seeds 26 active currencies: SGD, USD, JPY, EUR, GBP, CHF, AUD, CAD, NZD, CNY, HKD, TWD,
+KRW, INR, THB, MYR, PHP, IDR, VND, KHR, LAK, MMK, BND, AED, SAR — all fiat, 0 or 2 decimal places — plus
+`USDT` (Tether USD), the one seeded crypto asset, at 6 decimal places. Any other currency, fiat or
+otherwise, can still be registered at run time through `POST /v1/currencies`.
 
 ### Account groups — the bucket accounts belong to
 
@@ -186,28 +198,34 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | Method | Route | What it does | Scope | Refused when |
 |---|---|---|---|---|
 | `GET` | `/v1/currencies` | List supported currencies and their decimal places | `accounts.read` | — |
+| `POST` | `/v1/currencies` | Register a currency. Body: `code`, `name`, `decimalPlaces`. Returns `201` + the currency | `accounts.write` | `code` already used (`DUPLICATE_CURRENCY_CODE`); a malformed body → `400` |
+| `GET` | `/v1/currencies/{id}` | Read one currency | `accounts.read` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/currencies/{id}` | Rename a currency. Body: `name`. Returns `200` + the currency | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `POST` | `/v1/currencies/{id}/activate` | Reactivate a deactivated currency. No request body. Returns `200` + the currency | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `POST` | `/v1/currencies/{id}/deactivate` | Deactivate a currency, so it is no longer offered for new accounts. No request body. Returns `200` + the currency | `accounts.write` | An account in that currency still holds a balance (`CURRENCY_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups` | Create a group. Body: `code`, `name`, `type`, `ownerId`, optional `description`, `metadata`. Returns `201` + the group | `accounts.write` | `code` already used (`DUPLICATE_GROUP_CODE`); a malformed body → `400` |
 | `GET` | `/v1/account-groups` | List groups. Query: `filter=Field:Operation:Value` (repeatable), `search`, `orderBy`, `desc`, `pageNumber`, `pageSize`, `fromDate`, `toDate` — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
 | `GET` | `/v1/account-groups/{id}` | Read one group | `accounts.read` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}` | Rename a group. Body: `name`. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-description` | Change a group's description. Body: `description` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/account-groups/{id}/change-metadata` | Change a group's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
+| `PUT` | `/v1/account-groups/{id}` | Update a group. Body: any of `name`, `description`, `metadata`; a member left out (or null) is unchanged. Returns `200` + the group | `accounts.write` | No member supplied → `400`; malformed id → `400`; unknown id → `404` |
 | `DELETE` | `/v1/account-groups/{id}` | Delete a group. Returns `204` with no body | `accounts.write` | The group still holds any account (`GROUP_NOT_EMPTY`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/close` | Close a group. No request body. Returns `200` + the group | `accounts.write` | An account it holds carries a balance (`GROUP_HOLDS_BALANCE`); malformed id → `400`; unknown id → `404` |
 | `POST` | `/v1/account-groups/{id}/activate` | Reactivate a closed group. No request body. Returns `200` + the group | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
+| `GET` | `/v1/account-groups/{id}/balances` | Group totals, one line per currency — each line carrying the balance, the available amount and the held amount. A group holding no account answers `200` with an empty list — and so does an identifier that matches no group, since this read sums accounts *by* group id and never looks the group up | `accounts.read` | Malformed id → `404` |
+| `GET` | `/v1/account-groups/status-counts` | Count account groups by status — `Active`, `Closed` — including a value no group currently holds. Optional `from`/`to` window (RFC 3339 timestamps) on the date each group was created | `accounts.read` | A narrowing other than the date window → `400` |
 | `POST` | `/v1/accounts` | Open an account. Body: `groupId`, `name`, `currency`, `classification`, `permittedToGoNegative`, optional `overdraftLimit`, `minimumBalance`, `externalReference`, `metadata`. Returns `201` + the account | `accounts.write` | Negative permitted with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); currency not supported (`UNSUPPORTED_CURRENCY`) |
 | `GET` | `/v1/accounts` | List accounts. Same query surface as the group list — see [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `accounts.read` | Unknown filter/order field, or a malformed filter triple → `400` |
+| `GET` | `/v1/accounts/status-counts` | Count accounts by status — `Active`, `Frozen`, `Dormant`, `Closed` — including a value no account currently holds. Optional `from`/`to` window (RFC 3339 timestamps) on the date each account was created | `accounts.read` | A narrowing other than the date window → `400` |
+| `GET` | `/v1/accounts/balances` | The ledger's balances grouped by currency, across every account group — each line carries the balance, the available amount and the held amount. Currencies are never combined | `accounts.read` | — |
 | `GET` | `/v1/accounts/{id}` | Read one account | `accounts.read` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}` | Rename an account. Body: `name`. Returns `200` + the account | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `PUT` | `/v1/accounts/{id}/change-metadata` | Change an account's metadata. Body: `metadata` | `accounts.write` | Malformed id → `400`; unknown id → `404` |
-| `GET` | `/v1/accounts/{id}/balance` | Read the balance alone | `accounts.read` | Unknown id → `404` |
-| `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit` and `minimumBalance` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
+| `PUT` | `/v1/accounts/{id}` | Update an account. Body: either of `name`, `metadata`; a member left out (or null) is unchanged. Returns `200` + the account | `accounts.write` | No member supplied → `400`; malformed id → `400`; unknown id → `404` |
+| `GET` | `/v1/accounts/{id}/balance` | Read the balance alone, plus the account's floor | `accounts.read` | Unknown id → `404` |
+| `PATCH` | `/v1/accounts/{id}` | Change `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative` **only**. `{"status":"Closed"}` closes it; `{"status":"Active"}` reopens it; a member left out is unchanged | `accounts.write` | Closing while it holds a balance or a held amount (`ACCOUNT_HOLDS_BALANCE`); a floor-less control combination, including permitting negative with no overdraft limit (`OVERDRAFT_LIMIT_REQUIRED`); unknown id → `404` |
 | `GET` | `/v1/accounts/{id}/statement` | Date-bounded, paged statement in stream order. Query: `from`, `to`, `pageIndex`, `pageSize` | `postings.read` | — (past the end returns an empty page, never an error) |
+| `GET` | `/v1/postings` | List postings across every account, within a required effective-date window (`from`, `to`) of at most 90 days. Narrow by `accountId`, `direction`, `category`, `status`; shares `search`, `orderBy`, `desc`, `pageNumber`, `pageSize` with [Listing groups and accounts](#listing-groups-and-accounts). Returns the paged envelope | `postings.read` | No date window, or one wider than 90 days (`INVALID_DATE_RANGE`); an unrecognised `orderBy`, `direction`, `category` or `status` value, or a search term under 2 characters → `400` |
 | `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
-| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting | `postings.reverse` | Already reversed (`POSTING_ALREADY_REVERSED`); the account's status does not accept a movement in the reversal's own direction |
+| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
 
 #### Listing groups and accounts
 
@@ -274,19 +292,19 @@ route, and its answer is shaped by the same one setting every other failure goes
 
 | Route | Source | The orchestration that keeps it hand-written |
 |---|---|---|
-| `GET /v1/currencies` | hand-written | Static reference data (`Currency.All`), not a stored entity — there is nothing to generate over |
-| Create, list, read, rename, change-description, change-metadata, delete, activate and close on `/v1/account-groups` | **generated** — all nine from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set, excluding nothing by name; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
+| Create, list, read, update, activate and deactivate on `/v1/currencies` | **generated** — all six from one registration | A single `MapCurrencyCrud(...)` call publishes the whole set, excluding only `Delete`; they move together when the generator is upgraded. Currencies are stored records, not the old static `Currency.All` lookup. Deactivate's `CURRENCY_HOLDS_BALANCE` refusal is raised by a hand-written command handler sitting behind the generated route |
+| Create, list, read, update, delete, activate and close on `/v1/account-groups` | **generated** — all seven from one registration | A single `MapAccountGroupCrud(...)` call publishes the whole set, excluding nothing by name; they move together when the generator is upgraded. Create no longer needs a hand-written route — its duplicate-code refusal (`DUPLICATE_GROUP_CODE`) is raised by the create request's validator |
 | `POST /v1/account-groups/{id}/close` | **generated** | Its `GROUP_HOLDS_BALANCE` refusal is raised by a hand-written command handler sitting behind the generated route, not by a validator a hand-written route calls before dispatch — so the route itself no longer has to be written out |
 | `GET /v1/account-groups/{id}/balances` | hand-written | Aggregates the group's accounts into one line per currency — not a read of one record |
 | `POST /v1/accounts` | hand-written | Allocates the account number server-side, resolves the currency against the reference set (`UNSUPPORTED_CURRENCY`) and enforces a determinate floor (`OVERDRAFT_LIMIT_REQUIRED`). A generated request would expose the account number as a caller-settable field |
-| List, read, rename and change-metadata on `/v1/accounts` | **generated** — all four from one registration | A single `MapAccountCrud(...)` call publishes the set, excluding `Delete` by name: accounts publish no delete route at all, so `DELETE /v1/accounts/{id}` is not a route this service registers |
+| List, read and update on `/v1/accounts` | **generated** — all three from one registration | A single `MapAccountCrud(...)` call publishes the set, excluding `Delete` by name: accounts publish no delete route at all, so `DELETE /v1/accounts/{id}` is not a route this service registers |
 | `GET /v1/accounts/{id}/balance` | hand-written | Projects the three money fields plus the currency into a narrower record than the account itself |
 | `PATCH /v1/accounts/{id}` | hand-written | Refuses a close while the account holds a balance (`ACCOUNT_HOLDS_BALANCE`) and re-checks the floor when a control changes (`OVERDRAFT_LIMIT_REQUIRED`) |
 | `GET /v1/accounts/{id}/statement` | hand-written | A date-bounded page over another aggregate's stream, in stream order |
 | `POST /v1/postings` | hand-written | Idempotency replay/conflict resolution, the per-account posting lock, and the floor, status and currency refusals |
 | `POST /v1/postings/batch` | hand-written | The same, all-or-nothing across several accounts under one transaction group |
 | `GET /v1/postings/{id}` | **generated** | — |
-| `POST /v1/postings/{id}/reverse` | hand-written | Writes the opposing posting and flips the original's status in one step, with its own `422` refusals |
+| `POST /v1/postings/{id}/reverse` | **generated route, hand-written handler** | `MapActionById` binds the id from the route and the `reason` from the body; `ReversePostingCommandHandler` writes the opposing posting and flips the original's status in one step, with its own `422` refusals and its own idempotency replay |
 
 Route registration is in `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/` — one `*V1Endpoint.cs` per
 resource. Account groups and accounts each carry one commented generated registration — nine routes and
@@ -294,9 +312,12 @@ four respectively; the one generated posting route is still commented individual
 `ApiEndpoints/DKNet.Accounts.App.Tests/Architecture/RouteScopeCoverageTests.cs` enumerates the live
 routes and fails the build if any one loses the scope this table names, however it was registered.
 
-**Authentication.** JWT bearer, machine-to-machine only, default-deny — any route not explicitly
-anonymous needs an authenticated caller. The calling system's identity is read from the credential's
-`client_id` claim; a `recordedBy` field in a request body is ignored, not rejected. Scopes are read from
+**Authentication.** JWT bearer, default-deny — any route not explicitly anonymous needs an authenticated
+caller, whether the credential is a machine's or belongs to a person signed in through Microsoft Entra ID.
+The calling system's identity is read from the credential's `client_id` claim, else `azp` (a v2.0 token),
+else `appid` (a v1.0 token) — the first present wins; a `recordedBy` field in a request body is ignored, not
+rejected. This value names the calling application, never the individual: two operators using the same
+console share one calling-system value, so idempotency is scoped per application. Scopes are read from
 the `scp` or `scope` claim (space-separated) and are per operation class:
 
 | Scope | Grants |
@@ -348,7 +369,7 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `401` | — | No or invalid credential |
 | `403` | — | Credential lacks the scope for this operation class |
 | `404` | — | The resource id does not exist |
-| `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same idempotency key, different content |
+| `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same idempotency key, different content. On reverse, "content" is the posting being reversed plus the reason |
 | `422` | `INVALID_POSTING_AMOUNT` | **Both amount refusals share this one code:** the amount is ≤ 0, *or* it has more decimal places than the currency permits. The two conditions are not distinguishable from the response — one code, and one `message` covering both — so check the amount against the currency's decimal places yourself before posting |
 | `422` | `CURRENCY_MISMATCH` | Posting currency ≠ account currency |
 | `422` | `EFFECTIVE_DATE_IN_FUTURE` | Effective date later than the recording date |
@@ -360,11 +381,15 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `ACCOUNT_HOLDS_BALANCE` | Close requested while the balance or held amount ≠ 0 |
 | `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
 | `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
-| `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting |
+| `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting under a key not used before. A retry under the *same* key replays the earlier reversal with `200` instead |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |
 | `422` | `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing was recorded — retry, reusing the same `Idempotency-Key` |
+| `422` | `INVALID_DATE_RANGE` | The cross-account posting list was requested with no effective-date window, or one wider than 90 days |
+| `422` | `CURRENCY_HOLDS_BALANCE` | Currency deactivation requested while an account denominated in it still holds a balance |
+| `422` | `AMOUNT_OUT_OF_RANGE` | A write would store an amount above 999,999,999,999.999999 — a posting amount, the resulting balance of a posting, batch or reversal, or an account limit. Nothing is written |
+| `422` | `INVALID_LIMIT_AMOUNT` | An overdraft limit or minimum balance has more decimal places than its account's currency. `errors[].field` names the refused limit |
 
 Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that
 file is the authority if this table and the service ever disagree.
@@ -404,10 +429,18 @@ write a test for every one of them against your own integration.
   change once it has any posting.
 - **An account's balance always equals the signed sum of that account's postings.** This is a property
   you can verify, not an internal bookkeeping detail.
+- **No stored amount is ever rounded.** A posting amount, balance, held amount or account limit is stored
+  with exactly the value accepted, up to its currency's decimal places, and never above
+  999,999,999,999.999999 — a write that would breach either is refused (`INVALID_LIMIT_AMOUNT`,
+  `AMOUNT_OUT_OF_RANGE`), not silently truncated.
+- **Every amount is returned at its currency's decimal places.** `12400.00 SGD`, `5000 JPY`,
+  `1.500000 USDT` — 6-place storage never shows up as extra trailing zeros on a coarser currency.
 - **Each posting occupies a unique, gapless position in its account's stream**, so a consumer reading
   the stream can detect a missing entry.
 - **A request that repeats your idempotency key returns the original outcome and changes nothing.** The
-  same key carrying different content is refused rather than guessed at.
+  same key carrying different content is refused rather than guessed at. Trailing zeros never defeat this
+  match: a posting of `10.5 USDT` and a resend of `10.500000 USDT` under the same key are the same
+  amount, so the resend replays the original instead of conflicting.
 - **No posting is ever lost under concurrency.** When several postings are recorded against one account
   at the same moment, every one is either recorded or refused with a stated reason; none is silently
   dropped or overwritten, and the balance still equals the signed sum of those that were recorded.

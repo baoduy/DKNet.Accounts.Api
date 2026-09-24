@@ -17,6 +17,8 @@ internal static class PostingRefusalMapping
             LedgerErrors.Error(LedgerErrors.AccountDormantDebitRefused, "A dormant account refuses a debit."),
         PostingRefusalReason.BelowFloor =>
             LedgerErrors.Error(LedgerErrors.InsufficientFunds, "The posting would take the account below its floor."),
+        PostingRefusalReason.AmountOutOfRange =>
+            LedgerErrors.Error(LedgerErrors.AmountOutOfRange, "The amount, or the balance it would leave, is beyond 999,999,999,999.999999."),
         _ => LedgerErrors.Error("UNKNOWN_REFUSAL", "The posting was refused.")
     };
 }

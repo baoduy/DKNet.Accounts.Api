@@ -1,0 +1,48 @@
+/* Base — the minimum document reset the console assumes. */
+
+*, *::before, *::after { box-sizing: border-box }
+
+html { color-scheme: light dark }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --primary is a bright lime meant as a fill with black text on it. As text on the
+   page ground it measures about 1.6:1, so links take --link (the theme's slate in
+   light, the lime itself in dark, where it clears 4.5:1). */
+a { color: var(--link); text-decoration: none }
+a:hover { text-decoration: underline }
+/* --ring is the theme's lime, which measures 1.34:1 against the card — invisible as a
+   focus ring. --focus-ring is the accessible alias: the theme's slate in light, the lime
+   in dark. shadcn primitives that reach for --ring directly need the same override. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* A focused control shows the ring only — its own border line is hidden while focus is on
+   it, so the two never read as a double edge. The border stays in the box model, so nothing
+   shifts. !important because the form controls set their border inline. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: transparent !important;
+}
+/* Inputs and selects with a prefix, label or chevron sit in a bordered shell; the ring
+   belongs on the shell, not the inner control. */
+[data-field-shell]:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: transparent !important;
+}
+[data-field-shell] input:focus-visible,
+[data-field-shell] select:focus-visible { outline: none }
+
+::selection { background: var(--accent); color: var(--foreground) }

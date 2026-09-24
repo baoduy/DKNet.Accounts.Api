@@ -1,0 +1,22 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Iconography" subtitle="Lucide at 1.5 stroke. 16px inline and in nav, 20px beside a page title." -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--background);color:var(--foreground);font-family:var(--font-sans)}.lab{font-size:11px;line-height:15px;font-weight:600;letter-spacing:.05em;color:var(--muted-foreground);text-transform:uppercase;margin-bottom:8px}.grp{margin-bottom:18px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.DKNetAccountsDesignSystem_97519d;
+const { Icon } = NS;
+const NAMES = ['layout-dashboard','folder','wallet','arrow-left-right','coins','file-text','search','chevron-down','chevron-right','x','copy','check','triangle-alert','plus','arrow-right','info','rotate-ccw','lock','calendar','snowflake'];
+function App(){return <div>
+  <div style={{display:'grid',gridTemplateColumns:'repeat(10,1fr)',gap:14}}>
+    {NAMES.map(n => <div key={n} style={{textAlign:'center'}}>
+      <Icon name={n} size={20} />
+      <div style={{fontFamily:'var(--font-mono)',fontSize:9,lineHeight:'12px',color:'var(--muted-foreground)',marginTop:4,wordBreak:'break-word'}}>{n}</div>
+    </div>)}
+  </div>
+  <div style={{fontSize:12,lineHeight:'16px',color:'var(--muted-foreground)',marginTop:14}}>Line only, never filled, always <span style={{fontFamily:'var(--font-mono)'}}>currentColor</span>. No emoji anywhere in the console chrome — the one Unicode exception is the regional-indicator flag beside a currency code, which is decorative and aria-hidden.</div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

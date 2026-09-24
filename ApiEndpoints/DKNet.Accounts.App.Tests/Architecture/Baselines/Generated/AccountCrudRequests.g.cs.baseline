@@ -2,8 +2,8 @@
 #nullable enable
 namespace DKNet.Accounts.AppServices.Crud;
 
-/// <summary>Update request generated from Account.Rename.</summary>
-public sealed partial record RenameAccountRequest :
+/// <summary>Update request generated from Account.ChangeDetails.</summary>
+public sealed partial record ChangeDetailsAccountRequest :
     global::DKNet.SlimBus.Extensions.Fluents.Requests.IWitResponse<global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>,
     global::DKNet.SlimBus.Extensions.Fluents.Requests.IWithKey<global::System.Guid>
 {
@@ -11,16 +11,7 @@ public sealed partial record RenameAccountRequest :
     public global::System.Guid Id { get; set; }
 
     /// <summary>Maps to method parameter 'name'.</summary>
-    public required string Name { get; init; }
-}
-
-/// <summary>Update request generated from Account.ChangeMetadata.</summary>
-public sealed partial record ChangeMetadataAccountRequest :
-    global::DKNet.SlimBus.Extensions.Fluents.Requests.IWitResponse<global::DKNet.Accounts.AppServices.Accounts.V1.AccountDto>,
-    global::DKNet.SlimBus.Extensions.Fluents.Requests.IWithKey<global::System.Guid>
-{
-    /// <summary>The target Account identifier (bound from route).</summary>
-    public global::System.Guid Id { get; set; }
+    public string? Name { get; init; }
 
     /// <summary>Maps to method parameter 'metadata'.</summary>
     public global::System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get; init; }

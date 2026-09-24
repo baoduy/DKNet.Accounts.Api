@@ -37,8 +37,8 @@ docs-browser addresses — those are operational, not part of the integration su
 
 | Area | Methods |
 |---|---|
-| Account groups (10) | `CreateAccountGroupAsync`, `GetAccountGroupsAsync`, `GetAccountGroupAsync`, `RenameAccountGroupAsync`, `ChangeAccountGroupDescriptionAsync`, `ChangeAccountGroupMetadataAsync`, `CloseAccountGroupAsync`, `ActivateAccountGroupAsync`, `DeleteAccountGroupAsync`, `GetAccountGroupBalancesAsync` |
-| Accounts (8) | `OpenAccountAsync`, `GetAccountsAsync`, `GetAccountAsync`, `GetAccountBalanceAsync`, `RenameAccountAsync`, `ChangeAccountMetadataAsync`, `UpdateAccountAsync`, `GetAccountStatementAsync` |
+| Account groups (8) | `CreateAccountGroupAsync`, `GetAccountGroupsAsync`, `GetAccountGroupAsync`, `UpdateAccountGroupAsync`, `CloseAccountGroupAsync`, `ActivateAccountGroupAsync`, `DeleteAccountGroupAsync`, `GetAccountGroupBalancesAsync` |
+| Accounts (7) | `OpenAccountAsync`, `GetAccountsAsync`, `GetAccountAsync`, `GetAccountBalanceAsync`, `ChangeAccountDetailsAsync`, `UpdateAccountAsync`, `GetAccountStatementAsync` |
 | Currencies (6) | `GetCurrenciesAsync`, `GetCurrencyAsync`, `CreateCurrencyAsync`, `RenameCurrencyAsync`, `ActivateCurrencyAsync`, `DeactivateCurrencyAsync` |
 | Postings (4) | `RecordPostingAsync`, `RecordPostingBatchAsync`, `GetPostingAsync`, `ReversePostingAsync` |
 
@@ -70,12 +70,16 @@ response envelope: `Items`, `PageCount`, `PageNumber`, `PageSize`, `TotalItemCou
 
 ### The idempotency key is a header, not a body field
 
-`RecordPostingAsync` and `RecordPostingBatchAsync` each take an `idempotencyKey` method argument —
-sent as the `Idempotency-Key` request header, exactly like a direct HTTP call to this service
-(see [docs/integration-guide.md §5](integration-guide.md#5-post-a-credit)). It is never a property
-on `RecordPostingRequest` or `RecordPostingBatchRequest`. Repeating the same key with the same
-content returns the original posting; repeating it with different content throws
+`RecordPostingAsync`, `RecordPostingBatchAsync` and `ReversePostingAsync` each take an
+`idempotencyKey` method argument — sent as the `Idempotency-Key` request header, exactly like a direct
+HTTP call to this service (see [docs/integration-guide.md §5](integration-guide.md#5-post-a-credit)).
+It is never a property on `RecordPostingRequest` or `RecordPostingBatchRequest`. Repeating the same key
+with the same content returns the original posting; repeating it with different content throws
 `AccountApiException` with `Code` `IDEMPOTENCY_KEY_CONFLICT`.
+
+On `ReversePostingAsync` the key is **not optional** and neither is `reason` — the service refuses a
+reversal missing either with `400`. Retrying the same reversal under the same key returns the reversal
+already written, which is the difference between a safe retry and a `POSTING_ALREADY_REVERSED` refusal.
 
 ### A refusal reaches the caller as a code, not JSON
 
@@ -117,8 +121,9 @@ pointed at `baseAddress`:
 
 - The client attaches no `Authorization` header, retry policy or timeout of its own — supply those
   through your own `DelegatingHandler` or `HttpClient` configuration.
-- `RecordPostingAsync` / `RecordPostingBatchAsync` refuse to compile the idempotency key into the
-  request body — always pass it as the method's `idempotencyKey` argument, never as metadata.
+- `RecordPostingAsync` / `RecordPostingBatchAsync` / `ReversePostingAsync` refuse to compile the
+  idempotency key into the request body — always pass it as the method's `idempotencyKey` argument,
+  never as metadata.
 - `AccountClient` can also be constructed directly around any `HttpClient` (for example a
   `WebApplicationFactory`'s in-memory one) — useful as an integration-test seam, not just through DI.
 

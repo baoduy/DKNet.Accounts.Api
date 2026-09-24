@@ -1,0 +1,45 @@
+/* Spacing, radius and density — DKNet Accounts Console.
+   Everything here derives from two roots: --spacing (0.25rem, the theme's own base step)
+   and --radius. Change either and the whole system retunes.
+
+   Every density value is a whole multiple of --spacing. The console previously carried
+   14px and 11px cell padding, which sat off the 4px grid for no reason; they are now
+   16px and 12px, and the row is 44px — which also clears the 44px minimum hit target. */
+
+:root {
+  --spacing: 0.25rem; /* 4px */
+
+  --space-1: calc(var(--spacing) * 1);  /* 4px */
+  --space-2: calc(var(--spacing) * 2);  /* 8px */
+  --space-3: calc(var(--spacing) * 3);  /* 12px */
+  --space-4: calc(var(--spacing) * 4);  /* 16px */
+  --space-5: calc(var(--spacing) * 5);  /* 20px — card padding, gap between page sections */
+  --space-6: calc(var(--spacing) * 6);  /* 24px */
+  --space-8: calc(var(--spacing) * 8);  /* 32px */
+  --space-12: calc(var(--spacing) * 12); /* 48px */
+
+  /* Radius. The theme ships --radius: 1rem; this system sets shadcn's 10px default,
+     which is the value the console was designed at. The four derivatives use the
+     theme's own calc() formula unchanged, so overriding --radius alone retunes them. */
+  --radius: 10px;
+  --radius-xs: calc(var(--radius) - 6px); /* 4px — 12–16px elements: the checkbox box */
+  --radius-sm: calc(var(--radius) - 4px); /* 6px — status dots, skeletons */
+  --radius-md: calc(var(--radius) - 2px); /* 8px — buttons, inputs, nav items */
+  --radius-lg: var(--radius);             /* 10px — cards, alerts */
+  --radius-xl: calc(var(--radius) + 4px); /* 14px — dialogs */
+  --radius-full: 9999px; /* status badges and the switch track only — never a button */
+
+  /* Density — the console's defining measurement, all on the 4px grid */
+  --row-height: calc(var(--spacing) * 11);     /* 44px */
+  --cell-padding-x: calc(var(--spacing) * 4);  /* 16px */
+  --cell-padding-y: calc(var(--spacing) * 3);  /* 12px */
+  --card-padding: calc(var(--spacing) * 5);    /* 20px */
+  --page-padding: calc(var(--spacing) * 7);    /* 28px */
+  --topbar-height: calc(var(--spacing) * 14);  /* 56px */
+  --sidebar-width: calc(var(--spacing) * 56);  /* 224px */
+  --drawer-width: calc(var(--spacing) * 105);  /* 420px */
+
+  /* Motion */
+  --duration-panel: 0.18s; /* @kind other */
+  --easing-panel: ease; /* @kind other */
+}

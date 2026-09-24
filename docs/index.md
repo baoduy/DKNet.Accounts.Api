@@ -10,6 +10,8 @@ production-ready .NET 10 microservices using vertical-slice DDD/CQRS.
   back, page a statement.
 - [Readme](../README.md) — what the service is, every field of every record type, the invariants it
   guarantees, the API contract, and the decisions on record.
+- [Console](console.md) — the Next.js operations console: how to run it locally, its environment
+  keys, and the Entra ID app registration it needs.
 
 Everything below documents the solution template this service was scaffolded from — reach for it when
 you are changing the service, not when you are calling it.

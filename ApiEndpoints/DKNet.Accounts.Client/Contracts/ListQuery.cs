@@ -57,6 +57,34 @@ public sealed record StatementQuery
     public int? PageSize { get; init; }
 }
 
+/// <summary>Query arguments for <c>GET /v1/postings</c> — deliberately its own shape (not a
+/// <see cref="ListQuery"/>): the effective-date window is required, unlike the shared surface's optional
+/// activity window, and narrowing by account/direction/category/status rides beside it.</summary>
+public sealed record PostingsListQuery
+{
+    public DateOnly? From { get; init; }
+
+    public DateOnly? To { get; init; }
+
+    public Guid? AccountId { get; init; }
+
+    public string? Direction { get; init; }
+
+    public string? Category { get; init; }
+
+    public string? Status { get; init; }
+
+    public string? Search { get; init; }
+
+    public string? OrderBy { get; init; }
+
+    public bool Desc { get; init; }
+
+    public int? PageNumber { get; init; }
+
+    public int? PageSize { get; init; }
+}
+
 /// <summary>Mirrors the service's <c>PagedResponse&lt;TResult&gt;</c> envelope.</summary>
 public sealed record PagedResult<TResult>
 {

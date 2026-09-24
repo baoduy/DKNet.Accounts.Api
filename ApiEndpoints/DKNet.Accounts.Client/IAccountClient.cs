@@ -21,15 +21,14 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/account-groups/{id}")]
     Task<AccountGroupDto> GetAccountGroupAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Partial update: a null member is left unchanged. At least one must be supplied.</summary>
     [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}")]
-    Task<AccountGroupDto> RenameAccountGroupAsync(Guid id, string name, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}/change-description")]
-    Task<AccountGroupDto> ChangeAccountGroupDescriptionAsync(Guid id, string? description, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/account-groups/{id}/change-metadata")]
-    Task<AccountGroupDto> ChangeAccountGroupMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default);
+    Task<AccountGroupDto> UpdateAccountGroupAsync(
+        Guid id,
+        string? name = null,
+        string? description = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default);
 
     [AccountRoute("POST", "/v{version:apiVersion}/account-groups/{id}/close")]
     Task<AccountGroupDto> CloseAccountGroupAsync(Guid id, CancellationToken ct = default);
@@ -42,6 +41,12 @@ public interface IAccountClient
 
     [AccountRoute("GET", "/v{version:apiVersion}/account-groups/{id:guid}/balances")]
     Task<IReadOnlyList<AccountGroupBalanceLineDto>> GetAccountGroupBalancesAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Every value of <c>AccountGroupStatus</c>, zeros included, optionally narrowed to a
+    /// created-on window (from/to only — any other narrowing is refused).</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/account-groups/status-counts")]
+    Task<IReadOnlyList<StatusCountDto>> GetAccountGroupStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default);
 
     // ---- Accounts (8) ----
 
@@ -57,20 +62,34 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/balance")]
     Task<AccountBalanceDto> GetAccountBalanceAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Partial update of name/metadata: a null member is left unchanged. At least one must be
+    /// supplied. Status, overdraft limit and minimum balance go through <see cref="UpdateAccountAsync"/>.</summary>
     [AccountRoute("PUT", "/v{version:apiVersion}/accounts/{id}")]
-    Task<AccountDto> RenameAccountAsync(Guid id, string name, CancellationToken ct = default);
-
-    [AccountRoute("PUT", "/v{version:apiVersion}/accounts/{id}/change-metadata")]
-    Task<AccountDto> ChangeAccountMetadataAsync(
-        Guid id, IReadOnlyDictionary<string, string>? metadata, CancellationToken ct = default);
+    Task<AccountDto> ChangeAccountDetailsAsync(
+        Guid id,
+        string? name = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken ct = default);
 
     /// <summary>{"status":"Closed"} closes the account — mirrors the service's own PATCH contract.</summary>
     [AccountRoute("PATCH", "/v{version:apiVersion}/accounts/{id:guid}")]
     Task<AccountDto> UpdateAccountAsync(
-        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance, CancellationToken ct = default);
+        Guid id, AccountStatus? status, decimal? overdraftLimit, decimal? minimumBalance,
+        bool? permittedToGoNegative = null, CancellationToken ct = default);
 
     [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/statement")]
     Task<PagedResult<PostingDto>> GetAccountStatementAsync(Guid id, StatementQuery? query = null, CancellationToken ct = default);
+
+    /// <summary>Every value of <c>AccountStatus</c>, zeros included, optionally narrowed to a created-on
+    /// window (from/to only — any other narrowing is refused).</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/accounts/status-counts")]
+    Task<IReadOnlyList<StatusCountDto>> GetAccountStatusCountsAsync(
+        DateTimeOffset? from = null, DateTimeOffset? toDate = null, CancellationToken ct = default);
+
+    /// <summary>The ledger's position by currency, across every account — one line per currency, never
+    /// combined.</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/accounts/balances")]
+    Task<IReadOnlyList<LedgerBalanceLineDto>> GetLedgerBalancesAsync(CancellationToken ct = default);
 
     // ---- Currencies (6) ----
 
@@ -92,7 +111,10 @@ public interface IAccountClient
     [AccountRoute("POST", "/v{version:apiVersion}/currencies/{id}/deactivate")]
     Task<CurrencyDto> DeactivateCurrencyAsync(Guid id, CancellationToken ct = default);
 
-    // ---- Postings (4) ----
+    // ---- Postings (5) ----
+
+    [AccountRoute("GET", "/v{version:apiVersion}/postings/")]
+    Task<PagedResult<PostingDto>> ListPostingsAsync(PostingsListQuery? query = null, CancellationToken ct = default);
 
     /// <summary>Sends <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request header (spec
     /// §3 row 7), never as a body field.</summary>
@@ -108,6 +130,10 @@ public interface IAccountClient
     [AccountRoute("GET", "/v{version:apiVersion}/postings/{id:guid}")]
     Task<PostingDto> GetPostingAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Reversal requires both: <paramref name="reason"/> travels in the body and is recorded as the
+    /// reversal posting's description, <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request
+    /// header — a retry under the same key returns the reversal already written rather than a refusal.</summary>
     [AccountRoute("POST", "/v{version:apiVersion}/postings/{id:guid}/reverse")]
-    Task<PostingDto> ReversePostingAsync(Guid id, CancellationToken ct = default);
+    Task<PostingDto> ReversePostingAsync(
+        Guid id, string reason, string idempotencyKey, CancellationToken ct = default);
 }

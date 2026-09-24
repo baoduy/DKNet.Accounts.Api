@@ -26,59 +26,21 @@ internal sealed class CreateAccountGroupHandler(
     }
 }
 
-/// <summary>Generated update handler for AccountGroup.Rename. Write a class implementing the same IHandler to replace it.</summary>
-internal sealed class RenameAccountGroupHandler(
+/// <summary>Generated update handler for AccountGroup.Update. Write a class implementing the same IHandler to replace it.</summary>
+internal sealed class UpdateAccountGroupHandler(
     global::DKNet.EfCore.Specifications.Repositories.IRepositorySpec repository,
     global::MapsterMapper.IMapper mapper)
-    : global::DKNet.SlimBus.Extensions.Fluents.Requests.IHandler<RenameAccountGroupRequest, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>
+    : global::DKNet.SlimBus.Extensions.Fluents.Requests.IHandler<UpdateAccountGroupRequest, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>
 {
     /// <inheritdoc />
     public async global::System.Threading.Tasks.Task<global::FluentResults.IResult<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>> OnHandle(
-        RenameAccountGroupRequest request, global::System.Threading.CancellationToken cancellationToken)
+        UpdateAccountGroupRequest request, global::System.Threading.CancellationToken cancellationToken)
     {
         var entity = await repository.FirstOrDefaultAsync(new AccountGroupByIdCrudSpec(request.Id), cancellationToken);
         if (entity is null)
             return global::FluentResults.Result.Fail<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(
                 new global::DKNet.SlimBus.Extensions.NotFoundError($"AccountGroup '{request.Id}' was not found."));
-        entity.Rename(request.Name);
-        return global::DKNet.SlimBus.Extensions.LazyMapper.LazyMapExtensions.ResultOf<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(mapper, entity);
-    }
-}
-
-/// <summary>Generated update handler for AccountGroup.ChangeDescription. Write a class implementing the same IHandler to replace it.</summary>
-internal sealed class ChangeDescriptionAccountGroupHandler(
-    global::DKNet.EfCore.Specifications.Repositories.IRepositorySpec repository,
-    global::MapsterMapper.IMapper mapper)
-    : global::DKNet.SlimBus.Extensions.Fluents.Requests.IHandler<ChangeDescriptionAccountGroupRequest, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>
-{
-    /// <inheritdoc />
-    public async global::System.Threading.Tasks.Task<global::FluentResults.IResult<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>> OnHandle(
-        ChangeDescriptionAccountGroupRequest request, global::System.Threading.CancellationToken cancellationToken)
-    {
-        var entity = await repository.FirstOrDefaultAsync(new AccountGroupByIdCrudSpec(request.Id), cancellationToken);
-        if (entity is null)
-            return global::FluentResults.Result.Fail<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(
-                new global::DKNet.SlimBus.Extensions.NotFoundError($"AccountGroup '{request.Id}' was not found."));
-        entity.ChangeDescription(request.Description);
-        return global::DKNet.SlimBus.Extensions.LazyMapper.LazyMapExtensions.ResultOf<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(mapper, entity);
-    }
-}
-
-/// <summary>Generated update handler for AccountGroup.ChangeMetadata. Write a class implementing the same IHandler to replace it.</summary>
-internal sealed class ChangeMetadataAccountGroupHandler(
-    global::DKNet.EfCore.Specifications.Repositories.IRepositorySpec repository,
-    global::MapsterMapper.IMapper mapper)
-    : global::DKNet.SlimBus.Extensions.Fluents.Requests.IHandler<ChangeMetadataAccountGroupRequest, global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>
-{
-    /// <inheritdoc />
-    public async global::System.Threading.Tasks.Task<global::FluentResults.IResult<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>> OnHandle(
-        ChangeMetadataAccountGroupRequest request, global::System.Threading.CancellationToken cancellationToken)
-    {
-        var entity = await repository.FirstOrDefaultAsync(new AccountGroupByIdCrudSpec(request.Id), cancellationToken);
-        if (entity is null)
-            return global::FluentResults.Result.Fail<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(
-                new global::DKNet.SlimBus.Extensions.NotFoundError($"AccountGroup '{request.Id}' was not found."));
-        entity.ChangeMetadata(request.Metadata);
+        entity.Update(request.Name, request.Description, request.Metadata);
         return global::DKNet.SlimBus.Extensions.LazyMapper.LazyMapExtensions.ResultOf<global::DKNet.Accounts.AppServices.AccountGroups.V1.AccountGroupDto>(mapper, entity);
     }
 }

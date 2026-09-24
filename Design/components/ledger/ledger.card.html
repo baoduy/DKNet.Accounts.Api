@@ -1,0 +1,54 @@
+<!-- @dsCard group="Components" viewport="700x1050" name="Ledger" subtitle="Money, Currency, StatusBadge, AccountNumber, BalanceTiles, FloorLine, CurrencyBalanceList, LedgerTable, StatementTable" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:var(--space-4);background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:var(--text-body-size);line-height:var(--text-body-leading);letter-spacing:var(--tracking-normal)}.lab{font-size:var(--text-label-size);line-height:var(--text-label-leading);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-label);color:var(--muted-foreground);text-transform:uppercase;margin-bottom:var(--space-2)}.grp{margin-bottom:var(--space-5)}.row{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}.stack{display:flex;flex-direction:column;gap:var(--space-3)}.frame{position:relative;transform:translateZ(0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--background)}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.DKNetAccountsDesignSystem_97519d;
+const { Money, Currency, StatusBadge, AccountNumber, PostingNumber, BalanceTiles, FloorLine, CurrencyBalanceList, LedgerTable, StatementTable, Card, Chip, Caption } = NS;
+const ACCOUNTS=[
+ {id:'a1',accountNumber:'ACME-000123',name:'Operating Account',group:'ACME',currency:'SGD',status:'Active',balance:12400,available:12400,opened:'18 Sep 2026'},
+ {id:'a2',accountNumber:'MERCH-000044',name:'Settlement — APAC',group:'MERCH',currency:'SGD',status:'Dormant',balance:0,available:0,opened:'14 Sep 2026'},
+ {id:'a3',accountNumber:'SUSP-000002',name:'Suspense — unmatched',group:'SUSP',currency:'SGD',status:'Frozen',balance:1204.55,available:1204.55,opened:'12 Sep 2026'}];
+const COLS=[
+ {key:'accountNumber',header:'Account no.',sortable:true,render:r=><AccountNumber value={r.accountNumber} href="#" />},
+ {key:'name',header:'Name',sortable:true},
+ {key:'currency',header:'Currency',sortable:true,queryAs:'CurrencyCode',render:r=><Currency code={r.currency} />},
+ {key:'status',header:'Status',sortable:true,render:r=><StatusBadge status={r.status} />},
+ {key:'balance',header:'Balance',sortable:true,align:'right',render:r=><Money amount={r.balance} />},
+ {key:'availableBalance',header:'Available',sortable:false,align:'right',render:r=><Money amount={r.available} />},
+ {key:'openedOn',header:'Opened',sortable:false,align:'right',render:r=><Caption>{r.opened}</Caption>}];
+const STMT=[
+ {id:'p121',effectiveDate:'18 Sep 2026',recordedAt:'18 Sep 09:02',postingNumber:'POST-000121',description:'Opening balance',category:'OpeningBalance',signedAmount:10000,balanceAfter:10000,streamPosition:1,status:'Posted'},
+ {id:'p123',effectiveDate:'19 Sep 2026',recordedAt:'19 Sep 14:41',postingNumber:'POST-000123',description:'Settlement to merchant',category:'Transfer',signedAmount:-892.45,balanceAfter:9107.55,streamPosition:2,status:'Reversed'},
+ {id:'p124',effectiveDate:'19 Sep 2026',recordedAt:'19 Sep 15:10',postingNumber:'POST-000124',description:'Reversal of POST-000123',category:'Reversal',signedAmount:892.45,balanceAfter:10000,streamPosition:3,status:'Posted'}];
+function App(){
+  const [sel,setSel]=React.useState('a1');
+  return <div>
+    <div className="grp"><div className="lab">Money, Currency, StatusBadge, identifiers</div><div className="row">
+      <Money amount={12400} /><Money amount={10000} signed /><Money amount={-1600} signed />
+      <Money amount={-892.45} signed struck /><Money amount={44120000} decimalPlaces={0} /><Money amount={1204.55} decimalPlaces={3} />
+      <Currency code="SGD" /><Currency code="JPY" /><Currency code="XAU" />
+      <StatusBadge status="Active" /><StatusBadge status="Dormant" /><StatusBadge status="Frozen" /><StatusBadge status="Posted" /><StatusBadge status="Reversed" />
+      <AccountNumber value="ACME-000123" href="#" /><PostingNumber value="POST-000124" href="#" />
+    </div></div>
+    <div className="grp"><div className="lab">BalanceTiles and FloorLine</div>
+      <BalanceTiles account={{balance:12400,availableBalance:12400,heldAmount:0,currency:'SGD',decimalPlaces:2}} />
+      <FloorLine account={{permittedToGoNegative:true,overdraftLimit:5000,currency:'SGD',decimalPlaces:2}} style={{marginTop:'var(--space-2)'}} />
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'300px minmax(0, 1fr)',gap:'var(--space-4)',alignItems:'start',marginBottom:'var(--space-5)'}}>
+      <div><div className="lab">CurrencyBalanceList</div><Card><CurrencyBalanceList balances={[{currency:'SGD',amount:1204882.5},{currency:'USD',amount:318004},{currency:'JPY',amount:44120000,decimalPlaces:0}]} /></Card></div>
+      <div><div className="lab">BalanceTiles — inline</div><Card><BalanceTiles layout="inline" account={{balance:8400,availableBalance:8400,heldAmount:0,currency:'SGD',decimalPlaces:2}} /></Card></div>
+    </div>
+    <div className="grp"><div className="lab">LedgerTable — Available and Opened carry no sort control</div>
+      <Card padded={false} style={{overflow:'hidden'}}><LedgerTable columns={COLS} rows={ACCOUNTS} selectedId={sel} onSelectRow={r=>setSel(r.id)} orderBy="accountNumber" /></Card>
+    </div>
+    <div className="grp"><div className="lab">StatementTable — stream order, sorting off entirely</div>
+      <Card padded={false} style={{overflow:'hidden'}}><StatementTable rows={STMT} postingHref={()=>'#'} /></Card>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

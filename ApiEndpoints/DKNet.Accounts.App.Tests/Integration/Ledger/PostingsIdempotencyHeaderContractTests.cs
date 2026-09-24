@@ -7,8 +7,9 @@ namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 /// contribution for <c>[FromRequestHeader]</c> (§9 Q1) — the header parameter is declared by hand on each
 /// route (§3 row 5) — so this reads the generated OpenAPI document, the published contract, rather than the
 /// attribute or the route mapping directly. Reuses <see cref="SwaggerOnApiFixture"/>, the existing way to
-/// reach <c>/openapi/v1.json</c> (<see cref="AuthorFromCredentialContractTests"/>); no new seam. Red today:
-/// neither operation declares it.
+/// reach <c>/openapi/v1.json</c> (<see cref="AuthorFromCredentialContractTests"/>); no new seam.
+/// Reverse is covered here too, now that it requires the header — the third case fails if its
+/// <c>[FromRequestHeader]</c> is dropped, which is the only reason the header reaches the validator at all.
 /// </summary>
 public sealed class PostingsIdempotencyHeaderContractTests(SwaggerOnApiFixture fixture)
     : IClassFixture<SwaggerOnApiFixture>
@@ -16,6 +17,7 @@ public sealed class PostingsIdempotencyHeaderContractTests(SwaggerOnApiFixture f
     [Theory]
     [InlineData("/v1/postings", "post")]
     [InlineData("/v1/postings/batch", "post")]
+    [InlineData("/v1/postings/{id}/reverse", "post")]
     public async Task PostingRoute_PublishesTheIdempotencyKeyHeaderParameter(string path, string method)
     {
         var response = await fixture.CreateClient().GetAsync("/openapi/v1.json");

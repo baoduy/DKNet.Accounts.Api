@@ -1,0 +1,139 @@
+/**
+ * DRK-1696 §3 row 6 — account read hooks, through `/api/ledger/...` (the pass-through), body
+ * parsed with `parseLedgerJson` so a money field never routes through `Number`. `useAccount`
+ * resolves a non-guid via `filter=AccountNumber:Equal:<value>` and returns a distinct
+ * not-found on an empty page — never the first row.
+ */
+'use client';
+
+import { keepPreviousData, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { parseLedgerJson } from '@/lib/api/json';
+import { refusalError } from '@/lib/api/refusal';
+import { fetchCurrencies, type Currency } from '@/lib/query/currencies';
+import type { components } from '@/lib/api/schema';
+import { accountBalanceKey, accountGroupsKey, accountKey, accountsListKey, currenciesQueryOptions, postingsListKey } from '@/lib/query/keys';
+import type { ListViewState } from '@/lib/url-state';
+import { toAccountsQuery } from './filters';
+import { toPostingsQuery, type PostingsFilterState } from './postings-filter';
+
+export type AccountDto = components['schemas']['AccountDto'];
+export type AccountGroupDto = components['schemas']['AccountGroupDto'];
+export type AccountBalanceDto = components['schemas']['AccountBalanceDto'];
+export type PostingDto = components['schemas']['PostingDto'];
+export type PagedAccountResponse = components['schemas']['PagedAccountResponse'];
+export type PagedPostingResponse = components['schemas']['PagedPostingResponse'];
+
+const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** DRK-1704 finding 5 — a refused read throws (never a silent "not found" or an empty page),
+ * so the screen shows the service's own wording instead of guessing. */
+async function fetchLedgerJson(path: string): Promise<unknown> {
+  const response = await fetch(path);
+  const body = parseLedgerJson(await response.text());
+  if (!response.ok) throw refusalError(body);
+  return body;
+}
+
+export function useAccounts(state: ListViewState, pageSize?: number): UseQueryResult<PagedAccountResponse> {
+  const query = toAccountsQuery(state, pageSize);
+  return useQuery({
+    queryKey: accountsListKey({ ...state, pageSize }),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/accounts?${query!.toString()}`)) as PagedAccountResponse,
+    enabled: query !== null,
+    // A filter/sort/page change swaps the query key — without this the list would flash to
+    // empty between the old and new response instead of holding the previous rows.
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface AccountLookup {
+  found: boolean;
+  account?: AccountDto;
+}
+
+async function lookupAccount(idOrNumber: string): Promise<AccountLookup> {
+  if (GUID_PATTERN.test(idOrNumber)) {
+    const response = await fetch(`/api/ledger/accounts/${idOrNumber}`);
+    // 404 is the only "not found" — any other refusal (401, 403, 500, ...) throws instead
+    // of being mistaken for one (DRK-1704 finding 5).
+    if (response.status === 404) return { found: false };
+    const body = parseLedgerJson(await response.text());
+    if (!response.ok) throw refusalError(body);
+    return { found: true, account: body as AccountDto };
+  }
+  const params = new URLSearchParams({ filter: `AccountNumber:Equal:${idOrNumber}` });
+  const page = (await fetchLedgerJson(`/api/ledger/accounts?${params.toString()}`)) as PagedAccountResponse;
+  const account = page.items[0];
+  return account ? { found: true, account } : { found: false };
+}
+
+export function useAccount(idOrNumber: string): UseQueryResult<AccountLookup> {
+  return useQuery({ queryKey: accountKey(idOrNumber), queryFn: () => lookupAccount(idOrNumber) });
+}
+
+/** DRK-1713 §3 row 6 — the accounts a page of postings names, one cached read per account id
+ * (the same key `useAccount` uses), so a row can show the account number rather than its guid. */
+export function useAccountsById(ids: string[]): UseQueryResult<AccountLookup>[] {
+  return useQueries({ queries: ids.map((id) => ({ queryKey: accountKey(id), queryFn: () => lookupAccount(id) })) });
+}
+
+/** DRK-1696 §3 row 3 — `GET /accounts/{id}/balance`, keyed so a reversal or a record on this
+ * account (`lib/query/mutations.ts`) invalidates the same cached copy the detail screen reads. */
+export function useAccountBalance(accountId: string): UseQueryResult<AccountBalanceDto> {
+  return useQuery({
+    queryKey: accountBalanceKey(accountId),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/accounts/${accountId}/balance`)) as AccountBalanceDto,
+    enabled: accountId.length > 0,
+  });
+}
+
+/** DRK-1696 §3 row 3 — `GET /postings`, narrowed to this account and the operator's period +
+ * direction/category/status filter. A period the service would refuse produces no call. */
+export function usePostings(accountId: string, filter: PostingsFilterState, pageSize?: number, acrossAccounts = false): UseQueryResult<PagedPostingResponse> {
+  const query = toPostingsQuery(accountId, filter, pageSize);
+  return useQuery({
+    queryKey: postingsListKey({ accountId, ...filter, pageSize }),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/postings?${query!.toString()}`)) as PagedPostingResponse,
+    enabled: query !== null && (accountId.length > 0 || acrossAccounts),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAccountGroups(): UseQueryResult<AccountGroupDto[]> {
+  return useQuery({
+    queryKey: accountGroupsKey(),
+    queryFn: async () => {
+      const page = (await fetchLedgerJson('/api/ledger/account-groups')) as { items: AccountGroupDto[] };
+      return page.items;
+    },
+  });
+}
+
+/** DRK-1704 finding 9 — reuses `lib/query/currencies.ts`'s `fetchCurrencies`, the one currency
+ * read the DRK-1697 cycle already built (`readLedgerJson`/`refusalError`), instead of a second
+ * implementation with its own query function and a different result shape sharing the same
+ * `staleTime: Infinity` cache key. */
+export function useCurrencies(): UseQueryResult<Currency[]> {
+  return useQuery({
+    ...currenciesQueryOptions(),
+    queryFn: fetchCurrencies,
+  });
+}
+
+/** DRK-1713 §3 row 4 — `GET /postings` across every account (no `accountId`), with the Records
+ * screen's search, sort and page. Keyed under `postingsListKey`, so a record or reverse
+ * (`lib/query/mutations.ts`) refreshes it. */
+export function useRecords(filter: PostingsFilterState, pageSize?: number): UseQueryResult<PagedPostingResponse> {
+  return usePostings('', filter, pageSize, true);
+}
+
+/** DRK-1713 §3 row 4 — `GET /postings/{id}`, to follow the link between a posting and its
+ * reversal when the other one is not on the listed page. Keyed under `postingsListKey` too, so
+ * the same writes that refresh the lists refresh it. */
+export function usePosting(postingId: string | null | undefined): UseQueryResult<PostingDto> {
+  return useQuery({
+    queryKey: postingsListKey({ postingId }),
+    queryFn: async () => (await fetchLedgerJson(`/api/ledger/postings/${postingId}`)) as PostingDto,
+    enabled: !!postingId,
+  });
+}

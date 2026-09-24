@@ -38,34 +38,30 @@ public class AccountGroupTests
     }
 
     [Fact]
-    public void Rename_ChangesName()
-    {
-        var group = NewGroup();
-
-        group.Rename("New Name");
-
-        group.Name.ShouldBe("New Name");
-    }
-
-    [Fact]
-    public void ChangeDescription_AcceptsNullToClearIt()
-    {
-        var group = NewGroup();
-
-        group.ChangeDescription(null);
-
-        group.Description.ShouldBeNull();
-    }
-
-    [Fact]
-    public void ChangeMetadata_ReplacesTheBag()
+    public void Update_AppliesEveryMemberSupplied()
     {
         var group = NewGroup();
         var metadata = new Dictionary<string, string> { ["region"] = "SG" };
 
-        group.ChangeMetadata(metadata);
+        group.Update("New Name", "New desc", metadata);
 
+        group.Name.ShouldBe("New Name");
+        group.Description.ShouldBe("New desc");
         group.Metadata.ShouldBe(metadata);
+    }
+
+    [Fact]
+    public void Update_LeavesANullMemberAlone()
+    {
+        // Partial update: null means "not supplied", never "clear it" — no field can be cleared through this
+        // route, which is why UpdateAccountGroupRequestValidator refuses a body with every member null.
+        var group = NewGroup();
+
+        group.Update(name: "Only the name", description: null, metadata: null);
+
+        group.Name.ShouldBe("Only the name");
+        group.Description.ShouldBe("desc");
+        group.Metadata!["k"].ShouldBe("v");
     }
 
     [Fact]

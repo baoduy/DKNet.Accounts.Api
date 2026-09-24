@@ -363,7 +363,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
 
     #region DRK-1438 §5 shared helpers
 
-    /// <summary>Dispatches one of the four generated-route operations §5's outlines name, against
+    /// <summary>Dispatches one of the generated-route operations §5's outlines name, against
     /// whatever identifier the scenario supplies — a real group id, a well-formed but unknown one, or a
     /// malformed string. Request bodies carry field names only; none of these calls is expected to reach
     /// body validation (route/model binding or authorization refuses first in every outline this backs).</summary>
@@ -371,13 +371,9 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         operation switch
         {
             "a read" => client.SendAsCallerAsync(state, HttpMethod.Get, $"{GroupsPath}/{identifier}"),
-            "a rename" => client.SendAsCallerAsync(
-                state, HttpMethod.Put, $"{GroupsPath}/{identifier}", new { name = "Ignored" }),
-            "a description change" => client.SendAsCallerAsync(
-                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-description", new { description = "Ignored" }),
-            "a metadata change" => client.SendAsCallerAsync(
-                state, HttpMethod.Put, $"{GroupsPath}/{identifier}/change-metadata",
-                new { metadata = new Dictionary<string, string>() }),
+            "an update" => client.SendAsCallerAsync(
+                state, HttpMethod.Put, $"{GroupsPath}/{identifier}",
+                new { name = "Ignored", description = "Ignored", metadata = new Dictionary<string, string>() }),
             "a delete" => client.SendAsCallerAsync(state, HttpMethod.Delete, $"{GroupsPath}/{identifier}"),
             _ => throw new NotSupportedException($"Unknown operation '{operation}'.")
         };
@@ -470,7 +466,8 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
     [When(@"it reverses that posting")]
     public async Task WhenItReversesThatPosting() =>
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Post, $"{PostingsPath}/{LastPostingId}/reverse");
+            state, HttpMethod.Post, $"{PostingsPath}/{LastPostingId}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
 
     [When(@"it records the same credit again under idempotency key ""([^""]+)""")]
     public async Task WhenItRecordsTheSameCreditAgainUnderIdempotencyKey(string key)
@@ -546,11 +543,11 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Response = await client.SendAsCallerAsync(
             state, HttpMethod.Delete, $"{GroupsPath}/{state.Values[$"group:{code}"]}");
 
-    [When(@"""[^""]+"" sends (a rename|a description change|a metadata change|a delete) for that group$")]
+    [When(@"""[^""]+"" sends (an update|a delete) for that group$")]
     public async Task WhenSendsOperationForThatGroup(string operation) =>
         state.Response = await DispatchGeneratedRouteOperationAsync(operation, LastGroupId.ToString());
 
-    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for the identifier ""([^""]+)""")]
+    [When(@"""[^""]+"" sends (a read|an update) for the identifier ""([^""]+)""")]
     public async Task WhenSendsOperationForTheIdentifier(string operation, string identifier)
     {
         state.CallerClientId = "treasury-ops";
@@ -558,7 +555,7 @@ public sealed class AttributeCrudMigrationSteps(HttpClient client, ScenarioState
         state.Response = await DispatchGeneratedRouteOperationAsync(operation, identifier);
     }
 
-    [When(@"""[^""]+"" sends (a read|a rename|a description change|a metadata change) for that identifier$")]
+    [When(@"""[^""]+"" sends (a read|an update) for that identifier$")]
     public async Task WhenSendsOperationForThatIdentifier(string operation)
     {
         state.CallerClientId = "treasury-ops";

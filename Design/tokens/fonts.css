@@ -1,0 +1,5 @@
+/* Webfonts — DKNet Accounts Console.
+   No font binaries were supplied. All three families the theme names are covered: Inter
+   and JetBrains Mono come from the Google CDN, Georgia is a system face and needs no load.
+   Swap this @import for local @font-face rules if the binaries are later added. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");

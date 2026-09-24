@@ -111,7 +111,7 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     {
         var id = await OpenAccountAsync();
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{AccountsPath}/{id}/change-metadata", new
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{AccountsPath}/{id}", new
         {
             metadata = new Dictionary<string, string> { ["region"] = "SG" }
         }));
@@ -199,7 +199,7 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     }
 
     /// <summary>
-    /// GetById, Rename and ChangeMetadata are served by the generated composite's own default pattern
+    /// GetById and ChangeDetails are served by the generated composite's own default pattern
     /// "{id}" (spec revision 13 §3, frozen — pr-reviewer round 1 finding 7's attempt to restore "{id:guid}"
     /// by excluding these routes was reverted in round 2). The route still matches a malformed id; binding it
     /// to the handler's Guid parameter is what fails, so the answer is 400, not a 404 route miss.
@@ -207,7 +207,6 @@ public sealed class AccountsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     [Theory]
     [InlineData("GET", null, "")]
     [InlineData("PUT", "Ignored", "")]
-    [InlineData("PUT", "Ignored", "/change-metadata")]
     public async Task AMalformedId_StillMatchesTheRoute_AndIsAnsweredAsABadRequest(
         string method, string? name, string suffix)
     {

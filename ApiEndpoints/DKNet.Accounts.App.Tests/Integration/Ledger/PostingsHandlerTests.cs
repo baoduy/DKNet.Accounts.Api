@@ -98,6 +98,16 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         return body.GetProperty("id").GetGuid();
     }
 
+    /// <summary>Reversal requires both a reason (body) and an <c>Idempotency-Key</c> header; a fresh key per
+    /// call by default so each reversal is its own request rather than a replay of the previous one.</summary>
+    private Task<HttpResponseMessage> ReverseAsync(
+        Guid postingId, string reason = "Recorded in error", string? idempotencyKey = null) =>
+        Client.SendAsync(AsPayHub(
+            HttpMethod.Post,
+            $"{PostingsPath}/{postingId}/reverse",
+            new { reason },
+            idempotencyKey ?? $"rev-{Guid.NewGuid():N}"));
+
     [Fact]
     public async Task GetPostingById_ReturnsNotFound_ForAnUnknownPosting()
     {
@@ -412,7 +422,7 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var postingId = await RecordAsync(account, "Credit", 50m);
         await PatchStatusAsync(account, "Frozen");
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/{postingId}/reverse"));
+        var response = await ReverseAsync(postingId);
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -430,7 +440,7 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var postingId = await RecordAsync(account, "Debit", 20m);
         await PatchStatusAsync(account, "Dormant");
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/{postingId}/reverse"));
+        var response = await ReverseAsync(postingId);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -465,9 +475,107 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     [Fact]
     public async Task Reverse_AgainstAnUnknownPosting_IsRefused()
     {
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/{Guid.NewGuid()}/reverse"));
+        var response = await ReverseAsync(Guid.NewGuid());
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Reverse_WithoutAnIdempotencyKey_IsRejected()
+    {
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+
+        var response = await Client.SendAsync(AsPayHub(
+            HttpMethod.Post, $"{PostingsPath}/{postingId}/reverse", new { reason = "Recorded in error" }));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reverse_WithoutAReason_IsRejected()
+    {
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+
+        var response = await ReverseAsync(postingId, reason: "");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reverse_PutsTheCallersReasonOnTheReversalsDescription()
+    {
+        // The reason replaces the old auto-generated "Reversal of {postingNumber}" prose — the lineage is
+        // already carried structurally by reversesPostingId, so the description is free to hold why.
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+
+        var response = await ReverseAsync(postingId, "Duplicate of TX-991");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("description").GetString().ShouldBe("Duplicate of TX-991");
+        body.GetProperty("reversesPostingId").GetGuid().ShouldBe(postingId);
+    }
+
+    [Fact]
+    public async Task Reverse_ReplayedUnderTheSameKeyAndReason_ReturnsTheFirstReversal()
+    {
+        // The whole point of requiring the key: a retried reversal (timeout, redelivery) must return the
+        // reversal it already wrote, NOT POSTING_ALREADY_REVERSED — and must not write a second one.
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+        var key = $"rev-{Guid.NewGuid():N}";
+
+        var first = await ReverseAsync(postingId, "Recorded in error", key);
+        var replay = await ReverseAsync(postingId, "Recorded in error", key);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.OK);
+        replay.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var replayBody = await replay.Content.ReadFromJsonAsync<JsonElement>();
+        replayBody.GetProperty("id").GetGuid().ShouldBe(firstBody.GetProperty("id").GetGuid());
+
+        // Only one reversal landed, so the balance is back to zero rather than overshot to -50.
+        var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));
+        var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
+        balance.GetProperty("balance").GetDecimal().ShouldBe(0m);
+    }
+
+    [Fact]
+    public async Task Reverse_ReusingAKeyWithADifferentReason_IsRefused()
+    {
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+        var key = $"rev-{Guid.NewGuid():N}";
+        (await ReverseAsync(postingId, "Recorded in error", key)).EnsureSuccessStatusCode();
+
+        var response = await ReverseAsync(postingId, "Customer dispute", key);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.IdempotencyKeyConflict)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.IdempotencyKeyConflict}, got: {body}");
+    }
+
+    [Fact]
+    public async Task Reverse_UnderAFreshKeyAgainstAnAlreadyReversedPosting_IsStillRefused()
+    {
+        // A genuinely new request (its own key) against an already-reversed posting keeps the 422 — only a
+        // replay of the SAME key is answered with the earlier reversal.
+        var account = await OpenAccountAsync();
+        var postingId = await RecordAsync(account, "Credit", 50m);
+        (await ReverseAsync(postingId)).EnsureSuccessStatusCode();
+
+        var response = await ReverseAsync(postingId);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.PostingAlreadyReversed)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.PostingAlreadyReversed}, got: {body}");
     }
 
     /// <summary>

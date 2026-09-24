@@ -8,11 +8,23 @@ public sealed class ScenarioState
 
     public string? ResponseBody { get; set; }
 
-    /// <summary>The calling system the next request authenticates as. Defaults to PayHub, full scope.</summary>
-    public string CallerClientId { get; set; } = "PayHub";
+    /// <summary>The calling system the next request authenticates as, carried as a <c>client_id</c> claim.
+    /// Defaults to PayHub, full scope. Null means the credential carries no <c>client_id</c> — a person's
+    /// Entra token names its calling application under <see cref="CallerAzp"/> or <see cref="CallerAppId"/>
+    /// instead (DRK-1670).</summary>
+    public string? CallerClientId { get; set; } = "PayHub";
 
-    /// <summary>The person named in the next request's credential, alongside <see cref="CallerClientId"/>'s
-    /// calling system. Null (default) means the credential names no person — today's behaviour.</summary>
+    /// <summary>The calling application named as a v2.0 Entra token's <c>azp</c> claim. Null (default) means
+    /// the credential carries no <c>azp</c> claim.</summary>
+    public string? CallerAzp { get; set; }
+
+    /// <summary>The calling application named as a v1.0 Entra token's <c>appid</c> claim. Null (default) means
+    /// the credential carries no <c>appid</c> claim.</summary>
+    public string? CallerAppId { get; set; }
+
+    /// <summary>The person named in the next request's credential, alongside the calling system named by
+    /// <see cref="CallerClientId"/>/<see cref="CallerAzp"/>/<see cref="CallerAppId"/>. Null (default) means the
+    /// credential names no person — today's behaviour.</summary>
     public string? CallerSubject { get; set; }
 
     public string[] CallerScopes { get; set; } = [.. ScopeNames.All];

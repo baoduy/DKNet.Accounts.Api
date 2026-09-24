@@ -1,0 +1,58 @@
+<!-- @dsCard group="Components" viewport="700x680" name="Core" subtitle="Button, Badge, Chip, Card, Tabs, Breadcrumb, Pagination, Skeleton, Separator, Icon, Label" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:var(--space-4);background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:var(--text-body-size);line-height:var(--text-body-leading);letter-spacing:var(--tracking-normal)}.lab{font-size:var(--text-label-size);line-height:var(--text-label-leading);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-label);color:var(--muted-foreground);text-transform:uppercase;margin-bottom:var(--space-2)}.grp{margin-bottom:var(--space-5)}.row{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap}.stack{display:flex;flex-direction:column;gap:var(--space-3)}.frame{position:relative;transform:translateZ(0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--background)}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.DKNetAccountsDesignSystem_97519d;
+const { Button, Badge, Chip, Card, CardBar, Tabs, Breadcrumb, Pagination, Skeleton, Separator, Icon, Label, Caption, Note, Mono } = NS;
+function App(){
+  const [tab,setTab] = React.useState('single');
+  return <div>
+    <div className="grp"><div className="lab">Button — variant</div><div className="row">
+      <Button variant="primary">Record posting</Button>
+      <Button>View statement</Button>
+      <Button variant="ghost">Cancel</Button>
+      <Button variant="destructive">Close account</Button>
+      <Button variant="primary" disabled>Record posting</Button>
+      <Caption>disabled states its reason beside it</Caption>
+    </div></div>
+    <div className="grp"><div className="lab">Button — size and icon</div><div className="row">
+      <Button size="sm">sm</Button><Button size="md">md</Button><Button size="lg">lg</Button>
+      <Button icon={<Icon name="plus" size={14} />}>Create group</Button>
+      <Button variant="primary" icon={<Icon name="rotate-ccw" size={14} />}>Reverse</Button>
+    </div></div>
+    <div className="grp"><div className="lab">Badge and Chip</div><div className="row">
+      <Badge tone="credit">Active</Badge><Badge tone="warning">Dormant</Badge><Badge tone="debit">Frozen</Badge>
+      <Badge tone="info">Posted</Badge><Badge tone="neutral">Closed</Badge>
+      <Separator orientation="vertical" style={{height:'var(--space-5)'}} />
+      <Chip>Transfer</Chip><Chip selected>7d</Chip>
+    </div></div>
+    <div className="grp"><div className="lab">Tabs</div><div className="row">
+      <Tabs items={[{value:'single',label:'Single'},{value:'batch',label:'Batch'}]} value={tab} onChange={setTab} />
+      <Separator orientation="vertical" style={{height:'var(--space-5)'}} />
+      <Chip>Liability</Chip><Chip selected>30d</Chip><Chip>All</Chip>
+      <Caption>selection is a wash of the primary's hue, not the theme's --accent</Caption>
+    </div></div>
+    <div className="grp"><div className="lab">Breadcrumb</div><div className="row">
+      <Breadcrumb items={[{label:'Accounts',href:'#'},{label:'ACME-000123',href:'#'},{label:'Statement'}]} />
+    </div></div>
+    <div className="grp"><div className="lab">Card, CardBar and Pagination</div>
+      <Card padded={false}>
+        <CardBar position="top"><Label>Recently viewed</Label><Caption style={{marginLeft:'auto'}}>3 of 214</Caption></CardBar>
+        <div style={{padding:'var(--cell-padding-y) var(--cell-padding-x)',display:'flex',gap:'var(--space-3)',alignItems:'center'}}>
+          <Mono>ACME-000123</Mono><span style={{fontSize:'var(--text-table-size)'}}>Operating Account</span><Badge tone="credit">Active</Badge>
+        </div>
+        <Pagination position="bottom" page={1} pageCount={7} pageSize={10} onPageChange={()=>{}} onPageSizeChange={()=>{}} />
+      </Card>
+    </div>
+    <div className="grp"><div className="lab">Skeleton</div><div className="row">
+      <Skeleton width={120} height={32} /><Skeleton width={120} height={32} /><Skeleton width={120} height={32} /><Skeleton width={120} height={32} />
+    </div>
+    <Note style={{marginTop:'var(--space-2)'}}>Skeletons match the final layout. Tables never collapse to a spinner.</Note></div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

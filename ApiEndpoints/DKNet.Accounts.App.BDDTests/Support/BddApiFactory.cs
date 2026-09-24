@@ -19,6 +19,10 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
 
     protected override string DbConnectionString => _container.GetConnectionString();
 
+    /// <summary>The run-shared container's connection string, for a scenario that needs a database of its own
+    /// on the same server (<see cref="ScratchDatabaseApiFactory"/>).</summary>
+    public string ContainerConnectionString => _container.GetConnectionString();
+
     protected override void ConfigureDatabase(DbContextOptionsBuilder options) =>
         options.UseNpgsql(_container.GetConnectionString());
 

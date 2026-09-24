@@ -222,7 +222,7 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         }
     }
 
-    [Given(@"PayHub holds an? ([A-Z]{3}) account$")]
+    [Given(@"PayHub holds an? ([A-Z]{3,10}) account$")]
     public async Task GivenPayHubHoldsACurrencyAccount(string currency)
     {
         var accountId = await OpenAccountAsync(currency);
@@ -306,7 +306,8 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         var postingId = await RecordPostingAsync(accountId, "Credit", amount, currency);
         state.Values["posting"] = postingId?.ToString() ?? "";
         state.Response = await client.SendAsCallerAsync(
-            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
     }
 
     [Given(@"PayHub recorded a credit of ([\d.]+) (\w+) against an account not permitted to go negative")]
@@ -594,13 +595,19 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [When(@"PayHub reverses that credit$")]
     [When(@"PayHub reverses that credit of [\d.]+ \w+$")]
     public async Task WhenPayHubReversesThatPosting() =>
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
 
     [When(@"PayHub asks to reverse that same posting again")]
     [When(@"PayHub asks to reverse that posting$")]
     [When(@"PayHub asks to reverse that credit$")]
+    // A FRESH key deliberately: this is a genuinely new request, not a retry, so it must still be refused
+    // POSTING_ALREADY_REVERSED. Replaying the earlier key instead would (correctly) return that reversal.
     public async Task WhenPayHubAsksToReverseThatSamePostingAgain() =>
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
 
     [When(@"PayHub submits one batch debiting ([\d.]+) (\w+) from the first and crediting ([\d.]+) (\w+) to the second")]
     public async Task WhenPayHubSubmitsOneBatch(decimal debitAmount, string debitCurrency, decimal creditAmount, string creditCurrency) =>
@@ -955,7 +962,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     public async Task ThenAfterPayHubReturnsTheAccountToActiveTheSameReversalIsRecorded()
     {
         await PatchAccountStatusAsync(Account(), "Active");
-        state.Response = await client.SendAsCallerAsync(state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse");
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
         state.Response.IsSuccessStatusCode.ShouldBeTrue(
             $"expected the reversal to be recorded after reactivation, status was {(int)state.Response.StatusCode}");
     }

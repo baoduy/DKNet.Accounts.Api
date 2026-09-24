@@ -11,6 +11,8 @@ using DKNet.Accounts.Domains.Features.Currencies.Entities;
 using DKNet.Accounts.Domains.Services;
 using DKNet.Accounts.Domains.Share;
 using DKNet.Accounts.Infra.Contexts;
+using DKNet.Accounts.Infra.Features.Currencies;
+using DKNet.Accounts.AppServices.Share;
 
 namespace DKNet.Accounts.App.TestSupport;
 
@@ -115,7 +117,8 @@ public abstract class TestApiFactoryBase(string? dbName = null) : WebApplication
     /// <c>Currency.All</c> lookup is gone — <c>protected</c> so both reset paths can call this (takes no
     /// <c>CoreDbContext</c> parameter and opens its own scope instead, since that type is internal to
     /// <c>DKNet.Accounts.Infra</c> and a protected member's signature can't expose it across assemblies).
-    /// Same fixed ids/values as the migration, so test and production data agree. <see cref="Currency"/>'s
+    /// Every seeded currency, read from <see cref="SeededCurrencies"/> — the same list the migrations insert
+    /// from — so test and production data agree. <see cref="Currency"/>'s
     /// public constructor always assigns a fresh <c>Guid</c> and leaves <c>CreatedBy</c>/<c>CreatedOn</c>
     /// unset (stamped on save by <c>DataOwnerHook</c>, which needs an <c>HttpContext</c> this setup path
     /// doesn't have) — both are overwritten directly through the change tracker before saving, the same
@@ -125,21 +128,18 @@ public abstract class TestApiFactoryBase(string? dbName = null) : WebApplication
     {
         using var scope = CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
-        var seededOn = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
-        Seed(new Guid("c0de0001-0000-4000-8000-000000000702"), new Currency("SGD", "Singapore Dollar", 2));
-        Seed(new Guid("c0de0001-0000-4000-8000-000000000840"), new Currency("USD", "US Dollar", 2));
-        Seed(new Guid("c0de0001-0000-4000-8000-000000000392"), new Currency("JPY", "Japanese Yen", 0));
+        foreach (var seeded in SeededCurrencies.All)
+        {
+            var entry = dbContext.Add(new Currency(seeded.Code, seeded.Name, seeded.DecimalPlaces));
+            entry.Property("Id").CurrentValue = seeded.Id;
+            entry.Property("CreatedBy").CurrentValue = SeededCurrencies.SeededBy;
+            entry.Property("CreatedOn").CurrentValue = SeededCurrencies.SeededOn;
+        }
 
         await dbContext.SaveChangesAsync();
-        return;
 
-        void Seed(Guid id, Currency currency)
-        {
-            var entry = dbContext.Add(currency);
-            entry.Property("Id").CurrentValue = id;
-            entry.Property("CreatedBy").CurrentValue = "system";
-            entry.Property("CreatedOn").CurrentValue = seededOn;
-        }
+        // The database was just wiped and re-seeded under a running host, which production never does: a
+        // currency a previous test registered may be gone, or back with other decimal places.
+        scope.ServiceProvider.GetRequiredService<CurrencyDecimalPlaces>().Clear();
     }
 }

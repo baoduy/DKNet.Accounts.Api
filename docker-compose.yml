@@ -1,0 +1,111 @@
+services:
+  postgres:
+    profiles: [api]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: accounts
+      POSTGRES_USER: accounts
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-accounts}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accounts -d accounts"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    # No profile: Redis serves both the API side and the console.
+    image: redis:8-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Build-or-pull bases for api/console, never started themselves (profile "base" is never selected).
+  # A named image must not carry a build section (compose builds whenever the pull fails), so the
+  # section comes from extends: "<svc>-build" when <SVC>_IMAGE is blank, "<svc>-build-off" when set.
+  api-build:
+    profiles: [base]
+    build:
+      context: .
+      dockerfile: ApiEndpoints/DKNet.Accounts.Api/Dockerfile
+    pull_policy: build
+  api-build-off:
+    profiles: [base]
+    pull_policy: missing
+  console-build:
+    profiles: [base]
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    pull_policy: build
+  console-build-off:
+    profiles: [base]
+    pull_policy: missing
+
+  api:
+    extends: { service: "api-build${API_IMAGE:+-off}" }
+    profiles: [api]
+    # Blank API_IMAGE builds from source under this local tag; a named image is pulled.
+    image: ${API_IMAGE:-dknet-accounts-api:local}
+    # ghcr's current :latest has USER "$APP_UID" as a literal string, which docker cannot resolve
+    # ("unable to find user $APP_UID"). The csproj and the local Dockerfile both run as the base
+    # image's user (uid 1654), so drop this line once a :latest built after that fix is published.
+    user: "1654:1654"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # Feature flags and auth live in .env — see .env.sample.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__AppDb: Host=postgres;Database=accounts;Username=accounts;Password=${POSTGRES_PASSWORD:-accounts}
+      ConnectionStrings__Redis: redis:6379
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  console:
+    extends: { service: "console-build${CONSOLE_IMAGE:+-off}" }
+    profiles: [console]
+    # Blank CONSOLE_IMAGE builds ui/Dockerfile under this local tag; a named image is pulled.
+    image: ${CONSOLE_IMAGE:-dknet-accounts-console:local}
+    depends_on:
+      # Not required: with the api profile off the console runs against CONSOLE_API_ADDRESS instead.
+      api: { condition: service_healthy, required: false }
+      redis: { condition: service_healthy }
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CONSOLE_API_BASE_URL: ${CONSOLE_API_ADDRESS:-http://api:8080}
+      CONSOLE_REDIS_URL: redis://redis:6379
+      # Next's standalone server listens on $HOSTNAME, which docker sets to the container id, so a
+      # loopback healthcheck is refused; bind every IPv4 interface instead.
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${CONSOLE_PORT:-3000}:3000"
+    healthcheck:
+      # 127.0.0.1, not localhost: alpine resolves localhost to ::1 and the server binds IPv4 only.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

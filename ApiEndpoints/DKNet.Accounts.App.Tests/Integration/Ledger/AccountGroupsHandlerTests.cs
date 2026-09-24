@@ -76,7 +76,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         // were member names ("region" -> "Region") — see the matching Account-level test for the root cause.
         var id = await CreateGroupAsync($"M{Guid.NewGuid():N}"[..5].ToUpperInvariant());
 
-        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{id}/change-metadata", new
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{id}", new
         {
             metadata = new Dictionary<string, string> { ["region"] = "SG" }
         }));
@@ -160,7 +160,7 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Covers the generated Rename/ChangeDescription routes (DRK-1277 §11/§12) plus a successful
+    /// <summary>Covers the generated Update route (DRK-1277 §11/§12) plus a successful
     /// (no-balance) close and reactivation through the generated Close/Activate actions (DRK-1418 §3 row 1) —
     /// none reachable from the existing duplicate-code/close-with-balance tests or the BDD acceptance
     /// scenarios.</summary>
@@ -176,13 +176,19 @@ public sealed class AccountGroupsHandlerTests(LedgerApiFixture fixture) : IClass
         renamed.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await renamed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString().ShouldBe("Renamed Group");
 
-        var described = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}/change-description", new
+        // description only: name is absent from the body, so the rename above survives it.
+        var described = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}", new
         {
             description = "Updated description"
         }));
         described.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await described.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("description").GetString()
-            .ShouldBe("Updated description");
+        var describedBody = await described.Content.ReadFromJsonAsync<JsonElement>();
+        describedBody.GetProperty("description").GetString().ShouldBe("Updated description");
+        describedBody.GetProperty("name").GetString().ShouldBe("Renamed Group");
+
+        // No member supplied: refused by UpdateAccountGroupRequestValidator, not answered 200 having changed nothing.
+        var empty = await Client.SendAsync(AsPayHub(HttpMethod.Put, $"{GroupsPath}/{groupId}", new { }));
+        empty.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         // No account holds a balance, so closing succeeds — the success path of the close route.
         var closed = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{GroupsPath}/{groupId}/close"));

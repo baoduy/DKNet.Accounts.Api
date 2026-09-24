@@ -2,7 +2,6 @@
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using AccountDto = DKNet.Accounts.AppServices.Accounts.V1.AccountDto;
-using AccountBalanceDto = DKNet.Accounts.AppServices.Accounts.V1.AccountBalanceDto;
 using PostingDto = DKNet.Accounts.AppServices.Postings.V1.PostingDto;
 
 namespace DKNet.Accounts.AppServices;
@@ -45,9 +44,6 @@ public static class AppSetup
             .Map(dest => dest.AvailableBalanceAmount, src => src.AvailableBalance)
             .Map(dest => dest.AccountOpenedOn, src => src.OpenedOn);
 
-        TypeAdapterConfig<Account, AccountBalanceDto>.NewConfig()
-            .Map(dest => dest.Currency, src => src.CurrencyCode);
-
         TypeAdapterConfig<Posting, PostingDto>.NewConfig()
             .Map(dest => dest.SignedAmount, src => src.SignedValue);
 
@@ -55,7 +51,8 @@ public static class AppSetup
 
         services
             .AddSingleton(TypeAdapterConfig.GlobalSettings)
-            .AddScoped<IMapper, ServiceMapper>();
+            .AddScoped<IMapper, ServiceMapper>()
+            .AddSingleton<CurrencyDecimalPlaces>();
 
         // The generic list endpoints (DKNet.AspCore.Extensions' MapGetList, DRK-1277 §11/§12) default to a
         // 3-month "recent activity" window on audited entities when a caller supplies neither fromDate nor

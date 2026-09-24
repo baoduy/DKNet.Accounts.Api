@@ -5,6 +5,8 @@ using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1;
+using DKNet.Accounts.AppServices.Share.Generics;
+using DKNet.Accounts.Domains.Features.Accounts.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
@@ -32,20 +34,35 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             .Produces<AccountDto>(StatusCodes.Status201Created)
             .WithDescription("Open an account inside a group, in one currency, with an accounting classification.");
 
-        // GetById/GetList/Rename/ChangeMetadata now register through one generated composite (DRK-1522 §3
+        // GetById/GetList/ChangeDetails now register through one generated composite (DRK-1522 §3
         // row 12), same as account groups. Accounts publish no delete route (R1: never reachable today) — the
-        // generated composite's Delete stays excluded by name. Every one of these routes answers a malformed
+        // generated composite's Delete operation stays excluded. Every one of these routes answers a malformed
         // id with 400, not 404 — the generated composite's own default pattern is the looser "{id}" (spec
         // revision 13 §3, frozen: accounts are served by the generated route set for every operation it
         // covers, and publish no delete route; pr-reviewer round 1 finding 7's attempt to restore "{id:guid}"
         // by excluding these routes reversed that frozen requirement and was reverted in round 2).
         group.MapAccountCrud(o => o
-                .Exclude("Delete")
-                .Configure("GetList", b => b.WithDescription(
+                .Exclude(CrudOp.Delete)
+                .Configure(CrudOp.GetList, b => b.WithDescription(
                     "List accounts. Filter as 'field:operation:value', e.g. filter=GroupId:Equal:{id}."))
-                .Configure("GetById", b => b.WithDescription("Read one account."))
-                .Configure("Rename", b => b.WithDescription("Rename an account."))
-                .Configure("ChangeMetadata", b => b.WithDescription("Change an account's metadata.")));
+                .Configure(CrudOp.GetById, b => b.WithDescription("Read one account."))
+                .Configure(CrudOp.Update, b => b.WithDescription(
+                    "Update an account. Send either of name, metadata; a member left out is unchanged.")));
+
+        // Literal segments ("status-counts", "balances") outrank the generated composite's "{id}" read
+        // route regardless of registration order — ASP.NET Core route precedence always prefers a literal
+        // match over a parameter match (spec revision 13 §3 rows 1/4).
+        group.MapGetStatusCounts<Account>("status-counts", new StatusPropertyInfo(nameof(Account.Status), typeof(AccountStatus)));
+
+        group.MapGet("balances", async (
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var balances = await bus.Send(new GetLedgerBalancesQuery(), cancellationToken: ct);
+                return Results.Ok(balances);
+            })
+            .Produces<IReadOnlyCollection<LedgerBalanceLineDto>>()
+            .WithDescription("Read the ledger's position by currency — one line per currency, never combined.");
 
         group.MapGet("{id:guid}/balance", async (
                 Guid id,

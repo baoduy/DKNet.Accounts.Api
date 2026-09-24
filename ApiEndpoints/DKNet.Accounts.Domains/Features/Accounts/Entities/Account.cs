@@ -124,14 +124,27 @@ public sealed class Account : AggregateRoot
     #region Methods
 
     /// <summary>
-    /// Renames the account. No acting-user parameter (DRK-1277 C3) — this is the first <see cref="CrudUpdateAttribute"/>
-    /// member declared on this type, so it lands on the plain <c>PUT {id}</c> route; <c>UpdatedBy</c> is left
-    /// for <c>DataOwnerHook</c> to stamp on save.
+    /// Partial update of the account's editable attributes — the one <see cref="CrudUpdateAttribute"/> member on
+    /// this type, so it lands on the plain <c>PUT {id}</c> route and replaces the former rename /
+    /// change-metadata pair. A null member means "leave this one alone", so no field can be cleared through
+    /// this route; a body with every member null is refused by <c>ChangeDetailsAccountRequestValidator</c>
+    /// rather than answered as a silent no-op. Named <c>ChangeDetails</c>, not <c>Update</c>: the generated
+    /// request would then collide by name with the hand-written <c>UpdateAccountRequest</c> that backs the
+    /// status/overdraft/minimum-balance <c>PATCH {id}</c> route. No acting-user parameter (DRK-1277 C3) —
+    /// <c>UpdatedBy</c> is left for <c>DataOwnerHook</c> to stamp on save.
     /// </summary>
     [CrudUpdate]
-    public void Rename(string name)
+    public void ChangeDetails(string? name, IReadOnlyDictionary<string, string>? metadata)
     {
-        Name = name;
+        if (name is not null)
+        {
+            Name = name;
+        }
+
+        if (metadata is not null)
+        {
+            Metadata = metadata;
+        }
     }
 
     /// <summary>
@@ -151,16 +164,18 @@ public sealed class Account : AggregateRoot
         OverdraftLimit = overdraftLimit;
     }
 
+    /// <summary>
+    /// Grants or withdraws permission to go negative after the account was opened (DRK-1659 §5 surface 3).
+    /// The floor stays the caller's call via <see cref="AccountFloorPolicy"/> — this only assigns the flag.
+    /// </summary>
+    public void ChangePermittedToGoNegative(bool permittedToGoNegative)
+    {
+        PermittedToGoNegative = permittedToGoNegative;
+    }
+
     public void ChangeMinimumBalance(decimal? minimumBalance)
     {
         MinimumBalance = minimumBalance;
-    }
-
-    /// <summary>No acting-user parameter (DRK-1277 C3) — lands on <c>{id}/change-metadata</c>.</summary>
-    [CrudUpdate]
-    public void ChangeMetadata(IReadOnlyDictionary<string, string>? metadata)
-    {
-        Metadata = metadata;
     }
 
     /// <summary>
@@ -169,8 +184,9 @@ public sealed class Account : AggregateRoot
     /// classification produce, advances <see cref="Balance"/> and <see cref="LastPostedOn"/>. Enforces the
     /// status gate (frozen/closed refuse everything; dormant refuses a debit only) and, unless
     /// <paramref name="isReversal"/>, the floor (R1/R2/R3) — a reversal is exempt from the floor check only,
-    /// never from the status gate. Returns a failed <see cref="PostingApplication"/> (no state change) when
-    /// either guard refuses; callers must not call this more than once per posting.
+    /// never from the status gate or the <see cref="PostingAmount.Ceiling"/>. Returns a failed
+    /// <see cref="PostingApplication"/> (no state change) when any guard refuses; callers must not call this
+    /// more than once per posting.
     /// </summary>
     public PostingApplication TryApplyPosting(bool isDebit, decimal amount, DateTimeOffset postedAt, bool isReversal = false)
     {
@@ -180,8 +196,19 @@ public sealed class Account : AggregateRoot
             return new PostingApplication(false, refusal, 0, 0, Balance);
         }
 
+        // R2 (DRK-1719): checked before the balance is projected, so an absurd amount can never overflow the
+        // sum, and for reversals too — the ceiling is a storage limit, not a policy a reversal is exempt from.
+        if (PostingAmount.ExceedsCeiling(amount))
+        {
+            return new PostingApplication(false, PostingRefusalReason.AmountOutOfRange, 0, 0, Balance);
+        }
+
         var signedValue = AccountPostingPolicy.SignedValue(Classification, isDebit, amount);
         var projectedBalance = Balance + signedValue;
+        if (PostingAmount.ExceedsCeiling(projectedBalance))
+        {
+            return new PostingApplication(false, PostingRefusalReason.AmountOutOfRange, 0, 0, Balance);
+        }
 
         if (!isReversal)
         {
@@ -210,7 +237,10 @@ public enum PostingRefusalReason
     AccountClosed,
     AccountFrozen,
     AccountDormantDebitRefused,
-    BelowFloor
+    BelowFloor,
+
+    /// <summary>The amount, or the balance it would leave, is beyond <see cref="PostingAmount.Ceiling"/>.</summary>
+    AmountOutOfRange
 }
 
 /// <summary>The outcome of <see cref="Account.TryApplyPosting"/>: on success, the position/signed value/

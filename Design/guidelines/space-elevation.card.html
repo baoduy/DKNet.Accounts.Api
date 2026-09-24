@@ -1,0 +1,11 @@
+<!-- @dsCard group="Spacing" viewport="700x215" name="Elevation" subtitle="One geometry restated at rising opacity — 0px 8px 20px, with a contact shadow from sm up." -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{margin:0;padding:16px;background:var(--background);color:var(--foreground);font-family:var(--font-sans)}.g{display:flex;gap:10px;align-items:stretch}.sw{flex:1;min-width:0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}.chip{height:56px;border-bottom:1px solid var(--border)}.meta{padding:7px 9px}.n{font-size:12px;line-height:16px;font-weight:600}.v{font-family:var(--font-mono);font-size:10px;line-height:14px;color:var(--muted-foreground)}.lab{font-size:11px;line-height:15px;font-weight:600;letter-spacing:.05em;color:var(--muted-foreground);text-transform:uppercase;margin:0 0 8px}.note{font-size:12px;line-height:17px;color:var(--muted-foreground);margin-top:10px}.e{flex:1;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px}</style></head><body>
+<div class="g" style="align-items:flex-start">
+<div class="e" style="box-shadow:var(--shadow-xs)"><div class="n">xs</div><div class="v">3%</div></div>
+<div class="e" style="box-shadow:var(--shadow-sm)"><div class="n">sm</div><div class="v">5% + contact</div></div>
+<div class="e" style="box-shadow:var(--shadow-md)"><div class="n">md</div><div class="v">5% + 4px</div></div>
+<div class="e" style="box-shadow:var(--shadow-lg)"><div class="n">lg</div><div class="v">5% + 6px</div></div>
+<div class="e" style="box-shadow:var(--shadow-xl)"><div class="n">xl</div><div class="v">5% + 10px</div></div>
+<div class="e" style="box-shadow:var(--shadow-2xl)"><div class="n">2xl</div><div class="v">13%</div></div>
+</div>
+<div class="note">Two semantic names alias into the scale so component code never picks a step by number: <span class="v">--shadow-card</span> is <span class="v">sm</span> (every card and table), <span class="v">--shadow-overlay</span> is <span class="v">xl</span> (dialogs and the detail panel only). The wide low-opacity spread is what makes a white card read as lifted off the off-white ground rather than pasted onto it.</div></body></html>

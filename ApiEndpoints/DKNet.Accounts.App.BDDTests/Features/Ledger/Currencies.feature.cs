@@ -135,13 +135,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 9
-    await testRunner.WhenAsync("PayHub creates the currency \"EUR\" named \"Euro\" with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub creates the currency \"NOK\" named \"Norwegian Krone\" with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 10
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 11
-    await testRunner.AndAsync("\"EUR\" appears in the currency list as active with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("\"NOK\" appears in the currency list as active with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -285,17 +285,18 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 36
-    await testRunner.GivenAsync("PayHub has created the currency \"CHF\" named \"Swiss Franc\" with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("PayHub has created the currency \"SEK\" named \"Swedish Krona\" with 2 decimal places" +
+                        "", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 37
-    await testRunner.WhenAsync("PayHub renames the currency \"CHF\" to \"Confederation Franc\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("PayHub renames the currency \"SEK\" to \"Swedish Crown\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 38
     await testRunner.ThenAsync("the request succeeds", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 39
-    await testRunner.AndAsync("the currency \"CHF\" is now named \"Confederation Franc\", still coded \"CHF\" with 2 d" +
-                        "ecimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+    await testRunner.AndAsync("the currency \"SEK\" is now named \"Swedish Crown\", still coded \"SEK\" with 2 decimal" +
+                        " places", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

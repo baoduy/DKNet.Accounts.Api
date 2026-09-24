@@ -57,4 +57,8 @@ public sealed record AccountBalanceDto
     public decimal AvailableBalance { get; init; }
 
     public decimal HeldAmount { get; init; }
+
+    // R3: a computed, unmapped member must never reach AccountDto (see its own comment) — Floor follows the
+    // same precedent but lives here instead, on the balance-only DTO the generic list route never projects.
+    public decimal Floor { get; init; }
 }

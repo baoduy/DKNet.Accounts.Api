@@ -61,13 +61,15 @@ public class AccountTests
     }
 
     [Fact]
-    public void Rename_ChangesName()
+    public void ChangeDetails_AppliesEveryMemberSupplied()
     {
         var account = NewAccount();
+        var metadata = new Dictionary<string, string> { ["region"] = "SG" };
 
-        account.Rename("New Name");
+        account.ChangeDetails("New Name", metadata);
 
         account.Name.ShouldBe("New Name");
+        account.Metadata.ShouldBe(metadata);
     }
 
     [Theory]
@@ -158,14 +160,17 @@ public class AccountTests
     }
 
     [Fact]
-    public void ChangeMetadata_ReplacesTheBag()
+    public void ChangeDetails_LeavesANullMemberAlone()
     {
+        // Partial update: null means "not supplied", never "clear it" — which is why
+        // ChangeDetailsAccountRequestValidator refuses a body with every member null.
         var account = NewAccount();
-        var metadata = new Dictionary<string, string> { ["region"] = "SG" };
+        var originalName = account.Name;
 
-        account.ChangeMetadata(metadata);
+        account.ChangeDetails(name: null, metadata: new Dictionary<string, string> { ["region"] = "SG" });
 
-        account.Metadata.ShouldBe(metadata);
+        account.Name.ShouldBe(originalName);
+        account.Metadata!["region"].ShouldBe("SG");
     }
 
     [Fact]
@@ -252,5 +257,69 @@ public class AccountTests
         var creditReversal = account.TryApplyPosting(isDebit: false, amount: 10m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
         creditReversal.Success.ShouldBeTrue();
         account.Balance.ShouldBe(10m);
+    }
+
+    // DRK-1719 R2: nothing beyond 999,999,999,999.999999 is ever stored — neither the amount nor the balance.
+    [Fact]
+    public void TryApplyPosting_AnAmountBeyondTheCeiling_RefusesAndChangesNothing()
+    {
+        var account = NewAccount();
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 1_000_000_000_000m, postedAt: DateTimeOffset.UtcNow);
+
+        result.Success.ShouldBeFalse();
+        result.Refusal.ShouldBe(PostingRefusalReason.AmountOutOfRange);
+        account.Balance.ShouldBe(0m);
+        account.StreamPosition.ShouldBe(0);
+        account.LastPostedOn.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryApplyPosting_ABalanceExactlyAtTheCeiling_IsAccepted()
+    {
+        var account = NewAccount();
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 999_999_999_999.999999m, postedAt: DateTimeOffset.UtcNow);
+
+        result.Success.ShouldBeTrue();
+        account.Balance.ShouldBe(999_999_999_999.999999m);
+    }
+
+    [Fact]
+    public void TryApplyPosting_ABalanceThatWouldPassTheCeiling_RefusesAndChangesNothing()
+    {
+        var account = NewAccount();
+        account.TryApplyPosting(isDebit: false, amount: 999_999_999_999.999999m, postedAt: DateTimeOffset.UtcNow);
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 0.000001m, postedAt: DateTimeOffset.UtcNow);
+
+        result.Success.ShouldBeFalse();
+        result.Refusal.ShouldBe(PostingRefusalReason.AmountOutOfRange);
+        account.Balance.ShouldBe(999_999_999_999.999999m);
+        account.StreamPosition.ShouldBe(1);
+    }
+
+    [Fact]
+    public void TryApplyPosting_AReversalThatWouldPassTheNegativeCeiling_IsRefusedDespiteTheFloorExemption()
+    {
+        var account = NewAccount();
+        account.TryApplyPosting(isDebit: true, amount: 999_999_999_999.999999m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
+
+        var result = account.TryApplyPosting(isDebit: true, amount: 1m, postedAt: DateTimeOffset.UtcNow, isReversal: true);
+
+        result.Success.ShouldBeFalse();
+        result.Refusal.ShouldBe(PostingRefusalReason.AmountOutOfRange);
+        account.Balance.ShouldBe(-999_999_999_999.999999m);
+    }
+
+    [Fact]
+    public void TryApplyPosting_AFrozenAccount_RefusesAsFrozenBeforeTheCeilingIsChecked()
+    {
+        var account = NewAccount();
+        account.ChangeStatus(AccountStatus.Frozen);
+
+        var result = account.TryApplyPosting(isDebit: false, amount: 1_000_000_000_000m, postedAt: DateTimeOffset.UtcNow);
+
+        result.Refusal.ShouldBe(PostingRefusalReason.AccountFrozen);
     }
 }

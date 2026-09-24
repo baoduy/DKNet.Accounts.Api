@@ -14,7 +14,32 @@ namespace DKNet.Accounts.AppServices.Postings.V1;
 /// </summary>
 internal static class PostingSignature
 {
+    /// <summary>
+    /// The signature every posting is stored with (DRK-1719): the amount is compared by value, so 10.5 and
+    /// 10.500000 are the same request however many trailing zeros the client writes.
+    /// </summary>
     public static string Compute(
+        Guid accountId,
+        PostingDirection direction,
+        decimal amount,
+        string currency,
+        PostingCategory category,
+        DateOnly effectiveDate,
+        string? description,
+        Guid? counterpartyAccountId,
+        string? counterpartyReference,
+        string? externalReference,
+        IReadOnlyDictionary<string, string>? metadata) =>
+        ComputeAsWritten(accountId, direction, WithoutTrailingZeros(amount), currency, category, effectiveDate,
+            description, counterpartyAccountId, counterpartyReference, externalReference, metadata);
+
+    /// <summary>
+    /// The signature as computed before DRK-1719, over the amount exactly as the client wrote it (10.5 and
+    /// 10.50 differ). Only ever compared against, never stored: a posting recorded before the change still
+    /// carries it, and an identical resend must still replay it. For an amount written with no trailing
+    /// zero it equals <see cref="Compute"/>.
+    /// </summary>
+    public static string ComputeAsWritten(
         Guid accountId,
         PostingDirection direction,
         decimal amount,
@@ -46,6 +71,10 @@ internal static class PostingSignature
         var json = JsonSerializer.Serialize(canonical);
         return Hash(json);
     }
+
+    /// <summary>The same value at its smallest scale: dividing by a 1 of scale 28 makes the runtime drop
+    /// every trailing zero (10.500000 → 10.5, 100 → 100).</summary>
+    private static decimal WithoutTrailingZeros(decimal amount) => amount / 1.0000000000000000000000000000m;
 
     /// <summary>
     /// Canonicalizes an arbitrary string down to the same 64-char SHA-256 hex digest shape <see cref="Compute"/>

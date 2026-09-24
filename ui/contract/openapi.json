@@ -1,0 +1,630 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DKNet.Accounts.Api",
+    "version": "1",
+    "description": "DRK-1684 §3 row 1 — committed snapshot of the ledger service's own published OpenAPI document. Regenerated and diffed by `verify:contract` (row 3); never hand-edited."
+  },
+  "servers": [{ "url": "/v1" }],
+  "paths": {
+    "/accounts": {
+      "get": {
+        "operationId": "listAccounts",
+        "summary": "List accounts. Shares the generic list query surface with /account-groups.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedAccountResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "openAccount",
+        "summary": "Open an account.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpenAccountRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "Read one account.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateAccount",
+        "summary": "Update an account's name and/or metadata.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAccountRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "patch": {
+        "operationId": "setAccountControls",
+        "summary": "Change status, overdraftLimit, minimumBalance and permittedToGoNegative only.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PatchAccountRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/accounts/balances": {
+      "get": {
+        "operationId": "getLedgerBalances",
+        "summary": "Read the ledger's position by currency — one line per currency, never combined.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/LedgerBalanceLineDto" } } } }
+          }
+        }
+      }
+    },
+    "/accounts/{id}/balance": {
+      "get": {
+        "operationId": "getAccountBalance",
+        "summary": "Read an account's balance.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountBalanceDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/accounts/{id}/statement": {
+      "get": {
+        "operationId": "getAccountStatement",
+        "summary": "Read an account's postings as a date-bounded, paged statement in stream order.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "pageIndex", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedPostingResponse" } } } }
+        }
+      }
+    },
+    "/postings": {
+      "get": {
+        "operationId": "listPostings",
+        "summary": "List postings across every account, within a required effective-date window of at most 90 days.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "accountId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "direction", "in": "query", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedPostingResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "recordPosting",
+        "summary": "Record one credit or debit. Idempotency key is required in the header.",
+        "security": [{ "bearer": ["postings.write"] }],
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordPostingRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "409": { "description": "Idempotency key conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/postings/{id}": {
+      "get": {
+        "operationId": "getPosting",
+        "summary": "Read one posting.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/postings/{id}/reverse": {
+      "post": {
+        "operationId": "reversePosting",
+        "summary": "Reverse a posting. Requires a reason in the body and an idempotency key in the header.",
+        "security": [{ "bearer": ["postings.reverse"] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostingDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/currencies": {
+      "get": {
+        "operationId": "listCurrencies",
+        "summary": "List the reference currency set.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "registerCurrency",
+        "summary": "Register a currency.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCurrencyRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/currencies/{id}": {
+      "get": {
+        "operationId": "getCurrency",
+        "summary": "Read one currency.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateCurrency",
+        "summary": "Correct a currency's name.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCurrencyRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/currencies/{id}/activate": {
+      "post": {
+        "operationId": "activateCurrency",
+        "summary": "Reactivate a currency.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/currencies/{id}/deactivate": {
+      "post": {
+        "operationId": "deactivateCurrency",
+        "summary": "Deactivate a currency, so it is no longer offered for new accounts.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CurrencyDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups": {
+      "get": {
+        "operationId": "listAccountGroups",
+        "summary": "List account groups, narrowed, sorted and paged.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } },
+          { "name": "fromDate", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "toDate", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedAccountGroupResponse" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createAccountGroup",
+        "summary": "Create a group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAccountGroupRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/account-groups/{id}": {
+      "get": {
+        "operationId": "getAccountGroup",
+        "summary": "Read one group.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "put": {
+        "operationId": "updateAccountGroup",
+        "summary": "Change a group's name, description or metadata.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateAccountGroupRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAccountGroup",
+        "summary": "Delete a group that holds no account.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "204": { "description": "No Content" },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/close": {
+      "post": {
+        "operationId": "closeAccountGroup",
+        "summary": "Close a group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/activate": {
+      "post": {
+        "operationId": "activateAccountGroup",
+        "summary": "Reopen a closed group.",
+        "security": [{ "bearer": ["accounts.write"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountGroupDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/account-groups/{id}/balances": {
+      "get": {
+        "operationId": "getAccountGroupBalances",
+        "summary": "Read a group's balances, one line per currency.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupBalanceLineDto" } } } }
+          },
+          "404": { "description": "Not Found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "LedgerBalanceLineDto": {
+        "type": "object",
+        "required": ["currency", "balance"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" }
+        }
+      },
+      "AccountBalanceDto": {
+        "type": "object",
+        "required": ["currency", "balance", "availableBalance", "heldAmount", "floor"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" },
+          "availableBalance": { "type": "string" },
+          "heldAmount": { "type": "string" },
+          "floor": { "type": "string" }
+        }
+      },
+      "PostingDto": {
+        "type": "object",
+        "required": ["id", "postingNumber", "accountId", "streamPosition", "direction", "amount", "signedAmount", "currency", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "postingNumber": { "type": "string" },
+          "accountId": { "type": "string", "format": "uuid" },
+          "streamPosition": { "type": "integer" },
+          "direction": { "type": "string" },
+          "amount": { "type": "string" },
+          "signedAmount": { "type": "string" },
+          "currency": { "type": "string" },
+          "status": { "type": "string" },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "effectiveDate": { "type": "string", "format": "date" },
+          "reversesPostingId": { "type": "string", "format": "uuid" },
+          "reversedByPostingId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "PagedPostingResponse": {
+        "type": "object",
+        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/PostingDto" } },
+          "pageIndex": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" }
+        }
+      },
+      "RecordPostingRequest": {
+        "type": "object",
+        "required": ["accountId", "direction", "amount", "currency", "category"],
+        "properties": {
+          "accountId": { "type": "string", "format": "uuid" },
+          "direction": { "type": "string", "enum": ["Debit", "Credit"] },
+          "amount": { "type": "string" },
+          "currency": { "type": "string" },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "effectiveDate": { "type": "string", "format": "date" }
+        }
+      },
+      "CurrencyDto": {
+        "type": "object",
+        "required": ["id", "code", "name", "decimalPlaces", "isActive"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "decimalPlaces": { "type": "integer" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "CreateCurrencyRequest": {
+        "type": "object",
+        "required": ["code", "name", "decimalPlaces"],
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "decimalPlaces": { "type": "integer" }
+        }
+      },
+      "AccountDto": {
+        "type": "object",
+        "required": ["id", "groupId", "accountNumber", "name", "currency", "classification", "status", "balance", "availableBalance", "heldAmount", "permittedToGoNegative", "streamPosition", "openedOn"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid" },
+          "accountNumber": { "type": "string" },
+          "name": { "type": "string" },
+          "currency": { "type": "string" },
+          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "balance": { "type": "string" },
+          "availableBalance": { "type": "string" },
+          "heldAmount": { "type": "string" },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "permittedToGoNegative": { "type": "boolean" },
+          "streamPosition": { "type": "integer" },
+          "externalReference": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+          "openedOn": { "type": "string", "format": "date-time" },
+          "closedOn": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PagedAccountResponse": {
+        "type": "object",
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountDto" } },
+          "pageNumber": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
+        }
+      },
+      "OpenAccountRequest": {
+        "type": "object",
+        "required": ["groupId", "name", "currency", "classification", "permittedToGoNegative"],
+        "properties": {
+          "groupId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "currency": { "type": "string" },
+          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "permittedToGoNegative": { "type": "boolean" },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "externalReference": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "UpdateAccountRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "PatchAccountRequest": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "overdraftLimit": { "type": "string" },
+          "minimumBalance": { "type": "string" },
+          "permittedToGoNegative": { "type": "boolean" }
+        }
+      },
+      "UpdateCurrencyRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "AccountGroupType": {
+        "type": "string",
+        "enum": ["Customer", "Merchant", "Internal", "Suspense", "Settlement"]
+      },
+      "AccountGroupStatus": {
+        "type": "string",
+        "enum": ["Active", "Closed"]
+      },
+      "AccountGroupDto": {
+        "type": "object",
+        "required": ["id", "code", "name", "type", "status", "ownerId"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/AccountGroupType" },
+          "status": { "$ref": "#/components/schemas/AccountGroupStatus" },
+          "ownerId": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "CreateAccountGroupRequest": {
+        "type": "object",
+        "required": ["code", "name", "type", "ownerId"],
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/AccountGroupType" },
+          "ownerId": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "UpdateAccountGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "AccountGroupBalanceLineDto": {
+        "type": "object",
+        "required": ["currency", "balance", "available", "held"],
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" },
+          "available": { "type": "string" },
+          "held": { "type": "string" }
+        }
+      },
+      "PagedAccountGroupResponse": {
+        "type": "object",
+        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
+          "pageIndex": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" }
+        }
+      },
+      "ErrorItem": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "code": { "type": "string" },
+          "field": { "type": "string" }
+        }
+      },
+      "RefusalBody": {
+        "type": "object",
+        "required": ["status", "errors", "traceId"],
+        "properties": {
+          "status": { "type": "integer" },
+          "errors": { "type": "array", "items": { "$ref": "#/components/schemas/ErrorItem" } },
+          "traceId": { "type": "string" }
+        }
+      }
+    }
+  }
+}
