@@ -176,11 +176,14 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
 
   /**
    * View-mode actions (Close/Reopen/Delete) have no form field of their own to attach a field
-   * error to, so every entry — field or not — goes to the alert (B2, DRK-1700 review).
+   * error to, so every entry — field or not — goes to the alert; `RefusalAlert` itself drops
+   * anything carrying a `field` (it expects a field-error renderer to show those instead), so
+   * the field is stripped here rather than left for that filter to silently swallow it (R2-1,
+   * DRK-1700 review round 2).
    */
   function applyViewRefusal(errors: LedgerError[] | undefined, refusalTraceId: string | undefined): void {
     setFieldErrors({});
-    setAlertErrors(errors ?? []);
+    setAlertErrors((errors ?? []).map(({ field: _field, ...rest }) => rest));
     setTraceId(refusalTraceId);
   }
 
@@ -353,7 +356,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <ScopeGate scope="accounts.write" granted={canWrite}>
-                        <Button type="button" variant="destructive" size="sm" disabled={holdsBalance} onClick={handleClose}>
+                        <Button type="button" variant="destructive" size="sm" disabled={holdsBalance || !balancesQuery.isSuccess} onClick={handleClose}>
                           Close group
                         </Button>
                       </ScopeGate>
@@ -366,7 +369,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                   )}
                   <span className="inline-flex items-center gap-2">
                     <ScopeGate scope="accounts.write" granted={canWrite}>
-                      <Button type="button" variant="destructive" size="sm" disabled={holdsAccount} onClick={handleDelete}>
+                      <Button type="button" variant="destructive" size="sm" disabled={holdsAccount || !balancesQuery.isSuccess} onClick={handleDelete}>
                         Delete group
                       </Button>
                     </ScopeGate>
@@ -413,10 +416,14 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                   </>
                 ) : null}
                 <DetailSection>Balances</DetailSection>
-                <CurrencyBalanceList
-                  balances={balances.map((line) => ({ currency: line.currency, amount: line.balance, decimalPlaces: fractionDigits(line.balance) }))}
-                  emptyMessage="This group holds no account."
-                />
+                {balancesQuery.isError ? (
+                  <RefusalAlert errors={[toLedgerError(balancesQuery.error)]} traceId={ledgerErrorTraceId(balancesQuery.error)} />
+                ) : (
+                  <CurrencyBalanceList
+                    balances={balances.map((line) => ({ currency: line.currency, amount: line.balance, decimalPlaces: fractionDigits(line.balance) }))}
+                    emptyMessage="This group holds no account."
+                  />
+                )}
                 {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
             ) : panelMode === 'view' && viewQuery.isError ? (

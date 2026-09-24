@@ -194,6 +194,28 @@ describe('CurrenciesScreen', () => {
     expect(panel.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
   });
 
+  it('a view-mode Deactivate refused with a field still renders in the alert (DRK-1700 review round 2, R2-1)', async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/deactivate') && init?.method === 'POST') {
+        return jsonResponse(422, { errors: [{ message: 'An account in SGD still holds a balance.', code: 'CURRENCY_HOLDS_BALANCE', field: 'Id' }], traceId: 't-deact2' });
+      }
+      if (url.includes('/accounts/balances')) return new Response('[]', { status: 200 });
+      return jsonResponse(200, [CURRENCY]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
+    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
+    await waitFor(() => expect(deactivateButton).toBeEnabled());
+
+    await userEvent.click(deactivateButton);
+
+    const panel = within(await screen.findByTestId('detail-panel'));
+    expect(await panel.findByText(/An account in SGD still holds a balance\./)).toBeInTheDocument();
+    expect(panel.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
+  });
+
   it('a failed list read shows the service code instead of the empty-list text (DRK-1700 review I2)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(401, { errors: [{ message: 'Session expired.', code: 'UNAUTHENTICATED' }], traceId: 't-auth' })));
     renderScreen();

@@ -234,6 +234,48 @@ describe('AccountGroupsScreen', () => {
     expect(panel.getByText('GROUP_HOLDS_BALANCE')).toBeInTheDocument();
   });
 
+  it('a view-mode Delete refused with a field still renders in the alert (DRK-1700 review round 2, R2-1)', async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'DELETE') {
+        return jsonResponse(422, { errors: [{ message: 'Group TRSY still holds an account.', code: 'GROUP_NOT_EMPTY', field: 'Id' }], traceId: 't-del' });
+      }
+      if (url.includes('/balances')) return new Response('[]', { status: 200 });
+      if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+      return pagedResponse([GROUP]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('row', { name: /TRSY/ }));
+    const deleteButton = await screen.findByRole('button', { name: 'Delete group' });
+    await waitFor(() => expect(deleteButton).toBeEnabled());
+
+    await userEvent.click(deleteButton);
+
+    const panel = within(await screen.findByTestId('detail-panel'));
+    expect(await panel.findByText(/Group TRSY still holds an account\./)).toBeInTheDocument();
+    expect(panel.getByText('GROUP_NOT_EMPTY')).toBeInTheDocument();
+  });
+
+  it('a failed balances read shows its code, and Close/Delete stay disabled (DRK-1700 review round 2, R2-2)', async () => {
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = String(input);
+      if (url.includes('/balances')) return jsonResponse(503, { errors: [{ message: 'Balances service unavailable.', code: 'BALANCES_UNAVAILABLE' }], traceId: 't-bal' });
+      if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+      return pagedResponse([GROUP]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('row', { name: /TRSY/ }));
+
+    const panel = within(await screen.findByTestId('detail-panel'));
+    expect(await panel.findByText('Balances service unavailable.')).toBeInTheDocument();
+    expect(panel.getByText('BALANCES_UNAVAILABLE')).toBeInTheDocument();
+    expect(panel.queryByText('This group holds no account.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close group' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete group' })).toBeDisabled();
+  });
+
   it('a failed list read shows the service code instead of the empty-list text (DRK-1700 review I2)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(403, { errors: [{ message: 'Not permitted.', code: 'FORBIDDEN' }], traceId: 't-list' })));
     renderScreen();

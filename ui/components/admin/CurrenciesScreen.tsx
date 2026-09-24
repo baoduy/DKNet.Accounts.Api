@@ -104,11 +104,14 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
 
   /**
    * View-mode actions (Activate/Deactivate) have no form field of their own to attach a field
-   * error to, so every entry — field or not — goes to the alert (B2, DRK-1700 review).
+   * error to, so every entry — field or not — goes to the alert; `RefusalAlert` itself drops
+   * anything carrying a `field` (it expects a field-error renderer to show those instead), so
+   * the field is stripped here rather than left for that filter to silently swallow it (R2-1,
+   * DRK-1700 review round 2).
    */
   function applyViewRefusal(errors: LedgerError[] | undefined, refusalTraceId: string | undefined): void {
     setFieldErrors({});
-    setAlertErrors(errors ?? []);
+    setAlertErrors((errors ?? []).map(({ field: _field, ...rest }) => rest));
     setTraceId(refusalTraceId);
   }
 
