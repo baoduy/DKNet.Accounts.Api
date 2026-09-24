@@ -109,7 +109,7 @@ The record and reverse forms here are shared with the Records screen, below: rec
 confirmation — restating direction, amount, currency and account — before anything is sent, and
 `Reverse` stays on screen but disabled, with its reason, on a posting that is already reversed
 (`POSTING_ALREADY_REVERSED`) or on a posting that is itself a reversal (no code; the service has
-none) (DRK-1713 §3, "Both screens").
+none) (`ui/components/accounts/RecordPostingForm.tsx`, `ui/components/accounts/ReversePostingForm.tsx`).
 
 ### Records screen
 
@@ -122,12 +122,13 @@ a wider period is refused on screen with no request sent. It also searches by po
 counterparty reference and description — no other field is promised, and a term under 2 characters
 is never sent. Only the posting number, the amount and the effective date carry a sort control.
 The period, narrowing, search, sort, page and the open posting all live in the page address, so a
-copied link reopens the same view. The screen offers no export action (DRK-1713 §3, "The list").
+copied link reopens the same view. The screen offers no export action
+(`ui/app/records/page.tsx`, `ui/components/records/RecordsScreen.tsx`).
 
 Choosing a row opens that posting's details beside the list: a posting is never edited or deleted
 — reversing records an opposing posting and marks this one reversed, and both stay on the account.
 A reversed posting shows which posting reversed it and that reversal's reason; a reversal shows
-which posting it reverses and its own reason (DRK-1713 §3, "One posting").
+which posting it reverses and its own reason (`ui/components/records/PostingDetails.tsx`).
 
 Recording chooses the account by searching accounts by number or name; once chosen, its currency
 is shown and locked, and the amount is sent exactly as typed — the service checks its decimal
@@ -135,10 +136,11 @@ places, not the form. Reversing states a reason of at most 500 characters; a mis
 over-length reason is refused on screen and nothing is reversed. Both actions confirm before
 anything is sent, and after a success the list shows the result before the operator acts again:
 the new posting for a recording, or both the new opposing posting and the original marked reversed
-for a reversal (DRK-1713 §3, "Recording" and "Reversing"). Recording a posting needs
-`postings.write`; reversing needs the separate `postings.reverse`; an operator missing either sees
-that action on screen, disabled, naming the permission it needs (DRK-1713 §3, "Refusals and
-permissions").
+for a reversal (`ui/components/accounts/RecordPostingForm.tsx`,
+`ui/components/accounts/ReversePostingForm.tsx`). Recording a posting needs `postings.write`;
+reversing needs the separate `postings.reverse`; an operator missing either sees that action on
+screen, disabled, naming the permission it needs (`ui/components/accounts/RecordPostingForm.tsx`,
+`ui/components/accounts/ReversePostingForm.tsx`).
 
 ### Ledger pass-through endpoint
 
@@ -150,7 +152,7 @@ unchanged. Every inbound request is checked against `isLedgerRouteAllowed`
 before any outbound call if the route isn't in it. This cycle widens that set with the account
 operations the accounts screen needs: opening an account, listing accounts, reading one, updating
 its name/metadata, and changing its status/floor controls. It also gains `GET /postings/{id}`,
-which the Records screen uses to follow a reversal link to the other posting (DRK-1713 §3a). The
+which the Records screen uses to follow a reversal link to the other posting (`ui/contract/openapi.json`). The
 token never crosses back to the browser — the service still checks every permission itself, so a
 control disabled on screen for a missing scope is convenience only, not the enforcement point.
 
