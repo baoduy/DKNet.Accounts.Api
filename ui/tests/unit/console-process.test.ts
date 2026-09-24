@@ -7,7 +7,9 @@
  * are this file's own (DRK-1726 R1): nothing is adopted from, or stopped for, another run (R2).
  */
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
+import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { type ConsoleHandle, startConsole, stopConsole } from '../support/console-process';
 import { FAKE_OIDC_PORT, FAKE_REDIS_CONTAINER, FAKE_REDIS_PORT, TENANT_DRUNK_CODING, TENANT_OTHER_DIRECTORY, defaultConsoleEnv } from '../support/fixtures';
@@ -36,6 +38,16 @@ async function waitForPortOpen(port: number, timeoutMs: number): Promise<void> {
   }
 }
 
+async function waitForPortFree(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (await isPortOpen(port)) {
+    if (Date.now() > deadline) {
+      throw new Error(`port ${port} still answered after ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
+
 /**
  * Kills the whole process group a console handle leads (`startConsole` spawns `next` detached)
  * — the handle this file started, never whatever holds a port: `stopConsole`'s own
@@ -51,7 +63,7 @@ function killConsoleGroup(handle: ConsoleHandle): void {
   }
 }
 
-const SCRATCH_PORTS = freePorts(3);
+const SCRATCH_PORTS = freePorts(4);
 let fakeOidcChild: ChildProcess | undefined;
 
 beforeAll(async () => {
@@ -93,6 +105,38 @@ afterEach(async () => {
 });
 
 describe('console restart harness', () => {
+  test('A console does not outlive the worker that started it', async () => {
+    // DRK-1734 B3: a check that runs out of time never reaches its own `stopConsole`. The
+    // worker (here: a process that starts a console and exits without stopping it) must take
+    // the console down with it, or the next check finds the port taken.
+    const PORT = SCRATCH_PORTS[3];
+    const script = path.join(UI_ROOT, 'tests', `tmp-exits-with-console-${PORT}.ts`);
+    fs.writeFileSync(
+      script,
+      `import { startConsole } from './support/console-process';
+import { defaultConsoleEnv } from './support/fixtures';
+const handle = await startConsole(defaultConsoleEnv(${PORT}), ${PORT});
+process.stdout.write(String(handle.process.pid));
+process.exit(0);
+`,
+    );
+    let consolePid: number | undefined;
+    try {
+      consolePid = Number(execFileSync(path.join(UI_ROOT, 'node_modules', '.bin', 'tsx'), [script], { cwd: UI_ROOT, encoding: 'utf8' }));
+      expect(consolePid).toBeGreaterThan(0);
+      await waitForPortFree(PORT, 10_000);
+    } finally {
+      fs.rmSync(script, { force: true });
+      if (consolePid) {
+        try {
+          process.kill(-consolePid, 'SIGKILL');
+        } catch {
+          // ESRCH — gone, as it should be.
+        }
+      }
+    }
+  }, 90_000);
+
   test('Stopping a console frees its port', async () => {
     const PORT = SCRATCH_PORTS[0];
 

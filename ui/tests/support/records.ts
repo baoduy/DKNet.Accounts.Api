@@ -98,6 +98,9 @@ export async function fillRecordForm(
   movement: { accountTerm?: string; accountNumber?: string; direction: 'Credit' | 'Debit'; amount: string; category?: string },
 ): Promise<void> {
   const toggle = page.getByRole('button', { name: 'Record posting', exact: true });
+  // `isVisible` does not wait: read before the screen has drawn, a toggle not yet there would
+  // leave the form closed. Wait until either the toggle or the open form is on screen.
+  await expect(toggle.or(page.getByLabel('Direction', { exact: true })).first()).toBeVisible();
   if (await toggle.isVisible()) await toggle.click();
   if (movement.accountNumber) {
     const picker = page.getByLabel('Account', { exact: true });
