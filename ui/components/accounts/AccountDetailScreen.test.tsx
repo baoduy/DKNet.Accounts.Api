@@ -440,6 +440,28 @@ describe('AccountDetailScreen', () => {
     const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')!);
     expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { source: 'core-banking', region: 'SG', notes: 'Closed for audit' } });
   });
+
+  it('writes metadata back exactly as the service sent it, even values that spell an enum member (DRK-1734 B1)', async () => {
+    // The service's own wire shape: camelCase enums on the account, free-form text in metadata.
+    const seeded = { ...ACCOUNT, status: 'active', classification: 'liability', metadata: { status: 'active', category: 'payment', type: 'customer', notes: 'Reconciled monthly' } };
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT' || init?.method === 'PATCH') return Promise.resolve(jsonResponse({ id: 'a1' }));
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [seeded] }));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: ['accounts.write'] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue('Reconciled monthly'));
+    await user.clear(screen.getByLabelText('Free-form notes'));
+    await user.type(screen.getByLabelText('Free-form notes'), 'Closed for audit');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')!);
+    expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { status: 'active', category: 'payment', type: 'customer', notes: 'Closed for audit' } });
+  });
 });
 
 describe('AccountDetailScreen — a write refreshes the lookup keyed by account number (review round 3)', () => {

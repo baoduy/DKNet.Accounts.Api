@@ -62,6 +62,8 @@ function markNumberLiterals(text: string): string {
  * spells them as the service's enums declare them (`'Credit'`, `'Reversed'`), so a read maps
  * each back by its field name. Only a value that is exactly a member's camelCase form is
  * mapped; anything else (a status count's `"ACTIVE"`, a refusal's `type`) stays as sent.
+ * A `metadata` map is the operator's own free-form text, never an enum: nothing under it is
+ * mapped, so an edit form writes it back exactly as the service sent it (DRK-1734 B1).
  */
 const ENUM_MEMBERS: Record<string, readonly string[]> = {
   direction: ['Credit', 'Debit'],
@@ -75,6 +77,16 @@ const ENUM_MEMBERS: Record<string, readonly string[]> = {
 const APP_ENUM_VALUES = new Map(
   Object.entries(ENUM_MEMBERS).flatMap(([field, members]) => members.map((member) => [`${field}:${member[0].toLowerCase()}${member.slice(1)}`, member])),
 );
+
+/** `value` with every DTO enum field (`ENUM_MEMBERS`) spelled the app's way; `metadata` left whole. */
+function withAppEnums(value: unknown, key: string): unknown {
+  if (Array.isArray(value)) return value.map((item) => withAppEnums(item, ''));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([field, item]) => [field, field === 'metadata' ? item : withAppEnums(item, field)]));
+  }
+  // A boolean or null never names a member, so it falls through as sent.
+  return APP_ENUM_VALUES.get(`${key}:${String(value)}`) ?? value;
+}
 
 /** What a read hands back for a wire type: every enum member spelled the app's way. */
 export type AsRead<T> = T extends string
@@ -94,11 +106,10 @@ export type AsRead<T> = T extends string
  * enum value is spelled the app's way (`ENUM_MEMBERS`).
  */
 export function parseLedgerJsonPreservingNumbers(text: string): unknown {
-  return JSON.parse(markNumberLiterals(text), (key, value) => {
-    if (typeof value !== 'string') return value;
-    if (value.startsWith(NUMBER_MARKER)) return value.slice(NUMBER_MARKER.length);
-    return APP_ENUM_VALUES.get(`${key}:${value}`) ?? value;
-  });
+  const parsed: unknown = JSON.parse(markNumberLiterals(text), (_key, value) =>
+    typeof value === 'string' && value.startsWith(NUMBER_MARKER) ? value.slice(NUMBER_MARKER.length) : value,
+  );
+  return withAppEnums(parsed, '');
 }
 
 /**

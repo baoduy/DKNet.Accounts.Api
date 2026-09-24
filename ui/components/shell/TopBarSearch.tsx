@@ -2,7 +2,8 @@
  * DRK-1728 §3 row 4 — the one search every screen carries: in the top bar of every screen but
  * Overview, and as Overview's own page field (brief Q4: one search landmark per screen). The
  * caption states the route before anything is sent (`lib/search/classify.ts`); Enter sends it.
- * ⌘K on a Mac, Ctrl+K elsewhere, puts focus in it.
+ * ⌘K on a Mac, Ctrl+K elsewhere, puts focus in it. Escape, or emptying the field, puts the
+ * results away and leaves focus in the field (DRK-1734 N2).
  */
 'use client';
 
@@ -98,6 +99,12 @@ export function TopBarSearch({ grantedScopes, variant = 'topbar' }: TopBarSearch
     if (ticket === latestRef.current) setOutcome(next);
   }
 
+  /** Puts the results away; an answer still on its way is dropped too. */
+  function dismiss(): void {
+    latestRef.current += 1;
+    setOutcome(null);
+  }
+
   function searchText(text: string): Promise<void> {
     return run(async () => ({ kind: 'matches', text, ...(await searchAccountsAndGroups(text)) }));
   }
@@ -134,12 +141,16 @@ export function TopBarSearch({ grantedScopes, variant = 'topbar' }: TopBarSearch
         aria-describedby={captionId}
         placeholder={variant === 'page' ? 'Account id or number, group, posting id, or a name' : 'Search (⌘K)'}
         value={typed}
-        onChange={(event) => setTyped(event.target.value)}
+        onChange={(event) => {
+          setTyped(event.target.value);
+          if (event.target.value === '') dismiss();
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
             submit();
           }
+          if (event.key === 'Escape') dismiss();
         }}
       />
       <span id={captionId} className="text-[length:var(--text-caption-size)] text-muted-foreground">

@@ -158,3 +158,15 @@ describe("every member of the service's enums is read the app's way (DRK-1732 §
     }
   });
 });
+
+describe('metadata is the operator\'s own text, never an enum (DRK-1734 B1)', () => {
+  it('reads metadata back unchanged while the DTO\'s own status in the same payload still maps', () => {
+    const text = '{"status":"active","metadata":{"status":"active","category":"payment","type":"customer"}}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ status: 'Active', metadata: { status: 'active', category: 'payment', type: 'customer' } });
+  });
+
+  it('leaves the metadata of every item on a page unchanged', () => {
+    const text = '{"items":[{"type":"customer","metadata":{"type":"customer","direction":"credit"}}]}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ items: [{ type: 'Customer', metadata: { type: 'customer', direction: 'credit' } }] });
+  });
+});

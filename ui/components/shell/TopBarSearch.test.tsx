@@ -219,6 +219,59 @@ describe('free text', () => {
   });
 });
 
+describe('putting the results away (DRK-1734 N2)', () => {
+  const ANSWERED = {
+    '/api/ledger/accounts?': { status: 200, body: { items: [], totalItemCount: 3 } },
+    '/api/ledger/account-groups?': { status: 200, body: { items: [], totalItemCount: 0 } },
+  };
+
+  it('removes the results on Escape and keeps focus in the field', async () => {
+    stubLedger(ANSWERED);
+    await search('Acme');
+    expect(await within(results()).findByText('3 accounts matched')).toBeInTheDocument();
+
+    await userEvent.setup().keyboard('{Escape}');
+
+    expect(screen.queryByRole('region', { name: 'Search results' })).toBeNull();
+    expect(screen.getByRole('searchbox', { name: SEARCH_LABEL })).toHaveFocus();
+  });
+
+  it('removes the results when the field is emptied, and keeps focus in the field', async () => {
+    stubLedger(ANSWERED);
+    await search('Acme');
+    expect(await within(results()).findByText('3 accounts matched')).toBeInTheDocument();
+
+    await userEvent.setup().clear(screen.getByRole('searchbox', { name: SEARCH_LABEL }));
+
+    expect(screen.queryByRole('region', { name: 'Search results' })).toBeNull();
+    expect(screen.getByRole('searchbox', { name: SEARCH_LABEL })).toHaveFocus();
+  });
+
+  it('keeps the results while the field still holds text', async () => {
+    stubLedger(ANSWERED);
+    await search('Acme');
+    expect(await within(results()).findByText('3 accounts matched')).toBeInTheDocument();
+
+    await userEvent.setup().keyboard('{Backspace}');
+
+    expect(within(results()).getByText('3 accounts matched')).toBeInTheDocument();
+  });
+
+  it('never draws an answer that arrives after Escape', async () => {
+    const answers: Array<(response: Response) => void> = [];
+    stubLedger({ '/api/ledger/': () => new Promise<Response>((resolve) => answers.push(resolve)) });
+    await search('Acme');
+    const user = userEvent.setup();
+    await user.keyboard('{Escape}');
+
+    answers[0](respond({ status: 200, body: { items: [], totalItemCount: 3 } }));
+    answers[1](respond({ status: 200, body: { items: [], totalItemCount: 0 } }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole('region', { name: 'Search results' })).toBeNull();
+  });
+});
+
 describe('the field', () => {
   it('states no route and sends nothing while empty', async () => {
     const fetchMock = stubLedger({});
