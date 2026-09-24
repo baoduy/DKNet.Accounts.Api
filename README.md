@@ -73,8 +73,10 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/v1/currencies
 ```
 
 ```json
-[{"code":"SGD","decimalPlaces":2},{"code":"USD","decimalPlaces":2},{"code":"JPY","decimalPlaces":0}]
+[{"code":"SGD","decimalPlaces":2},{"code":"USD","decimalPlaces":2},{"code":"JPY","decimalPlaces":0},{"code":"USDT","decimalPlaces":6}]
 ```
+
+That's 4 of the 26 seeded currencies — see below for the full set.
 
 Everything else starts at [docs/integration-guide.md](docs/integration-guide.md).
 
@@ -91,8 +93,13 @@ activated and deactivated — not fixed reference data. List them through `GET /
 
 | Field | Type | Meaning |
 |---|---|---|
-| `code` | string | ISO 4217 alphabetic code — `SGD`, `USD`, `JPY` at this commit. |
-| `decimalPlaces` | integer | How many decimal places the currency legally has. An amount finer than this is refused. |
+| `code` | string | 3-10 upper-case letters — no longer required to be an ISO 4217 alphabetic code, so a non-fiat asset such as `USDT` registers the same way a fiat currency does. |
+| `decimalPlaces` | integer | How many decimal places the currency legally has, 0-6. An amount finer than this is refused. Fixed once the currency is registered — it never changes afterwards. |
+
+A fresh database seeds 26 active currencies: SGD, USD, JPY, EUR, GBP, CHF, AUD, CAD, NZD, CNY, HKD, TWD,
+KRW, INR, THB, MYR, PHP, IDR, VND, KHR, LAK, MMK, BND, AED, SAR — all fiat, 0 or 2 decimal places — plus
+`USDT` (Tether USD), the one seeded crypto asset, at 6 decimal places. Any other currency, fiat or
+otherwise, can still be registered at run time through `POST /v1/currencies`.
 
 ### Account groups — the bucket accounts belong to
 
@@ -381,6 +388,8 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `LOCK_TIMEOUT` | The service waited 10 seconds for this account's posting lock and gave up. Nothing was recorded — retry, reusing the same `Idempotency-Key` |
 | `422` | `INVALID_DATE_RANGE` | The cross-account posting list was requested with no effective-date window, or one wider than 90 days |
 | `422` | `CURRENCY_HOLDS_BALANCE` | Currency deactivation requested while an account denominated in it still holds a balance |
+| `422` | `AMOUNT_OUT_OF_RANGE` | A write would store an amount above 999,999,999,999.999999 — a posting amount, the resulting balance of a posting, batch or reversal, or an account limit. Nothing is written |
+| `422` | `INVALID_LIMIT_AMOUNT` | An overdraft limit or minimum balance has more decimal places than its account's currency. `errors[].field` names the refused limit |
 
 Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that
 file is the authority if this table and the service ever disagree.
@@ -420,10 +429,18 @@ write a test for every one of them against your own integration.
   change once it has any posting.
 - **An account's balance always equals the signed sum of that account's postings.** This is a property
   you can verify, not an internal bookkeeping detail.
+- **No stored amount is ever rounded.** A posting amount, balance, held amount or account limit is stored
+  with exactly the value accepted, up to its currency's decimal places, and never above
+  999,999,999,999.999999 — a write that would breach either is refused (`INVALID_LIMIT_AMOUNT`,
+  `AMOUNT_OUT_OF_RANGE`), not silently truncated.
+- **Every amount is returned at its currency's decimal places.** `12400.00 SGD`, `5000 JPY`,
+  `1.500000 USDT` — 6-place storage never shows up as extra trailing zeros on a coarser currency.
 - **Each posting occupies a unique, gapless position in its account's stream**, so a consumer reading
   the stream can detect a missing entry.
 - **A request that repeats your idempotency key returns the original outcome and changes nothing.** The
-  same key carrying different content is refused rather than guessed at.
+  same key carrying different content is refused rather than guessed at. Trailing zeros never defeat this
+  match: a posting of `10.5 USDT` and a resend of `10.500000 USDT` under the same key are the same
+  amount, so the resend replays the original instead of conflicting.
 - **No posting is ever lost under concurrency.** When several postings are recorded against one account
   at the same moment, every one is either recorded or refused with a stated reason; none is silently
   dropped or overwritten, and the balance still equals the signed sum of those that were recorded.
