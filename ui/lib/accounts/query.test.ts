@@ -9,8 +9,8 @@ function wrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
 }
 
-function jsonResponse(body: unknown, status = 200): { status: number; text: () => Promise<string> } {
-  return { status, text: async () => JSON.stringify(body) };
+function jsonResponse(body: unknown, status = 200): { status: number; ok: boolean; text: () => Promise<string> } {
+  return { status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body) };
 }
 
 afterEach(() => {
@@ -163,14 +163,51 @@ describe('usePostings', () => {
 });
 
 describe('useCurrencies', () => {
-  it('fetches the currency list with the reference-data query options', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{ code: 'SGD', decimalPlaces: 2 }]));
+  it('fetches the currency list through the one shared currencies query (DRK-1704 finding 9)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }]));
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
     const { result } = renderHook(() => useCurrencies(), { wrapper: wrapper(queryClient) });
 
-    await waitFor(() => expect(result.current.data).toEqual([{ code: 'SGD', decimalPlaces: '2' }]));
+    // `fetchCurrencies` (lib/query/currencies.ts) routes `decimalPlaces` back through `Number`
+    // deliberately — it is a small int, not a money figure (R1 draws that line at money only).
+    await waitFor(() => expect(result.current.data).toEqual([{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }]));
     expect(fetchMock).toHaveBeenCalledWith('/api/ledger/currencies');
+  });
+});
+
+describe('a refused read throws instead of being mistaken for empty or not-found (DRK-1704 finding 5)', () => {
+  it('useAccount throws the service refusal for a non-404 failure on a guid lookup', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 401, errors: [{ message: 'Not signed in.' }] }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useAccount('11111111-1111-4111-8111-111111111111'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect((result.current.error as Error).message).toBe('Not signed in.');
+  });
+
+  it('useAccount throws the service refusal for a failure on an account-number lookup', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 500, errors: [{ message: 'Internal error.' }] }, 500));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useAccount('ACME-000123'), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect((result.current.error as Error).message).toBe('Internal error.');
+  });
+
+  it('useAccounts throws the service refusal instead of rendering an empty list', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 401, errors: [{ message: 'Not signed in.' }] }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useAccounts({ filters: {} }), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect((result.current.error as Error).message).toBe('Not signed in.');
   });
 });

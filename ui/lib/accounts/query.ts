@@ -8,6 +8,9 @@
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { parseLedgerJson } from '@/lib/api/json';
+import { isOkStatus } from '@/lib/api/money-json';
+import { refusalError } from '@/lib/api/refusal';
+import { fetchCurrencies, type Currency } from '@/lib/query/currencies';
 import type { components } from '@/lib/api/schema';
 import { accountBalanceKey, accountGroupsKey, accountKey, accountsListKey, currenciesQueryOptions, postingsListKey } from '@/lib/query/keys';
 import type { ListViewState } from '@/lib/url-state';
@@ -18,15 +21,18 @@ export type AccountDto = components['schemas']['AccountDto'];
 export type AccountGroupDto = components['schemas']['AccountGroupDto'];
 export type AccountBalanceDto = components['schemas']['AccountBalanceDto'];
 export type PostingDto = components['schemas']['PostingDto'];
-export type CurrencyDto = components['schemas']['CurrencyDto'];
 export type PagedAccountResponse = components['schemas']['PagedAccountResponse'];
 export type PagedPostingResponse = components['schemas']['PagedPostingResponse'];
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** DRK-1704 finding 5 — a refused read throws (never a silent "not found" or an empty page),
+ * so the screen shows the service's own wording instead of guessing. */
 async function fetchLedgerJson(path: string): Promise<unknown> {
   const response = await fetch(path);
-  return parseLedgerJson(await response.text());
+  const body = parseLedgerJson(await response.text());
+  if (!isOkStatus(response.status)) throw refusalError(body);
+  return body;
 }
 
 export function useAccounts(state: ListViewState, pageSize?: number): UseQueryResult<PagedAccountResponse> {
@@ -52,8 +58,12 @@ export function useAccount(idOrNumber: string): UseQueryResult<AccountLookup> {
     queryFn: async (): Promise<AccountLookup> => {
       if (GUID_PATTERN.test(idOrNumber)) {
         const response = await fetch(`/api/ledger/accounts/${idOrNumber}`);
+        // 404 is the only "not found" — any other refusal (401, 403, 500, ...) throws instead
+        // of being mistaken for one (DRK-1704 finding 5).
         if (response.status === 404) return { found: false };
-        return { found: true, account: parseLedgerJson(await response.text()) as AccountDto };
+        const body = parseLedgerJson(await response.text());
+        if (!isOkStatus(response.status)) throw refusalError(body);
+        return { found: true, account: body as AccountDto };
       }
       const params = new URLSearchParams({ filter: `AccountNumber:Equal:${idOrNumber}` });
       const page = (await fetchLedgerJson(`/api/ledger/accounts?${params.toString()}`)) as PagedAccountResponse;
@@ -95,9 +105,13 @@ export function useAccountGroups(): UseQueryResult<AccountGroupDto[]> {
   });
 }
 
-export function useCurrencies(): UseQueryResult<CurrencyDto[]> {
+/** DRK-1704 finding 9 — reuses `lib/query/currencies.ts`'s `fetchCurrencies`, the one currency
+ * read the DRK-1697 cycle already built (`readLedgerJson`/`refusalError`), instead of a second
+ * implementation with its own query function and a different result shape sharing the same
+ * `staleTime: Infinity` cache key. */
+export function useCurrencies(): UseQueryResult<Currency[]> {
   return useQuery({
     ...currenciesQueryOptions(),
-    queryFn: async () => (await fetchLedgerJson('/api/ledger/currencies')) as CurrencyDto[],
+    queryFn: fetchCurrencies,
   });
 }

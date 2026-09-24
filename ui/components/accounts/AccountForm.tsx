@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, type CSSProperties, type JSX } from 'react';
-import type { LedgerError } from '@/components/feedback/RefusalAlert';
+import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { routeRefusal } from '@/lib/api/refusal';
 import { FloorSettings, type FloorSettingsValue } from './FloorSettings';
 
@@ -62,11 +62,14 @@ export interface AccountFormProps {
   groups?: AccountFormOption[];
   currencies?: AccountFormOption[];
   errors?: LedgerError[];
+  /** Edit mode only — `false` locks Save, Status and the floor controls behind the
+   * `accounts.write` scope (DRK-1704 finding 7), mirroring `ScopeGate`'s own caption. */
+  writeGranted?: boolean;
   onSubmit?: (values: AccountFormValues) => void;
   style?: CSSProperties;
 }
 
-export function AccountForm({ mode, account, groups = [], currencies = [], errors = [], onSubmit, style }: AccountFormProps): JSX.Element {
+export function AccountForm({ mode, account, groups = [], currencies = [], errors = [], writeGranted = true, onSubmit, style }: AccountFormProps): JSX.Element {
   const [name, setName] = useState(account.name);
   const [notes, setNotes] = useState(account.notes);
   const [groupId, setGroupId] = useState(groups[0]?.value ?? '');
@@ -85,6 +88,9 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
   });
 
   const { fieldErrors, alertErrors } = routeRefusal(errors);
+  const editLocked = mode === 'edit' && !writeGranted;
+  const overdraftRefusal = alertErrors.find((error) => error.code === 'OVERDRAFT_LIMIT_REQUIRED');
+  const otherAlertErrors = alertErrors.filter((error) => error !== overdraftRefusal);
 
   function submit(): void {
     onSubmit?.({
@@ -107,6 +113,8 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
         submit();
       }}
     >
+      {otherAlertErrors.length ? <RefusalAlert errors={otherAlertErrors} /> : null}
+
       <label className="flex flex-col gap-1">
         Name
         <input
@@ -189,7 +197,13 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
       {mode === 'edit' ? (
         <label className="flex flex-col gap-1">
           Status
-          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status">
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            aria-label="Status"
+            aria-invalid={fieldErrors.status ? 'true' : undefined}
+            disabled={editLocked}
+          >
             <option value="" disabled>
               Change status…
             </option>
@@ -199,6 +213,7 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
               </option>
             ))}
           </select>
+          {fieldErrors.status ? <span role="alert">{fieldErrors.status.message}</span> : null}
         </label>
       ) : null}
 
@@ -206,17 +221,22 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
         value={floor}
         currency={mode === 'open' ? currency : account.currency}
         onChange={setFloor}
+        disabled={editLocked}
+        overdraftLimitError={fieldErrors.overdraftLimit?.message}
+        minimumBalanceError={fieldErrors.minimumBalance?.message}
         refusal={
-          fieldErrors.OVERDRAFT_LIMIT_REQUIRED || alertErrors.find((error) => error.code === 'OVERDRAFT_LIMIT_REQUIRED') ? (
+          overdraftRefusal ? (
             <p role="alert">
-              <span className="font-mono font-semibold">OVERDRAFT_LIMIT_REQUIRED</span>{' '}
-              {alertErrors.find((error) => error.code === 'OVERDRAFT_LIMIT_REQUIRED')?.message ?? 'An overdraft limit is required.'}
+              <span className="font-mono font-semibold">OVERDRAFT_LIMIT_REQUIRED</span> {overdraftRefusal.message}
             </p>
           ) : null
         }
       />
 
-      <button type="submit">{mode === 'open' ? 'Open' : 'Save'}</button>
+      <button type="submit" disabled={editLocked}>
+        {mode === 'open' ? 'Open' : 'Save'}
+      </button>
+      {editLocked ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">requires accounts.write</span> : null}
     </form>
   );
 }

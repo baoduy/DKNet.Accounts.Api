@@ -33,7 +33,9 @@ export interface AccountDetailAccount {
   balance: string;
   availableBalance: string;
   heldAmount: string;
-  floor: string;
+  /** Absent while the balance read is pending or refused — `FloorLine` falls back to its own
+   * `computeFloor` off the floor-policy fields below rather than showing a guessed `0`. */
+  floor?: string;
   status: string;
   permittedToGoNegative: boolean;
   overdraftLimit?: string | null;
@@ -56,10 +58,11 @@ export interface AccountDetailProps {
   postingsTo?: string;
   postingsFilter?: PostingsPanelFilter;
   onPostingsFilterChange?: (filter: PostingsPanelFilter) => void;
+  onPostingsPeriodChange?: (from: string, to: string) => void;
   style?: CSSProperties;
 }
 
-function AccountEditPanel({ accountId, account }: { accountId: string; account: AccountDetailAccount }): JSX.Element {
+function AccountEditPanel({ accountId, account, writeGranted }: { accountId: string; account: AccountDetailAccount; writeGranted: boolean }): JSX.Element {
   const [errors, setErrors] = useState<LedgerError[]>([]);
   const changeDetails = useChangeAccountDetails();
   const setControls = useSetAccountControls();
@@ -67,10 +70,15 @@ function AccountEditPanel({ accountId, account }: { accountId: string; account: 
   async function handleSubmit(values: AccountFormValues): Promise<void> {
     // Only the endpoint the changed field actually belongs to is called — `PUT` accepts
     // just `name`/`metadata`, `PATCH` just `status`/floor settings (README.md) — never both
-    // concurrently when only one half of the form changed.
+    // concurrently when only one half of the form changed. The service has no dedicated
+    // "notes" field, so the free-form text rides in `metadata.notes` (DRK-1704 finding 4).
     const errors: LedgerError[] = [];
-    if (values.name !== account.name) {
-      const nameResult = await changeDetails.mutate({ accountId, name: values.name });
+    if (values.name !== account.name || values.notes !== (account.notes ?? '')) {
+      const nameResult = await changeDetails.mutate({
+        accountId,
+        name: values.name !== account.name ? values.name : undefined,
+        metadata: { notes: values.notes },
+      });
       if (!nameResult.ok) errors.push(...(nameResult.errors ?? []));
     }
     const controlsResult = await setControls.mutate({
@@ -101,6 +109,7 @@ function AccountEditPanel({ accountId, account }: { accountId: string; account: 
         status: account.status,
       }}
       errors={errors}
+      writeGranted={writeGranted}
       onSubmit={handleSubmit}
     />
   );
@@ -115,6 +124,7 @@ export function AccountDetail({
   postingsTo = '',
   postingsFilter,
   onPostingsFilterChange,
+  onPostingsPeriodChange,
   style,
 }: AccountDetailProps): JSX.Element {
   const [selectedPostingId, setSelectedPostingId] = useState<string | null>(null);
@@ -129,6 +139,7 @@ export function AccountDetail({
 
   const decimalPlaces = account.decimalPlaces;
   const selectedPosting = postings.find((posting) => posting.id === selectedPostingId) ?? null;
+  const writeGranted = grantedScopes.includes('accounts.write');
 
   return (
     <div style={style} className="flex flex-col gap-6">
@@ -170,14 +181,15 @@ export function AccountDetail({
             accountId={accountId}
             status={account.status}
             balance={account.balance}
+            heldAmount={account.heldAmount}
             currency={account.currency}
             decimalPlaces={decimalPlaces}
-            granted={grantedScopes.includes('accounts.write')}
+            granted={writeGranted}
           />
         ) : null}
       </div>
 
-      {accountId ? <AccountEditPanel accountId={accountId} account={account} /> : null}
+      {accountId ? <AccountEditPanel accountId={accountId} account={account} writeGranted={writeGranted} /> : null}
 
       <PostingsPanel
         rows={postings}
@@ -185,6 +197,7 @@ export function AccountDetail({
         to={postingsTo}
         filter={postingsFilter}
         onFilterChange={onPostingsFilterChange}
+        onPeriodChange={onPostingsPeriodChange}
         selectedId={selectedPostingId}
         onSelectRow={(row) => setSelectedPostingId(row.id === selectedPostingId ? null : row.id)}
       />

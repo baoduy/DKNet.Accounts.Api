@@ -14,6 +14,7 @@ import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import { useAccountGroups, useAccounts, useCurrencies } from '@/lib/accounts/query';
 import { useOpenAccount } from '@/lib/accounts/mutations';
 import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
@@ -123,12 +124,16 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
         </ScopeGate>
       </div>
 
-      <AccountsTable
-        rows={rows}
-        orderBy={state.sort?.field}
-        desc={state.sort?.desc}
-        onSort={(field) => navigate({ ...state, sort: { field, desc: state.sort?.field === field ? !state.sort.desc : false } })}
-      />
+      {accountsQuery.isError ? (
+        <RefusalAlert errors={[toLedgerError(accountsQuery.error)]} traceId={ledgerErrorTraceId(accountsQuery.error)} />
+      ) : (
+        <AccountsTable
+          rows={rows}
+          orderBy={state.sort?.field}
+          desc={state.sort?.desc}
+          onSort={(field) => navigate({ ...state, sort: { field, desc: state.sort?.field === field ? !state.sort.desc : false } })}
+        />
+      )}
 
       <div className="flex items-center gap-2">
         {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (

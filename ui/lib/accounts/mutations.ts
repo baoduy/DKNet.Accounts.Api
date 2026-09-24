@@ -6,6 +6,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
+import { readLedgerJson } from '@/lib/api/money-json';
 import { accountKey, accountsListKey } from '@/lib/query/keys';
 import type { AccountDto } from './query';
 
@@ -16,10 +17,11 @@ export interface AccountWriteResult {
   traceId?: string;
 }
 
+/** `readLedgerJson`, never `response.json()` — an `AccountDto` carries money fields (R1). */
 async function readAccountResult(response: Response): Promise<AccountWriteResult> {
-  const body = (await response.json()) as AccountDto & { errors?: LedgerError[]; traceId?: string };
+  const body = (await readLedgerJson(response)) as (AccountDto & { errors?: LedgerError[]; traceId?: string }) | null;
   if (response.ok) return { ok: true, account: body as AccountDto };
-  return { ok: false, errors: body.errors, traceId: body.traceId };
+  return { ok: false, errors: body?.errors, traceId: body?.traceId };
 }
 
 export interface OpenAccountInput {

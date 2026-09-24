@@ -40,6 +40,18 @@ describe('AccountStatusControl', () => {
     expect(screen.getByText('ACCOUNT_HOLDS_BALANCE')).toBeInTheDocument();
   });
 
+  it('disables closing on a zero balance that still carries a held amount (DRK-1704 finding 2)', () => {
+    renderControl({ balance: '0.00', heldAmount: '50.00' });
+    const button = screen.getByRole('button', { name: 'Close' });
+    expect(button).toBeDisabled();
+    expect(screen.getByText('ACCOUNT_HOLDS_BALANCE')).toBeInTheDocument();
+  });
+
+  it('offers to close a zero balance with no held amount', () => {
+    renderControl({ balance: '0.00', heldAmount: '0.00' });
+    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();
+  });
+
   it('offers to reopen a closed account, regardless of balance', () => {
     renderControl({ status: 'Closed', balance: '0.00' });
     expect(screen.getByRole('button', { name: 'Reopen' })).toBeEnabled();
@@ -53,7 +65,7 @@ describe('AccountStatusControl', () => {
   });
 
   it('closes the account through a PATCH carrying the new status', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'a1', status: 'Closed' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'a1', status: 'Closed' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderControl();
@@ -63,5 +75,20 @@ describe('AccountStatusControl', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ledger/accounts/a1', expect.objectContaining({ method: 'PATCH' })));
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(body.status).toBe('Closed');
+  });
+
+  it('shows a write refusal from the close control (DRK-1704 finding 3)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      text: async () => JSON.stringify({ status: 422, errors: [{ message: 'The account holds 50.00 SGD and cannot be closed.', code: 'ACCOUNT_HOLDS_BALANCE' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderControl();
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(screen.getAllByText('ACCOUNT_HOLDS_BALANCE').length).toBeGreaterThan(0));
+    expect(screen.getByText('The account holds 50.00 SGD and cannot be closed.')).toBeInTheDocument();
   });
 });

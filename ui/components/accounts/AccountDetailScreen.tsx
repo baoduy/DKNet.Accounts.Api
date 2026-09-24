@@ -7,9 +7,11 @@
 'use client';
 
 import { useState, type JSX } from 'react';
+import { RefusalAlert } from '@/components/feedback/RefusalAlert';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
 import type { PostingsPanelRow } from './PostingsPanel';
-import { useAccount, useAccountBalance, useCurrencies, usePostings } from '@/lib/accounts/query';
+import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
+import { useAccount, useAccountBalance, useAccountGroups, useCurrencies, usePostings } from '@/lib/accounts/query';
 import { defaultPostingsFilter, type PostingsFilterState } from '@/lib/accounts/postings-filter';
 
 export interface AccountDetailScreenProps {
@@ -26,10 +28,17 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
 
   const balanceQuery = useAccountBalance(accountId);
   const currenciesQuery = useCurrencies();
+  const groupsQuery = useAccountGroups();
   const postingsQuery = usePostings(accountId, filter);
 
   if (accountQuery.isPending) {
     return <p>Loading…</p>;
+  }
+
+  // A refused lookup (401, 403, 500, ...) shows the service's own wording — 404 is the only
+  // "not found" (DRK-1704 finding 5); `useAccount` already draws that line.
+  if (accountQuery.isError) {
+    return <RefusalAlert errors={[toLedgerError(accountQuery.error)]} traceId={ledgerErrorTraceId(accountQuery.error)} />;
   }
 
   if (!accountQuery.data?.found || !account) {
@@ -38,6 +47,8 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
 
   const decimalPlaces = (currenciesQuery.data ?? []).find((currency) => currency.code === account.currency)?.decimalPlaces ?? 2;
   const balance = balanceQuery.data;
+  const groupName = (groupsQuery.data ?? []).find((group) => group.id === account.groupId)?.name ?? '';
+  const metadata = (account.metadata ?? undefined) as Record<string, string> | undefined;
 
   const detailAccount: AccountDetailAccount = {
     accountNumber: account.accountNumber,
@@ -47,13 +58,18 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
     balance: balance?.balance ?? account.balance,
     availableBalance: balance?.availableBalance ?? account.availableBalance,
     heldAmount: balance?.heldAmount ?? account.heldAmount,
-    floor: balance?.floor ?? '0',
+    // No default of '0' while the balance read is pending or refused (DRK-1704 finding 5) —
+    // `FloorLine` falls back to its own `computeFloor` off the account's own floor policy
+    // fields when the service hasn't stated the exact figure yet.
+    floor: balance?.floor,
     status: account.status,
     permittedToGoNegative: account.permittedToGoNegative,
     overdraftLimit: account.overdraftLimit ?? null,
     minimumBalance: account.minimumBalance ?? null,
     externalReference: account.externalReference ?? '',
     classification: account.classification,
+    groupName,
+    notes: metadata?.notes ?? '',
   };
 
   const postingRows: PostingsPanelRow[] = (postingsQuery.data?.items ?? []).map((posting) => ({
@@ -79,6 +95,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes }: AccountDet
       postingsTo={filter.to}
       postingsFilter={{ direction: filter.direction, category: filter.category, status: filter.status }}
       onPostingsFilterChange={(next) => setFilter((current) => ({ ...current, ...next }))}
+      onPostingsPeriodChange={(from, to) => setFilter((current) => ({ ...current, from, to }))}
     />
   );
 }

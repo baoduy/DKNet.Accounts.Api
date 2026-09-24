@@ -14,9 +14,15 @@ function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** `null` when the period is acceptable — the service refuses anything wider than 90 days. */
+/** `null` when the period is acceptable — the service refuses anything wider than 90 days,
+ * unset, unparseable, or inverted (pr-reviewer DRK-1704 findings 1/14). */
 export function postingPeriodError(from: string, to: string): string | null {
-  const spanDays = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000);
+  if (!from || !to) return 'A period must be set.';
+  const fromMs = Date.parse(from);
+  const toMs = Date.parse(to);
+  if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return 'A period must be set.';
+  if (fromMs > toMs) return 'The period start must not be after its end.';
+  const spanDays = Math.round((toMs - fromMs) / 86_400_000);
   return spanDays > MAX_POSTING_PERIOD_DAYS ? `The period may span at most ${MAX_POSTING_PERIOD_DAYS} days.` : null;
 }
 

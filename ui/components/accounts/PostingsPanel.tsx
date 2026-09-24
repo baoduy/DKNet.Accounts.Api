@@ -4,9 +4,21 @@
  * so this renders with no query provider (`AccountDetailScreen` owns the fetching).
  */
 import type { CSSProperties, JSX } from 'react';
-import { DateRangeFilter } from '@/components/forms/DateRangeFilter';
+import { DateRangeFilter, type DatePreset } from '@/components/forms/DateRangeFilter';
 import { StatementTable, type StatementRowShape } from '@/components/ledger/StatementTable';
-import { POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES } from '@/lib/accounts/postings-filter';
+import { MAX_POSTING_PERIOD_DAYS, POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES, postingPeriodError } from '@/lib/accounts/postings-filter';
+
+/** Only spans this screen's own 90-day cap can ever accept — `DateRangeFilter`'s own generic
+ * `month`/`all` presets would always be refused here, so this screen offers its own set. */
+const POSTING_PERIOD_PRESETS: DatePreset[] = [
+  { value: '7', label: '7d' },
+  { value: '30', label: '30d' },
+  { value: String(MAX_POSTING_PERIOD_DAYS), label: `${MAX_POSTING_PERIOD_DAYS}d` },
+];
+
+function toDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 export interface PostingsPanelRow {
   id: string;
@@ -33,6 +45,9 @@ export interface PostingsPanelProps {
   to: string;
   filter?: PostingsPanelFilter;
   onFilterChange?: (filter: PostingsPanelFilter) => void;
+  /** DRK-1704 finding 1/14 — the period is operator-editable end to end; a span the service
+   * would refuse (over 90 days, inverted or unset) is shown here and never fetched (R2). */
+  onPeriodChange?: (from: string, to: string) => void;
   selectedId?: string | null;
   onSelectRow?: (row: PostingsPanelRow) => void;
   style?: CSSProperties;
@@ -40,10 +55,19 @@ export interface PostingsPanelProps {
 
 const EMPTY_FILTER: PostingsPanelFilter = { direction: '', category: '', status: '' };
 
-export function PostingsPanel({ rows, from, to, filter = EMPTY_FILTER, onFilterChange, selectedId, onSelectRow, style }: PostingsPanelProps): JSX.Element {
+export function PostingsPanel({ rows, from, to, filter = EMPTY_FILTER, onFilterChange, onPeriodChange, selectedId, onSelectRow, style }: PostingsPanelProps): JSX.Element {
   function setFilter(patch: Partial<PostingsPanelFilter>): void {
     onFilterChange?.({ ...filter, ...patch });
   }
+
+  function applyPreset(days: string): void {
+    const to = new Date();
+    const spanDays = Number(days);
+    const from = new Date(to.getTime() - spanDays * 86_400_000);
+    onPeriodChange?.(toDateOnly(from), toDateOnly(to));
+  }
+
+  const periodError = postingPeriodError(from, to);
 
   const statementRows: StatementRowShape[] = rows.map((row) => ({
     id: row.id,
@@ -60,7 +84,20 @@ export function PostingsPanel({ rows, from, to, filter = EMPTY_FILTER, onFilterC
 
   return (
     <div data-testid="postings-panel" style={style} className="flex flex-col gap-3">
-      <DateRangeFilter from={from} to={to} />
+      <DateRangeFilter from={from} to={to} presets={POSTING_PERIOD_PRESETS} onPreset={applyPreset} />
+
+      <div className="flex items-center gap-3">
+        <label className="flex flex-col gap-1">
+          From
+          <input type="date" aria-label="From" value={from} onChange={(event) => onPeriodChange?.(event.target.value, to)} />
+        </label>
+        <label className="flex flex-col gap-1">
+          To
+          <input type="date" aria-label="To" value={to} onChange={(event) => onPeriodChange?.(from, event.target.value)} />
+        </label>
+      </div>
+
+      {periodError ? <p role="alert">{periodError}</p> : null}
 
       <div className="flex items-center gap-3">
         <label className="flex flex-col gap-1">

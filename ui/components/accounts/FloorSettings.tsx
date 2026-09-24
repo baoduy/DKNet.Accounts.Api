@@ -18,11 +18,23 @@ export interface FloorSettingsProps {
   onChange: (value: FloorSettingsValue) => void;
   /** A field-less refusal (e.g. `OVERDRAFT_LIMIT_REQUIRED`), shown against this group. */
   refusal?: ReactNode;
+  /** A refusal named to this specific field (`overdraftLimit`/`minimumBalance`), marked on it
+   * rather than in the group-level `refusal` slot (DRK-1704 finding 3). */
+  overdraftLimitError?: string;
+  minimumBalanceError?: string;
   disabled?: boolean;
   style?: CSSProperties;
 }
 
-export function FloorSettings({ value, onChange, refusal, disabled = false, style }: FloorSettingsProps): JSX.Element {
+export function FloorSettings({
+  value,
+  onChange,
+  refusal,
+  overdraftLimitError,
+  minimumBalanceError,
+  disabled = false,
+  style,
+}: FloorSettingsProps): JSX.Element {
   function setPermittedToGoNegative(permittedToGoNegative: boolean): void {
     onChange({
       permittedToGoNegative,
@@ -56,20 +68,24 @@ export function FloorSettings({ value, onChange, refusal, disabled = false, styl
         Overdraft limit
         <Input
           aria-label="Overdraft limit"
+          aria-invalid={overdraftLimitError ? 'true' : undefined}
           value={value.overdraftLimit ?? ''}
           disabled={disabled || !value.permittedToGoNegative}
           onChange={(event) => onChange({ ...value, overdraftLimit: event.target.value === '' ? null : event.target.value })}
         />
+        {overdraftLimitError ? <span role="alert">{overdraftLimitError}</span> : null}
       </label>
 
       <label className="flex flex-col gap-1">
         Smallest permitted balance
         <Input
           aria-label="Smallest permitted balance"
+          aria-invalid={minimumBalanceError ? 'true' : undefined}
           value={value.minimumBalance ?? ''}
           disabled={disabled}
           onChange={(event) => onChange({ ...value, minimumBalance: event.target.value === '' ? null : event.target.value })}
         />
+        {minimumBalanceError ? <span role="alert">{minimumBalanceError}</span> : null}
       </label>
 
       {refusal}

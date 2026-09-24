@@ -3,7 +3,7 @@
  * `postings-filter.ts` mutation score below 80%). Each test names the mutant it kills.
  */
 import { describe, expect, it } from 'vitest';
-import { defaultPostingsFilter, toPostingsQuery, type PostingsFilterState } from './postings-filter';
+import { defaultPostingsFilter, postingPeriodError, toPostingsQuery, type PostingsFilterState } from './postings-filter';
 
 const BASE: PostingsFilterState = { from: '2026-01-01', to: '2026-01-31', direction: '', category: '', status: '' };
 
@@ -57,6 +57,38 @@ describe('toPostingsQuery', () => {
 
   it('carries a given pageSize', () => {
     expect(toPostingsQuery('a1', BASE, 20)!.get('pageSize')).toBe('20');
+  });
+});
+
+describe('postingPeriodError — unset, unparseable and inverted periods (DRK-1704 finding 14)', () => {
+  it('refuses an empty from', () => {
+    expect(postingPeriodError('', '2026-01-31')).toBe('A period must be set.');
+  });
+
+  it('refuses an empty to', () => {
+    expect(postingPeriodError('2026-01-01', '')).toBe('A period must be set.');
+  });
+
+  it('refuses an unparseable date', () => {
+    expect(postingPeriodError('not-a-date', '2026-01-31')).toBe('A period must be set.');
+  });
+
+  it('refuses an inverted period (from after to)', () => {
+    expect(postingPeriodError('2026-01-31', '2026-01-01')).toBe('The period start must not be after its end.');
+  });
+
+  it('accepts from equal to to (a one-day period)', () => {
+    expect(postingPeriodError('2026-01-01', '2026-01-01')).toBeNull();
+  });
+});
+
+describe('toPostingsQuery — unset and inverted periods make no call (DRK-1704 finding 1/14)', () => {
+  it('returns null for an empty period', () => {
+    expect(toPostingsQuery('a1', { ...BASE, from: '', to: '' })).toBeNull();
+  });
+
+  it('returns null for an inverted period', () => {
+    expect(toPostingsQuery('a1', { ...BASE, from: '2026-01-31', to: '2026-01-01' })).toBeNull();
   });
 });
 

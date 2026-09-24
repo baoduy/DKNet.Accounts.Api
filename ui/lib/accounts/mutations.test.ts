@@ -16,7 +16,7 @@ afterEach(() => {
 describe('useOpenAccount', () => {
   it('posts to /api/ledger/accounts and invalidates the accounts list on success', async () => {
     const account = { id: 'a1', accountNumber: 'ACME-000001' };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => account });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(account) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -38,7 +38,7 @@ describe('useOpenAccount', () => {
   it('returns the service refusal unchanged and invalidates nothing on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ errors: [{ message: 'An overdraft limit is required.', code: 'OVERDRAFT_LIMIT_REQUIRED' }], traceId: 't-1' }),
+      text: async () => JSON.stringify({ errors: [{ message: 'An overdraft limit is required.', code: 'OVERDRAFT_LIMIT_REQUIRED' }], traceId: 't-1' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -66,7 +66,7 @@ describe('useOpenAccount', () => {
 describe('useChangeAccountDetails', () => {
   it('puts to /api/ledger/accounts/:id and invalidates the account and the list on success', async () => {
     const account = { id: 'a1', accountNumber: 'ACME-000123', name: 'New name' };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => account });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(account) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -86,7 +86,7 @@ describe('useChangeAccountDetails', () => {
   });
 
   it('invalidates nothing on failure', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ errors: [{ message: 'Not found.' }], traceId: 't-2' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'Not found.' }], traceId: 't-2' }) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -98,12 +98,34 @@ describe('useChangeAccountDetails', () => {
     expect(response.ok).toBe(false);
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
+
+  it('carries metadata through unchanged (DRK-1704 finding 4 — notes ride in metadata.notes)', async () => {
+    const account = { id: 'a1', accountNumber: 'ACME-000123', name: 'Operating account', metadata: { notes: 'Reconciled monthly' } };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(account) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useChangeAccountDetails(), { wrapper: wrapper(new QueryClient()) });
+    await result.current.mutate({ accountId: 'ACME-000123', metadata: { notes: 'Reconciled monthly' } });
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.metadata).toEqual({ notes: 'Reconciled monthly' });
+  });
+
+  it('keeps a returned balance past Number.MAX_SAFE_INTEGER as text, never routed through Number (R1)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '{"id":"a1","accountNumber":"ACME-000123","balance":9007199254740993.75}' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useChangeAccountDetails(), { wrapper: wrapper(new QueryClient()) });
+    const response = await result.current.mutate({ accountId: 'ACME-000123', name: 'x' });
+
+    expect(response.account?.balance).toBe('9007199254740993.75');
+  });
 });
 
 describe('useSetAccountControls', () => {
   it('patches to /api/ledger/accounts/:id and invalidates the account and the list on success', async () => {
     const account = { id: 'a1', accountNumber: 'ACME-000123', status: 'Closed' };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => account });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(account) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -125,7 +147,7 @@ describe('useSetAccountControls', () => {
   it('returns the refusal unchanged and invalidates nothing on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ errors: [{ message: 'The account holds a balance.', code: 'ACCOUNT_HOLDS_BALANCE' }], traceId: 't-3' }),
+      text: async () => JSON.stringify({ errors: [{ message: 'The account holds a balance.', code: 'ACCOUNT_HOLDS_BALANCE' }], traceId: 't-3' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
