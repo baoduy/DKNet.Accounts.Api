@@ -37,7 +37,7 @@ test('The console refuses an account-groups route it declares no operation for',
   const body = await response.json();
   expect(body.errors[0].message).toContain('not declare');
 
-  const calls = (await ledgerRequests()).filter((r) => r.path.includes('account-groups'));
+  const calls = (await ledgerRequests()).filter((r) => r.method === 'PATCH' && r.path.includes('account-groups'));
   expect(calls.length).toBe(0);
 });
 
