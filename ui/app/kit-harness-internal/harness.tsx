@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { AppShell } from '@/components/shell/AppShell';
 import { DetailPanel } from '@/components/feedback/DetailPanel';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
 import { LedgerTable } from '@/components/ledger/LedgerTable';
@@ -11,6 +10,7 @@ import { Money } from '@/components/ledger/Money';
 import { StatementTable } from '@/components/ledger/StatementTable';
 import type { StatementRowShape } from '@/components/ledger/StatementTable';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
+import { TableCard } from '@/components/ui/table-card';
 
 interface Account {
   id: string;
@@ -100,8 +100,10 @@ function PanelDemoSection(): JSX.Element {
 
   return (
     <section data-testid="panel-demo">
-      <AppShell
-        panelOpen={selected !== null}
+      {/* The restyled DetailPanel (DRK-1747 §3 row 12) is its own non-modal chrome, laid over the
+          table card's right edge — no longer inside AppShell's Sheet. */}
+      <TableCard
+        className="min-h-96"
         panel={
           selected ? (
             <DetailPanel title={selected.accountNumber} onClose={() => setSelectedId(null)}>
@@ -113,7 +115,7 @@ function PanelDemoSection(): JSX.Element {
         }
       >
         <LedgerTable columns={ACCOUNT_COLUMNS} rows={ACCOUNTS} rowKey="id" selectedId={selectedId} onSelectRow={(row) => setSelectedId(row.id)} />
-      </AppShell>
+      </TableCard>
     </section>
   );
 }
