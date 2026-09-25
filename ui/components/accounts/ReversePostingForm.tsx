@@ -2,27 +2,31 @@
  * DRK-1696 §3 row 6 — reverses a posting with a required reason, through `useReversePosting`
  * (passing `accountId`, or the balance is never invalidated — DRK-1687 finding 10). Wrapped in
  * `ScopeGate scope="postings.reverse"`. Shared by the detail and Records screens (DRK-1713 §3
- * row 12): the reason is required and at most 500 characters, refused on its own control with
- * nothing sent; `Reverse` stays on screen, disabled with its reason, on a posting already
- * reversed or on a reversal. Mounted only under a query provider.
+ * row 12), and drawn in a side panel's footer.
+ *
+ * DRK-1745 §3 row 8 (Design/ui_kits/records-crud) — `Reverse` opens the destructive "Reverse
+ * record" dialog, which collects the reason (required, at most 500 characters, refused on its
+ * own control with nothing sent); `Continue` restates the opposing movement in
+ * `ConfirmMovement`, and only its `Reverse record` sends. A refusal reopens the reason dialog
+ * with the service's words. `Reverse` stays on screen, disabled, on a posting already reversed
+ * or on a reversal; the panel's footnote says why.
  */
 'use client';
 
-import { useState, type CSSProperties, type JSX } from 'react';
+import { useRef, useState, type CSSProperties, type JSX } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Caption, Mono, Note } from '@/components/ui/text';
 import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { isUnreachable, NO_ANSWER_ERROR, routeRefusal } from '@/lib/api/refusal';
-import { usePosting } from '@/lib/accounts/query';
 import { useReversePosting } from '@/lib/query/mutations';
 
 export const MAX_REVERSAL_REASON_LENGTH = 500;
-
-/** DRK-1713 §5 — said before any action, on the details and in the reversal's confirmation. */
-export const NEVER_EDITED_STATEMENT =
-  'A posting is never edited or deleted. Reversing records an opposing posting and marks this one reversed. Both stay on the account.';
 
 function reasonError(reason: string): LedgerError | null {
   if (reason.trim().length === 0) return { message: 'A reason is required.' };
@@ -30,9 +34,24 @@ function reasonError(reason: string): LedgerError | null {
   return null;
 }
 
+export interface ReversedPosting {
+  postingNumber: string;
+  accountNumber: string;
+}
+
+/** The `Record reversed` acknowledgement. */
+export function reversedText(reversed: ReversedPosting): JSX.Element {
+  return (
+    <>
+      An opposing entry was recorded and <Mono>{reversed.postingNumber}</Mono> is marked Reversed. Nothing was erased — <Mono>{reversed.accountNumber}</Mono> now carries both rows.
+    </>
+  );
+}
+
 export interface ReversePostingFormProps {
   accountId: string;
   accountNumber: string;
+  accountName?: string;
   postingId: string;
   postingNumber: string;
   amount: string;
@@ -44,12 +63,17 @@ export interface ReversePostingFormProps {
   /** The posting this one reverses — a reversal is corrected by a new posting, never reversed. */
   reversesPostingId?: string | null;
   granted?: boolean;
+  /** Called once the service recorded the reversal — the screen acknowledges it. */
+  onReversed?: (reversed: ReversedPosting) => void;
   style?: CSSProperties;
 }
+
+type Step = 'closed' | 'reason' | 'confirm';
 
 export function ReversePostingForm({
   accountId,
   accountNumber,
+  accountName,
   postingId,
   postingNumber,
   amount,
@@ -59,24 +83,35 @@ export function ReversePostingForm({
   reversedByPostingId,
   reversesPostingId,
   granted = true,
+  onReversed,
   style,
 }: ReversePostingFormProps): JSX.Element {
-  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<Step>('closed');
   const [pending, setPending] = useState(false);
   const [reason, setReason] = useState('');
   const [localReasonError, setLocalReasonError] = useState<LedgerError | null>(null);
   const [errors, setErrors] = useState<LedgerError[]>([]);
+  const reverseButton = useRef<HTMLButtonElement>(null);
 
   const idempotency = useIdempotencyKey();
   const reverse = useReversePosting();
-  const linked = usePosting(reversedByPostingId || reversesPostingId).data;
   const { fieldErrors, alertErrors } = routeRefusal(errors);
   const shownReasonError = localReasonError ?? fieldErrors.reason ?? null;
+  const refused = Boolean(reversedByPostingId || reversesPostingId);
+
+  function cancel(): void {
+    setStep('closed');
+    setLocalReasonError(null);
+  }
+
+  function proceed(): void {
+    const refusal = reasonError(reason);
+    setLocalReasonError(refusal);
+    if (!refusal) setStep('confirm');
+  }
 
   async function handleConfirm(): Promise<void> {
-    const refused = reasonError(reason);
-    setLocalReasonError(refused);
-    if (refused) return;
+    setStep('closed');
     setPending(true);
     try {
       const result = await reverse.mutate({
@@ -89,63 +124,108 @@ export function ReversePostingForm({
       if (result.ok) {
         setErrors([]);
         setReason('');
-        setOpen(false);
+        onReversed?.({ postingNumber, accountNumber });
       } else {
         // The pass-through's unreachable answer means the service never answered this write.
         setErrors(isUnreachable(result.errors) ? [NO_ANSWER_ERROR] : (result.errors ?? []));
+        setStep('reason');
       }
     } catch {
       setErrors([NO_ANSWER_ERROR]);
+      setStep('reason');
     } finally {
       setPending(false);
     }
   }
 
+  // Focus goes back to `Reverse` once the last dialog has closed, never to the page body.
+  function returnFocus(event: Event): void {
+    event.preventDefault();
+    reverseButton.current?.focus();
+  }
+
   return (
-    <div style={style} className="flex flex-col gap-2">
+    <span style={style} className="contents">
       <ScopeGate scope="postings.reverse" granted={granted}>
-        <Button type="button" disabled={pending || !!reversedByPostingId || !!reversesPostingId} onClick={() => setOpen(true)}>
+        <Button ref={reverseButton} type="button" size="sm" variant="destructive" disabled={pending || refused} onClick={() => setStep('reason')}>
+          <RotateCcw size={14} aria-hidden="true" />
           Reverse
         </Button>
       </ScopeGate>
 
-      {reversedByPostingId ? (
-        <p>
-          <span className="font-mono font-semibold">POSTING_ALREADY_REVERSED</span> Already reversed by {linked?.postingNumber ?? ''}
-        </p>
-      ) : reversesPostingId ? (
-        <p>This posting is a reversal of {linked?.postingNumber ?? ''}; record a new posting to correct it</p>
-      ) : null}
-
-      <RefusalAlert errors={alertErrors} />
+      <Dialog
+        open={step === 'reason'}
+        tone="destructive"
+        title="Reverse record"
+        onClose={cancel}
+        onCloseAutoFocus={(event) => {
+          if (step === 'closed') returnFocus(event);
+        }}
+        footer={
+          <>
+            <Button type="button" onClick={cancel}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" className="ml-auto" onClick={proceed}>
+              Continue
+            </Button>
+          </>
+        }
+      >
+        <div>
+          Reversing <Mono>{postingNumber}</Mono> posts an opposing entry against <Mono>{accountNumber}</Mono>. Nothing is erased.
+        </div>
+        <label className="mt-4 flex flex-col gap-1.5">
+          <Caption>
+            Reason
+            <span aria-hidden="true" className="ml-0.5 text-destructive-solid">
+              *
+            </span>
+          </Caption>
+          <Textarea
+            rows={3}
+            value={reason}
+            invalid={shownReasonError !== null}
+            placeholder="Why this record is being reversed."
+            onChange={(event) => {
+              setReason(event.target.value);
+              if (localReasonError && reasonError(event.target.value) === null) setLocalReasonError(null);
+            }}
+          />
+        </label>
+        <Note className="mt-3">
+          Required, at most {MAX_REVERSAL_REASON_LENGTH} characters. Stored as the reversal&apos;s description and shown in the reversal lineage — this is the audit trail for the correction.
+        </Note>
+        {shownReasonError ? (
+          <span role="alert" className="mt-3 block text-[length:var(--text-caption-size)] text-destructive-solid">
+            {shownReasonError.message}
+          </span>
+        ) : null}
+        <RefusalAlert errors={alertErrors} style={{ marginTop: 'var(--space-3)' }} />
+      </Dialog>
 
       <ConfirmMovement
-        open={open}
-        direction={direction}
+        open={step === 'confirm'}
+        direction={direction === 'Credit' ? 'Debit' : 'Credit'}
         amount={amount}
         currency={currency}
         decimalPlaces={decimalPlaces}
         accountNumber={accountNumber}
-        confirmLabel="Confirm"
+        accountName={accountName}
+        category="Reversal"
         consequence={
-          <div className="flex flex-col gap-2">
-            <p>Reversing posting {postingNumber}.</p>
-            <p>{NEVER_EDITED_STATEMENT}</p>
-            <label className="flex flex-col gap-1">
-              Reason
-              <textarea
-                aria-label="Reason"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                aria-invalid={shownReasonError ? 'true' : undefined}
-              />
-              {shownReasonError ? <span role="alert">{shownReasonError.message}</span> : null}
-            </label>
-          </div>
+          <>
+            A new opposing record is posted, effective the day it is recorded, and <Mono>{postingNumber}</Mono> is marked Reversed. Nothing is erased — the account carries both rows.
+            Reason: {reason.trim()}
+          </>
         }
-        onBack={() => setOpen(false)}
+        onBack={() => setStep('reason')}
+        onCloseAutoFocus={(event) => {
+          if (step === 'closed') returnFocus(event);
+        }}
         onConfirm={handleConfirm}
+        confirmLabel="Reverse record"
       />
-    </div>
+    </span>
   );
 }

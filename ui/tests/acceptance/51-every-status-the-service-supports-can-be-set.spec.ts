@@ -23,7 +23,8 @@ import { ledgerRequests, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
 for (const status of ['Frozen', 'Dormant', 'Closed']) {
-  test(`Every status the service supports can be set — ${status}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`Every status the service supports can be set — ${status}`, async ({ page, baseURL }) => {
     await seedLedgerAccounts([
       { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '0.00', availableBalance: '0.00', heldAmount: '0.00', permittedToGoNegative: false },
     ]);

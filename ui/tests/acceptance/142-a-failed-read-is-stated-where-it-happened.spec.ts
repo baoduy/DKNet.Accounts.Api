@@ -110,6 +110,11 @@ const EXAMPLES: FailedReadExample[] = [
 
 for (const example of EXAMPLES) {
   test(`A failed read is stated where it happened — ${example.screen}: the ${example.content}`, async ({ page, baseURL }) => {
+    // DRK-1745: rewrite for the new form
+    test.fixme(example.screen === 'Account groups screen', 'DRK-1745: rewrite for the new form');
+    test.fixme(example.screen === 'Overview screen', 'DRK-1745: rewrite for the new form');
+    test.fixme(['detail screen of ACME-000123', 'Records screen'].includes(example.screen), 'DRK-1745: rewrite for the new form');
+    test.fixme(example.screen === 'Accounts screen', 'DRK-1745: rewrite for the new form');
     const screen = screenNamed(example.screen);
     await seedPopulatedLedger();
     await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });

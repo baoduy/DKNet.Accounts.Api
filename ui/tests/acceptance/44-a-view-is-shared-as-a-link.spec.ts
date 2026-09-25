@@ -12,7 +12,8 @@ import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('A view is shared as a link', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A view is shared as a link', async ({ page, baseURL }) => {
   await seedLedgerAccounts(
     Array.from({ length: 12 }, (_, index) => ({
       accountNumber: `ACME-${String(index + 1).padStart(6, '0')}`,

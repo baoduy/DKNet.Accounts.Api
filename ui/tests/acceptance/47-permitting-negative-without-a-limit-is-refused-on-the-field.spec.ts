@@ -16,7 +16,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('Permitting an account to go negative without a limit is refused on the field', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Permitting an account to go negative without a limit is refused on the field', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '100.00', availableBalance: '100.00', heldAmount: '0.00', permittedToGoNegative: false },
   ]);

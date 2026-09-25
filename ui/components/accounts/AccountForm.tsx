@@ -4,13 +4,19 @@
  * Edit: only name, notes and the floor settings are editable — group, account number,
  * currency, external reference and classification are locked (README.md: `PUT` accepts only
  * `name`/`metadata`; everything else the service never lets an edit change).
+ * DRK-1745 — the kit's two-column `FormRow` grid (Design/ui_kits/accounts-crud/Accounts.jsx).
  */
 'use client';
 
-import { useState, type CSSProperties, type JSX } from 'react';
+import { useEffect, useState, type CSSProperties, type JSX } from 'react';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { Button } from '@/components/ui/button';
+import { Input, ReadOnlyField } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Caption, Mono } from '@/components/ui/text';
+import { Textarea } from '@/components/ui/textarea';
 import { routeRefusal } from '@/lib/api/refusal';
-import { FloorSettings, type FloorSettingsValue } from './FloorSettings';
+import { FloorSettings, FormRow, type FloorSettingsValue } from './FloorSettings';
 
 export interface AccountFormAccount {
   accountNumber: string;
@@ -31,6 +37,8 @@ export interface AccountFormAccount {
 export interface AccountFormOption {
   value: string;
   label: string;
+  /** Currencies only — the scale the floor-policy hint quotes. */
+  decimalPlaces?: number;
 }
 
 export const ACCOUNT_CLASSIFICATIONS: AccountFormOption[] = [
@@ -65,15 +73,40 @@ export interface AccountFormProps {
   /** Edit mode only — `false` locks Save, Status and the floor controls behind the
    * `accounts.write` scope (DRK-1704 finding 7), mirroring `ScopeGate`'s own caption. */
   writeGranted?: boolean;
+  /** Set when the submit buttons live outside the form (the side panel's footer): the form
+   * takes this id and draws no submit button of its own. */
+  formId?: string;
+  /** Edit mode — the Status select. The side panel closes and reopens from its footer instead. */
+  showStatus?: boolean;
+  /** Fires whenever the form moves between untouched and edited. */
+  onDirtyChange?: (dirty: boolean) => void;
   onSubmit?: (values: AccountFormValues) => void;
   style?: CSSProperties;
 }
 
-export function AccountForm({ mode, account, groups = [], currencies = [], errors = [], writeGranted = true, onSubmit, style }: AccountFormProps): JSX.Element {
+/** A field fixed once the account is open. The empty text keeps the field's own type size, so the
+ * loading form (every value blank) stands exactly as tall as the loaded one (DRK-1725 R1). */
+function Locked({ value }: { value: string }): JSX.Element {
+  return <ReadOnlyField locked>{value ? <Mono>{value}</Mono> : <span>Not set.</span>}</ReadOnlyField>;
+}
+
+export function AccountForm({
+  mode,
+  account,
+  groups = [],
+  currencies = [],
+  errors = [],
+  writeGranted = true,
+  formId,
+  showStatus = true,
+  onDirtyChange,
+  onSubmit,
+  style,
+}: AccountFormProps): JSX.Element {
   const [name, setName] = useState(account.name);
   const [notes, setNotes] = useState(account.notes);
-  const [groupId, setGroupId] = useState(groups[0]?.value ?? '');
-  const [currency, setCurrency] = useState(mode === 'open' ? (currencies[0]?.value ?? '') : account.currency);
+  const [groupId, setGroupId] = useState('');
+  const [currency, setCurrency] = useState(mode === 'open' ? '' : account.currency);
   const [classification, setClassification] = useState(account.classification);
   // Starts unset, not the account's current status: a closed `<select>` displays its own
   // selected option's text as if it were on-screen content, which would otherwise restate the
@@ -87,10 +120,23 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
     minimumBalance: account.minimumBalance,
   });
 
+  const dirty =
+    name !== account.name ||
+    notes !== account.notes ||
+    groupId !== '' ||
+    currency !== (mode === 'open' ? '' : account.currency) ||
+    classification !== account.classification ||
+    status !== '' ||
+    floor.permittedToGoNegative !== account.permittedToGoNegative ||
+    floor.overdraftLimit !== account.overdraftLimit ||
+    floor.minimumBalance !== account.minimumBalance;
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+
   const { fieldErrors, alertErrors } = routeRefusal(errors);
   const editLocked = mode === 'edit' && !writeGranted;
   const overdraftRefusal = alertErrors.find((error) => error.code === 'OVERDRAFT_LIMIT_REQUIRED');
   const otherAlertErrors = alertErrors.filter((error) => error !== overdraftRefusal);
+  const floorCurrency = mode === 'open' ? currency : account.currency;
 
   function submit(): void {
     onSubmit?.({
@@ -106,6 +152,7 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
 
   return (
     <form
+      id={formId}
       style={style}
       className="flex flex-col gap-4"
       onSubmit={(event) => {
@@ -113,146 +160,129 @@ export function AccountForm({ mode, account, groups = [], currencies = [], error
         submit();
       }}
     >
+      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+        <FormRow label="Group" required hint={mode === 'open' ? 'The group code becomes the prefix of the account number.' : null}>
+          {mode === 'open' ? (
+            <>
+              <Select
+                aria-label="Group"
+                options={[{ value: '', label: 'Select a group' }, ...groups]}
+                value={groupId}
+                onChange={(event) => setGroupId(event.target.value)}
+                className="w-full"
+              />
+              {fieldErrors.groupId ? <span role="alert">{fieldErrors.groupId.message}</span> : null}
+            </>
+          ) : (
+            <Locked value={account.groupName} />
+          )}
+        </FormRow>
+
+        <FormRow label="Account no.">
+          {mode === 'open' ? (
+            <ReadOnlyField>
+              <Caption>Assigned by the service on open.</Caption>
+            </ReadOnlyField>
+          ) : (
+            <Locked value={account.accountNumber} />
+          )}
+        </FormRow>
+
+        <FormRow label="Name" required>
+          <Input
+            aria-label="Name"
+            placeholder="Operating account"
+            value={name}
+            invalid={Boolean(fieldErrors.name)}
+            onChange={(event) => setName(event.target.value)}
+          />
+          {fieldErrors.name ? <span role="alert">{fieldErrors.name.message}</span> : null}
+        </FormRow>
+
+        <FormRow label="Currency" required hint={mode === 'open' ? 'Fixed once the account is open. Every amount on it is stored at this currency’s scale.' : null}>
+          {mode === 'open' ? (
+            <>
+              <Select
+                aria-label="Currency"
+                options={[{ value: '', label: 'Select a currency' }, ...currencies.map(({ value, label }) => ({ value, label }))]}
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value)}
+                className="w-full"
+              />
+              {fieldErrors.currency ? <span role="alert">{fieldErrors.currency.message}</span> : null}
+            </>
+          ) : (
+            <Locked value={account.currency} />
+          )}
+        </FormRow>
+
+        <FormRow label="Classification" required={mode === 'open'}>
+          {mode === 'open' ? (
+            <Select
+              aria-label="Classification"
+              options={ACCOUNT_CLASSIFICATIONS}
+              value={classification}
+              onChange={(event) => setClassification(event.target.value)}
+              className="w-full"
+            />
+          ) : (
+            <Locked value={account.classification} />
+          )}
+        </FormRow>
+
+        <FloorSettings
+          value={floor}
+          currency={floorCurrency}
+          decimalPlaces={currencies.find((option) => option.value === floorCurrency)?.decimalPlaces}
+          onChange={setFloor}
+          disabled={editLocked}
+          overdraftLimitError={fieldErrors.overdraftLimit?.message}
+          minimumBalanceError={fieldErrors.minimumBalance?.message}
+          refusal={
+            overdraftRefusal ? (
+              <p role="alert">
+                <span className="font-mono font-semibold">OVERDRAFT_LIMIT_REQUIRED</span> {overdraftRefusal.message}
+              </p>
+            ) : null
+          }
+        />
+
+        <FormRow label="External ref.">
+          <Locked value={account.externalReference} />
+        </FormRow>
+
+        {mode === 'edit' && showStatus ? (
+          <FormRow label="Status">
+            <Select
+              aria-label="Status"
+              options={[{ value: '', label: 'Change status…' }, ...ACCOUNT_STATUSES]}
+              value={status}
+              disabled={editLocked}
+              onChange={(event) => setStatus(event.target.value)}
+              className="w-full"
+            />
+            {fieldErrors.status ? <span role="alert">{fieldErrors.status.message}</span> : null}
+          </FormRow>
+        ) : null}
+
+        <FormRow label="Notes" hint="Stored in the account’s metadata under notes.">
+          <label className="block">
+            <span className="sr-only">Free-form notes</span>
+            <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+          </label>
+        </FormRow>
+      </div>
+
       {otherAlertErrors.length ? <RefusalAlert errors={otherAlertErrors} /> : null}
 
-      <label className="flex flex-col gap-1">
-        Name
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          aria-label="Name"
-          aria-invalid={fieldErrors.name ? 'true' : undefined}
-        />
-        {fieldErrors.name ? <span role="alert">{fieldErrors.name.message}</span> : null}
-      </label>
-
-      <label className="flex flex-col gap-1">
-        Free-form notes
-        <textarea value={notes} onChange={(event) => setNotes(event.target.value)} aria-label="Free-form notes" />
-      </label>
-
-      {mode === 'edit' ? (
-        <label className="flex flex-col gap-1">
-          Account number
-          <input value={account.accountNumber} disabled aria-label="Account number" />
-        </label>
+      {formId === undefined ? (
+        <div className="flex items-center gap-2">
+          <Button type="submit" variant="primary" disabled={editLocked}>
+            {mode === 'open' ? 'Open' : 'Save'}
+          </Button>
+          {editLocked ? <Caption>requires accounts.write</Caption> : null}
+        </div>
       ) : null}
-
-      <label className="flex flex-col gap-1">
-        Group
-        {mode === 'open' ? (
-          <>
-            <select
-              value={groupId}
-              onChange={(event) => setGroupId(event.target.value)}
-              aria-label="Group"
-              aria-invalid={fieldErrors.groupId ? 'true' : undefined}
-            >
-              {groups.map((group) => (
-                <option key={group.value} value={group.value}>
-                  {group.label}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.groupId ? <span role="alert">{fieldErrors.groupId.message}</span> : null}
-          </>
-        ) : (
-          <select value={account.groupName} disabled aria-label="Group">
-            <option value={account.groupName}>{account.groupName}</option>
-          </select>
-        )}
-      </label>
-
-      <label className="flex flex-col gap-1">
-        Currency
-        {mode === 'open' ? (
-          <>
-            <select
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value)}
-              aria-label="Currency"
-              aria-invalid={fieldErrors.currency ? 'true' : undefined}
-            >
-              {currencies.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.currency ? <span role="alert">{fieldErrors.currency.message}</span> : null}
-          </>
-        ) : (
-          <select value={account.currency} disabled aria-label="Currency">
-            <option value={account.currency}>{account.currency}</option>
-          </select>
-        )}
-      </label>
-
-      <label className="flex flex-col gap-1">
-        Accounting classification
-        {mode === 'open' ? (
-          <select value={classification} onChange={(event) => setClassification(event.target.value)} aria-label="Accounting classification">
-            {ACCOUNT_CLASSIFICATIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <select value={account.classification} disabled aria-label="Accounting classification">
-            <option value={account.classification}>{account.classification}</option>
-          </select>
-        )}
-      </label>
-
-      <label className="flex flex-col gap-1">
-        Outside reference
-        <input value={account.externalReference} disabled aria-label="Outside reference" />
-      </label>
-
-      {mode === 'edit' ? (
-        <label className="flex flex-col gap-1">
-          Status
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label="Status"
-            aria-invalid={fieldErrors.status ? 'true' : undefined}
-            disabled={editLocked}
-          >
-            <option value="" disabled>
-              Change status…
-            </option>
-            {ACCOUNT_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.status ? <span role="alert">{fieldErrors.status.message}</span> : null}
-        </label>
-      ) : null}
-
-      <FloorSettings
-        value={floor}
-        currency={mode === 'open' ? currency : account.currency}
-        onChange={setFloor}
-        disabled={editLocked}
-        overdraftLimitError={fieldErrors.overdraftLimit?.message}
-        minimumBalanceError={fieldErrors.minimumBalance?.message}
-        refusal={
-          overdraftRefusal ? (
-            <p role="alert">
-              <span className="font-mono font-semibold">OVERDRAFT_LIMIT_REQUIRED</span> {overdraftRefusal.message}
-            </p>
-          ) : null
-        }
-      />
-
-      <button type="submit" disabled={editLocked}>
-        {mode === 'open' ? 'Open' : 'Save'}
-      </button>
-      {editLocked ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">requires accounts.write</span> : null}
     </form>
   );
 }

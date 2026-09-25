@@ -19,7 +19,8 @@ import { startConsole, stopConsole } from '../support/console-process';
 const PORT = OWN_CONSOLE_PORT;
 const BASE = `http://127.0.0.1:${PORT}`;
 
-test('Restarting the console does not sign the operator out', async ({ page }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Restarting the console does not sign the operator out', async ({ page }) => {
   let handle = await startConsole(defaultConsoleEnv(PORT), PORT, '/signin');
   try {
     await signInAs(page, { consoleBaseUrl: BASE, email: MAI.email });

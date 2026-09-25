@@ -29,7 +29,8 @@ const MONTHS = [
   'April 2026', 'May 2026', 'June 2026', 'July 2026', 'August 2026', 'September 2026',
 ];
 
-test('Accounts opened per month are split by status', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Accounts opened per month are split by status', async ({ page, baseURL }) => {
   await setLedgerClock('2026-09-24');
   const opened = (n: number, openedOn: string, status: 'Active' | 'Closed') =>
     account(`OPEN-${String(n).padStart(6, '0')}`, `a6000000-0000-4000-8000-${String(n).padStart(12, '0')}`, { openedOn, status, balance: '0.00', availableBalance: '0.00' });

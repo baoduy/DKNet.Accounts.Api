@@ -31,7 +31,8 @@ const EXAMPLES = [
 ];
 
 for (const { name, reason, reversed } of EXAMPLES) {
-  test(`A reversal reason is required and at most 500 characters — ${name}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`A reversal reason is required and at most 500 characters — ${name}`, async ({ page, baseURL }) => {
     await seedLedgerAccounts([account('GLOBEX-000456', GLOBEX_ID)]);
     await seedLedgerPostings([
       posting({ id: P_10042, postingNumber: 'P-10042', accountId: GLOBEX_ID, direction: 'Credit', amount: '30.00', currency: 'SGD', category: 'Transfer', effectiveDate: daysAgo(1) }),

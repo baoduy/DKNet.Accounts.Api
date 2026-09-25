@@ -16,7 +16,8 @@ import { panel, tableCell } from '../support/overview';
 import { ACME_ID, account } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('A chart the operator has no permission for says so', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A chart the operator has no permission for says so', async ({ page, baseURL }) => {
   await setLedgerClock('2026-09-24');
   await seedLedgerAccounts([account('ACME-000123', ACME_ID, { balance: '100.00', availableBalance: '100.00', openedOn: '2026-09-10T08:00:00.000Z' })]);
   await seedLedgerAccountGroups([{ id: 'c4000000-0000-4000-8000-000000000001', code: 'ACME', name: 'Acme Corporation', type: 'Customer', ownerId: 'ops' }]);

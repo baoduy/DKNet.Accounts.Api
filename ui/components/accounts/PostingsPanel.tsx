@@ -1,37 +1,29 @@
 /**
- * DRK-1696 §3 row 4 — `DateRangeFilter` + the three narrowing controls over a `StatementTable
- * showBalanceAfter={false}`. Presentational: filter state and postings both arrive as props,
- * so this renders with no query provider (`AccountDetailScreen` owns the fetching).
+ * DRK-1696 §3 row 4 — the account's postings. Presentational: filter state and postings both
+ * arrive as props, so this renders with no query provider (`AccountDetailScreen` owns the
+ * fetching).
+ *
+ * DRK-1745 §3 rows 3–5 (Design/ui_kits/account-detail) — the Records screen's table card scoped
+ * to one account: search, `{rows} of {total}`, a filter menu with the one period choice
+ * (7/14/30/90 days) and direction, category and status, the pager, and the side panel passed
+ * through `panel` so it overlays the card's right edge. The Account column is dropped and
+ * Description takes its place; no balance-after column — this table sorts.
  */
-import type { CSSProperties, JSX } from 'react';
+import type { CSSProperties, JSX, ReactNode } from 'react';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
-import { DateRangeFilter, type DatePreset } from '@/components/forms/DateRangeFilter';
-import { StatementTable, type StatementRowShape } from '@/components/ledger/StatementTable';
-import { MAX_POSTING_PERIOD_DAYS, POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES, postingPeriodError } from '@/lib/accounts/postings-filter';
+import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
+import { RecordsTable, type RecordsTableRow } from '@/components/records/RecordsTable';
+import { Select } from '@/components/ui/select';
+import { TableCard } from '@/components/ui/table-card';
+import {
+  DEFAULT_POSTING_PERIOD,
+  POSTING_CATEGORIES,
+  POSTING_DIRECTIONS,
+  POSTING_PERIOD_OPTIONS,
+  POSTING_STATUSES,
+} from '@/lib/accounts/postings-filter';
 
-/** Only spans this screen's own 90-day cap can ever accept — `DateRangeFilter`'s own generic
- * `month`/`all` presets would always be refused here, so this screen offers its own set. */
-const POSTING_PERIOD_PRESETS: DatePreset[] = [
-  { value: '7', label: '7d' },
-  { value: '30', label: '30d' },
-  { value: String(MAX_POSTING_PERIOD_DAYS), label: `${MAX_POSTING_PERIOD_DAYS}d` },
-];
-
-function toDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-export interface PostingsPanelRow {
-  id: string;
-  postingNumber: string;
-  direction: string;
-  amount: string;
-  currency: string;
-  decimalPlaces?: number;
-  category?: string;
-  status?: string;
-  description?: string;
-  effectiveDate: string;
+export interface PostingsPanelRow extends RecordsTableRow {
   /** DRK-1713 §3 row 14 — the links between a posting and its reversal, so `Reverse` is refused on either. */
   reversedByPostingId?: string | null;
   reversesPostingId?: string | null;
@@ -45,13 +37,16 @@ export interface PostingsPanelFilter {
 
 export interface PostingsPanelProps {
   rows: PostingsPanelRow[];
-  from: string;
-  to: string;
+  /** One of `POSTING_PERIODS`; `from`/`to` are derived from it, so no refused period can be asked for. */
+  period?: string;
+  onPeriodChange?: (period: string) => void;
   filter?: PostingsPanelFilter;
   onFilterChange?: (filter: PostingsPanelFilter) => void;
-  /** DRK-1704 finding 1/14 — the period is operator-editable end to end; a span the service
-   * would refuse (over 90 days, inverted or unset) is shown here and never fetched (R2). */
-  onPeriodChange?: (from: string, to: string) => void;
+  search?: string;
+  onSearchChange?: (search: string) => void;
+  orderBy?: string;
+  desc?: boolean;
+  onSort?: (field: string) => void;
   selectedId?: string | null;
   onSelectRow?: (row: PostingsPanelRow) => void;
   /** The statement is still being read: the table keeps its headings over placeholder rows. */
@@ -59,136 +54,100 @@ export interface PostingsPanelProps {
   /** The statement read failed — stated in place of the table; the filters stay usable (DRK-1725 R2). */
   failure?: { error: unknown; onRetry: () => void };
   emptyMessage?: string;
-  /** The statement's page, and how many the service counts; page links show past one page. */
   page?: number;
   pageCount?: number;
+  pageSize?: number;
+  pageSizeOptions?: number[];
+  /** The service's count of every posting in the view. */
+  total?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  /** The side panel — overlays this card's right edge. */
+  panel?: ReactNode;
   style?: CSSProperties;
 }
 
 const EMPTY_FILTER: PostingsPanelFilter = { direction: '', category: '', status: '' };
 
+function anyOf(values: readonly string[]): { value: string; label: string }[] {
+  return [{ value: '', label: 'Any' }, ...values.map((value) => ({ value, label: value }))];
+}
+
 export function PostingsPanel({
   rows,
-  from,
-  to,
+  period = DEFAULT_POSTING_PERIOD,
+  onPeriodChange,
   filter = EMPTY_FILTER,
   onFilterChange,
-  onPeriodChange,
+  search = '',
+  onSearchChange,
+  orderBy,
+  desc,
+  onSort,
   selectedId,
   onSelectRow,
   loading = false,
   failure,
-  emptyMessage,
+  emptyMessage = 'No postings.',
   page = 1,
   pageCount = 1,
+  pageSize = 10,
+  pageSizeOptions = [5, 10, 25, 50],
+  total = 0,
   onPageChange,
+  onPageSizeChange,
+  panel,
   style,
 }: PostingsPanelProps): JSX.Element {
-  function setFilter(patch: Partial<PostingsPanelFilter>): void {
-    onFilterChange?.({ ...filter, ...patch });
-  }
-
-  function applyPreset(days: string): void {
-    const to = new Date();
-    const spanDays = Number(days);
-    const from = new Date(to.getTime() - spanDays * 86_400_000);
-    onPeriodChange?.(toDateOnly(from), toDateOnly(to));
-  }
-
-  const periodError = postingPeriodError(from, to);
-
-  const statementRows: StatementRowShape[] = rows.map((row) => ({
-    id: row.id,
-    effectiveDate: row.effectiveDate,
-    recordedAt: row.effectiveDate,
-    postingNumber: row.postingNumber,
-    description: row.description ?? '',
-    category: row.category,
-    signedAmount: row.direction === 'Debit' ? `-${row.amount}` : row.amount,
-    balanceAfter: '0',
-    streamPosition: 0,
-    status: row.status as StatementRowShape['status'],
-  }));
+  const activeCount = [period !== DEFAULT_POSTING_PERIOD, filter.direction, filter.category, filter.status].filter(Boolean).length;
+  const narrow = (key: keyof PostingsPanelFilter, options: { value: string; label: string }[]): JSX.Element => (
+    <Select options={options} value={filter[key]} className="w-full" onChange={(event) => onFilterChange?.({ ...filter, [key]: event.target.value })} />
+  );
 
   return (
-    <div data-testid="postings-panel" style={style} className="flex flex-col gap-3">
-      <DateRangeFilter from={from} to={to} presets={POSTING_PERIOD_PRESETS} onPreset={applyPreset} />
-
-      <div className="flex items-center gap-3">
-        <label className="flex flex-col gap-1">
-          From
-          <input type="date" aria-label="From" value={from} onChange={(event) => onPeriodChange?.(event.target.value, to)} />
-        </label>
-        <label className="flex flex-col gap-1">
-          To
-          <input type="date" aria-label="To" value={to} onChange={(event) => onPeriodChange?.(from, event.target.value)} />
-        </label>
-      </div>
-
-      {periodError ? <p role="alert">{periodError}</p> : null}
-
-      <div className="flex items-center gap-3">
-        <label className="flex flex-col gap-1">
-          Direction filter
-          <select aria-label="Direction filter" value={filter.direction} onChange={(event) => setFilter({ direction: event.target.value })}>
-            <option value="">All directions</option>
-            {POSTING_DIRECTIONS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          Category filter
-          <select aria-label="Category filter" value={filter.category} onChange={(event) => setFilter({ category: event.target.value })}>
-            <option value="">All categories</option>
-            {POSTING_CATEGORIES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          Status filter
-          <select aria-label="Status filter" value={filter.status} onChange={(event) => setFilter({ status: event.target.value })}>
-            <option value="">All statuses</option>
-            {POSTING_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {failure ? (
-        <FailedRead error={failure.error} onRetry={failure.onRetry} />
-      ) : (
-        <StatementTable
-          rows={statementRows}
-          decimalPlaces={rows[0]?.decimalPlaces}
-          showBalanceAfter={false}
-          selectedId={selectedId}
-          onSelectRow={onSelectRow ? (row) => onSelectRow(rows.find((candidate) => candidate.id === row.id)!) : undefined}
-          loading={loading}
-          emptyMessage={emptyMessage}
-        />
-      )}
-
-      {pageCount > 1 ? (
-        <div className="flex items-center gap-2">
-          {Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => (
-            <button key={number} type="button" aria-current={number === page ? 'page' : undefined} onClick={() => onPageChange?.(number)}>
-              Page {number}
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <div data-testid="postings-panel" style={style}>
+      <TableCard
+        searchPlaceholder="Search record or reference"
+        searchValue={search}
+        onSearchChange={onSearchChange}
+        rows={rows.length}
+        total={total}
+        filter={
+          <FilterMenu
+            activeCount={activeCount}
+            onClear={() => {
+              onPeriodChange?.(DEFAULT_POSTING_PERIOD);
+              onFilterChange?.(EMPTY_FILTER);
+            }}
+          >
+            <FilterField label="Period" hint="Effective date. 90 days is the widest window.">
+              <Select options={POSTING_PERIOD_OPTIONS} value={period} className="w-full" onChange={(event) => onPeriodChange?.(event.target.value)} />
+            </FilterField>
+            <FilterField label="Direction">{narrow('direction', anyOf(POSTING_DIRECTIONS))}</FilterField>
+            <FilterField label="Category">{narrow('category', anyOf(POSTING_CATEGORIES))}</FilterField>
+            <FilterField label="Status">{narrow('status', anyOf(POSTING_STATUSES))}</FilterField>
+          </FilterMenu>
+        }
+        pagination={{ page, pageCount, pageSize, pageSizeOptions, onPageChange, onPageSizeChange }}
+        panel={panel}
+      >
+        {failure ? (
+          <FailedRead error={failure.error} onRetry={failure.onRetry} />
+        ) : (
+          <RecordsTable
+            scope="account"
+            rows={rows}
+            orderBy={orderBy}
+            desc={desc}
+            onSort={onSort}
+            selectedId={selectedId}
+            onSelectRow={onSelectRow ? (row) => onSelectRow(rows.find((candidate) => candidate.id === row.id)!) : undefined}
+            loading={loading}
+            placeholderRows={pageSize}
+            emptyMessage={emptyMessage}
+          />
+        )}
+      </TableCard>
     </div>
   );
 }

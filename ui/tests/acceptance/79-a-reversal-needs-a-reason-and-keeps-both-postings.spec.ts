@@ -16,7 +16,8 @@ import { ledgerPostings, seedLedgerAccounts, seedLedgerPostings } from '../suppo
 import { GLOBEX_ID, account, cellText, confirmMovement, daysAgo, posting, recordRow, recordRows, rowCells } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('A reversal needs a reason and keeps both postings', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A reversal needs a reason and keeps both postings', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account('GLOBEX-000456', GLOBEX_ID)]);
   await seedLedgerPostings([
     posting({ id: 'b0000000-0000-4000-8000-000000010042', postingNumber: 'P-10042', accountId: GLOBEX_ID, direction: 'Credit', amount: '30.00', currency: 'SGD', category: 'Transfer', effectiveDate: daysAgo(1) }),

@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 import { Money } from '@/components/ledger/Money';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
 
@@ -36,6 +36,10 @@ export interface ConfirmMovementProps {
   confirmLabel?: string;
 }
 
+/**
+ * The restate-in-words dialog used by record, batch and reverse (Design/components/feedback/ConfirmMovement.jsx).
+ * It restates the movement rather than echoing the form: a number read twice in the same layout is a number read once.
+ */
 export function ConfirmMovement({
   open = true,
   direction,
@@ -52,55 +56,72 @@ export function ConfirmMovement({
   onDismiss = onBack,
   onCloseAutoFocus,
   onConfirm,
-  confirmLabel = 'Confirm',
+  confirmLabel = 'Record posting',
 }: ConfirmMovementProps): JSX.Element {
+  const batch = legs !== undefined && legs.length > 0;
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onDismiss?.())}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
-        <DialogTitle>Confirm this movement</DialogTitle>
-
-        {legs && legs.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <p>All legs are recorded together, or none are — this is all-or-nothing.</p>
-            <ul className="flex flex-col gap-1">
-              {legs.map((leg, index) => (
-                <li key={index} className="flex items-center justify-between gap-4">
-                  <span>
-                    {leg.direction} <AccountNumber value={leg.accountNumber} />
-                  </span>
-                  <Money amount={leg.amount} currency={leg.currency} decimalPlaces={leg.decimalPlaces} showCurrency align="right" />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <>
-            {/* DRK-1713 §3 row 11 — a typed amount is restated exactly as typed, never through
-                `Money`, which would re-pad or regroup it; a ledger amount is drawn at its scale. */}
-            <p>
-              {direction}{' '}
-              {decimalPlaces === undefined ? `${String(amount ?? '')} ${currency ?? ''}` : <Money amount={amount ?? ''} currency={currency} decimalPlaces={decimalPlaces} showCurrency />}{' '}
-              {direction === 'Debit' ? 'from' : 'to'} <AccountNumber value={accountNumber ?? ''} />
-            </p>
-            {accountName || effectiveDate || category ? (
-              <p className="text-muted-foreground">
-                {[accountName, effectiveDate ? `effective ${effectiveDate}` : '', category ? `category ${category}` : ''].filter(Boolean).join(', ')}
-              </p>
-            ) : null}
-          </>
-        )}
-
-        {consequence ? <div className="text-muted-foreground">{consequence}</div> : null}
-
-        <DialogFooter>
-          <Button variant="default" onClick={onBack}>
+    <Dialog
+      open={open}
+      title={batch ? 'Confirm this batch' : 'Confirm this movement'}
+      onClose={() => onDismiss?.()}
+      onCloseAutoFocus={onCloseAutoFocus}
+      footer={
+        <>
+          <Button type="button" onClick={onBack}>
             Back
           </Button>
-          <Button variant="primary" onClick={onConfirm}>
+          <Button type="button" variant="primary" className="ml-auto" onClick={onConfirm}>
             {confirmLabel}
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </>
+      }
+    >
+      {batch ? (
+        <>
+          <div>All-or-nothing: a refusal on any leg leaves the whole batch unrecorded.</div>
+          <ul className="mt-3 flex list-disc flex-col gap-1 pl-4.5">
+            {legs.map((leg, index) => (
+              <li key={index}>
+                {leg.direction}{' '}
+                <b className="tabular-nums">
+                  <Money amount={leg.amount} currency={leg.currency} decimalPlaces={leg.decimalPlaces} showCurrency />
+                </b>{' '}
+                {leg.direction === 'Debit' ? 'from' : 'to'}{' '}
+                <b className="font-mono">
+                  <AccountNumber value={leg.accountNumber} />
+                </b>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="m-0">
+          {direction}{' '}
+          <b className="tabular-nums">
+            {/* DRK-1713 §3 row 11 — a typed amount is restated exactly as typed, never through
+                `Money`, which would re-pad or regroup it; a ledger amount is drawn at its scale. */}
+            {decimalPlaces === undefined ? `${String(amount ?? '')} ${currency ?? ''}` : <Money amount={amount ?? ''} currency={currency} decimalPlaces={decimalPlaces} showCurrency />}
+          </b>{' '}
+          {direction === 'Debit' ? 'from' : 'to'}{' '}
+          <b className="font-mono">
+            <AccountNumber value={accountNumber ?? ''} />
+          </b>
+          {accountName ? <> · {accountName}</> : null}
+          {effectiveDate ? (
+            <>
+              ,<br />
+              effective <b>{effectiveDate}</b>
+            </>
+          ) : null}
+          {category ? (
+            <>
+              , category <b>{category}</b>
+            </>
+          ) : null}
+          .
+        </p>
+      )}
+      {consequence ? <div className="mt-3 text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-muted-foreground">{consequence}</div> : null}
     </Dialog>
   );
 }

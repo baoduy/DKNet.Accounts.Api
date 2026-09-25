@@ -51,10 +51,50 @@ export async function fetchPostingCount(window: DateWindow): Promise<number> {
   return Number(body.totalItemCount);
 }
 
+/** A list route whose page carries the service's `totalItemCount`. */
+export type TotalResource = 'accounts' | 'account-groups' | 'currencies';
+
+/**
+ * The service's own count of every row `resource` holds under `params` — one read of a page of 1
+ * (`/currencies` takes no query and is read bare), its `totalItemCount` taken as the figure (R1).
+ */
+export async function fetchListTotal(resource: TotalResource, params: Record<string, string> = {}): Promise<number> {
+  const query = resource === 'currencies' ? '' : `?${new URLSearchParams({ ...params, pageSize: '1' }).toString()}`;
+  const body = (await getLedgerJson(`/api/ledger/${resource}${query}`)) as { totalItemCount: string };
+  return Number(body.totalItemCount);
+}
+
+/** The Overview's activity window (DRK-1745 §3): a number of days, or `all`. */
+export type ActivityWindow = '7' | '30' | '90' | 'all';
+
+export const ACTIVITY_WINDOWS: Array<{ value: ActivityWindow; label: string }> = [
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+  { value: 'all', label: 'All time' },
+];
+
+/** The posting list answers a window of at most 90 days, so `All time` reads the last 90. */
+export const LONGEST_POSTING_DAYS = 90;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function utcDay(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** The window's posting reads: its last `days` days in UTC, both inclusive, today the last. */
+export function activityPostingWindow(now: Date, window: ActivityWindow): DateWindow {
+  const days = window === 'all' ? LONGEST_POSTING_DAYS : Number(window);
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return { from: utcDay(today - (days - 1) * DAY_MS), to: utcDay(today) };
+}
+
+/** The window's `fromDate` on the group list — the start of its first UTC day; `All time` the earliest date. */
+export function activityFromDate(now: Date, window: ActivityWindow): string {
+  if (window === 'all') return '0001-01-01T00:00:00Z';
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return new Date(today - (Number(window) - 1) * DAY_MS).toISOString();
 }
 
 /** The last 13 weeks of 7 days, oldest first, the latest ending today in UTC. */

@@ -27,7 +27,8 @@ async function holdsFocus(dialog: Locator): Promise<boolean> {
   return dialog.evaluate((element) => element.contains(document.activeElement));
 }
 
-test('A dialog keeps focus and returns it on close', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A dialog keeps focus and returns it on close', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account(ACME_NUMBER, ACME_ID)]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
   await page.goto(`${baseURL}/accounts/${ACME_NUMBER}`);

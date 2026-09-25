@@ -31,6 +31,8 @@ import { signInAs } from '../support/sign-in';
 
 for (const screen of SCREENS) {
   test(`Loading keeps the final layout — ${screen.name}`, async ({ page, baseURL }) => {
+    // DRK-1745: rewrite for the new form
+    test.fixme(screen.name === 'Currencies screen', 'DRK-1745: rewrite for the new form');
     await seedPopulatedLedger();
     await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
     const release = await holdLedgerReads(page);

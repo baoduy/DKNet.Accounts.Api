@@ -113,3 +113,48 @@ export function useSetAccountControls(): { mutate: (input: SetAccountControlsInp
   });
   return { mutate: (input) => mutation.mutateAsync(input) };
 }
+
+export interface SaveAccountEditInput {
+  accountId: string;
+  /** The account as read — what the form's name and notes are compared against. */
+  current: { name: string; notes: string; metadata?: Record<string, string> };
+  name: string;
+  notes: string;
+  status?: string;
+  floor: { permittedToGoNegative: boolean; overdraftLimit: string | null; minimumBalance: string | null };
+}
+
+/**
+ * The account edit form's save, shared by the Accounts panel and the detail page. Only the
+ * endpoint a changed field belongs to is called — `PUT` accepts just `name`/`metadata`,
+ * `PATCH` just `status`/floor settings (README.md) — `PUT` only when the name or notes
+ * changed, then `PATCH`. The service has no dedicated "notes" field, so the free-form text
+ * rides in `metadata.notes`, resent with every other key (DRK-1704 finding 4). Resolves to
+ * every refusal both calls returned — empty when the save went through.
+ */
+export function useSaveAccountEdit(): (input: SaveAccountEditInput) => Promise<LedgerError[]> {
+  const changeDetails = useChangeAccountDetails();
+  const setControls = useSetAccountControls();
+  return async ({ accountId, current, name, notes, status, floor }) => {
+    const errors: LedgerError[] = [];
+    const nameChanged = name !== current.name;
+    const notesChanged = notes !== current.notes;
+    if (nameChanged || notesChanged) {
+      const result = await changeDetails.mutate({
+        accountId,
+        name: nameChanged ? name : undefined,
+        metadata: notesChanged ? { ...current.metadata, notes } : undefined,
+      });
+      if (!result.ok) errors.push(...(result.errors ?? []));
+    }
+    const controls = await setControls.mutate({
+      accountId,
+      status,
+      overdraftLimit: floor.overdraftLimit,
+      minimumBalance: floor.minimumBalance,
+      permittedToGoNegative: floor.permittedToGoNegative,
+    });
+    if (!controls.ok) errors.push(...(controls.errors ?? []));
+    return errors;
+  };
+}

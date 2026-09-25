@@ -2,9 +2,9 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
 import { OverviewScreen } from '@/components/overview/OverviewScreen';
-import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { AppShell } from '@/components/shell/AppShell';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { UserMenu } from '@/components/shell/UserMenu';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
@@ -21,7 +21,8 @@ export const dynamic = 'force-dynamic';
  * `GET /` — the Overview screen (DRK-1728 §3 row 5). Anonymous visitors (and a
  * `notConfigured` console) are redirected before this component would render any
  * screen data (DRK-1669 §3a). Overview draws its own search field, so the top bar carries
- * none here — one search per screen (brief Q4).
+ * none here — one search per screen (brief Q4). Its page header lives in `OverviewScreen`, which
+ * holds the activity window the header carries (DRK-1745 §3).
  */
 export default async function ConsoleHome(): Promise<JSX.Element> {
   const config = loadConfig();
@@ -44,6 +45,7 @@ export default async function ConsoleHome(): Promise<JSX.Element> {
   return (
     <AppShell
       sidebar={<Sidebar active="overview" />}
+      breadcrumb={<Breadcrumb items={[{ label: 'Ledger', href: '/' }, { label: 'Overview' }]} />}
       topbarRight={
         <UserMenu
           name={session.displayName}
@@ -55,7 +57,6 @@ export default async function ConsoleHome(): Promise<JSX.Element> {
         />
       }
     >
-      <PageHeader title="Overview" description="Find any record, and read the figures the service counts." />
       <OverviewScreen grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
     </AppShell>
   );

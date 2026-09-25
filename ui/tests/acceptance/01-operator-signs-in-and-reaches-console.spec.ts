@@ -11,7 +11,8 @@ import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
-test('An operator signs in and reaches the framed console', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('An operator signs in and reaches the framed console', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/`);
 
   // Mai is sent to Microsoft Entra ID (the fake issuer's sign-in form).

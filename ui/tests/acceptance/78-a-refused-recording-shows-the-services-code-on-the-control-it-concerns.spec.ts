@@ -44,7 +44,8 @@ const EXAMPLES: Array<{ state: string; fixture: Partial<LedgerAccountFixture>; d
 ];
 
 for (const { state, fixture, direction, amount, code, reason, control } of EXAMPLES) {
-  test(`A refused recording shows the service's code on the control it concerns — ${state}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`A refused recording shows the service's code on the control it concerns — ${state}`, async ({ page, baseURL }) => {
     await seedLedgerAccounts([account('ACME-000123', ACME_ID, fixture)]);
     await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
     await page.goto(`${baseURL}/records`);

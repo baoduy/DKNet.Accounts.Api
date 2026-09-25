@@ -3,10 +3,10 @@ import { redirect } from 'next/navigation';
 import { Suspense, type JSX } from 'react';
 import { RecordsScreen } from '@/components/records/RecordsScreen';
 import { AppShell } from '@/components/shell/AppShell';
-import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
 import { scopesFromAccessToken } from '@/lib/oidc';
@@ -19,7 +19,8 @@ import NotConfiguredPage from '../not-configured/page';
 export const dynamic = 'force-dynamic';
 
 /** `GET /records` — a thin server page mirroring `app/accounts/page.tsx`: session + granted scopes,
- * then `AppShell` around the client `RecordsScreen`. No fetching, no screen logic here (DRK-1713 §3 row 8). */
+ * then `AppShell` around the client `RecordsScreen`. No fetching, no screen logic here (DRK-1713 §3 row 8).
+ * The page header lives in `RecordsScreen`: its `Record posting` action opens the screen's side panel. */
 export default async function RecordsPage(): Promise<JSX.Element> {
   const config = loadConfig();
   if (getConfigMode(config) === 'notConfigured') {
@@ -41,6 +42,7 @@ export default async function RecordsPage(): Promise<JSX.Element> {
   return (
     <AppShell
       sidebar={<Sidebar active="records" />}
+      breadcrumb={<Breadcrumb items={[{ label: 'Ledger', href: '/' }, { label: 'Records' }]} />}
       topbarRight={
         <>
           <TopBarSearch grantedScopes={grantedScopes} />
@@ -55,7 +57,6 @@ export default async function RecordsPage(): Promise<JSX.Element> {
         </>
       }
     >
-      <PageHeader title="Records" description="Postings across every account: narrow, search, record and reverse." />
       <Suspense>
         <RecordsScreen grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
       </Suspense>

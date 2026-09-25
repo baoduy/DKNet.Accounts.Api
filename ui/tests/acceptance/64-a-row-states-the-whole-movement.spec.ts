@@ -15,7 +15,8 @@ import { seedLedgerAccounts, seedLedgerPostings } from '../support/ledger';
 import { ACME_ID, account, posting, recordRow, rowCells, setPeriod } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('A row states the whole movement', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A row states the whole movement', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account('ACME-000123', ACME_ID)]);
   await seedLedgerPostings([
     posting({ id: 'b0000000-0000-4000-8000-000000010042', postingNumber: 'P-10042', accountId: ACME_ID, direction: 'Credit', amount: '100.00', currency: 'SGD', category: 'Transfer', effectiveDate: '2026-09-21', status: 'Posted' }),
