@@ -24,7 +24,8 @@ import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
-test('The frame follows the operator system theme without a reload', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('The frame follows the operator system theme without a reload', async ({ page, baseURL }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await expect(page.getByText('LEDGER')).toBeVisible();

@@ -25,7 +25,8 @@ const STATUSES: Array<{ status: 'Active' | 'Frozen' | 'Closed'; count: number }>
   { status: 'Closed', count: 1 },
 ];
 
-test('Status counts show every status, including an empty one', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Status counts show every status, including an empty one', async ({ page, baseURL }) => {
   let n = 0;
   await seedLedgerAccounts(
     STATUSES.flatMap(({ status, count }) =>

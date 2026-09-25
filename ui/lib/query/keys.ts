@@ -73,6 +73,11 @@ export function postingCountKey(window: { from: string; to: string }): readonly 
   return ['ledger', 'postings', 'count', window] as const;
 }
 
+/** DRK-1745 §3 — the service's `totalItemCount` for one list read of a page of 1. */
+export function listTotalKey(resource: string, params: Record<string, string> = {}): readonly unknown[] {
+  return ['ledger', resource, 'total', params] as const;
+}
+
 /** DRK-1728 §3 row 7 — one recently viewed record, read again under the operator's own permissions. */
 export function recentRecordKey(kind: string, id: string): readonly unknown[] {
   return ['ledger', 'recent', kind, id] as const;

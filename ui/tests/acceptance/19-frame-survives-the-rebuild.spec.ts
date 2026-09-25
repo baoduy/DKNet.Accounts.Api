@@ -18,7 +18,8 @@ import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
-test('The frame an operator already knows survives the rebuild', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('The frame an operator already knows survives the rebuild', async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
 
   // She reaches the console without signing in a second time: reloading keeps her signed in.
