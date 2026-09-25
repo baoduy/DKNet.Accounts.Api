@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isZeroAmount, parseLedgerJsonPreservingNumbers, readLedgerJson } from './money-json';
 
@@ -94,5 +97,76 @@ describe('readLedgerJson', () => {
   it('reads a 204 No Content response as null instead of a JSON.parse syntax error', async () => {
     const response = new Response(null, { status: 204 });
     await expect(readLedgerJson(response)).resolves.toBeNull();
+  });
+});
+
+describe('enum values are read the way the app spells them (DRK-1732 §3 row 11)', () => {
+  it.each([
+    ['direction', 'credit', 'Credit'],
+    ['direction', 'debit', 'Debit'],
+    ['category', 'transfer', 'Transfer'],
+    ['category', 'reversal', 'Reversal'],
+    ['category', 'openingBalance', 'OpeningBalance'],
+    ['status', 'posted', 'Posted'],
+    ['status', 'reversed', 'Reversed'],
+    ['status', 'frozen', 'Frozen'],
+    ['status', 'dormant', 'Dormant'],
+    ['classification', 'liability', 'Liability'],
+    ['classification', 'asset', 'Asset'],
+    ['type', 'customer', 'Customer'],
+    ['type', 'settlement', 'Settlement'],
+  ])('reads %s "%s" as "%s"', (field, sent, read) => {
+    expect(parseLedgerJsonPreservingNumbers(`{"${field}":"${sent}"}`)).toEqual({ [field]: read });
+  });
+
+  it('maps every enum field of a posting on a page, nested in its items', () => {
+    const text = '{"items":[{"direction":"debit","status":"posted","category":"reversal","amount":25.00}],"pageNumber":1}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ items: [{ direction: 'Debit', status: 'Posted', category: 'Reversal', amount: '25.00' }], pageNumber: '1' });
+  });
+
+  it('leaves a value that is not the camelCase form of a member as sent', () => {
+    const text = '{"status":"ACTIVE","type":"AccountStatus","direction":"Credit","category":"credit"}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ status: 'ACTIVE', type: 'AccountStatus', direction: 'Credit', category: 'credit' });
+  });
+
+  it('leaves a member name under any other field as sent', () => {
+    expect(parseLedgerJsonPreservingNumbers('{"name":"active","description":"reversed"}')).toEqual({ name: 'active', description: 'reversed' });
+  });
+});
+
+describe("every member of the service's enums is read the app's way (DRK-1732 §3 row 11)", () => {
+  // The service's own enum declarations, and the field each is written under.
+  // Through git, not a relative walk: a mutation run copies this folder elsewhere.
+  const REPO_ROOT = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  const ENUMS: Array<[file: string, name: string, field: string]> = [
+    ['Postings/Entities/Posting.cs', 'PostingDirection', 'direction'],
+    ['Postings/Entities/Posting.cs', 'PostingCategory', 'category'],
+    ['Postings/Entities/Posting.cs', 'PostingStatus', 'status'],
+    ['Accounts/Entities/Account.cs', 'AccountClassification', 'classification'],
+    ['Accounts/Entities/Account.cs', 'AccountStatus', 'status'],
+    ['AccountGroups/Entities/AccountGroup.cs', 'AccountGroupType', 'type'],
+    ['AccountGroups/Entities/AccountGroup.cs', 'AccountGroupStatus', 'status'],
+  ];
+
+  it.each(ENUMS)('%s %s, written camelCase under "%s"', (file, name, field) => {
+    const source = fs.readFileSync(path.join(REPO_ROOT, 'ApiEndpoints', 'DKNet.Accounts.Domains', 'Features', file), 'utf8');
+    const members = new RegExp(`public enum ${name}\\s*\\{([^}]*)\\}`).exec(source)![1].match(/\w+/g)!;
+    expect(members.length).toBeGreaterThan(1);
+    for (const member of members) {
+      const camelCase = `${member[0].toLowerCase()}${member.slice(1)}`;
+      expect(parseLedgerJsonPreservingNumbers(`{"${field}":"${camelCase}"}`)).toEqual({ [field]: member });
+    }
+  });
+});
+
+describe('metadata is the operator\'s own text, never an enum (DRK-1734 B1)', () => {
+  it('reads metadata back unchanged while the DTO\'s own status in the same payload still maps', () => {
+    const text = '{"status":"active","metadata":{"status":"active","category":"payment","type":"customer"}}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ status: 'Active', metadata: { status: 'active', category: 'payment', type: 'customer' } });
+  });
+
+  it('leaves the metadata of every item on a page unchanged', () => {
+    const text = '{"items":[{"type":"customer","metadata":{"type":"customer","direction":"credit"}}]}';
+    expect(parseLedgerJsonPreservingNumbers(text)).toEqual({ items: [{ type: 'Customer', metadata: { type: 'customer', direction: 'credit' } }] });
   });
 });

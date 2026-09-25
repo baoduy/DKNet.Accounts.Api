@@ -13,7 +13,7 @@
  *   --border-control #7d8b9f · --focus-ring #334155 · --destructive-solid #dc2626 ·
  *   --surface-selected #d4f094 (a selected row) · --surface-hover #f1f5f9 (a hovered row)
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

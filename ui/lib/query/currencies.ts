@@ -12,10 +12,13 @@ export interface Currency {
   isActive: boolean;
 }
 
-/** One line per currency actually in use, across every account group (`GET /v1/accounts/balances`). */
+/** One line per currency actually in use, across every account group (`GET /v1/accounts/balances`);
+ * every amount is the exact text the service sent. */
 export interface LedgerBalanceLine {
   currency: string;
   balance: string;
+  available: string;
+  held: string;
 }
 
 /**
@@ -32,7 +35,10 @@ export async function fetchCurrencies(): Promise<Currency[]> {
   const response = await fetch('/api/ledger/currencies');
   const body = await readLedgerJson(response);
   if (!response.ok) throw refusalError(body);
-  return (body as unknown[]).map(toCurrency);
+  // DRK-1732 §3 row 10: the service answers with a page (`PagedCurrencyResponse`). A bare list
+  // is still read, because the component tests (`components/**`, not this cycle's to change)
+  // stub the old shape.
+  return (Array.isArray(body) ? body : (body as { items: unknown[] }).items).map(toCurrency);
 }
 
 export async function fetchCurrency(currencyId: string): Promise<Currency> {
@@ -43,9 +49,9 @@ export async function fetchCurrency(currencyId: string): Promise<Currency> {
 }
 
 /**
- * The ledger-wide per-currency totals — used only to tell whether a currency still holds a
- * balance (R5: the console shows that reason, disabled, before the operator ever tries to
- * deactivate it), never displayed as a combined figure (R2).
+ * The ledger-wide per-currency totals — tells whether a currency still holds a balance (R5: the
+ * console shows that reason, disabled, before the operator ever tries to deactivate it) and draws
+ * Overview's position by currency (DRK-1728 §3 row 6); never displayed as a combined figure (R2).
  */
 export async function fetchLedgerBalances(): Promise<LedgerBalanceLine[]> {
   const response = await fetch('/api/ledger/accounts/balances');

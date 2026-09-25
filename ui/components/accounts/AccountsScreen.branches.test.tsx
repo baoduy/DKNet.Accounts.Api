@@ -412,7 +412,9 @@ describe('AccountsScreen — review round 2', () => {
     renderScreen();
 
     await waitFor(() => expect(screen.getByRole('option', { name: 'SGD' })).toBeInTheDocument());
-    expect(screen.getByText('No accounts found.')).toBeInTheDocument();
+    // Placeholder rows under the headings, never an empty-list message (DRK-1725 R1).
+    expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]')).toHaveLength(70);
+    expect(screen.queryByText(/^No accounts/)).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
   });
 

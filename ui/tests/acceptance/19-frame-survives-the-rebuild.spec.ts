@@ -14,7 +14,7 @@
  * identity-menu trigger carrying no `style` attribute is what proves the frame is drawn on
  * its new base controls, not merely that its behaviour still looks the same.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

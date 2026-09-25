@@ -1,0 +1,81 @@
+# Test-only: the end-to-end check's stack (`cd ui && pnpm run test:e2e`), never a developer's or
+# a deployment's. The runner (ui/tests/e2e/support/global-setup.ts) starts it on top of
+# docker-compose.yml under its own project name, sets every ${CONSOLE_E2E_*} value below, and
+# removes it when the run ends. Everything that makes the service and the console trust the
+# stand-in sign-in server lives here and nowhere else: not in docker-compose.yml, .env.sample,
+# appsettings*.json or any image.
+#
+# One issuer address for everyone: the stand-in listens inside the stack on the same port the
+# runner publishes on the host, so https://fake-oidc:<port> reaches it from the containers (compose
+# network) and from the checks' browser (which maps fake-oidc to 127.0.0.1).
+# `environment:` wins over a checkout's .env, so a developer's settings never leak into the check.
+
+services:
+  fake-oidc:
+    image: node:22-alpine
+    working_dir: /ui
+    # The stand-in is TypeScript with type annotations only; node runs it as is, and its one
+    # package (jose) comes from the checkout's own ui/node_modules.
+    command: ["node", "--experimental-strip-types", "--disable-warning=ExperimentalWarning", "tests/fakes/fake-oidc-issuer.ts"]
+    volumes:
+      - ./ui:/ui:ro
+      - ${CONSOLE_E2E_TLS_DIR:?set by pnpm run test:e2e}:/e2e-tls:ro
+    environment:
+      FAKE_OIDC_PORT: ${CONSOLE_E2E_OIDC_PORT:?set by pnpm run test:e2e}
+      FAKE_OIDC_PUBLIC_BASE_URL: https://fake-oidc:${CONSOLE_E2E_OIDC_PORT}
+      FAKE_OIDC_ACCESS_TOKEN_AUDIENCE: api://dknet-accounts-e2e
+      FAKE_OIDC_TLS_CERT: /e2e-tls/fake-oidc.pem
+      FAKE_OIDC_TLS_KEY: /e2e-tls/fake-oidc-key.pem
+      CONSOLE_ENTRA_CLIENT_ID: dknet-console-e2e
+    ports:
+      - "127.0.0.1:${CONSOLE_E2E_OIDC_PORT}:${CONSOLE_E2E_OIDC_PORT}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:net').connect(Number(process.env.FAKE_OIDC_PORT), '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    # Per run, so two checkouts never rebuild each other's image or a developer's :local one.
+    image: dknet-accounts-api:e2e-${CONSOLE_E2E_RUN_ID:?set by pnpm run test:e2e}
+    depends_on:
+      fake-oidc: { condition: service_healthy }
+    volumes:
+      - ${CONSOLE_E2E_TLS_DIR}:/e2e-tls:ro
+    environment:
+      FeatureManagement__RequireAuthorization: "true"
+      FeatureManagement__RunDbMigrationWhenAppStart: "true"
+      FeatureManagement__EnableHealthCheck: "true"
+      FeatureManagement__EnableHttps: "false"
+      FeatureManagement__EnableServiceBus: "false"
+      FeatureManagement__EnableAntiforgery: "false"
+      FeatureManagement__EnableAzureAppConfig: "false"
+      FeatureManagement__EnableOpenTelemetry: "false"
+      FeatureManagement__EnableSwagger: "false"
+      Authentication__Schemes__Bearer__MetadataAddress: https://fake-oidc:${CONSOLE_E2E_OIDC_PORT}/e2e-tenant/.well-known/openid-configuration
+      Authentication__Schemes__Bearer__ValidIssuer: https://fake-oidc:${CONSOLE_E2E_OIDC_PORT}/e2e-tenant
+      Authentication__Schemes__Bearer__ValidAudiences__0: api://dknet-accounts-e2e
+      # Keeps `scp` as `scp`: with the default claim mapping the service's scope check
+      # (HasScopeHandler) finds no scope claim and refuses every call.
+      Authentication__Schemes__Bearer__MapInboundClaims: "false"
+      # The run's own CA is the only root the service trusts in this stack.
+      SSL_CERT_FILE: /e2e-tls/ca.pem
+
+  console:
+    image: dknet-accounts-console:e2e-${CONSOLE_E2E_RUN_ID}
+    depends_on:
+      fake-oidc: { condition: service_healthy }
+    volumes:
+      - ${CONSOLE_E2E_TLS_DIR}:/e2e-tls:ro
+    environment:
+      CONSOLE_BASE_URL: ${CONSOLE_E2E_CONSOLE_BASE_URL:?set by pnpm run test:e2e}
+      CONSOLE_API_BASE_URL: http://api:8080
+      CONSOLE_ENTRA_ISSUER_BASE_URL: https://fake-oidc:${CONSOLE_E2E_OIDC_PORT}
+      CONSOLE_ENTRA_TENANT_ID: e2e-tenant
+      CONSOLE_ENTRA_CLIENT_ID: dknet-console-e2e
+      CONSOLE_ENTRA_CLIENT_SECRET: e2e-client-secret
+      CONSOLE_ENTRA_SCOPES: accounts.read accounts.write postings.read postings.write postings.reverse
+      CONSOLE_REDIS_KEY_PREFIX: "console:"
+      CONSOLE_SESSION_SECRET: e2e-session-secret-not-for-deploy
+      CONSOLE_TOKEN_ENCRYPTION_KEY: e2e-token-key-not-for-deploy-000
+      NODE_EXTRA_CA_CERTS: /e2e-tls/ca.pem

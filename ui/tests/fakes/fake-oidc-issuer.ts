@@ -11,16 +11,37 @@
  *   POST /:tenant/token       — PKCE (S256) verified, issues access_token/id_token
  *   GET  /:tenant/jwks
  *
+ * The end-to-end check (`docker-compose.e2e.yml`) runs it as a service of its own stack and
+ * sets, beside the port:
+ *   FAKE_OIDC_PUBLIC_BASE_URL       — the address every issuer and endpoint names, the same for
+ *                                     the browser and the containers, whatever address a request
+ *                                     arrived on (default: the address it arrived on)
+ *   FAKE_OIDC_ACCESS_TOKEN_AUDIENCE — access tokens carry this `aud`, and the console's client id
+ *                                     as `azp`, the way Entra ID's v2.0 tokens for an API do
+ *                                     (default: neither — the acceptance suite's fake ledger reads
+ *                                     scopes only)
+ *   FAKE_OIDC_TLS_CERT / _KEY       — PEM files: serve HTTPS instead of HTTP (default: HTTP)
+ *
  * A `POST /authorize` may include a hidden `accessTokenOverride` field: the acceptance
  * scenario that proves a cached token is unreadable needs to know the literal plaintext
  * it must NOT find in Redis, and browsers never see the access token (R3), so the test
  * fixes the literal here instead of reading it back from anywhere.
  */
-import { createServer } from 'node:http';
+import fs from 'node:fs';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 
-const PORT = Number(process.env.FAKE_OIDC_PORT ?? 4488);
+// The run's own port, always passed in by `playwright.config.ts` (DRK-1726 R1) — never a default.
+const PORT = Number(process.env.FAKE_OIDC_PORT);
+if (!Number.isInteger(PORT) || PORT <= 0) throw new Error('FAKE_OIDC_PORT is not set to a port');
+const PUBLIC_BASE_URL = process.env.FAKE_OIDC_PUBLIC_BASE_URL?.replace(/\/$/, '');
+const ACCESS_TOKEN_AUDIENCE = process.env.FAKE_OIDC_ACCESS_TOKEN_AUDIENCE;
+const TLS =
+  process.env.FAKE_OIDC_TLS_CERT && process.env.FAKE_OIDC_TLS_KEY
+    ? { cert: fs.readFileSync(process.env.FAKE_OIDC_TLS_CERT), key: fs.readFileSync(process.env.FAKE_OIDC_TLS_KEY) }
+    : undefined;
 
 const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName: string; scopes: string[] }> = {
   // DRK-1696 §3 row 11: `MAI`, `MAI_MISSING_REVERSE_SCOPE` and `MAI_WITH_WRITE` are three
@@ -50,6 +71,20 @@ const FIXTURE_USERS: Record<string, { name: string; objectId: string; tenantName
     objectId: '22222222-2222-4222-8222-222222222222',
     tenantName: 'Drunk Coding',
     scopes: ['accounts.read'],
+  },
+  // DRK-1727: Nam before he lost the postings read permission (same object id), and Lan, who
+  // reads accounts and postings and may change nothing.
+  'nam-postings@drunkcoding.net': {
+    name: 'Nam Tran',
+    objectId: '22222222-2222-4222-8222-222222222222',
+    tenantName: 'Drunk Coding',
+    scopes: ['accounts.read', 'postings.read'],
+  },
+  'lan@drunkcoding.net': {
+    name: 'Lan Pham',
+    objectId: '33333333-3333-4333-8333-333333333333',
+    tenantName: 'Drunk Coding',
+    scopes: ['accounts.read', 'postings.read'],
   },
 };
 
@@ -82,6 +117,11 @@ async function base64UrlSha256(input: string): Promise<string> {
   return Buffer.from(digest).toString('base64url');
 }
 
+/** The issuer of `tenant`: the public address when one is set, else the one the request arrived on. */
+function issuerOf(url: URL, tenant: string): string {
+  return `${PUBLIC_BASE_URL ?? `${url.protocol}//${url.host}`}/${tenant}`;
+}
+
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const segments = url.pathname.split('/').filter(Boolean);
@@ -92,8 +132,7 @@ async function handle(request: Request): Promise<Response> {
   }
 
   if (segments.length >= 1 && segments.at(-1) === 'openid-configuration') {
-    const tenant = segments[0];
-    const base = `${url.protocol}//${url.host}/${tenant}`;
+    const base = issuerOf(url, segments[0]);
     return Response.json({
       issuer: base,
       authorization_endpoint: `${base}/authorize`,
@@ -188,7 +227,7 @@ async function handle(request: Request): Promise<Response> {
 
     const user = FIXTURE_USERS[pending.email];
     const expiresIn = pending.expiresInOverride ?? 3600;
-    const base = `${url.protocol}//${url.host}/${tenant}`;
+    const base = issuerOf(url, tenant);
 
     const idToken = await new SignJWT({
       name: user.name,
@@ -206,19 +245,19 @@ async function handle(request: Request): Promise<Response> {
       .setExpirationTime(`${expiresIn}s`)
       .sign(privateKey);
 
-    const accessToken =
-      pending.accessTokenOverride ??
-      (await new SignJWT({
-        scp: user.scopes.join(' '),
-        oid: user.objectId,
-        tid: tenant,
-      })
-        .setProtectedHeader({ alg: 'RS256', kid: KEY_ID })
-        .setIssuer(base)
-        .setSubject(user.objectId)
-        .setIssuedAt()
-        .setExpirationTime(`${expiresIn}s`)
-        .sign(privateKey));
+    let accessTokenJwt = new SignJWT({
+      scp: user.scopes.join(' '),
+      oid: user.objectId,
+      tid: tenant,
+      ...(ACCESS_TOKEN_AUDIENCE ? { azp: CLIENT_ID_FROM_ENV() } : {}),
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: KEY_ID })
+      .setIssuer(base)
+      .setSubject(user.objectId)
+      .setIssuedAt()
+      .setExpirationTime(`${expiresIn}s`);
+    if (ACCESS_TOKEN_AUDIENCE) accessTokenJwt = accessTokenJwt.setAudience(ACCESS_TOKEN_AUDIENCE);
+    const accessToken = pending.accessTokenOverride ?? (await accessTokenJwt.sign(privateKey));
 
     return Response.json({
       token_type: 'Bearer',
@@ -236,12 +275,12 @@ function CLIENT_ID_FROM_ENV(): string {
   return process.env.CONSOLE_ENTRA_CLIENT_ID ?? 'console-test-client';
 }
 
-const server = createServer((req, res) => {
+function serve(req: IncomingMessage, res: ServerResponse): void {
   const chunks: Buffer[] = [];
   req.on('data', (chunk) => chunks.push(chunk));
   req.on('end', async () => {
     const body = Buffer.concat(chunks);
-    const request = new Request(`http://127.0.0.1:${PORT}${req.url}`, {
+    const request = new Request(`${TLS ? 'https' : 'http'}://127.0.0.1:${PORT}${req.url}`, {
       method: req.method,
       headers: req.headers as Record<string, string>,
       body: ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : body,
@@ -255,7 +294,9 @@ const server = createServer((req, res) => {
       res.end(String(error));
     }
   });
-});
+}
+
+const server = TLS ? createTlsServer(TLS, serve) : createServer(serve);
 
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console

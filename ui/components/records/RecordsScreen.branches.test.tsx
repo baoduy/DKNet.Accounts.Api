@@ -170,19 +170,22 @@ describe('RecordsScreen', () => {
     fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') || String(raw).startsWith('/api/ledger/currencies') ? new Promise(() => {}) : Promise.resolve(jsonResponse({}, 404))));
     renderScreen();
 
-    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    // Placeholder rows under the headings stand in for it (DRK-1725 R1).
+    await waitFor(() => expect(document.querySelectorAll('tbody tr')).toHaveLength(10));
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(document.querySelectorAll('tbody tr')).toHaveLength(0);
+    expect([...document.querySelectorAll('tbody tr')].every((row) => row.querySelector('[data-slot="skeleton"]'))).toBe(true);
+    expect(screen.queryByText(/^Loading/)).toBeNull();
     expect(fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith('/api/ledger/accounts'))).toEqual([]);
   });
 
   it('draws the list only once every account on it is known', async () => {
-    stubLedger({ items: [P1, { ...P1, id: 'b0000000-0000-4000-8000-000000000002', postingNumber: 'P-2', accountId: GLOBEX_ID }], pending: [GLOBEX_ID] });
+    const fetchMock = stubLedger({ items: [P1, { ...P1, id: 'b0000000-0000-4000-8000-000000000002', postingNumber: 'P-2', accountId: GLOBEX_ID }], pending: [GLOBEX_ID] });
     renderScreen();
 
-    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes(GLOBEX_ID))).toBe(true));
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.queryByRole('cell', { name: 'P-1' })).toBeNull();
+    expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 
   it('opens a listed posting from the list itself, without waiting on its own read', async () => {
@@ -224,12 +227,14 @@ describe('RecordsScreen', () => {
     expect(screen.getByText('INVALID_DATE_RANGE')).toBeInTheDocument();
   });
 
-  it("shows the service's wording when the currencies are refused, and draws no row at a guessed scale", async () => {
+  it("shows the service's wording when the currencies are refused, and draws each amount as the service sent it, never at a guessed scale", async () => {
     stubLedger({ currenciesStatus: 500 });
     renderScreen();
 
     expect(await screen.findByText('Currencies were refused.')).toBeInTheDocument();
-    expect(screen.queryByRole('cell', { name: 'P-1' })).toBeNull();
+    // Never left loading (DRK-1725 R2): the list is drawn, its amount the service's own text.
+    const row = (await screen.findByRole('cell', { name: 'P-1' })).closest('tr')!;
+    expect(within(row).getAllByRole('cell')[4]).toHaveTextContent(/^10$/);
   });
 
   it('opens a posting named by the page address even when it is not on the listed page, its amount as sent when its currency is unknown', async () => {
@@ -270,5 +275,87 @@ describe('RecordsScreen', () => {
     expect(within(credit).getByText('10.00')).toHaveClass('text-credit');
     expect(within(debit).getByText('10.00')).toHaveClass('text-debit');
     expect(fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith('/api/ledger/accounts'))).toEqual([`/api/ledger/accounts/${ACME_ID}`]);
+  });
+});
+
+describe('RecordsScreen — screen states (DRK-1725 §3)', () => {
+  function stubList(page: Record<string, unknown>): ReturnType<typeof vi.fn> {
+    const fetchMock = stubLedger();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') ? Promise.resolve(jsonResponse(page)) : answer(raw)));
+    return fetchMock;
+  }
+
+  it.each([
+    { search: 'from=2026-09-01&to=2026-09-24', total: 0, message: 'No postings between 1 Sep and 24 Sep.' },
+    { search: 'from=2026-09-01&to=2026-09-24&category=Fee', total: 0, message: 'No postings match this filter.' },
+    { search: 'from=2026-09-01&to=2026-09-24&direction=Debit', total: 0, message: 'No postings match this filter.' },
+    { search: 'from=2026-09-01&to=2026-09-24&status=Reversed', total: 0, message: 'No postings match this filter.' },
+    { search: 'from=2026-09-01&to=2026-09-24&search=zz', total: 0, message: 'No postings match this filter.' },
+    { search: 'page=9', total: 25, message: 'No more postings.' },
+  ])('says $message for an empty list at "$search"', async ({ search, total, message }) => {
+    mockSearch = search;
+    stubList({ items: [], pageNumber: 9, pageSize: 10, pageCount: 3, totalItemCount: total });
+    renderScreen();
+    expect(await screen.findByRole('cell', { name: message })).toHaveAttribute('colspan', '8');
+  });
+
+  it('states a period it refuses to send in place of the list, never loading', async () => {
+    mockSearch = 'from=&to=2026-09-24';
+    stubList({ items: [], totalItemCount: 0 });
+    const { container } = renderScreen();
+    expect(await screen.findByRole('cell', { name: 'A period must be set.' })).toBeInTheDocument();
+    expect(container.querySelector('tbody [data-slot="skeleton"]')).toBeNull();
+  });
+
+  it('never stands placeholders in for a search too short to send', async () => {
+    mockSearch = 'search=a';
+    stubList({ items: [], totalItemCount: 0 });
+    const { container } = renderScreen();
+    expect(await screen.findByRole('cell', { name: 'No postings match this filter.' })).toBeInTheDocument();
+    expect(container.querySelector('tbody [data-slot="skeleton"]')).toBeNull();
+  });
+
+  it('offers Retry on a failed list read, and on a failed currency read', async () => {
+    const fetchMock = stubLedger({ listStatus: 422, currenciesStatus: 500 });
+    renderScreen();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2));
+
+    const healthy = stubLedger().getMockImplementation()!;
+    fetchMock.mockImplementation(healthy);
+    vi.stubGlobal('fetch', fetchMock);
+    for (const retry of screen.getAllByRole('button', { name: 'Retry' })) fireEvent.click(retry);
+    expect(await screen.findByRole('cell', { name: 'P-1' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('moves focus into the details a row opens', async () => {
+    stubLedger();
+    renderScreen();
+    fireEvent.click(await screen.findByRole('cell', { name: 'P-1' }));
+    const panel = await screen.findByTestId('detail-panel');
+    expect(panel).toHaveFocus();
+    expect(panel).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps placeholders, drawing no row, while only the currency scale is still read', async () => {
+    const fetchMock = stubLedger();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/currencies') ? new Promise(() => {}) : answer(raw)));
+    renderScreen();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === `/api/ledger/accounts/${ACME_ID}`)).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole('cell', { name: 'P-1' })).toBeNull();
+    expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
+  });
+
+  it('reads a search of exactly 2 characters, placeholders standing in meanwhile', async () => {
+    mockSearch = 'search=ab';
+    const fetchMock = stubLedger();
+    const answer = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') ? new Promise(() => {}) : answer(raw)));
+    renderScreen();
+    await waitFor(() => expect(lastListQuery(fetchMock).get('search')).toBe('ab'));
+    expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 });

@@ -318,3 +318,50 @@ describe("The console's new-currency form accepts up to 6 decimal places", () =>
     expect(posts(fetchMock)).toHaveLength(0);
   });
 });
+
+describe('CurrenciesScreen — screen states (DRK-1725 §3)', () => {
+  it('says the ledger holds no currencies yet, under the list headings', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, [])));
+    renderScreen();
+    expect(await screen.findByRole('cell', { name: 'No currencies yet.' })).toHaveAttribute('colspan', '4');
+  });
+
+  it('draws placeholder rows under its headings while the list is read', () => {
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+    const { container } = renderScreen();
+    expect(container.querySelectorAll('thead th')).toHaveLength(4);
+    expect(container.querySelectorAll('tbody tr [data-slot="skeleton"]')).toHaveLength(40);
+    expect(screen.queryByText('No currencies yet.')).toBeNull();
+  });
+
+  it('offers Retry on a failed list read, keeping New currency usable', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    expect(await screen.findByRole('alert')).toHaveTextContent('The ledger service cannot be reached.');
+    expect(screen.getByRole('button', { name: 'New currency' })).toBeEnabled();
+
+    fetchMock.mockResolvedValue(jsonResponse(200, [CURRENCY]));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('cell', { name: 'SGD' })).toBeInTheDocument();
+  });
+
+  it('states a failed balances read in the panel, with Retry, and moves focus into the panel', async () => {
+    const fetchMock = vi.fn(async (input: string) => (String(input).includes('/balances') ? jsonResponse(503, { errors: [{ message: 'Ledger store unavailable' }] }) : jsonResponse(200, [CURRENCY])));
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('cell', { name: 'SGD' }));
+
+    const panel = await screen.findByTestId('detail-panel');
+    expect(panel).toHaveFocus();
+    expect(panel).toHaveAttribute('tabindex', '-1');
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+
+    fetchMock.mockImplementation(async (input: string) =>
+      String(input).includes('/balances') ? jsonResponse(200, [{ currency: 'SGD', balance: '5.00', available: '5.00', held: '0' }]) : jsonResponse(200, [CURRENCY]),
+    );
+    await userEvent.click(within(panel).getByRole('button', { name: 'Retry' }));
+    expect(await within(panel).findByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
+    expect(within(panel).queryByRole('alert')).toBeNull();
+  });
+});

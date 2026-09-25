@@ -12,7 +12,7 @@
  * satisfy; the "no call reached the ledger service" assertion is expected to hold both today
  * and after Build (it never stops being true), so it alone would prove nothing.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { ledgerRequests } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

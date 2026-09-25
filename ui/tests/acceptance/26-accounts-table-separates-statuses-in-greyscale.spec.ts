@@ -8,7 +8,7 @@
  * Proved with a real CSS `filter: grayscale(1)` rendering, not a `data-*` attribute
  * stand-in for colour: the status word itself is always rendered (StatusBadge.d.ts).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('An accounts table separates its statuses with all colour removed', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/kit-harness-internal`);

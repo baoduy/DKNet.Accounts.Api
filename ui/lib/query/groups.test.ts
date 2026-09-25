@@ -58,6 +58,34 @@ describe('fetchAccountGroups', () => {
     expect(url.searchParams.get('pageSize')).toBe('10');
   });
 
+  it("sends ?search= as the service's own free-text search, not a filter (DRK-1728 §3 row 9)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { items: [], pageNumber: 1, pageSize: 1000, pageCount: 1, totalItemCount: 0, hasNextPage: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchAccountGroups({ filters: { search: 'Acme', status: 'Active' } });
+
+    const url = new URL(fetchMock.mock.calls[0][0], 'http://localhost');
+    expect(url.searchParams.get('search')).toBe('Acme');
+    expect(url.searchParams.getAll('filter')).toEqual(['Status:Equal:Active']);
+  });
+
+  it('sends no search when it was cleared to empty', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { items: [], pageNumber: 1, pageSize: 1000, pageCount: 1, totalItemCount: 0, hasNextPage: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchAccountGroups({ filters: { search: '' } });
+
+    const url = new URL(fetchMock.mock.calls[0][0], 'http://localhost');
+    expect(url.searchParams.has('search')).toBe(false);
+  });
+
+  it("reads the service's paging fields: pageNumber and totalItemCount", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, { items: [], pageNumber: 2, pageSize: 10, pageCount: 4, totalItemCount: 37, hasNextPage: true })));
+
+    const page = await fetchAccountGroups({ filters: {}, page: 2, pageSize: 10 });
+    expect(page).toEqual({ items: [], pageNumber: 2, pageSize: 10, pageCount: 4, totalItemCount: 37, hasNextPage: true });
+  });
+
   it('parses the paged envelope through the exact-digit reader', async () => {
     vi.stubGlobal(
       'fetch',

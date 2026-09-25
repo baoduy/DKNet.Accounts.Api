@@ -57,14 +57,59 @@ function markNumberLiterals(text: string): string {
 }
 
 /**
+ * DRK-1732 §3 row 11 — the service writes every enum value camelCase (`SharedConsts.cs:47`,
+ * `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`): `"credit"`, `"reversed"`. The app
+ * spells them as the service's enums declare them (`'Credit'`, `'Reversed'`), so a read maps
+ * each back by its field name. Only a value that is exactly a member's camelCase form is
+ * mapped; anything else (a status count's `"ACTIVE"`, a refusal's `type`) stays as sent.
+ * A `metadata` map is the operator's own free-form text, never an enum: nothing under it is
+ * mapped, so an edit form writes it back exactly as the service sent it (DRK-1734 B1).
+ */
+const ENUM_MEMBERS: Record<string, readonly string[]> = {
+  direction: ['Credit', 'Debit'],
+  category: ['Transfer', 'Payment', 'Fee', 'Interest', 'Adjustment', 'Refund', 'Reversal', 'OpeningBalance'],
+  // Posting, account and account-group statuses share the field name.
+  status: ['Posted', 'Reversed', 'Active', 'Frozen', 'Dormant', 'Closed'],
+  classification: ['Asset', 'Liability', 'Equity', 'Income', 'Expense'],
+  type: ['Customer', 'Merchant', 'Internal', 'Suspense', 'Settlement'],
+};
+
+const APP_ENUM_VALUES = new Map(
+  Object.entries(ENUM_MEMBERS).flatMap(([field, members]) => members.map((member) => [`${field}:${member[0].toLowerCase()}${member.slice(1)}`, member])),
+);
+
+/** `value` with every DTO enum field (`ENUM_MEMBERS`) spelled the app's way; `metadata` left whole. */
+function withAppEnums(value: unknown, key: string): unknown {
+  if (Array.isArray(value)) return value.map((item) => withAppEnums(item, ''));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([field, item]) => [field, field === 'metadata' ? item : withAppEnums(item, field)]));
+  }
+  // A boolean or null never names a member, so it falls through as sent.
+  return APP_ENUM_VALUES.get(`${key}:${String(value)}`) ?? value;
+}
+
+/** What a read hands back for a wire type: every enum member spelled the app's way. */
+export type AsRead<T> = T extends string
+  ? string extends T
+    ? T
+    : Capitalize<T>
+  : T extends readonly (infer Item)[]
+    ? AsRead<Item>[]
+    : T extends object
+      ? { [K in keyof T]: AsRead<T[K]> }
+      : T;
+
+/**
  * Parses `text` (a JSON document read verbatim from the ledger response) into a value where
  * every JSON number becomes a string holding its exact source digits — never routed through
- * `JSON.parse`'s own numeric coercion, which silently drops precision past 2^53.
+ * `JSON.parse`'s own numeric coercion, which silently drops precision past 2^53 — and every
+ * enum value is spelled the app's way (`ENUM_MEMBERS`).
  */
 export function parseLedgerJsonPreservingNumbers(text: string): unknown {
-  return JSON.parse(markNumberLiterals(text), (_key, value) =>
+  const parsed: unknown = JSON.parse(markNumberLiterals(text), (_key, value) =>
     typeof value === 'string' && value.startsWith(NUMBER_MARKER) ? value.slice(NUMBER_MARKER.length) : value,
   );
+  return withAppEnums(parsed, '');
 }
 
 /**
@@ -80,4 +125,34 @@ export async function readLedgerJson(response: Response): Promise<unknown> {
 /** Whether a decimal-string amount is exactly zero — never routed through `Number` (R1). */
 export function isZeroAmount(amount: string): boolean {
   return /^[-+]?0(\.0+)?$/.test(amount);
+}
+
+/** A decimal-string amount as an integer count of `10^-scale` units — exact, never via `Number`. */
+function toScaledUnits(amount: string, scale: number): bigint {
+  const negative = amount.startsWith('-');
+  const [intPart, fracPart = ''] = amount.replace(/^[-+]/, '').split('.');
+  // `BigInt('')` is 0n, so a missing whole part (`.5`) or fraction reads as 0.
+  const units = BigInt(intPart) * 10n ** BigInt(scale) + BigInt(fracPart.padEnd(scale, '0'));
+  return negative ? -units : units;
+}
+
+/** How many digits follow the decimal point in `amount`'s text. */
+export function fractionDigitsOf(amount: string): number {
+  const dot = amount.indexOf('.');
+  return dot < 0 ? 0 : amount.length - dot - 1;
+}
+
+/**
+ * DRK-1728 §3 row 6 — `part`'s share of `part + rest`, in basis points (0 to 10000, rounded
+ * down), worked out on the exact decimal text so neither amount passes through `Number` (R2);
+ * only the resulting proportion does. A negative amount counts as 0; `null` when nothing is
+ * left to share.
+ */
+export function shareBasisPoints(part: string, rest: string): number | null {
+  const scale = Math.max(fractionDigitsOf(part), fractionDigitsOf(rest));
+  const partUnits = toScaledUnits(part, scale);
+  const restUnits = toScaledUnits(rest, scale);
+  const p = partUnits > 0n ? partUnits : 0n;
+  const whole = p + (restUnits > 0n ? restUnits : 0n);
+  return whole === 0n ? null : Number((p * 10000n) / whole);
 }

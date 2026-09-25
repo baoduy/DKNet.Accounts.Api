@@ -6,7 +6,7 @@
  *     Then the panel shows that row instead
  *     And the panel never closed and the list was never dimmed
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('The detail panel leaves the page behind it usable', async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/kit-harness-internal`);

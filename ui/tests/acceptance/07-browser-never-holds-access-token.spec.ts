@@ -6,7 +6,7 @@
  *     Then no access token appears in the page, in a response body, or in browser storage
  *     And the session cookie cannot be read by page scripts
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

@@ -6,13 +6,13 @@ const TEST_CONFIG = {
   entraClientSecret: 'console-test-secret',
   entraScopes: ['accounts.read', 'postings.read', 'postings.reverse'],
   apiBaseUrl: 'http://127.0.0.1:8080',
-  baseUrl: 'http://127.0.0.1:3100',
+  baseUrl: 'http://console.test',
   redisUrl: 'redis://fake',
   redisKeyPrefix: 'console:',
   sessionSecret: 'session-secret',
   tokenEncryptionKey: '0123456789abcdef0123456789abcdef',
 };
-const entraIssuerBaseUrl = vi.fn(() => 'http://127.0.0.1:4488');
+const entraIssuerBaseUrl = vi.fn(() => 'http://sign-in.test');
 vi.mock('./config', () => ({
   loadConfig: () => TEST_CONFIG,
   entraIssuerBaseUrl: () => entraIssuerBaseUrl(),
@@ -49,7 +49,7 @@ vi.mock('openid-client', () => ({
   randomPKCECodeVerifier: () => 'verifier-value',
   calculatePKCECodeChallenge: async (v: string) => `challenge-of-${v}`,
   buildAuthorizationUrl: (_config: unknown, params: Record<string, string>) =>
-    new URL(`http://127.0.0.1:4488/drunk-coding-tenant/authorize?${new URLSearchParams(params).toString()}`),
+    new URL(`http://sign-in.test/drunk-coding-tenant/authorize?${new URLSearchParams(params).toString()}`),
   authorizationCodeGrant,
 }));
 
@@ -60,7 +60,7 @@ beforeEach(() => {
   authorizationCodeGrant.mockClear();
   discovery.mockClear();
   allowInsecureRequests.mockClear();
-  entraIssuerBaseUrl.mockReturnValue('http://127.0.0.1:4488');
+  entraIssuerBaseUrl.mockReturnValue('http://sign-in.test');
 });
 
 function fakeJwt(payload: Record<string, unknown>): string {
@@ -91,7 +91,7 @@ describe('beginSignIn', () => {
     expect(url.searchParams.get('nonce')).toBe('nonce-value');
     expect(url.searchParams.get('code_challenge')).toBe('challenge-of-verifier-value');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
-    expect(url.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:3100/signin/callback');
+    expect(url.searchParams.get('redirect_uri')).toBe('http://console.test/signin/callback');
     expect(url.searchParams.get('scope')).toBe('openid profile email accounts.read postings.read postings.reverse');
     expect(state).toEqual({ state: 'state-value', nonce: 'nonce-value', codeVerifier: 'verifier-value', returnTo: '/' });
     expect(JSON.parse(store.get('console:signin:state-value')!)).toEqual(state);
@@ -100,7 +100,7 @@ describe('beginSignIn', () => {
   it('allows insecure requests for the fake (http) issuer the acceptance suite points at', async () => {
     await beginSignIn();
     expect(discovery).toHaveBeenCalledWith(
-      new URL('http://127.0.0.1:4488/drunk-coding-tenant'),
+      new URL('http://sign-in.test/drunk-coding-tenant'),
       TEST_CONFIG.entraClientId,
       TEST_CONFIG.entraClientSecret,
       undefined,
@@ -125,7 +125,7 @@ describe('beginSignIn', () => {
     try {
       await beginSignIn();
       expect(discovery).toHaveBeenCalledWith(
-        new URL('http://127.0.0.1:4488/drunk-coding-tenant'),
+        new URL('http://sign-in.test/drunk-coding-tenant'),
         TEST_CONFIG.entraClientId,
         TEST_CONFIG.entraClientSecret,
         undefined,

@@ -7,7 +7,7 @@
  *     Then Mai is sent to Microsoft Entra ID
  *     And after signing in Mai sees the console frame with no screen content
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

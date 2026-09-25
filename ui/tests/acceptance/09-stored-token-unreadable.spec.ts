@@ -5,7 +5,7 @@
  *     When the console's cache records are read directly
  *     Then no usable access token is found
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { CONSOLE_REDIS_KEY_PREFIX, MAI } from '../support/fixtures';
 import { connectTestRedis } from '../support/redis';
 import { signInAs } from '../support/sign-in';

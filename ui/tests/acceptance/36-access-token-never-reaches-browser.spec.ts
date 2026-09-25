@@ -17,8 +17,8 @@
  * for it directly, in every same-origin response's body and headers, not one hand-picked
  * body.
  */
-import { expect, test } from '@playwright/test';
-import { MAI } from '../support/fixtures';
+import { expect, test } from '../support/test';
+import { FAKE_LEDGER_PORT, MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
@@ -61,7 +61,7 @@ test('The access token never reaches the browser', async ({ page, baseURL }) => 
 
   // The browser's own request targeted the console's own origin, never the ledger service.
   expect(requestUrls.some((url) => url.startsWith(`${baseURL}/api/ledger/`))).toBe(true);
-  expect(requestUrls.every((url) => !url.includes('4499'))).toBe(true);
+  expect(requestUrls.every((url) => !url.includes(`:${FAKE_LEDGER_PORT}`))).toBe(true);
 
   expect(result.status).toBe(200);
   expect(result.body).not.toContain(CANARY_ACCESS_TOKEN);

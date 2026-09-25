@@ -445,3 +445,170 @@ describe('AccountGroupsScreen', () => {
     expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?page=1&pageSize=10');
   });
 });
+
+describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
+  function paged(items: unknown[], totalItemCount: number, pageNumber = 1): Response {
+    return jsonResponse(200, { items, pageNumber, pageSize: 10, pageCount: Math.max(1, Math.ceil(totalItemCount / 10)), totalItemCount, hasNextPage: false });
+  }
+
+  it('narrows by type from its own Type filter, beside the status filter', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(paged([], 0));
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    await userEvent.selectOptions(await screen.findByLabelText('Type filter'), 'Internal');
+
+    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?type=Internal');
+    await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain('/api/ledger/account-groups?filter=Type%3AEqual%3AInternal&pageNumber=1'));
+    expect(screen.getAllByRole('option').filter((option) => option.closest('select') === screen.getByLabelText('Type filter')).map((option) => option.textContent)).toEqual([
+      'Any',
+      'Customer',
+      'Merchant',
+      'Internal',
+      'Suspense',
+      'Settlement',
+    ]);
+  });
+
+  it('starts its Owner filter blank', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
+    renderScreen();
+    expect(await screen.findByLabelText('Owner filter')).toHaveValue('');
+  });
+
+  it('starts its Type filter on any type', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
+    renderScreen();
+    expect(((await screen.findByLabelText('Type filter')) as HTMLSelectElement).selectedOptions[0]).toHaveTextContent(/^Any$/);
+  });
+
+  it('keeps a type from the address in its filter', async () => {
+    setSearchParams('type=Internal');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
+    renderScreen();
+    expect(await screen.findByLabelText('Type filter')).toHaveValue('Internal');
+  });
+
+  it.each([
+    { search: '', total: 0, message: 'No groups yet.' },
+    { search: 'status=Closed', total: 0, message: 'No groups match this filter.' },
+    { search: 'page=9&pageSize=10', total: 25, message: 'No more groups.' },
+  ])('says $message for an empty list at "$search"', async ({ search, total, message }) => {
+    setSearchParams(search);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], total, 9)));
+    renderScreen();
+    const cell = await screen.findByRole('cell', { name: message });
+    expect(cell.closest('tbody')).not.toBeNull();
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Code', 'Name', 'Type', 'Owner', 'Status']);
+  });
+
+  it('draws placeholder rows under its headings while the list is read', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+    const { container } = renderScreen();
+    expect(container.querySelectorAll('tbody tr [data-slot="skeleton"]')).toHaveLength(50);
+    expect(screen.queryByText(/^No groups/)).toBeNull();
+  });
+
+  it('offers Retry on a failed list read, and draws the list once the service answers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(503, { errors: [{ message: 'Ledger store unavailable' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+
+    fetchMock.mockResolvedValue(paged([GROUP], 1));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('cell', { name: 'TRSY' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('moves focus into the panel a row opens, and keeps the filters usable while the panel shows a group', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/balances')) return new Response('[]', { status: 200 });
+        if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+        return paged([GROUP], 1);
+      }),
+    );
+    renderScreen();
+    const row = (await screen.findByRole('cell', { name: 'TRSY' })).closest('tr')!;
+    row.focus();
+    await userEvent.keyboard('{Enter}');
+
+    const panel = await screen.findByTestId('detail-panel');
+    expect(panel).toHaveFocus();
+    // It can hold focus, but is no tab stop of its own: Tab goes on through the page (R3).
+    expect(panel).toHaveAttribute('tabindex', '-1');
+    expect(row).toHaveAttribute('data-state', 'selected');
+    expect(screen.getByLabelText('Status filter')).toBeEnabled();
+    expect(screen.getByLabelText('Type filter')).toBeEnabled();
+
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByTestId('detail-panel')).toBeNull());
+    expect(row).toHaveFocus();
+  });
+
+  it("keeps the filters on screen while the panel's own form is open, and draws a placeholder until the balances answer", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/balances')) return new Promise<Response>(() => {});
+        if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+        return paged([GROUP], 1);
+      }),
+    );
+    renderScreen();
+    await userEvent.click(await screen.findByRole('cell', { name: 'TRSY' }));
+    const panel = await screen.findByTestId('detail-panel');
+    await within(panel).findByText('Balances');
+    expect(panel.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    expect(within(panel).queryByText('This group holds no account.')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'New group' }));
+    expect(screen.getByLabelText('Type', { exact: true })).toBeInTheDocument();
+    for (const label of ['Status filter', 'Type filter', 'Owner filter']) expect(screen.getByLabelText(label, { exact: true })).toBeEnabled();
+  });
+
+  it('offers Retry on a failed group read in the panel', async () => {
+    let failGroup = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/balances')) return new Response('[]', { status: 200 });
+        if (url.includes('/account-groups/g1')) return failGroup ? jsonResponse(503, { errors: [{ message: 'Ledger store unavailable' }] }) : jsonResponse(200, GROUP);
+        return paged([GROUP], 1);
+      }),
+    );
+    renderScreen();
+    await userEvent.click(await screen.findByRole('cell', { name: 'TRSY' }));
+    const panel = await screen.findByTestId('detail-panel');
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+
+    failGroup = false;
+    await userEvent.click(within(panel).getByRole('button', { name: 'Retry' }));
+    expect(await within(panel).findByText('Treasury')).toBeInTheDocument();
+  });
+
+  it('offers Retry on a failed balances read in the panel', async () => {
+    let failBalances = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes('/balances')) return failBalances ? jsonResponse(503, { errors: [{ message: 'Balances were refused.' }] }) : new Response('[]', { status: 200 });
+        if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
+        return paged([GROUP], 1);
+      }),
+    );
+    renderScreen();
+    await userEvent.click(await screen.findByRole('cell', { name: 'TRSY' }));
+    const panel = await screen.findByTestId('detail-panel');
+    expect(await within(panel).findByText('Balances were refused.')).toBeInTheDocument();
+
+    failBalances = false;
+    await userEvent.click(within(panel).getByRole('button', { name: 'Retry' }));
+    expect(await within(panel).findByText('This group holds no account.')).toBeInTheDocument();
+  });
+});

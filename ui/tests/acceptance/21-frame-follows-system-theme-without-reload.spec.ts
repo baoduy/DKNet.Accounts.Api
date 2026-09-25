@@ -20,7 +20,7 @@
  * Literal background colours copied from Design/tokens/colors.css (source of truth, R2):
  *   light --background #fbfcf8 · dark --background #020617
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

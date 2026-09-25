@@ -11,7 +11,7 @@
  * the constant DRK-1684 §3 row 11 widens from 3 to these same 5. RED today: the harness
  * env's `CONSOLE_ENTRA_SCOPES` (and the shipped `.env.sample` default) still requests only 3.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 const SERVICE_SCOPES = ['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse'];
 

@@ -14,7 +14,7 @@ import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
-import { NO_ANSWER_ERROR, routeRefusal } from '@/lib/api/refusal';
+import { isUnreachable, NO_ANSWER_ERROR, routeRefusal } from '@/lib/api/refusal';
 import { usePosting } from '@/lib/accounts/query';
 import { useReversePosting } from '@/lib/query/mutations';
 
@@ -91,7 +91,8 @@ export function ReversePostingForm({
         setReason('');
         setOpen(false);
       } else {
-        setErrors(result.errors ?? []);
+        // The pass-through's unreachable answer means the service never answered this write.
+        setErrors(isUnreachable(result.errors) ? [NO_ANSWER_ERROR] : (result.errors ?? []));
       }
     } catch {
       setErrors([NO_ANSWER_ERROR]);

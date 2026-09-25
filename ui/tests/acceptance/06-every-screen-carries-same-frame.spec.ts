@@ -8,7 +8,7 @@
  *     And the top bar shows a search field and the identity menu
  *     And the page carries a page header above its content
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

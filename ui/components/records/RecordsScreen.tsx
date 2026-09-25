@@ -8,13 +8,23 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useId, useState, type JSX } from 'react';
+import { useId, useLayoutEffect, useState, type JSX } from 'react';
 import { RecordPostingForm } from '@/components/accounts/RecordPostingForm';
-import { RefusalAlert } from '@/components/feedback/RefusalAlert';
+import { emptyMessage, postingsEmpty } from '@/components/feedback/empty';
+import { FailedRead } from '@/components/feedback/RefusalAlert';
+import { usePanelFocus } from '@/components/feedback/use-panel-focus';
 import { Input } from '@/components/ui/input';
-import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import { useAccountsById, useCurrencies, usePosting, useRecords } from '@/lib/accounts/query';
-import { POSTING_CATEGORIES, POSTING_DIRECTIONS, POSTING_STATUSES, defaultPostingsFilter, postingPeriodError, type PostingsFilterState } from '@/lib/accounts/postings-filter';
+import {
+  MIN_POSTING_SEARCH_LENGTH,
+  POSTING_CATEGORIES,
+  POSTING_DIRECTIONS,
+  POSTING_STATUSES,
+  defaultPostingsFilter,
+  postingPeriodError,
+  type PostingsFilterState,
+} from '@/lib/accounts/postings-filter';
+import { pushRecent } from '@/lib/recent/store';
 import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
 import { PostingDetails } from './PostingDetails';
 import { RecordsTable, type RecordsTableRow } from './RecordsTable';
@@ -25,6 +35,8 @@ const DEFAULT_ORDER = { field: 'RecordedAt', desc: true };
 
 export interface RecordsScreenProps {
   grantedScopes: string[];
+  /** Keys the operator's recently viewed list (DRK-1728 §3 row 8); unset, nothing is kept. */
+  directoryObjectId?: string;
 }
 
 /** A narrowing left empty is dropped; a period bound is kept even when empty, so an unset
@@ -36,7 +48,7 @@ function setFilter(state: ListViewState, key: string, value: string): ListViewSt
   return { ...state, filters, page: undefined };
 }
 
-export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Element {
+export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScreenProps): JSX.Element {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ListViewState>(() => parseListViewState(searchParams));
   const [defaults] = useState(() => defaultPostingsFilter());
@@ -71,14 +83,26 @@ export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Elemen
   const accountIds = [...new Set([...items.map((posting) => posting.accountId), ...(openPosting ? [openPosting.accountId] : [])])];
   const accountQueries = useAccountsById(accountIds);
 
+  // Kept as the posting's details are drawn — before paint, so moving straight on still keeps it.
+  const openedId = openPosting?.id ?? '';
+  useLayoutEffect(() => {
+    if (directoryObjectId && openedId) pushRecent(directoryObjectId, 'Posting', openedId);
+  }, [directoryObjectId, openedId]);
+
   const accountNumbers = new Map<string, string>();
   for (const query of accountQueries) {
     if (query.data?.account) accountNumbers.set(query.data.account.id, query.data.account.accountNumber);
   }
   const decimalPlacesByCurrency = new Map((currenciesQuery.data ?? []).map((currency) => [currency.code, currency.decimalPlaces]));
   // Rows are drawn only once every account number and currency scale is known — never a guid in
-  // the Account column or an amount at a guessed scale.
-  const ready = currenciesQuery.data !== undefined && accountQueries.every((query) => !query.isPending);
+  // the Account column or an amount at a guessed scale. A refused currency read is stated on its
+  // own and the amounts are then drawn as the service sent them, never left loading.
+  const ready = (currenciesQuery.data !== undefined || currenciesQuery.isError) && accountQueries.every((query) => !query.isPending);
+  // A refused period or a too-short search makes no read at all (`toPostingsQuery`).
+  const queryable = periodError === null && !(filter.search && filter.search.length < MIN_POSTING_SEARCH_LENGTH);
+  const loading = queryable && (recordsQuery.isPending || !ready);
+  const narrowed = Boolean(filter.direction || filter.category || filter.status || filter.search);
+  const panelRef = usePanelFocus<HTMLElement>(openPosting !== undefined);
   const rows: RecordsTableRow[] = items.map((posting) => ({
     id: posting.id,
     postingNumber: posting.postingNumber,
@@ -143,25 +167,26 @@ export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Elemen
 
       {periodError ? <p role="alert">{periodError}</p> : null}
 
-      {currenciesQuery.isError ? (
-        <RefusalAlert errors={[toLedgerError(currenciesQuery.error)]} traceId={ledgerErrorTraceId(currenciesQuery.error)} />
-      ) : null}
+      {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 
       <div className="flex items-start gap-4">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {recordsQuery.isError ? (
-            <RefusalAlert errors={[toLedgerError(recordsQuery.error)]} traceId={ledgerErrorTraceId(recordsQuery.error)} />
-          ) : ready ? (
+            <FailedRead error={recordsQuery.error} onRetry={() => void recordsQuery.refetch()} />
+          ) : (
             <RecordsTable
               rows={rows}
+              loading={loading}
+              emptyMessage={
+                periodError ??
+                emptyMessage(postingsEmpty(filter.from, filter.to), { total: Number(recordsQuery.data?.totalItemCount ?? 0), page: currentPage, filtered: narrowed })
+              }
               orderBy={state.sort?.field}
               desc={state.sort?.desc}
               onSort={(field) => navigate({ ...state, sort: { field, desc: sort.field === field ? !sort.desc : false } })}
               selectedId={state.openRecordId}
               onSelectRow={(row) => navigate({ ...state, openRecordId: row.id === state.openRecordId ? undefined : row.id })}
             />
-          ) : (
-            <p>Loading…</p>
           )}
 
           <div className="flex items-center gap-2">
@@ -174,7 +199,7 @@ export function RecordsScreen({ grantedScopes }: RecordsScreenProps): JSX.Elemen
         </div>
 
         {openPosting ? (
-          <aside data-testid="detail-panel" className="w-96 flex-none rounded-md border border-border p-4">
+          <aside ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="w-96 flex-none rounded-md border border-border p-4">
             <PostingDetails
               posting={openPosting}
               accountNumber={accountNumbers.get(openPosting.accountId) ?? openPosting.accountId}

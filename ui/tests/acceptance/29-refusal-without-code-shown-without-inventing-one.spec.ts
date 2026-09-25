@@ -11,7 +11,7 @@
  * `400` never carries a business `code`). The pass-through (row 5) must return that answer
  * unchanged — RED today because it is a stub that always throws.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

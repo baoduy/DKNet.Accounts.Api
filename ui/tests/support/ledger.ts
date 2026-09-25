@@ -31,6 +31,8 @@ export interface LedgerAccountGroupFixture {
   ownerId?: string;
   description?: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 — the date a group status count windows on; defaults to the epoch. */
+  createdOn?: string;
 }
 
 export interface LedgerPostingFixture {
@@ -70,6 +72,8 @@ export interface AccountGroupFixture {
   status?: AccountGroupStatus;
   ownerId: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 — the date a group status count windows on; defaults to the epoch. */
+  createdOn?: string;
 }
 
 export interface CurrencyFixture {
@@ -80,14 +84,31 @@ export interface CurrencyFixture {
   isActive?: boolean;
 }
 
+/**
+ * Calls one of the fake ledger's routes; a refused request or an answer outside 2xx throws,
+ * naming the stand-in, the route and the status (DRK-1726 §3 row 7) — a seed or reset that did
+ * not land never lets the check go on against the wrong data.
+ */
+async function ledgerFetch(route: string, init: RequestInit = {}): Promise<Response> {
+  const method = init.method ?? 'GET';
+  let response: Response;
+  try {
+    response = await fetch(`${FAKE_LEDGER_BASE}${route}`, init);
+  } catch (error) {
+    throw new Error(`stand-in ledger did not answer ${method} ${route}: ${(error as Error).message}`);
+  }
+  if (!response.ok) throw new Error(`stand-in ledger answered ${method} ${route} with ${response.status}: ${await response.text()}`);
+  return response;
+}
+
 /** Resets `fake-ledger-service.ts` to an empty dataset. */
 export async function resetLedger(): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__reset`, { method: 'POST' });
+  await ledgerFetch('/__reset', { method: 'POST' });
 }
 
 /** Seeds accounts into `fake-ledger-service.ts` (upsert by `accountNumber`). */
 export async function seedLedgerAccounts(accounts: LedgerAccountFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -118,7 +139,7 @@ export async function seedLedgerAccounts(accounts: LedgerAccountFixture[]): Prom
 
 /** Seeds account groups into `fake-ledger-service.ts` (upsert by `id`). */
 export async function seedLedgerAccountGroups(groups: LedgerAccountGroupFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accountGroups: groups.map((group) => ({ status: 'Active', ...group })) }),
@@ -127,7 +148,7 @@ export async function seedLedgerAccountGroups(groups: LedgerAccountGroupFixture[
 
 /** Seeds postings into `fake-ledger-service.ts`, appended to the existing stream. */
 export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ postings: postings.map((posting) => ({ status: 'Posted', ...posting })) }),
@@ -136,7 +157,7 @@ export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Prom
 
 /** DRK-1697 §3 row 15 — seeds account groups into `fake-ledger-service.ts` (upsert by `code`). */
 export async function seedAccountGroups(groups: AccountGroupFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accountGroups: groups }),
@@ -145,7 +166,7 @@ export async function seedAccountGroups(groups: AccountGroupFixture[]): Promise<
 
 /** DRK-1697 §3 row 15 — seeds currencies into `fake-ledger-service.ts` (upsert by `code`). */
 export async function seedCurrencies(currencies: CurrencyFixture[]): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__seed`, {
+  await ledgerFetch('/__seed', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ currencies }),
@@ -154,13 +175,13 @@ export async function seedCurrencies(currencies: CurrencyFixture[]): Promise<voi
 
 /** Every request `fake-ledger-service.ts` has received since the last reset. */
 export async function ledgerRequests(): Promise<Array<{ method: string; path: string }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
+  const response = await ledgerFetch('/__requests');
   return (await response.json()) as Array<{ method: string; path: string }>;
 }
 
 /** DRK-1713 §3 row 2 — every posting the fake ledger holds, recorded or seeded. */
 export async function ledgerPostings(): Promise<Array<{ id: string; postingNumber: string; accountId: string; direction: string; amount: string; currency: string; status: string; category: string; description: string | null; effectiveDate: string | null; reversesPostingId: string | null; reversedByPostingId: string | null }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__postings`);
+  const response = await ledgerFetch('/__postings');
   // Amounts arrive as raw numeric literals — kept as their exact text, never through `Number`.
   const text = (await response.text()).replace(/"(amount|signedAmount|balanceAfter)":(-?[0-9.]+)/g, '"$1":"$2"');
   return JSON.parse(text);
@@ -168,20 +189,53 @@ export async function ledgerPostings(): Promise<Array<{ id: string; postingNumbe
 
 /** DRK-1713 "Controlled clock" — the day the fake writes a reversal (or an undated recording) on. */
 export async function setLedgerClock(today: string | null): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__clock`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ today }) });
+  await ledgerFetch('/__clock', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ today }) });
 }
 
 /** DRK-1713 — the next recording is written, but its answer never reaches the console. */
 export async function dropNextPostingAnswer(): Promise<void> {
-  await fetch(`${FAKE_LEDGER_BASE}/__drop-next-answer`, { method: 'POST' });
+  await ledgerFetch('/__drop-next-answer', { method: 'POST' });
 }
 
 /** Every recording (`POST /v1/postings`) the fake has received since the last reset, with the
  * idempotency key it carried and its body as sent. */
 export async function recordingRequests(): Promise<Array<{ idempotencyKey: string | undefined; body: Record<string, unknown> }>> {
-  const response = await fetch(`${FAKE_LEDGER_BASE}/__requests`);
+  const response = await ledgerFetch('/__requests');
   const log = (await response.json()) as Array<{ method: string; path: string; headers: Record<string, string>; body?: Record<string, unknown> }>;
   return log
     .filter((entry) => entry.method === 'POST' && entry.path === '/v1/postings')
     .map((entry) => ({ idempotencyKey: entry.headers['idempotency-key'], body: entry.body ?? {} }));
+}
+
+/** DRK-1727 — removes a group from the fake ledger, the way the service's own delete does
+ * ("the group has since been deleted"). */
+export async function deleteLedgerAccountGroup(id: string): Promise<void> {
+  await ledgerFetch(`/v1/account-groups/${id}`, { method: 'DELETE' });
+}
+
+/** DRK-1729 — how a read fails: the service cannot be reached, or it answers with a refusal. */
+export type LedgerFailure = { unreachable: true } | { status: number; message: string; code?: string };
+
+/**
+ * DRK-1729 "A failed read is stated where it happened" — every `method` request to the fake whose
+ * path matches `path` (a regular expression over the service's own path, e.g. `/v1/accounts`,
+ * anchored at both ends) fails as `failure` says, until `clearLedgerFailures()` or the next reset.
+ * The failure happens at the service, behind the console's own pass-through.
+ */
+export async function failLedgerRead(path: string, failure: LedgerFailure, method = 'GET'): Promise<void> {
+  const rule =
+    'unreachable' in failure
+      ? { method, path, unreachable: true }
+      : { method, path, status: failure.status, errors: [{ message: failure.message, ...(failure.code ? { code: failure.code } : {}) }] };
+  await ledgerFetch('/__fail', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rule) });
+}
+
+/** Lifts every failure `failLedgerRead` set: the service answers again. */
+export async function clearLedgerFailures(): Promise<void> {
+  await ledgerFetch('/__fail/clear', { method: 'POST' });
+}
+
+/** DRK-1729 — the ledger holds no currency at all (the fake otherwise always carries SGD, JPY, BHD). */
+export async function clearLedgerCurrencies(): Promise<void> {
+  await ledgerFetch('/__clear-currencies', { method: 'POST' });
 }

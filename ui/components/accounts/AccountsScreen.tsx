@@ -9,12 +9,13 @@ import { useSearchParams } from 'next/navigation';
 import { useState, type JSX } from 'react';
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm';
 import { AccountsTable, type AccountsTableRow } from '@/components/accounts/AccountsTable';
-import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { ACCOUNTS_EMPTY, emptyMessage } from '@/components/feedback/empty';
+import { FailedRead, RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
+import { accountSearchError } from '@/lib/accounts/filters';
 import { useAccountGroups, useAccounts, useCurrencies } from '@/lib/accounts/query';
 import { useOpenAccount } from '@/lib/accounts/mutations';
 import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
@@ -102,38 +103,41 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
           />
         </label>
 
-        {!formOpen ? (
-          <label className="flex flex-col gap-1">
-            Currency filter
-            <select
-              aria-label="Currency filter"
-              value={state.filters.currency ?? ''}
-              onChange={(event) => navigate(setFilter(state, 'currency', event.target.value))}
-            >
-              <option value="">All currencies</option>
-              {(currenciesQuery.data ?? []).map((currency) => (
-                <option key={currency.code} value={currency.code}>
-                  {currency.code}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+        <label className="flex flex-col gap-1">
+          Currency filter
+          <select
+            aria-label="Currency filter"
+            value={state.filters.currency ?? ''}
+            onChange={(event) => navigate(setFilter(state, 'currency', event.target.value))}
+          >
+            <option value="">All currencies</option>
+            {(currenciesQuery.data ?? []).map((currency) => (
+              <option key={currency.code} value={currency.code}>
+                {currency.code}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <ScopeGate scope="accounts.write" granted={canWrite} style={{ marginLeft: 'auto' }}>
           <Button onClick={() => setFormOpen(true)}>Open account</Button>
         </ScopeGate>
       </div>
 
-      {currenciesQuery.isError ? (
-        <RefusalAlert errors={[toLedgerError(currenciesQuery.error)]} traceId={ledgerErrorTraceId(currenciesQuery.error)} />
-      ) : null}
+      {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 
       {accountsQuery.isError ? (
-        <RefusalAlert errors={[toLedgerError(accountsQuery.error)]} traceId={ledgerErrorTraceId(accountsQuery.error)} />
+        <FailedRead error={accountsQuery.error} onRetry={() => void accountsQuery.refetch()} />
       ) : (
         <AccountsTable
           rows={rows}
+          // A search too short to send makes no read (`toAccountsQuery`), so it is never loading.
+          loading={accountsQuery.isPending && accountSearchError(state.filters.search ?? '') === null}
+          emptyMessage={emptyMessage(ACCOUNTS_EMPTY, {
+            total: Number(accountsQuery.data?.totalItemCount ?? 0),
+            page: currentPage,
+            filtered: Object.values(state.filters).some(Boolean),
+          })}
           orderBy={state.sort?.field}
           desc={state.sort?.desc}
           onSort={(field) => navigate({ ...state, sort: { field, desc: state.sort?.field === field ? !state.sort.desc : false } })}

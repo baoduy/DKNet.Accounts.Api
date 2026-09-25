@@ -11,12 +11,12 @@
  * runs its own dedicated console process to restart mid-test rather than the shared
  * `webServer` instance.
  */
-import { expect, test } from '@playwright/test';
-import { defaultConsoleEnv, MAI } from '../support/fixtures';
+import { expect, test } from '../support/test';
+import { defaultConsoleEnv, MAI, OWN_CONSOLE_PORT } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 import { startConsole, stopConsole } from '../support/console-process';
 
-const PORT = 3201;
+const PORT = OWN_CONSOLE_PORT;
 const BASE = `http://127.0.0.1:${PORT}`;
 
 test('Restarting the console does not sign the operator out', async ({ page }) => {

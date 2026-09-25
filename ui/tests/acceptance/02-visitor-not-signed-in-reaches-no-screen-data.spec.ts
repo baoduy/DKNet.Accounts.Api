@@ -6,7 +6,7 @@
  *     Then Nam is sent to Microsoft Entra ID
  *     And no account, posting or currency value is returned to Nam
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 const FORBIDDEN_KEYS = ['account', 'posting', 'currency'];
 

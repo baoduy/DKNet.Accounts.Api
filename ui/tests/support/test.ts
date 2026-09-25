@@ -1,20 +1,23 @@
 import { test as base, expect } from '@playwright/test';
 import { resetLedger } from './ledger';
+import { resetPostingSequence } from './records';
 import { resetConsoleRedis } from './redis';
+import { standInStopped, stoppedStandIn } from './stand-ins';
+
+async function expectStandInsRunning(): Promise<void> {
+  const stopped = await stoppedStandIn();
+  if (stopped) throw new Error(standInStopped(stopped));
+}
 
 /**
- * DRK-1684 rework round 2 — `scripts/reset-console-redis-reporter.ts` and `scripts/reset-
- * fake-ledger-reporter.ts` reset from `Reporter.onTestBegin`, which Playwright's own type
- * declares `(test: TestCase, result: TestResult): void` (`playwright/types/testReporter.d.ts`)
- * — never `Promise<void>`, so the runner never awaits it. Both reporters' async bodies race
- * the test they meant to isolate: measured as 18 sign-ins' worth of leftover keys (36
- * predicted, 38 measured) by the time spec `38` runs.
+ * Every acceptance check imports `test`/`expect` from here (DRK-1726 R4). The auto fixture is
+ * part of each check's own lifecycle: Playwright awaits its setup before the check's first line
+ * and its teardown before the next check starts, so
  *
- * A fixture is part of the test's own lifecycle instead of the reporter's: Playwright awaits
- * an auto fixture's setup before calling the test body, so the reset is provably complete
- * before the test's first line runs. `10`, `11` and `38` — the only specs asserting the exact
- * keyspace rather than a scoped lookup — import `test`/`expect` from here instead of
- * `@playwright/test` directly; every other spec is unaffected.
+ * - every check starts from an empty cache keyspace, an empty fake ledger and a fresh posting
+ *   sequence, whatever the check before it left behind;
+ * - a stand-in that stopped (R3) fails the check that was running when it stopped, by name,
+ *   and no later check's body runs — `global-setup.ts` stops the run itself.
  */
 export const test = base.extend<{ isolatedTestState: void }>({
   isolatedTestState: [
@@ -22,9 +25,12 @@ export const test = base.extend<{ isolatedTestState: void }>({
     // parameter must stay a literal (if empty) destructuring pattern — not renamed, not typed
     // away — even though nothing here needs another fixture.
     async ({}, use) => {
+      await expectStandInsRunning();
       await resetConsoleRedis();
       await resetLedger();
+      resetPostingSequence();
       await use();
+      await expectStandInsRunning();
     },
     { auto: true },
   ],

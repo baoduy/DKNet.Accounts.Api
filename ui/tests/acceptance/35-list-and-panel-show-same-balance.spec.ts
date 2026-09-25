@@ -10,7 +10,7 @@
  * `GET .../balance` to the ledger service. RED today: the harness page 500s before any read
  * happens at all.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { ledgerRequests, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
