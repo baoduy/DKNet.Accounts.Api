@@ -636,6 +636,8 @@ people who read `direction` as the sign.
 - [Operations console](docs/console.md) — the Next.js console for signing in and running the
   service locally, and [its manual verification steps](docs/manual-verification.md) for what its
   automated checks cannot reach.
+- [Local setup with Microsoft Entra ID](docs/local-setup-entra.md) — register the API and console
+  apps in Entra, fill in `.env`, and run the whole stack with `docker compose` and authorization on.
 - [docs/index.md](docs/index.md) — the reference docs inherited from the DKNet solution template
   (pipeline, configuration, EF Core events, messaging). Reach for these when you are changing this
   service, not when you are calling it.
