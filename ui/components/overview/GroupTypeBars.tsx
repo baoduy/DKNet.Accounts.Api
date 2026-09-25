@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Mono, Note } from '@/components/ui/text';
 import { listTotalKey, statusCountsKey } from '@/lib/query/keys';
 import { fetchListTotal, fetchStatusCounts } from '@/lib/query/overview';
-import { countOf, formatCount, MissingScope, Panel, Ready } from './parts';
+import { countOf, formatCount, heightOf, MissingScope, Panel, Ready } from './parts';
 
 /**
  * DRK-1745 §3 row 6 — one bar per group type the service knows, each the service's
@@ -59,7 +59,7 @@ export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
                     <li key={type} className="grid grid-cols-[--spacing(24)_minmax(0,1fr)_--spacing(9)] items-center gap-3 text-[length:var(--text-table-size)] leading-(--text-table-leading)">
                       <span>{type}</span>
                       <span role="img" aria-label={`${type}: ${formatCount(count)} groups`} className="block h-2 overflow-hidden rounded-sm bg-muted">
-                        <span className="block h-full bg-chart-2" style={{ width: `${max === 0 ? 0 : (count / max) * 100}%` }} />
+                        <span className="block h-full bg-chart-2" style={{ width: heightOf(count, max) }} />
                       </span>
                       <span className="text-right font-semibold tabular-nums">{formatCount(count)}</span>
                     </li>

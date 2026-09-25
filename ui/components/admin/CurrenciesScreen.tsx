@@ -403,7 +403,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                   />
                 </FormRow>
-                <FormRow label="Decimals" required error={fieldErrors.decimalPlaces} hint={panelMode === 'create' ? workedExample ? <span data-testid="currency-worked-example">{workedExample}</span> : '0 to 6.' : undefined}>
+                <FormRow label="Decimal places" required error={fieldErrors.decimalPlaces} hint={panelMode === 'create' ? workedExample ? <span data-testid="currency-worked-example">{workedExample}</span> : '0 to 6.' : undefined}>
                   {panelMode === 'edit' ? (
                     <ReadOnlyField locked className="w-24">
                       <Mono>{draft.decimalPlaces}</Mono>

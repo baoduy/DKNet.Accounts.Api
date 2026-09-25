@@ -8,6 +8,11 @@ import type { StatusCount } from '@/lib/query/overview';
 
 /** DRK-1745 — the pieces every Overview region shares: its card, its scope gate and its read states. */
 
+/** A bar's length as a share of the chart's largest single figure — counts only, never money. */
+export function heightOf(count: number, max: number): string {
+  return `${max === 0 ? 0 : (count / max) * 100}%`;
+}
+
 export function formatCount(count: number): string {
   return count.toLocaleString('en-US');
 }

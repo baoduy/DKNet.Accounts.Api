@@ -17,13 +17,13 @@ import { Currency as CurrencyCode } from '@/components/ledger/Currency';
 import { FloorLine } from '@/components/ledger/FloorLine';
 import { Money } from '@/components/ledger/Money';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
+import { formatDate } from '@/components/records/RecordsTable';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Caption, Mono, Note } from '@/components/ui/text';
-import { formatOpenedOn } from '@/lib/accounts/filters';
-import { useChangeAccountDetails, useOpenAccount, useSetAccountControls } from '@/lib/accounts/mutations';
+import { useOpenAccount, useSaveAccountEdit } from '@/lib/accounts/mutations';
 import { useAccount, useAccountBalance, type AccountDto, type AccountGroupDto, type AccountLookup } from '@/lib/accounts/query';
 import type { Currency } from '@/lib/query/currencies';
 import { AccountForm, type AccountFormValues } from './AccountForm';
@@ -92,8 +92,7 @@ function PanelBody({
   const focusRef = usePanelFocus<HTMLDivElement>(true);
   const balanceQuery = useAccountBalance(mode === 'view' ? accountId : '');
   const openAccount = useOpenAccount();
-  const changeDetails = useChangeAccountDetails();
-  const setControls = useSetAccountControls();
+  const saveEdit = useSaveAccountEdit();
 
   const canWrite = grantedScopes.includes('accounts.write');
   const account = accountQuery?.data?.account;
@@ -120,26 +119,7 @@ function PanelBody({
         return;
       }
       if (!account) return;
-      // As the detail page's edit (`AccountDetail.tsx` `AccountEditPanel`): `PUT` only when the
-      // name or notes changed, `PATCH` for the floor settings; notes ride in `metadata.notes`.
-      const found: LedgerError[] = [];
-      const nameChanged = values.name !== account.name;
-      const notesChanged = values.notes !== notes;
-      if (nameChanged || notesChanged) {
-        const result = await changeDetails.mutate({
-          accountId: account.id,
-          name: nameChanged ? values.name : undefined,
-          metadata: notesChanged ? { ...account.metadata, notes: values.notes } : undefined,
-        });
-        if (!result.ok) found.push(...(result.errors ?? []));
-      }
-      const controls = await setControls.mutate({
-        accountId: account.id,
-        overdraftLimit: values.floor.overdraftLimit,
-        minimumBalance: values.floor.minimumBalance,
-        permittedToGoNegative: values.floor.permittedToGoNegative,
-      });
-      if (!controls.ok) found.push(...(controls.errors ?? []));
+      const found = await saveEdit({ ...values, accountId: account.id, current: { name: account.name, notes, metadata: account.metadata } });
       setErrors(found);
       if (found.length === 0) onSaved(account);
     } finally {
@@ -284,7 +264,7 @@ function PanelBody({
           <DetailList
             items={[
               { label: 'External ref.', value: account.externalReference ? <Mono>{account.externalReference}</Mono> : notSet },
-              { label: 'Opened', value: formatOpenedOn(account.openedOn) },
+              { label: 'Opened', value: formatDate(account.openedOn) },
             ]}
           />
         </>

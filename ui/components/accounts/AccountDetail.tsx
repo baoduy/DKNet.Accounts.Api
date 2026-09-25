@@ -34,7 +34,7 @@ import { PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Mono, Note } from '@/components/ui/text';
-import { useChangeAccountDetails, useSetAccountControls } from '@/lib/accounts/mutations';
+import { useSaveAccountEdit } from '@/lib/accounts/mutations';
 import type { PostingDto } from '@/lib/accounts/query';
 import { AccountForm, type AccountFormValues } from './AccountForm';
 import { AccountStatusControl } from './AccountStatusControl';
@@ -118,33 +118,11 @@ const NOT_POSTABLE_CODE: Record<string, string> = { frozen: 'ACCOUNT_FROZEN', cl
 
 function AccountEditPanel({ accountId, account, writeGranted, onSaved }: { accountId: string; account: AccountDetailAccount; writeGranted: boolean; onSaved: () => void }): JSX.Element {
   const [errors, setErrors] = useState<LedgerError[]>([]);
-  const changeDetails = useChangeAccountDetails();
-  const setControls = useSetAccountControls();
+  const saveEdit = useSaveAccountEdit();
 
   async function handleSubmit(values: AccountFormValues): Promise<void> {
-    // Only the endpoint the changed field actually belongs to is called — `PUT` accepts
-    // just `name`/`metadata`, `PATCH` just `status`/floor settings (README.md) — never both
-    // concurrently when only one half of the form changed. The service has no dedicated
-    // "notes" field, so the free-form text rides in `metadata.notes` (DRK-1704 finding 4).
-    const errors: LedgerError[] = [];
-    const nameChanged = values.name !== account.name;
-    const notesChanged = values.notes !== (account.notes ?? '');
-    if (nameChanged || notesChanged) {
-      const nameResult = await changeDetails.mutate({
-        accountId,
-        name: nameChanged ? values.name : undefined,
-        metadata: notesChanged ? { ...account.metadata, notes: values.notes } : undefined,
-      });
-      if (!nameResult.ok) errors.push(...(nameResult.errors ?? []));
-    }
-    const controlsResult = await setControls.mutate({
-      accountId,
-      status: values.status,
-      overdraftLimit: values.floor.overdraftLimit,
-      minimumBalance: values.floor.minimumBalance,
-      permittedToGoNegative: values.floor.permittedToGoNegative,
-    });
-    if (!controlsResult.ok) errors.push(...(controlsResult.errors ?? []));
+    // `lib/accounts/mutations.ts` `useSaveAccountEdit`: `PUT` only for a changed name or notes, then `PATCH`.
+    const errors = await saveEdit({ ...values, accountId, current: { name: account.name, notes: account.notes ?? '', metadata: account.metadata } });
     setErrors(errors);
     if (errors.length === 0) onSaved();
   }

@@ -4,7 +4,6 @@
  * most 90 days; narrows on `accountId` (guid), `direction`, `category`, `status`).
  */
 export const MAX_POSTING_PERIOD_DAYS = 90;
-export const DEFAULT_POSTING_PERIOD_DAYS = 30;
 
 export const POSTING_DIRECTIONS = ['Credit', 'Debit'] as const;
 export const POSTING_CATEGORIES = ['Transfer', 'Payment', 'Fee', 'Interest', 'Adjustment', 'Refund', 'Reversal', 'OpeningBalance'] as const;
@@ -44,8 +43,7 @@ export interface PostingsFilterState {
 /** Opens on the last 30 days, per the decision log ("the detail screen's posting list opens
  * on the last 30 days, because the service requires a period and refuses one wider than 90 days"). */
 export function defaultPostingsFilter(now: Date = new Date()): PostingsFilterState {
-  const from = new Date(now.getTime() - DEFAULT_POSTING_PERIOD_DAYS * 86_400_000);
-  return { from: toDateOnly(from), to: toDateOnly(now), direction: '', category: '', status: '' };
+  return { ...postingPeriodRange(DEFAULT_POSTING_PERIOD, now), direction: '', category: '', status: '' };
 }
 
 /** DRK-1745 §3 — the posting lists' one period choice: the last 7, 14, 30 or 90 days, opening on

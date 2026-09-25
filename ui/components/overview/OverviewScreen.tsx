@@ -35,7 +35,7 @@ import {
 import { parseRecent, readRecentText, subscribeRecent, type RecentEntry, type RecentKind } from '@/lib/recent/store';
 import { GroupTypeBars } from './GroupTypeBars';
 import { HeadlineTiles } from './HeadlineTiles';
-import { countOf, formatCount, MissingScope, Panel, Ready } from './parts';
+import { countOf, formatCount, heightOf, MissingScope, Panel, Ready } from './parts';
 import { StatusRing } from './StatusRing';
 
 /**
@@ -249,11 +249,6 @@ function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQ
       </Note>
     </Panel>
   );
-}
-
-/** A bar's height as a share of the chart's largest single figure — counts only, never money. */
-function heightOf(count: number, max: number): string {
-  return `${max === 0 ? 0 : (count / max) * 100}%`;
 }
 
 function ChartPlaceholder({ bars }: { bars: number }): JSX.Element {

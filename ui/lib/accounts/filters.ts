@@ -9,6 +9,7 @@ import { AccountNumber } from '@/components/ledger/AccountNumber';
 import { Money } from '@/components/ledger/Money';
 import { Currency } from '@/components/ledger/Currency';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
+import { formatDate } from '@/components/records/RecordsTable';
 import { Chip } from '@/components/ui/chip';
 import { Caption, Mono } from '@/components/ui/text';
 import type { ListViewState } from '@/lib/url-state';
@@ -57,14 +58,6 @@ export function toAccountsQuery(state: ListViewState, pageSize?: number): URLSea
   return params;
 }
 
-const OPENED_ON = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
-
-/** `18 Sep 2026`, as the kit's Opened column; the service's own text when it is not a date. */
-export function formatOpenedOn(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : OPENED_ON.format(date);
-}
-
 /**
  * The kit's columns in the kit's order (Design/ui_kits/accounts-crud/Accounts.jsx).
  * `availableBalance` and `openedOn` have no query counterpart — never sortable. Group sorts
@@ -97,5 +90,5 @@ export const ACCOUNT_COLUMNS: LedgerColumn<AccountsTableRow>[] = [
       row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.availableBalance, currency: row.currency, decimalPlaces: row.decimalPlaces }),
   },
   { key: 'currency', header: 'Currency', sortable: true, queryAs: 'CurrencyCode', render: (row) => createElement(Currency, { code: row.currency }) },
-  { key: 'openedOn', header: 'Opened', sortable: false, align: 'right', render: (row) => createElement(Caption, null, formatOpenedOn(row.openedOn)) },
+  { key: 'openedOn', header: 'Opened', sortable: false, align: 'right', render: (row) => createElement(Caption, null, formatDate(row.openedOn)) },
 ];
