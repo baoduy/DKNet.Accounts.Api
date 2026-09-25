@@ -161,8 +161,6 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
       {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 
       <TableCard
-        // The panel is as tall as the card it overlays: a short list still leaves it room to read.
-        className={panelMode ? 'min-h-[40rem]' : undefined}
         searchPlaceholder="Search number, name or reference"
         searchValue={state.filters.search ?? ''}
         onSearchChange={(value) => navigate(setFilter(state, 'search', value))}

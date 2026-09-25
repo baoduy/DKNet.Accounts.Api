@@ -100,10 +100,9 @@ function PanelDemoSection(): JSX.Element {
 
   return (
     <section data-testid="panel-demo">
-      {/* The restyled DetailPanel (DRK-1747 §3 row 12) is its own non-modal chrome, laid over the
-          table card's right edge — no longer inside AppShell's Sheet. */}
+      {/* The restyled DetailPanel (DRK-1747 §3 row 12) is its own non-modal chrome, drawn by
+          TableCard's panel slot over the frame's right edge — no longer inside AppShell's Sheet. */}
       <TableCard
-        className="min-h-96"
         panel={
           selected ? (
             <DetailPanel title={selected.accountNumber} onClose={() => setSelectedId(null)}>

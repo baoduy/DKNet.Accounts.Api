@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
 import type { PaginationProps } from '@/components/ui/pagination';
 import { Caption } from '@/components/ui/text';
-import { cn } from '@/components/ui/utils';
 
 export interface TableCardProps {
   /** The search field's placeholder — also its accessible name. Omit for a card with no search. */
@@ -20,7 +19,10 @@ export interface TableCardProps {
   filter?: ReactNode;
   /** The pager at the foot; omit for an unpaged table. */
   pagination?: PaginationProps;
-  /** The `DetailPanel`: it overlays this card's right edge, never the page. */
+  /**
+   * The `DetailPanel`. It is drawn full height over the frame's right edge, held to the viewport,
+   * so a short list never clips it and a long one scrolls beneath it. Nothing behind it is dimmed.
+   */
   panel?: ReactNode;
   children?: ReactNode;
   className?: string;
@@ -43,7 +45,7 @@ export function TableCard({
 }: TableCardProps): JSX.Element {
   const hasTopBar = searchPlaceholder !== undefined || (rows !== undefined && total !== undefined) || filter !== undefined;
   return (
-    <div style={style} className={cn('relative', className)}>
+    <div style={style} className={className}>
       <Card padded={false}>
         {hasTopBar ? (
           <CardBar position="top">
@@ -76,7 +78,13 @@ export function TableCard({
         {children}
         {pagination ? <Pagination {...pagination} /> : null}
       </Card>
-      {panel}
+      {panel ? (
+        // A grid, so the one child it holds — the panel, or a screen's focus wrapper around it —
+        // stretches to the full height. The slot itself lets the pointer through to the page.
+        <div data-slot="panel-slot" className="pointer-events-none fixed inset-y-0 right-0 z-50 grid w-(--drawer-width) max-w-[92%] *:pointer-events-auto">
+          {panel}
+        </div>
+      ) : null}
     </div>
   );
 }

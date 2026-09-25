@@ -276,7 +276,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
 
   const panel =
     panelMode !== null ? (
-      <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="absolute inset-y-0 right-0 z-50 w-(--drawer-width) max-w-[92%] outline-none">
+      <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="outline-none">
         <DetailPanel
           title={panelTitle}
           onClose={() => guardDirty(closePanel)}
@@ -451,8 +451,6 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       ) : null}
 
       <TableCard
-        // The panel overlays the card's right edge; a short list still leaves it room for the form.
-        className={panelMode !== null ? 'min-h-[36rem]' : undefined}
         searchPlaceholder="Search code or name"
         searchValue={query}
         onSearchChange={(value) => {

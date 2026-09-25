@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/utils';
 
 /**
- * The right-hand panel a row opens. Not a modal: it slides in over the right edge of its
- * nearest positioned ancestor (`TableCard`'s wrapper), nothing behind it is dimmed or
- * blocked, and choosing another row swaps the content in the same element. Esc or the
- * close button dismisses it. Ported from Design/components/feedback/DetailPanel.jsx.
+ * The right-hand panel a row opens. Not a modal: `TableCard`'s panel slot draws it full height
+ * over the frame's right edge, nothing behind it is dimmed or blocked, and choosing another row
+ * swaps the content in the same element. Esc or the close button dismisses it. Ported from Design/components/feedback/DetailPanel.jsx.
  */
 export interface DetailPanelProps {
   /** Defaults to `true`, unlike the kit: screens still mount the panel only while it is open (R4). */
@@ -64,7 +63,7 @@ export function DetailPanel({
       inert={!open}
       style={style}
       className={cn(
-        'absolute top-0 right-0 z-50 flex h-full w-(--drawer-width) max-w-[92%] flex-col border-l border-border bg-card text-card-foreground shadow-overlay',
+        'flex h-full min-h-0 w-full flex-col border-l border-border bg-card text-card-foreground shadow-overlay',
         'transition-transform duration-(--duration-panel) ease-(--easing-panel)',
         open ? 'translate-x-0' : 'translate-x-full',
       )}

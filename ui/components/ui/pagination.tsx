@@ -32,7 +32,7 @@ function PagerButton({ icon: Icon, label, disabled, onClick }: { icon: LucideIco
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex size-7.5 items-center justify-center rounded-full border border-border-control bg-card text-foreground outline-none hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-card"
+      className="inline-flex size-7.5 items-center justify-center rounded-full border border-border-control bg-card text-foreground outline-none hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:bg-surface-disabled disabled:text-text-disabled disabled:hover:bg-surface-disabled"
     >
       <Icon size={15} aria-hidden="true" />
     </button>

@@ -240,10 +240,8 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
         }}
         panel={
           panel ? (
-            // The kit's AppShell draws the panel full height over the frame's right edge
-            // (Design/components/shell/AppShell.jsx): held to the viewport, so a short list never clips
-            // it and a long one scrolls beneath it. Sized as the panel, so the focus it takes lands there.
-            <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="fixed inset-y-0 right-0 z-50 w-(--drawer-width) max-w-[92%] outline-none">
+            // Holds the focus the panel takes; TableCard's panel slot sizes it and the panel full height.
+            <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="outline-none">
               {panel}
             </div>
           ) : null
