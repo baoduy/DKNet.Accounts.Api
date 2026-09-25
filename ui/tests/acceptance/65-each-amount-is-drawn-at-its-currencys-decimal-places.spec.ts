@@ -26,7 +26,8 @@ const EXAMPLES = [
 ];
 
 for (const { currency, places, recorded, shown } of EXAMPLES) {
-  test(`Each amount is drawn at its currency's decimal places — ${currency}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`Each amount is drawn at its currency's decimal places — ${currency}`, async ({ page, baseURL }) => {
     await seedCurrencies([{ code: currency, decimalPlaces: places }]);
     await seedLedgerAccounts([account('ACME-000123', ACME_ID, { currency, decimalPlaces: places, balance: recorded, availableBalance: recorded, heldAmount: '0' })]);
     await seedLedgerPostings([

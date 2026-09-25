@@ -48,6 +48,23 @@ export function defaultPostingsFilter(now: Date = new Date()): PostingsFilterSta
   return { from: toDateOnly(from), to: toDateOnly(now), direction: '', category: '', status: '' };
 }
 
+/** DRK-1745 §3 — the posting lists' one period choice: the last 7, 14, 30 or 90 days, opening on
+ * 30. The address carries the choice (`?period=7d`); `from`/`to` are derived from it, so a
+ * period the service would refuse can no longer be asked for. */
+export const POSTING_PERIODS = ['7d', '14d', '30d', '90d'] as const;
+export const DEFAULT_POSTING_PERIOD = '30d';
+export const POSTING_PERIOD_OPTIONS = POSTING_PERIODS.map((value) => ({ value, label: `Last ${parseInt(value, 10)} days` }));
+
+/** An unknown or absent choice reads as the default, never as a refused period. */
+export function postingPeriod(value: string | null | undefined): string {
+  return (POSTING_PERIODS as readonly string[]).includes(value ?? '') ? value! : DEFAULT_POSTING_PERIOD;
+}
+
+export function postingPeriodRange(period: string, now: Date = new Date()): { from: string; to: string } {
+  const days = parseInt(postingPeriod(period), 10);
+  return { from: toDateOnly(new Date(now.getTime() - days * 86_400_000)), to: toDateOnly(now) };
+}
+
 /** Screen state → the service's query string. A period over 90 days, or a search term under 2
  * characters, produces no query at all (R2 — no call is ever made for a refused period or term).
  * An empty `accountId` lists postings across every account (DRK-1713 §3 row 3). */

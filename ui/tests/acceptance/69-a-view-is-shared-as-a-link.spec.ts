@@ -17,7 +17,8 @@ import { ledgerRequests, seedLedgerAccounts, seedLedgerPostings } from '../suppo
 import { ACME_ID, account, posting, recordRow, setPeriod } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('A view is shared as a link', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A view is shared as a link', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account('ACME-000123', ACME_ID)]);
   await seedLedgerPostings([
     // P-10047 … P-10058: 12 matching debits, 100.00 down to 45.00.

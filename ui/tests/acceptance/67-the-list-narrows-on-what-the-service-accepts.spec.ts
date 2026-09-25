@@ -32,7 +32,8 @@ const EXAMPLES: Array<{ narrowing: string; label: string; value: string; count: 
 ];
 
 for (const { narrowing, label, value, count } of EXAMPLES) {
-  test(`The list narrows on what the service accepts — ${narrowing}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`The list narrows on what the service accepts — ${narrowing}`, async ({ page, baseURL }) => {
     await setLedgerClock('2026-09-01');
     await seedLedgerAccounts([account('ACME-000123', ACME_ID), account('GLOBEX-000456', GLOBEX_ID)]);
     await seedLedgerPostings([

@@ -1,101 +1,212 @@
 /**
  * DRK-1696 §3 row 5 — records a posting. On the detail screen the account and currency arrive
  * as props, locked; on the Records screen (DRK-1713 §3 row 10) no account is passed and the
- * operator chooses one by searching accounts by number or name, its currency then shown
- * locked. Either way `ConfirmMovement` restates the movement before anything is sent.
- * Composes `useIdempotencyKey` + `IdempotencyKeyField` + `useRecordPosting`; mounted only
+ * operator chooses one, its currency then shown locked.
+ *
+ * DRK-1745 §3 row 7 (Design/ui_kits/records-crud) — the form is the side panel's content: kit
+ * fields and hints, `Review movement` in the panel footer, then `ConfirmMovement` restates the
+ * movement and only its `Record posting` sends (R2). The kit's counterparty, transaction group,
+ * external reference and metadata fields are not drawn: the service's `RecordPostingRequest`
+ * accepts none of them (brief Q1). Composes `useIdempotencyKey` + `IdempotencyKeyField` +
+ * `useRecordPosting`; the key is minted when the panel opens and dropped with it. Mounted only
  * under a query provider.
  */
 'use client';
 
-import { useRef, useState, type CSSProperties, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, ReadOnlyField } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Caption, Mono, Note } from '@/components/ui/text';
+import { Dialog } from '@/components/ui/dialog';
+import { Currency } from '@/components/ledger/Currency';
+import { Money } from '@/components/ledger/Money';
 import { IdempotencyKeyField } from '@/components/forms/IdempotencyKeyField';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
+import { DetailPanel } from '@/components/feedback/DetailPanel';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
-import { ScopeGate } from '@/components/feedback/ScopeGate';
+import { formatDate } from '@/components/records/RecordsTable';
 import { isUnreachable, NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
 import { POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
-import { useAccounts } from '@/lib/accounts/query';
+import { useAccounts, useCurrencies } from '@/lib/accounts/query';
 import { useRecordPosting } from '@/lib/query/mutations';
 
-const ACCOUNT_OPTIONS_PAGE_SIZE = 10;
+// ponytail: the Records screen's account select lists the service's first 1000 accounts (its
+// page-size ceiling); a searchable picker is the upgrade once a ledger holds more.
+const ACCOUNT_OPTIONS_PAGE_SIZE = 1000;
+const DEFAULT_CATEGORY = 'Transfer';
+
+/** Today as the service dates it (UTC) — a local date ahead of UTC would be refused as future. */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export interface PostingAccount {
+  id: string;
+  accountNumber: string;
+  name?: string;
+  currency: string;
+  status?: string;
+  balance?: string;
+}
+
+export interface RecordedPosting {
+  direction: 'Credit' | 'Debit';
+  amount: string;
+  currency: string;
+  accountNumber: string;
+  effectiveDate: string;
+}
+
+/** The `Record posted` acknowledgement. The service answers a recording with no posting, so it restates what was sent. */
+export function recordedText(recorded: RecordedPosting): JSX.Element {
+  return (
+    <>
+      {recorded.direction} of {recorded.amount} {recorded.currency} against <Mono>{recorded.accountNumber}</Mono>, effective {formatDate(recorded.effectiveDate)}. A new idempotency key has
+      been minted for the next record.
+    </>
+  );
+}
 
 export interface RecordPostingFormProps {
   /** The account to record against, locked. Absent: the operator chooses one. */
-  accountId?: string;
-  accountNumber?: string;
-  currency?: string;
+  account?: PostingAccount;
   granted?: boolean;
-  style?: CSSProperties;
+  /** Cancel or Esc — the panel's host asks before an unsent record is dropped. */
+  onClose: () => void;
+  /** Whether anything was entered, so the host can ask before dropping it. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Called once the service recorded the posting — never before. */
+  onRecorded?: (recorded: RecordedPosting) => void;
 }
 
-interface ChosenAccount {
-  id: string;
-  accountNumber: string;
-  currency: string;
+function FormRow({ label, hint, required = false, children }: { label: string; hint?: ReactNode; required?: boolean; children: ReactNode }): JSX.Element {
+  return (
+    <>
+      <Caption className="pt-2">
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-0.5 text-destructive-solid">
+            *
+          </span>
+        ) : null}
+      </Caption>
+      <div className="min-w-0">
+        {children}
+        {hint ? <Note className="mt-1.5">{hint}</Note> : null}
+      </div>
+    </>
+  );
 }
 
 function FieldRefusal({ error }: { error?: LedgerError }): JSX.Element | null {
   if (!error) return null;
   return (
-    <span role="alert">
+    <span role="alert" className="mt-1.5 block text-[length:var(--text-caption-size)] text-destructive-solid">
       {error.code ? <span className="font-mono font-semibold">{error.code}</span> : null} {error.message}
     </span>
   );
 }
 
-function AccountOptions({ term, onChoose }: { term: string; onChoose: (account: ChosenAccount) => void }): JSX.Element | null {
-  const accountsQuery = useAccounts({ filters: { search: term } }, ACCOUNT_OPTIONS_PAGE_SIZE);
-  const accounts = accountsQuery.data?.items ?? [];
-  if (accounts.length === 0) return null;
+function AccountSelect({ value, invalid, onChoose }: { value: string; invalid: boolean; onChoose: (account: PostingAccount | null) => void }): JSX.Element {
+  const accounts = useAccounts({ filters: {} }, ACCOUNT_OPTIONS_PAGE_SIZE).data?.items ?? [];
   return (
-    <ul role="listbox" aria-label="Accounts found" className="flex flex-col rounded-md border border-border">
-      {accounts.map((account) => {
-        const choose = (): void => onChoose({ id: account.id, accountNumber: account.accountNumber, currency: account.currency });
-        return (
-          <li key={account.id} role="option" aria-selected={false} tabIndex={0} className="cursor-pointer p-2 hover:bg-muted" onClick={choose} onKeyDown={(event) => event.key === 'Enter' && choose()}>
-            {account.accountNumber} {account.name}
-          </li>
-        );
-      })}
-    </ul>
+    <Select
+      aria-label="Account"
+      options={[{ value: '', label: 'Select an account' }, ...accounts.map((account) => ({ value: account.id, label: `${account.accountNumber} — ${account.name}` }))]}
+      value={value}
+      className={invalid ? 'w-full border-destructive' : 'w-full'}
+      onChange={(event) => {
+        const chosen = accounts.find((account) => account.id === event.target.value);
+        onChoose(chosen ? { id: chosen.id, accountNumber: chosen.accountNumber, name: chosen.name, currency: chosen.currency, status: chosen.status, balance: chosen.balance } : null);
+      }}
+    />
   );
 }
 
-export function RecordPostingForm({ accountId, accountNumber = '', currency = '', granted = true, style }: RecordPostingFormProps): JSX.Element {
-  const [open, setOpen] = useState(false);
+/** "Discard unsent record?" — dropping an unsent record drops its idempotency key with it. */
+export function DiscardRecordDialog({ open, onKeep, onDiscard }: { open: boolean; onKeep: () => void; onDiscard: () => void }): JSX.Element {
+  return (
+    <Dialog
+      open={open}
+      title="Discard unsent record?"
+      onClose={onKeep}
+      footer={
+        <>
+          <Button type="button" onClick={onKeep}>
+            Keep editing
+          </Button>
+          <Button type="button" variant="destructive" className="ml-auto" onClick={onDiscard}>
+            Discard record
+          </Button>
+        </>
+      }
+    >
+      This record has not been sent. Closing the panel drops it, and the idempotency key is discarded with it.
+    </Dialog>
+  );
+}
+
+export interface UnsentGuard {
+  /** Runs `next` at once, or — while an entered record is unsent — only once discarding is confirmed. */
+  guard: (next: () => void) => void;
+  onDirtyChange: (dirty: boolean) => void;
+  /** The record was sent: nothing is left to discard. */
+  clear: () => void;
+  dialog: JSX.Element;
+}
+
+/** DRK-1745 §3 row 9 — the panel host's "Discard unsent record?" step, shared by both screens. */
+export function useUnsentGuard(creating: boolean): UnsentGuard {
+  const [dirty, setDirty] = useState(false);
+  const [then, setThen] = useState<(() => void) | null>(null);
+  const onDirtyChange = useCallback((next: boolean) => setDirty(next), []);
+  return {
+    guard: (next) => (creating && dirty ? setThen(() => next) : next()),
+    onDirtyChange,
+    clear: () => setDirty(false),
+    dialog: (
+      <DiscardRecordDialog
+        open={then !== null}
+        onKeep={() => setThen(null)}
+        onDiscard={() => {
+          setThen(null);
+          setDirty(false);
+          then?.();
+        }}
+      />
+    ),
+  };
+}
+
+export function RecordPostingForm({ account: lockedAccount, granted = true, onClose, onDirtyChange, onRecorded }: RecordPostingFormProps): JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
-  const [chosen, setChosen] = useState<ChosenAccount | null>(null);
-  const [term, setTerm] = useState('');
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [chosen, setChosen] = useState<PostingAccount | null>(null);
   const [direction, setDirection] = useState<'Credit' | 'Debit'>('Credit');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState(today);
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<LedgerError[]>([]);
-  const recordPostingRef = useRef<HTMLButtonElement>(null);
-  const dismissedRef = useRef(false);
+  const reviewButton = useRef<HTMLButtonElement>(null);
 
   const idempotency = useIdempotencyKey();
   const record = useRecordPosting();
+  const currencies = useCurrencies().data;
   const { fieldErrors, alertErrors } = routeRefusal(errors, RECORD_POSTING_CODE_FIELDS);
-  const account: ChosenAccount | null = accountId ? { id: accountId, accountNumber, currency } : chosen;
+  const account = lockedAccount ?? chosen;
+  const decimalPlaces = account ? currencies?.find((currency) => currency.code === account.currency)?.decimalPlaces : undefined;
+  const status = account?.status?.toLowerCase();
 
-  function chooseAccount(next: ChosenAccount): void {
-    setChosen(next);
-    setTerm(next.accountNumber);
-    setOptionsOpen(false);
-  }
+  const dirty = Boolean(amount || description || chosen || direction !== 'Credit' || category !== DEFAULT_CATEGORY || effectiveDate !== today());
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   async function handleConfirm(): Promise<void> {
     if (!account) return;
-    // Collapses to the (disabled) `Record posting` toggle while the write is in flight; a
-    // refusal or no answer reopens the form, so its controls carry what went wrong.
     setConfirming(false);
-    setOpen(false);
     setPending(true);
     try {
       const result = await record.mutate({
@@ -104,106 +215,119 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
         amount,
         currency: account.currency,
         category,
+        description: description || undefined,
+        effectiveDate: effectiveDate || undefined,
         idempotencyKey: idempotency.value,
         regenerateIdempotencyKey: idempotency.regenerate,
       });
       if (result.ok) {
         setErrors([]);
-        setAmount('');
-        setCategory('');
+        onRecorded?.({ direction, amount, currency: account.currency, accountNumber: account.accountNumber, effectiveDate });
       } else {
         // The pass-through's unreachable answer means the service never answered this write.
         setErrors(isUnreachable(result.errors) ? [NO_ANSWER_ERROR] : (result.errors ?? []));
-        setOpen(true);
       }
     } catch {
       setErrors([NO_ANSWER_ERROR]);
-      setOpen(true);
     } finally {
       setPending(false);
     }
   }
 
+  const lock = (content: ReactNode): JSX.Element => (
+    <ReadOnlyField locked>
+      <span className="inline-flex items-center gap-1.5">{content}</span>
+    </ReadOnlyField>
+  );
+
   return (
-    <div style={style} className="flex flex-col gap-3">
-      {/* `Record posting` and `Record` are never both on screen: Playwright's `getByRole` matches
-          by substring, so `{ name: 'Record' }` would otherwise resolve to both. */}
-      {!open ? (
-        <ScopeGate scope="postings.write" granted={granted}>
-          <Button ref={recordPostingRef} type="button" disabled={pending} onClick={() => setOpen(true)}>
-            Record posting
-          </Button>
-        </ScopeGate>
-      ) : null}
-
-      <RefusalAlert errors={alertErrors} />
-
-      {open ? (
-        <div className="flex flex-col gap-3 rounded-md border border-border p-4">
-          <label className="flex flex-col gap-1">
-            Account
-            {accountId ? (
-              <Input aria-label="Account" value={accountNumber} disabled readOnly aria-invalid={fieldErrors.accountId ? 'true' : undefined} />
-            ) : (
-              <Input
-                aria-label="Account"
-                role="combobox"
-                aria-expanded={optionsOpen}
-                value={term}
-                onFocus={() => setOptionsOpen(true)}
-                onChange={(event) => {
-                  setTerm(event.target.value);
-                  setChosen(null);
-                  setOptionsOpen(true);
-                }}
-                aria-invalid={fieldErrors.accountId ? 'true' : undefined}
-              />
-            )}
+    <>
+      <DetailPanel
+        title="Record posting"
+        onClose={onClose}
+        actions={
+          <>
+            <Button type="button" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button ref={reviewButton} type="button" size="sm" variant="primary" disabled={pending || !account || !granted} onClick={() => setConfirming(true)}>
+              Review movement
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+          <FormRow
+            label="Account"
+            required
+            hint={account && status && status !== 'active' ? `${account.accountNumber} is ${status}.` : 'The account fixes the currency and the floor this record is checked against.'}
+          >
+            {lockedAccount ? lock(<Mono>{lockedAccount.accountNumber}</Mono>) : <AccountSelect value={chosen?.id ?? ''} invalid={Boolean(fieldErrors.accountId)} onChoose={setChosen} />}
             <FieldRefusal error={fieldErrors.accountId} />
-          </label>
-          {!accountId && optionsOpen && term ? <AccountOptions term={term} onChoose={chooseAccount} /> : null}
-
-          <label className="flex flex-col gap-1">
-            Posting currency
-            {/* Not labeled bare "Currency": the edit form's own locked Currency select
-                (`AccountForm.tsx`) already carries that exact name, and both show the same
-                locked, disabled value — no separate control for the operator to distinguish. */}
-            <Input aria-label="Posting currency" value={account?.currency ?? ''} disabled readOnly />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            Direction
-            <select aria-label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as 'Credit' | 'Debit')}>
-              <option value="Credit">Credit</option>
-              <option value="Debit">Debit</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1">
-            Amount
-            <Input aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} aria-invalid={fieldErrors.amount ? 'true' : undefined} />
+          </FormRow>
+          <FormRow label="Currency">
+            {account ? (
+              lock(
+                <>
+                  <Currency code={account.currency} />
+                  {decimalPlaces !== undefined ? <Caption>{decimalPlaces} dp</Caption> : null}
+                </>,
+              )
+            ) : (
+              <ReadOnlyField>
+                <Caption>Taken from the account.</Caption>
+              </ReadOnlyField>
+            )}
+          </FormRow>
+          <FormRow label="Direction" required hint={status === 'dormant' ? 'Debits are refused: this account is dormant. A credit can still be recorded.' : undefined}>
+            <Select
+              aria-label="Direction"
+              options={['Credit', 'Debit']}
+              value={direction}
+              className="w-full"
+              onChange={(event) => setDirection(event.target.value === 'Debit' ? 'Debit' : 'Credit')}
+            />
+          </FormRow>
+          <FormRow
+            label="Amount"
+            required
+            hint={
+              account && decimalPlaces !== undefined ? (
+                <>
+                  Unsigned, at {decimalPlaces} decimal places.
+                  {account.balance !== undefined ? (
+                    <>
+                      {' '}
+                      Balance is now <Money amount={account.balance} currency={account.currency} decimalPlaces={decimalPlaces} showCurrency />.
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                'Unsigned — the direction carries the sign.'
+              )
+            }
+          >
+            <Input numeric aria-label="Amount" placeholder="0.00" value={amount} invalid={Boolean(fieldErrors.amount)} onChange={(event) => setAmount(event.target.value)} className="w-42" />
             <FieldRefusal error={fieldErrors.amount} />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            Category
-            <select aria-label="Category" value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">Select a category</option>
-              {POSTING_CATEGORIES.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <IdempotencyKeyField value={idempotency.value} onRegenerate={idempotency.regenerate} note="Prevents a duplicate posting if this request is retried." />
-
-          <Button type="button" variant="primary" disabled={pending || !account} onClick={() => setConfirming(true)}>
-            Record
-          </Button>
+          </FormRow>
+          <FormRow label="Effective" hint="Defaults to today. A future date is refused.">
+            <Input type="date" aria-label="Effective date" value={effectiveDate} max={today()} onChange={(event) => setEffectiveDate(event.target.value)} className="w-42" />
+          </FormRow>
+          <FormRow label="Category" required>
+            <Select aria-label="Category" options={[...POSTING_CATEGORIES]} value={category} className="w-full" onChange={(event) => setCategory(event.target.value)} />
+          </FormRow>
+          <FormRow label="Description" hint="Optional.">
+            <label className="block">
+              <span className="sr-only">Description</span>
+              <Textarea rows={2} value={description} placeholder="What this record is for." onChange={(event) => setDescription(event.target.value)} />
+            </label>
+          </FormRow>
         </div>
-      ) : null}
+        <div className="mt-5">
+          <IdempotencyKeyField value={idempotency.value} note="Prevents a duplicate posting if this request is retried." />
+        </div>
+        <RefusalAlert errors={alertErrors} style={{ marginTop: 'var(--space-4)' }} />
+      </DetailPanel>
 
       <ConfirmMovement
         open={confirming}
@@ -211,23 +335,20 @@ export function RecordPostingForm({ accountId, accountNumber = '', currency = ''
         amount={amount}
         currency={account?.currency}
         accountNumber={account?.accountNumber}
-        category={category || undefined}
+        accountName={account?.name}
+        effectiveDate={effectiveDate ? formatDate(effectiveDate) : undefined}
+        category={category}
+        consequence="Posting is immediate and final. The record cannot be edited afterwards; a correction is recorded as an opposing record."
         onBack={() => setConfirming(false)}
-        onDismiss={() => {
-          // Escape leaves the whole recording: nothing is recorded, the form closes and focus goes
-          // back to `Record posting`, the control that started it (DRK-1725 §3 row 7, brief Q3).
-          dismissedRef.current = true;
-          setConfirming(false);
-          setOpen(false);
-        }}
+        // Back, Escape or a sent record: focus returns to `Review movement`, never to the page body
+        // (the dialog has no trigger of its own). Once the panel closes it goes to its opener.
         onCloseAutoFocus={(event) => {
-          if (!dismissedRef.current) return;
-          dismissedRef.current = false;
           event.preventDefault();
-          recordPostingRef.current?.focus();
+          reviewButton.current?.focus();
         }}
         onConfirm={handleConfirm}
+        confirmLabel="Record posting"
       />
-    </div>
+    </>
   );
 }

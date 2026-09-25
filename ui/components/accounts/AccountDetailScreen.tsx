@@ -7,6 +7,10 @@
  * DRK-1725 §3 — each part owns its read: while the account is read the screen is drawn in its
  * final shape with placeholders, a failed read is stated where its content would be, and the
  * statement's period and page live in the address, so a link reproduces them.
+ *
+ * DRK-1745 §3 rows 3, 6 — the period is one choice (`?period=7d`, opening on 30 days), the pager
+ * carries its page size (`?pageSize=`), and the side panel's content is in the address too:
+ * `?open=<posting id>`, `?open=new` (record a posting) or `?open=edit` (edit the account).
  */
 'use client';
 
@@ -17,8 +21,8 @@ import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
 import type { PostingsPanelFilter, PostingsPanelRow } from './PostingsPanel';
 import { fractionDigitsOf } from '@/lib/api/money-json';
-import { useAccount, useAccountBalance, useAccountGroups, useCurrencies, usePostings } from '@/lib/accounts/query';
-import { defaultPostingsFilter, postingPeriodError, type PostingsFilterState } from '@/lib/accounts/postings-filter';
+import { useAccount, useAccountBalance, useAccountGroups, useCurrencies, usePosting, usePostings } from '@/lib/accounts/query';
+import { DEFAULT_POSTING_PERIOD, MIN_POSTING_SEARCH_LENGTH, postingPeriod, postingPeriodRange, type PostingsFilterState } from '@/lib/accounts/postings-filter';
 import { pushRecent } from '@/lib/recent/store';
 
 /** The statement's page size — the console's list page size. */
@@ -31,23 +35,35 @@ export interface AccountDetailScreenProps {
   directoryObjectId?: string;
 }
 
-/** The statement's view as the address carries it: `?from=&to=` and `?page=`. */
+/** The statement's view as the address carries it: `?period=`, `?page=`, `?pageSize=` and `?open=`. */
 interface StatementView {
-  from?: string;
-  to?: string;
+  period?: string;
   page?: number;
+  pageSize?: number;
+  open?: string;
+}
+
+function positive(value: string | null): number | undefined {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : undefined;
 }
 
 function readView(params: URLSearchParams): StatementView {
-  const page = Number(params.get('page'));
-  return { from: params.get('from') ?? undefined, to: params.get('to') ?? undefined, page: Number.isInteger(page) && page > 0 ? page : undefined };
+  const period = params.get('period');
+  return {
+    period: period ? postingPeriod(period) : undefined,
+    page: positive(params.get('page')),
+    pageSize: positive(params.get('pageSize')),
+    open: params.get('open') ?? undefined,
+  };
 }
 
 function viewSearch(view: StatementView): string {
   const params = new URLSearchParams();
-  if (view.from !== undefined) params.set('from', view.from);
-  if (view.to !== undefined) params.set('to', view.to);
+  if (view.period !== undefined && view.period !== DEFAULT_POSTING_PERIOD) params.set('period', view.period);
   if (view.page !== undefined) params.set('page', String(view.page));
+  if (view.pageSize !== undefined) params.set('pageSize', String(view.pageSize));
+  if (view.open !== undefined) params.set('open', view.open);
   const search = params.toString();
   return search ? `?${search}` : '';
 }
@@ -58,7 +74,9 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
   const searchParams = useSearchParams();
   const [view, setView] = useState<StatementView>(() => readView(searchParams));
   const [narrowing, setNarrowing] = useState<PostingsPanelFilter>(NO_NARROWING);
-  const [defaults] = useState(() => defaultPostingsFilter());
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<{ field: string; desc: boolean } | undefined>(undefined);
+  const [now] = useState(() => new Date());
 
   // Same reasoning as `AccountsScreen.navigate`: local state first, the address bar mirrored
   // through the History API, so rapid changes never race a router round trip.
@@ -67,7 +85,22 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
     window.history.pushState(null, '', `${window.location.pathname}${viewSearch(next)}`);
   }
 
-  const filter: PostingsFilterState = { ...defaults, ...narrowing, from: view.from ?? defaults.from, to: view.to ?? defaults.to, pageNumber: view.page };
+  const period = postingPeriod(view.period);
+  const pageSize = view.pageSize ?? STATEMENT_PAGE_SIZE;
+  const filter: PostingsFilterState = {
+    ...postingPeriodRange(period, now),
+    ...narrowing,
+    search: search || undefined,
+    orderBy: sort?.field,
+    desc: sort?.desc,
+    pageNumber: view.page,
+  };
+  // A too-short search makes no read at all (`toPostingsQuery`), so it is never left loading.
+  const queryable = !(filter.search && filter.search.length < MIN_POSTING_SEARCH_LENGTH);
+  // A changed narrowing or search starts again from its first page.
+  const refilter = (): void => {
+    if (view.page !== undefined) navigate({ ...view, page: undefined });
+  };
 
   const accountQuery = useAccount(accountNumber);
   const account = accountQuery.data?.account;
@@ -76,7 +109,12 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
   const balanceQuery = useAccountBalance(accountId);
   const currenciesQuery = useCurrencies();
   const groupsQuery = useAccountGroups();
-  const postingsQuery = usePostings(accountId, filter, STATEMENT_PAGE_SIZE);
+  const postingsQuery = usePostings(accountId, filter, pageSize);
+  const listedPosting = postingsQuery.data?.items.find((posting) => posting.id === view.open);
+  const openQuery = usePosting(view.open && view.open !== 'new' && view.open !== 'edit' && !listedPosting ? view.open : undefined);
+  // Only a posting on this account opens here — never another account's, whatever the address says.
+  const openedPosting = listedPosting ?? openQuery.data;
+  const openPosting = openedPosting && openedPosting.accountId === accountId ? openedPosting : undefined;
 
   // Kept as the detail is drawn — before paint, so an operator who moves straight on still has it.
   const openedId = accountQuery.data?.found ? accountId : '';
@@ -91,7 +129,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
   }
 
   if (accountQuery.isSuccess && (!accountQuery.data.found || !account)) {
-    return <AccountDetail account={null} />;
+    return <AccountDetail account={null} accountNumber={accountNumber} />;
   }
 
   // No amount is drawn until the currency's own scale is known — never a guessed 2 places. A
@@ -99,7 +137,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
   const scale = account ? currenciesQuery.data?.find((currency) => currency.code === account.currency)?.decimalPlaces : undefined;
   const decimalPlaces = scale ?? (account && currenciesQuery.isError ? fractionDigitsOf(account.balance) : undefined);
   const balance = balanceQuery.data;
-  const groupName = (groupsQuery.data ?? []).find((group) => group.id === account?.groupId)?.name ?? '';
+  const group = (groupsQuery.data ?? []).find((candidate) => candidate.id === account?.groupId);
   const metadata = (account?.metadata ?? undefined) as Record<string, string> | undefined;
 
   const detailAccount: AccountDetailAccount | undefined = account
@@ -121,13 +159,15 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
         minimumBalance: account.minimumBalance ?? null,
         externalReference: account.externalReference ?? '',
         classification: account.classification,
-        groupName,
+        groupName: group?.name ?? '',
+        groupCode: group?.code,
+        openedOn: account.openedOn,
         notes: metadata?.notes ?? '',
         metadata,
       }
     : undefined;
 
-  const postingRows: PostingsPanelRow[] = (postingsQuery.data?.items ?? []).map((posting) => ({
+  const postingRows: PostingsPanelRow[] = (queryable ? (postingsQuery.data?.items ?? []) : []).map((posting) => ({
     id: posting.id,
     postingNumber: posting.postingNumber,
     direction: posting.direction,
@@ -136,49 +176,57 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
     decimalPlaces: scale ?? fractionDigitsOf(posting.amount),
     category: posting.category,
     status: posting.status,
-    description: posting.description ?? '',
-    effectiveDate: posting.effectiveDate ?? '',
+    description: posting.description,
+    effectiveDate: posting.effectiveDate,
     reversedByPostingId: posting.reversedByPostingId,
     reversesPostingId: posting.reversesPostingId,
   }));
 
-  // A period the service would refuse is never sent (`toPostingsQuery`): it is stated in the
-  // table's place, never left loading.
-  const periodError = postingPeriodError(filter.from, filter.to);
-
   // "Nothing yet" only when the account has had no posting at all (`streamPosition` is its posting
   // count) and no period was asked for; otherwise an empty period says which period it was.
-  const neverPosted = account !== undefined && Number(account.streamPosition) === 0 && view.from === undefined && view.to === undefined;
-  const statementEmpty =
-    periodError ??
-    emptyMessage(postingsEmpty(filter.from, filter.to, neverPosted ? NO_POSTINGS_ON_ACCOUNT : undefined), {
-      total: Number(postingsQuery.data?.totalItemCount ?? 0),
-      page: view.page ?? 1,
-      filtered: Boolean(narrowing.direction || narrowing.category || narrowing.status),
-    });
+  const neverPosted = account !== undefined && Number(account.streamPosition) === 0 && view.period === undefined;
+  const statementEmpty = emptyMessage(postingsEmpty(filter.from, filter.to, neverPosted ? NO_POSTINGS_ON_ACCOUNT : undefined), {
+    total: Number(postingsQuery.data?.totalItemCount ?? 0),
+    page: view.page ?? 1,
+    filtered: Boolean(narrowing.direction || narrowing.category || narrowing.status || filter.search),
+  });
 
   return (
     <>
       {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
       <AccountDetail
         account={detailAccount}
+        accountNumber={accountNumber}
         accountId={accountId || undefined}
         grantedScopes={grantedScopes}
         postings={postingRows}
-        postingsLoading={(periodError === null && postingsQuery.isPending) || currenciesQuery.isPending}
+        postingsLoading={(queryable && postingsQuery.isPending) || currenciesQuery.isPending}
         postingsFailure={postingsQuery.isError ? { error: postingsQuery.error, onRetry: () => void postingsQuery.refetch() } : undefined}
         postingsEmptyMessage={statementEmpty}
         postingsPage={view.page ?? 1}
         postingsPageCount={Number(postingsQuery.data?.pageCount ?? 1)}
+        postingsPageSize={pageSize}
+        postingsTotal={queryable ? Number(postingsQuery.data?.totalItemCount ?? 0) : 0}
         onPostingsPageChange={(page) => navigate({ ...view, page })}
-        postingsFrom={filter.from}
-        postingsTo={filter.to}
+        onPostingsPageSizeChange={(size) => navigate({ ...view, pageSize: size, page: undefined })}
+        postingsPeriod={period}
+        onPostingsPeriodChange={(next) => navigate({ ...view, period: next, page: undefined })}
         postingsFilter={narrowing}
         onPostingsFilterChange={(next) => {
           setNarrowing(next);
-          if (view.page !== undefined) navigate({ ...view, page: undefined });
+          refilter();
         }}
-        onPostingsPeriodChange={(from, to) => navigate({ from, to })}
+        postingsSearch={search}
+        onPostingsSearchChange={(next) => {
+          setSearch(next);
+          refilter();
+        }}
+        postingsOrderBy={sort?.field}
+        postingsDesc={sort?.desc}
+        onPostingsSort={(field) => setSort({ field, desc: sort?.field === field ? !sort.desc : false })}
+        open={view.open}
+        onOpenChange={(open) => navigate({ ...view, open })}
+        openPosting={openPosting}
       />
     </>
   );

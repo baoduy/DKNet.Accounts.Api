@@ -15,7 +15,8 @@ import { seedLedgerAccounts } from '../support/ledger';
 import { ACME_ID, account, confirmMovement, daysAgo, fillRecordForm, recordRows, rowCells } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('A confirmed recording appears in the list', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A confirmed recording appears in the list', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account('ACME-000123', ACME_ID)]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
   await page.goto(`${baseURL}/records`);

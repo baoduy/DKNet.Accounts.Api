@@ -2,26 +2,42 @@
  * DRK-1713 §3 row 6 — the Records screen: postings across every account, with period,
  * narrowing, search, sort, page and open posting round-tripped through the page address
  * (`lib/url-state.ts`) so a copied link reproduces the view, mirroring `AccountsScreen`. It
- * opens on the last 30 days, most recently recorded first; the shared record form sits above
- * the list and the chosen posting's details beside it.
+ * opens on the last 30 days, most recently recorded first.
+ *
+ * DRK-1745 §3 rows 1, 3, 5, 6, 9, 10 (Design/ui_kits/records-crud) — the kit's page header with
+ * `Record posting`, the list in a table card (search, count, filter menu with the one period
+ * choice, pager), and one side panel over the card's right edge that views a posting
+ * (`?open=<id>`) or records one (`?open=new`). Dropping an unsent record asks first; a recorded
+ * or reversed posting is acknowledged above the card.
  */
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useId, useLayoutEffect, useState, type JSX } from 'react';
-import { RecordPostingForm } from '@/components/accounts/RecordPostingForm';
+import { useLayoutEffect, useState, type JSX } from 'react';
+import { Plus } from 'lucide-react';
+import { RecordPostingForm, recordedText, useUnsentGuard } from '@/components/accounts/RecordPostingForm';
+import { reversedText } from '@/components/accounts/ReversePostingForm';
+import { Acknowledgement } from '@/components/feedback/Acknowledgement';
 import { emptyMessage, postingsEmpty } from '@/components/feedback/empty';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
+import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { usePanelFocus } from '@/components/feedback/use-panel-focus';
-import { Input } from '@/components/ui/input';
+import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
+import { PageHeader } from '@/components/shell/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { TableCard } from '@/components/ui/table-card';
+import { Mono, Note } from '@/components/ui/text';
 import { useAccountsById, useCurrencies, usePosting, useRecords } from '@/lib/accounts/query';
 import {
+  DEFAULT_POSTING_PERIOD,
   MIN_POSTING_SEARCH_LENGTH,
   POSTING_CATEGORIES,
   POSTING_DIRECTIONS,
+  POSTING_PERIOD_OPTIONS,
   POSTING_STATUSES,
-  defaultPostingsFilter,
-  postingPeriodError,
+  postingPeriod,
+  postingPeriodRange,
   type PostingsFilterState,
 } from '@/lib/accounts/postings-filter';
 import { pushRecent } from '@/lib/recent/store';
@@ -29,9 +45,11 @@ import { parseListViewState, toListViewSearchParams, type ListViewState } from '
 import { PostingDetails } from './PostingDetails';
 import { RecordsTable, type RecordsTableRow } from './RecordsTable';
 
-/** The accounts screen's own page size. */
+/** The console's list page size; the pager offers the kit's 5, 10, 25 and 50. */
 const RECORDS_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 const DEFAULT_ORDER = { field: 'RecordedAt', desc: true };
+const NEW_RECORD = 'new';
 
 export interface RecordsScreenProps {
   grantedScopes: string[];
@@ -39,20 +57,29 @@ export interface RecordsScreenProps {
   directoryObjectId?: string;
 }
 
-/** A narrowing left empty is dropped; a period bound is kept even when empty, so an unset
- * period is refused on screen rather than silently falling back to the default. */
+interface Flash {
+  title: string;
+  text: JSX.Element | string;
+}
+
+/** A narrowing left empty (or the default period) is dropped from the address. */
 function setFilter(state: ListViewState, key: string, value: string): ListViewState {
   const filters = { ...state.filters };
-  if (value || key === 'from' || key === 'to') filters[key] = value;
+  if (value && !(key === 'period' && value === DEFAULT_POSTING_PERIOD)) filters[key] = value;
   else delete filters[key];
   return { ...state, filters, page: undefined };
+}
+
+/** A select over the service's own values, `Any` first. */
+function anyOf(values: readonly string[]): { value: string; label: string }[] {
+  return [{ value: '', label: 'Any' }, ...values.map((value) => ({ value, label: value }))];
 }
 
 export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScreenProps): JSX.Element {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ListViewState>(() => parseListViewState(searchParams));
-  const [defaults] = useState(() => defaultPostingsFilter());
-  const searchHintId = useId();
+  const [now] = useState(() => new Date());
+  const [flash, setFlash] = useState<Flash | null>(null);
 
   // Same reasoning as `AccountsScreen.navigate`: local state first, the address bar mirrored
   // through the History API, so rapid changes never race a router round trip.
@@ -61,10 +88,15 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
     window.history.pushState(null, '', `/records?${toListViewSearchParams(next).toString()}`);
   }
 
+  const creating = state.openRecordId === NEW_RECORD;
+  // An unsent record is never dropped without asking (DRK-1745 §3 row 9).
+  const unsent = useUnsentGuard(creating);
+
+  const period = postingPeriod(state.filters.period);
   const sort = state.sort ?? DEFAULT_ORDER;
+  const pageSize = state.pageSize ?? RECORDS_PAGE_SIZE;
   const filter: PostingsFilterState = {
-    from: state.filters.from ?? defaults.from,
-    to: state.filters.to ?? defaults.to,
+    ...postingPeriodRange(period, now),
     direction: state.filters.direction ?? '',
     category: state.filters.category ?? '',
     status: state.filters.status ?? '',
@@ -73,13 +105,13 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
     desc: sort.desc,
     pageNumber: state.page ?? 1,
   };
-  const periodError = postingPeriodError(filter.from, filter.to);
 
-  const recordsQuery = useRecords(filter, RECORDS_PAGE_SIZE);
+  const recordsQuery = useRecords(filter, pageSize);
   const currenciesQuery = useCurrencies();
-  const openQuery = usePosting(state.openRecordId);
+  const viewedId = creating ? undefined : state.openRecordId;
+  const openQuery = usePosting(viewedId);
   const items = recordsQuery.data?.items ?? [];
-  const openPosting = items.find((posting) => posting.id === state.openRecordId) ?? openQuery.data;
+  const openPosting = viewedId ? (items.find((posting) => posting.id === viewedId) ?? openQuery.data) : undefined;
   const accountIds = [...new Set([...items.map((posting) => posting.accountId), ...(openPosting ? [openPosting.accountId] : [])])];
   const accountQueries = useAccountsById(accountIds);
 
@@ -89,24 +121,25 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
     if (directoryObjectId && openedId) pushRecent(directoryObjectId, 'Posting', openedId);
   }, [directoryObjectId, openedId]);
 
-  const accountNumbers = new Map<string, string>();
+  const accounts = new Map<string, { accountNumber: string; name: string }>();
   for (const query of accountQueries) {
-    if (query.data?.account) accountNumbers.set(query.data.account.id, query.data.account.accountNumber);
+    if (query.data?.account) accounts.set(query.data.account.id, query.data.account);
   }
   const decimalPlacesByCurrency = new Map((currenciesQuery.data ?? []).map((currency) => [currency.code, currency.decimalPlaces]));
   // Rows are drawn only once every account number and currency scale is known — never a guid in
   // the Account column or an amount at a guessed scale. A refused currency read is stated on its
   // own and the amounts are then drawn as the service sent them, never left loading.
   const ready = (currenciesQuery.data !== undefined || currenciesQuery.isError) && accountQueries.every((query) => !query.isPending);
-  // A refused period or a too-short search makes no read at all (`toPostingsQuery`).
-  const queryable = periodError === null && !(filter.search && filter.search.length < MIN_POSTING_SEARCH_LENGTH);
+  // A too-short search makes no read at all (`toPostingsQuery`).
+  const queryable = !(filter.search && filter.search.length < MIN_POSTING_SEARCH_LENGTH);
   const loading = queryable && (recordsQuery.isPending || !ready);
   const narrowed = Boolean(filter.direction || filter.category || filter.status || filter.search);
-  const panelRef = usePanelFocus<HTMLElement>(openPosting !== undefined);
+  const panelOpen = creating || openPosting !== undefined;
+  const panelRef = usePanelFocus<HTMLDivElement>(panelOpen);
   const rows: RecordsTableRow[] = items.map((posting) => ({
     id: posting.id,
     postingNumber: posting.postingNumber,
-    accountNumber: accountNumbers.get(posting.accountId) ?? posting.accountId,
+    accountNumber: accounts.get(posting.accountId)?.accountNumber ?? posting.accountId,
     direction: posting.direction,
     category: posting.category,
     amount: posting.amount,
@@ -116,99 +149,128 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
     status: posting.status,
   }));
 
-  const pageCount = recordsQuery.data?.pageCount ?? 1;
   const currentPage = state.page ?? 1;
+  const writeGranted = grantedScopes.includes('postings.write');
+  const activeFilters = [period !== DEFAULT_POSTING_PERIOD, filter.direction, filter.category, filter.status].filter(Boolean).length;
+  const closePanel = (): void => navigate({ ...state, openRecordId: undefined });
 
-  function selectFilter(key: string, label: string, emptyLabel: string, values: readonly string[]): JSX.Element {
-    return (
-      <label className="flex flex-col gap-1">
-        {label}
-        <select aria-label={label} value={state.filters[key] ?? ''} onChange={(event) => navigate(setFilter(state, key, event.target.value))}>
-          <option value="">{emptyLabel}</option>
-          {values.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-      </label>
+  function filterSelect(key: string, value: string, options: { value: string; label: string }[]): JSX.Element {
+    return <Select options={options} value={value} className="w-full" onChange={(event) => navigate(setFilter(state, key, event.target.value))} />;
+  }
+
+  let panel: JSX.Element | null = null;
+  if (creating) {
+    panel = (
+      <RecordPostingForm
+        granted={writeGranted}
+        onClose={() => unsent.guard(closePanel)}
+        onDirtyChange={unsent.onDirtyChange}
+        onRecorded={(recorded) => {
+          unsent.clear();
+          closePanel();
+          setFlash({ title: 'Record posted', text: recordedText(recorded) });
+        }}
+      />
+    );
+  } else if (openPosting) {
+    const account = accounts.get(openPosting.accountId);
+    panel = (
+      <PostingDetails
+        posting={openPosting}
+        accountNumber={account?.accountNumber ?? openPosting.accountId}
+        accountName={account?.name}
+        decimalPlaces={decimalPlacesByCurrency.get(openPosting.currency)}
+        reverseGranted={grantedScopes.includes('postings.reverse')}
+        onClose={closePanel}
+        onReversed={(reversed) => setFlash({ title: 'Record reversed', text: reversedText(reversed) })}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <RecordPostingForm granted={grantedScopes.includes('postings.write')} />
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon="file-text"
+        title="Records"
+        description="Every movement recorded against an account. A record is immutable once posted; a correction is an opposing record."
+        actions={
+          <ScopeGate scope="postings.write" granted={writeGranted}>
+            <Button type="button" variant="primary" onClick={() => navigate({ ...state, openRecordId: NEW_RECORD })}>
+              <Plus size={14} aria-hidden="true" />
+              Record posting
+            </Button>
+          </ScopeGate>
+        }
+      />
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          From
-          <input type="date" aria-label="From" value={filter.from} onChange={(event) => navigate(setFilter(state, 'from', event.target.value))} />
-        </label>
-        <label className="flex flex-col gap-1">
-          To
-          <input type="date" aria-label="To" value={filter.to} onChange={(event) => navigate(setFilter(state, 'to', event.target.value))} />
-        </label>
-        {selectFilter('direction', 'Direction filter', 'All directions', POSTING_DIRECTIONS)}
-        {selectFilter('category', 'Category filter', 'All categories', POSTING_CATEGORIES)}
-        {selectFilter('status', 'Status filter', 'All statuses', POSTING_STATUSES)}
-        <label className="flex flex-col gap-1">
-          Search postings
-          <Input
-            aria-label="Search postings"
-            aria-describedby={searchHintId}
-            value={state.filters.search ?? ''}
-            onChange={(event) => navigate(setFilter(state, 'search', event.target.value))}
-          />
-          <span id={searchHintId} className="text-[length:var(--text-caption-size)] text-muted-foreground">
-            Searches posting number, counterparty reference and description
-          </span>
-        </label>
-      </div>
-
-      {periodError ? <p role="alert">{periodError}</p> : null}
+      {flash ? (
+        <Acknowledgement title={flash.title} onDismiss={() => setFlash(null)}>
+          {flash.text}
+        </Acknowledgement>
+      ) : null}
 
       {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 
-      <div className="flex items-start gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          {recordsQuery.isError ? (
-            <FailedRead error={recordsQuery.error} onRetry={() => void recordsQuery.refetch()} />
-          ) : (
-            <RecordsTable
-              rows={rows}
-              loading={loading}
-              emptyMessage={
-                periodError ??
-                emptyMessage(postingsEmpty(filter.from, filter.to), { total: Number(recordsQuery.data?.totalItemCount ?? 0), page: currentPage, filtered: narrowed })
-              }
-              orderBy={state.sort?.field}
-              desc={state.sort?.desc}
-              onSort={(field) => navigate({ ...state, sort: { field, desc: sort.field === field ? !sort.desc : false } })}
-              selectedId={state.openRecordId}
-              onSelectRow={(row) => navigate({ ...state, openRecordId: row.id === state.openRecordId ? undefined : row.id })}
-            />
-          )}
+      <TableCard
+        searchPlaceholder="Search record, reference or description"
+        searchValue={state.filters.search ?? ''}
+        onSearchChange={(value) => navigate(setFilter(state, 'search', value))}
+        rows={items.length}
+        total={Number(recordsQuery.data?.totalItemCount ?? 0)}
+        filter={
+          <FilterMenu
+            activeCount={activeFilters}
+            onClear={() => navigate({ ...state, filters: state.filters.search ? { search: state.filters.search } : {}, page: undefined })}
+          >
+            <FilterField label="Period" hint="Effective date. 90 days is the widest window.">
+              {filterSelect('period', period, POSTING_PERIOD_OPTIONS)}
+            </FilterField>
+            <FilterField label="Direction">{filterSelect('direction', filter.direction, anyOf(POSTING_DIRECTIONS))}</FilterField>
+            <FilterField label="Category">{filterSelect('category', filter.category, anyOf(POSTING_CATEGORIES))}</FilterField>
+            <FilterField label="Status">{filterSelect('status', filter.status, anyOf(POSTING_STATUSES))}</FilterField>
+          </FilterMenu>
+        }
+        pagination={{
+          page: currentPage,
+          pageCount: Number(recordsQuery.data?.pageCount ?? 1),
+          pageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          onPageChange: (page) => navigate({ ...state, page }),
+          onPageSizeChange: (size) => navigate({ ...state, pageSize: size, page: undefined }),
+        }}
+        panel={
+          panel ? (
+            // The kit's AppShell draws the panel full height over the frame's right edge
+            // (Design/components/shell/AppShell.jsx): held to the viewport, so a short list never clips
+            // it and a long one scrolls beneath it. Sized as the panel, so the focus it takes lands there.
+            <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="fixed inset-y-0 right-0 z-50 w-(--drawer-width) max-w-[92%] outline-none">
+              {panel}
+            </div>
+          ) : null
+        }
+      >
+        {recordsQuery.isError ? (
+          <FailedRead error={recordsQuery.error} onRetry={() => void recordsQuery.refetch()} />
+        ) : (
+          <RecordsTable
+            rows={rows}
+            loading={loading}
+            placeholderRows={pageSize}
+            emptyMessage={emptyMessage(postingsEmpty(filter.from, filter.to), { total: Number(recordsQuery.data?.totalItemCount ?? 0), page: currentPage, filtered: narrowed })}
+            orderBy={state.sort?.field}
+            desc={state.sort?.desc}
+            onSort={(field) => navigate({ ...state, sort: { field, desc: sort.field === field ? !sort.desc : false } })}
+            selectedId={viewedId}
+            onSelectRow={(row) => unsent.guard(() => navigate({ ...state, openRecordId: row.id === state.openRecordId ? undefined : row.id }))}
+          />
+        )}
+      </TableCard>
+      <Note>
+        Amounts are shown at each currency&apos;s own precision and are never combined across currencies. <Mono>Balance after</Mono> is a property of one account&apos;s stream and
+        belongs on that account&apos;s statement, not in this cross-account list.
+      </Note>
 
-          <div className="flex items-center gap-2">
-            {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
-              <button key={page} type="button" aria-current={page === currentPage ? 'page' : undefined} onClick={() => navigate({ ...state, page })}>
-                Page {page}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {openPosting ? (
-          <aside ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="w-96 flex-none rounded-md border border-border p-4">
-            <PostingDetails
-              posting={openPosting}
-              accountNumber={accountNumbers.get(openPosting.accountId) ?? openPosting.accountId}
-              decimalPlaces={decimalPlacesByCurrency.get(openPosting.currency)}
-              reverseGranted={grantedScopes.includes('postings.reverse')}
-            />
-          </aside>
-        ) : null}
-      </div>
+      {unsent.dialog}
     </div>
   );
 }

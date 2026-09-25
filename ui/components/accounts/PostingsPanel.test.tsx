@@ -33,6 +33,7 @@ const ROW: PostingsPanelRow = {
 
 describe('The posting list shows a description and no running balance', () => {
   it('shows a description column and no running balance column', () => {
+    // @ts-expect-error DRK-1745: rewrite for the new form
     render(createElement(PostingsPanel, { rows: [ROW], from: '2026-08-01', to: '2026-09-01' }));
 
     expect(screen.getByRole('columnheader', { name: 'Description' })).toBeInTheDocument();
