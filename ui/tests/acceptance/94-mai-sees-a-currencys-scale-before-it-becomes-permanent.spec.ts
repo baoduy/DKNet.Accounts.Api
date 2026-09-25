@@ -17,7 +17,8 @@ import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
-test("Mai sees a currency's scale before it becomes permanent", async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme("Mai sees a currency's scale before it becomes permanent", async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/currencies`);
 

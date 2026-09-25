@@ -40,12 +40,9 @@ export interface PagedAccountGroups {
 }
 
 /**
- * The page size `84-mai-shares-the-exact-view-she-is-looking-at` assumes
- * (`Design/ui_kits/account-groups-crud/AccountGroups.jsx`'s own default) — sent only once the
- * operator engages pagination (`ListViewState.pageSize` set). An ordinary narrowed view sends
- * no `pageSize` at all, so `83-mai-narrows-the-group-list`'s 12-row match is never truncated
- * by a page size nobody asked for; the generic list surface's own default (`README.md`'s
- * `pageSize`: default `1000`) applies instead.
+ * The groups list's default page size (`Design/ui_kits/account-groups-crud/AccountGroups.jsx`'s
+ * own default) until the operator picks another in the pager. The screen always sends a page
+ * size, so the service pages the list and the pager's `Page N of M` is the service's own count.
  */
 export const ACCOUNT_GROUPS_PAGE_SIZE = 10;
 

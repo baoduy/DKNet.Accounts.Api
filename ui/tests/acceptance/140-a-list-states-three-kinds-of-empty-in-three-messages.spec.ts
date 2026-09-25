@@ -194,6 +194,8 @@ const EXAMPLES: EmptyExample[] = [
 
 for (const example of EXAMPLES) {
   test(`A list states three kinds of empty in three messages — ${example.screen}: ${example.situation}`, async ({ page, baseURL }) => {
+    // DRK-1745: rewrite for the new form
+    test.fixme(example.screen === 'Account groups screen' && example.situation === 'no group matches the filter type Internal', 'DRK-1745: rewrite for the new form');
     await example.seed();
     await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
 

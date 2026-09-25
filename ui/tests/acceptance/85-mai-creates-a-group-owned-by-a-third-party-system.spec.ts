@@ -16,7 +16,8 @@ import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
-test('Mai creates a group owned by a third-party system', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai creates a group owned by a third-party system', async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
 

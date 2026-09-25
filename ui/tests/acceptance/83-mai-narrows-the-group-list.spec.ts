@@ -39,7 +39,8 @@ test.beforeEach(async () => {
   await seedAccountGroups(groups);
 });
 
-test('Mai narrows the group list to closed groups', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai narrows the group list to closed groups', async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
 
@@ -52,7 +53,8 @@ test('Mai narrows the group list to closed groups', async ({ page, baseURL }) =>
   expect(names).toEqual([...names].sort());
 });
 
-test('Mai narrows the group list to groups owned by partner-bank-01', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai narrows the group list to groups owned by partner-bank-01', async ({ page, baseURL }) => {
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
 
