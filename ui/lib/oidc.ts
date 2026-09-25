@@ -48,7 +48,12 @@ function resolveReturnTo(baseUrl: string, candidate: string | undefined): string
 
 async function discover(config: ConsoleConfig): Promise<client.Configuration> {
   const issuerBase = entraIssuerBaseUrl();
-  const issuerUrl = new URL(`${issuerBase.replace(/\/$/, '')}/${config.entraTenantId}`);
+  // Entra's bare `/{tenant}` metadata is the v1 endpoint, which ignores `scope` and answers the
+  // callback with an error instead of a code; only `/{tenant}/v2.0` honours the requested scopes.
+  const tenantPath = new URL(issuerBase).hostname === 'login.microsoftonline.com'
+    ? `${config.entraTenantId}/v2.0`
+    : config.entraTenantId;
+  const issuerUrl = new URL(`${issuerBase.replace(/\/$/, '')}/${tenantPath}`);
   // The fake OIDC issuer standing in for Entra ID in tests runs over plain HTTP — never
   // relaxed in production, even if CONSOLE_ENTRA_ISSUER_BASE_URL were ever misconfigured.
   const insecure = issuerUrl.protocol === 'http:' && process.env.NODE_ENV !== 'production';

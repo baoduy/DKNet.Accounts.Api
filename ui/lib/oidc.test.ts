@@ -112,7 +112,7 @@ describe('beginSignIn', () => {
     entraIssuerBaseUrl.mockReturnValue('https://login.microsoftonline.com');
     await beginSignIn();
     expect(discovery).toHaveBeenCalledWith(
-      new URL('https://login.microsoftonline.com/drunk-coding-tenant'),
+      new URL('https://login.microsoftonline.com/drunk-coding-tenant/v2.0'),
       TEST_CONFIG.entraClientId,
       TEST_CONFIG.entraClientSecret,
       undefined,
