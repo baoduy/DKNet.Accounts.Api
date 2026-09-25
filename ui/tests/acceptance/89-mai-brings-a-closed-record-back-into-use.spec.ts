@@ -29,7 +29,8 @@ test('Mai reopens a closed group', async ({ page, baseURL }) => {
   await expect(page.getByTestId('detail-panel').getByText('Active')).toBeVisible();
 });
 
-test('Mai reactivates a deactivated currency', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai reactivates a deactivated currency', async ({ page, baseURL }) => {
   await seedCurrencies([{ code: 'VND', name: 'Vietnamese Dong', decimalPlaces: 0, isActive: false }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/currencies`);

@@ -1,14 +1,18 @@
+'use client';
+
+import { Fragment, useEffect, useRef } from 'react';
 import type { CSSProperties, JSX, ReactNode } from 'react';
-import { cn } from '@/components/ui/utils';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { cn } from '@/components/ui/utils';
 
 /**
- * The right-hand panel a row opens. Content only — the sliding, non-blocking chrome is
- * `AppShell`'s `panel` slot (a shadcn `Sheet` with `modal={false}`, DRK-1679 §3 row 8);
- * this component never wraps itself in a second dialog layer.
+ * The right-hand panel a row opens. Not a modal: `TableCard`'s panel slot draws it full height
+ * over the frame's right edge, nothing behind it is dimmed or blocked, and choosing another row
+ * swaps the content in the same element. Esc or the close button dismisses it. Ported from Design/components/feedback/DetailPanel.jsx.
  */
 export interface DetailPanelProps {
+  /** Defaults to `true`, unlike the kit: screens still mount the panel only while it is open (R4). */
   open?: boolean;
   title?: ReactNode;
   children?: ReactNode;
@@ -24,36 +28,67 @@ export interface DetailPanelProps {
 }
 
 export function DetailPanel({
+  open = true,
   title,
   children,
   onClose,
   moreHref,
-  moreLabel = 'View full record',
+  moreLabel = 'Open full page',
   actions,
   footnote,
   style,
 }: DetailPanelProps): JSX.Element {
+  const panel = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open || !onClose) return undefined;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      // Esc inside a dialog opened over the panel (confirm, discard) belongs to that dialog alone.
+      const dialog = (event.target as Element | null)?.closest?.('[role="dialog"]');
+      if (dialog && !dialog.contains(panel.current)) return;
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  const hasFooter = Boolean(actions || moreHref || footnote);
   return (
-    <div className="flex h-full flex-col gap-4" style={style}>
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-[length:var(--text-panel-title-size)] font-semibold">{title}</h2>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-          Close
+    <aside
+      ref={panel}
+      role="complementary"
+      aria-label="Details"
+      aria-hidden={!open}
+      inert={!open}
+      style={style}
+      className={cn(
+        'flex h-full min-h-0 w-full flex-col border-l border-border bg-card text-card-foreground shadow-overlay',
+        'transition-transform duration-(--duration-panel) ease-(--easing-panel)',
+        open ? 'translate-x-0' : 'translate-x-full',
+      )}
+    >
+      <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <h3 className="m-0 text-[length:var(--text-panel-title-size)] leading-[var(--text-panel-title-leading)] font-bold">{title}</h3>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close details" className="ml-auto text-[length:var(--text-caption-size)] text-muted-foreground">
+          Esc <X size={13} aria-hidden="true" />
         </Button>
-      </div>
-
-      {moreHref ? (
-        <a href={moreHref} className="text-link hover:underline">
-          {moreLabel}
-        </a>
+      </header>
+      <div className="flex-1 overflow-auto p-(--card-padding)">{children}</div>
+      {hasFooter ? (
+        <footer className="flex flex-col gap-3 border-t border-border bg-background px-4 py-3">
+          {footnote ? <div className="text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-muted-foreground">{footnote}</div> : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {moreHref ? (
+              <a href={moreHref} className="mr-auto text-[length:var(--text-table-size)] font-semibold text-link hover:underline">
+                {moreLabel} →
+              </a>
+            ) : null}
+            {actions}
+          </div>
+        </footer>
       ) : null}
-
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto">{children}</div>
-
-      {footnote ? <p className="text-[length:var(--text-caption-size)] text-muted-foreground">{footnote}</p> : null}
-
-      {actions ? <div className="flex items-center justify-end gap-2">{actions}</div> : null}
-    </div>
+    </aside>
   );
 }
 
@@ -67,14 +102,15 @@ export interface DetailListProps {
   style?: CSSProperties;
 }
 
+/** The panel's key/value grid: a 132px label column, the value taking the rest. */
 export function DetailList({ items, style }: DetailListProps): JSX.Element {
   return (
-    <dl className="flex flex-col gap-2" style={style}>
+    <dl style={style} className="m-0 grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-[length:var(--text-table-size)] leading-[var(--text-table-leading)]">
       {items.map((item, index) => (
-        <div key={index} className="flex items-center justify-between gap-4">
-          <dt className="text-muted-foreground">{item.label}</dt>
-          <dd>{item.value}</dd>
-        </div>
+        <Fragment key={index}>
+          <dt className="m-0 text-muted-foreground">{item.label}</dt>
+          <dd className="m-0">{item.value}</dd>
+        </Fragment>
       ))}
     </dl>
   );
@@ -87,11 +123,17 @@ export interface DetailSectionProps {
   style?: CSSProperties;
 }
 
+/** The 11px tracked heading between groups of panel fields. */
 export function DetailSection({ children, divider = true, style }: DetailSectionProps): JSX.Element {
   return (
-    <div style={style}>
-      {divider ? <Separator className="mb-3" /> : null}
-      <div className={cn('text-[length:var(--text-section-size)] font-semibold', divider && 'mt-3')}>{children}</div>
-    </div>
+    <h4
+      style={style}
+      className={cn(
+        'mx-0 mt-4.5 mb-2 text-[length:var(--text-label-size)] leading-[var(--text-label-leading)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase',
+        divider && 'mt-5 border-t border-border pt-4',
+      )}
+    >
+      {children}
+    </h4>
   );
 }

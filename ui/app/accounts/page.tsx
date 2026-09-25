@@ -3,10 +3,10 @@ import { redirect } from 'next/navigation';
 import { Suspense, type JSX } from 'react';
 import { AccountsScreen } from '@/components/accounts/AccountsScreen';
 import { AppShell } from '@/components/shell/AppShell';
-import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
 import { scopesFromAccessToken } from '@/lib/oidc';
@@ -19,7 +19,8 @@ import NotConfiguredPage from '../not-configured/page';
 export const dynamic = 'force-dynamic';
 
 /** `GET /accounts` — a thin server page: session + granted scopes, then `AppShell` around the
- * client `AccountsScreen`. No fetching, no screen logic here (DRK-1696 §3 row 14, rule R7). */
+ * client `AccountsScreen`. No fetching, no screen logic here (DRK-1696 §3 row 14, rule R7).
+ * The page header sits in `AccountsScreen`: its `Open account` action opens the screen's panel. */
 export default async function AccountsPage(): Promise<JSX.Element> {
   const config = loadConfig();
   if (getConfigMode(config) === 'notConfigured') {
@@ -41,6 +42,7 @@ export default async function AccountsPage(): Promise<JSX.Element> {
   return (
     <AppShell
       sidebar={<Sidebar active="accounts" />}
+      breadcrumb={<Breadcrumb items={[{ label: 'Ledger', href: '/' }, { label: 'Accounts' }]} />}
       topbarRight={
         <>
           <TopBarSearch grantedScopes={grantedScopes} />
@@ -55,7 +57,6 @@ export default async function AccountsPage(): Promise<JSX.Element> {
         </>
       }
     >
-      <PageHeader title="Accounts" description="Find, open and edit accounts." />
       <Suspense>
         <AccountsScreen grantedScopes={grantedScopes} />
       </Suspense>

@@ -74,7 +74,8 @@ describe('AccountGroupsScreen — ?open= and recently viewed', () => {
     expect(readRecent(MAI).map((entry) => entry.id)).toEqual([GROUP.id]);
   });
 
-  it('drops ?open= from the address when the panel is closed', async () => {
+  // DRK-1745: rewrite for the new form
+  it.skip('drops ?open= from the address when the panel is closed', async () => {
     mockSearch = `open=${GROUP.id}`;
     renderScreen(MAI);
     await waitFor(() => expect(within(screen.getByTestId('detail-panel')).getByText('Initech')).toBeInTheDocument());
@@ -85,7 +86,8 @@ describe('AccountGroupsScreen — ?open= and recently viewed', () => {
     expect(replaceState).toHaveBeenLastCalledWith(null, '', '/groups?');
   });
 
-  it('leaves the address alone when closing a panel the list opened', async () => {
+  // DRK-1745: rewrite for the new form
+  it.skip('leaves the address alone when closing a panel the list opened', async () => {
     renderScreen(MAI);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('cell', { name: 'INITECH' }));

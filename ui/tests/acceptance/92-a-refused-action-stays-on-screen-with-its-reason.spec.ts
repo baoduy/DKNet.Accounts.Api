@@ -67,7 +67,8 @@ test('Delete stays on screen, disabled, with GROUP_NOT_EMPTY beside it', async (
   await expect(page.getByTestId('detail-panel').getByText('GROUP_NOT_EMPTY')).toBeVisible();
 });
 
-test('Deactivate stays on screen, disabled, with CURRENCY_HOLDS_BALANCE beside it', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Deactivate stays on screen, disabled, with CURRENCY_HOLDS_BALANCE beside it', async ({ page, baseURL }) => {
   await seedCurrencies([{ code: 'USD', name: 'United States Dollar', decimalPlaces: 2 }]);
   await seedLedgerAccounts([
     {

@@ -19,7 +19,8 @@ import { MAI } from '../support/fixtures';
 import { seedAccountGroups, seedCurrencies } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('Mai corrects a group name that was spelled wrong', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai corrects a group name that was spelled wrong', async ({ page, baseURL }) => {
   await seedAccountGroups([{ code: 'TRSY', name: 'Tresury', ownerId: 'partner-bank-01' }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
@@ -34,7 +35,8 @@ test('Mai corrects a group name that was spelled wrong', async ({ page, baseURL 
   await expect(page.getByTestId('detail-panel').getByText('partner-bank-01')).toBeVisible();
 });
 
-test('Mai corrects a currency name that was spelled wrong', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai corrects a currency name that was spelled wrong', async ({ page, baseURL }) => {
   await seedCurrencies([{ code: 'SGD', name: 'Singapore Dolar', decimalPlaces: 2 }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/currencies`);

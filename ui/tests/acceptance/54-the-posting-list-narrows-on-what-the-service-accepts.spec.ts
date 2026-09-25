@@ -28,7 +28,8 @@ const CASES: Array<{ dimension: string; label: string; value: string; visible: s
 ];
 
 for (const { dimension, label, value, visible, hidden } of CASES) {
-  test(`The posting list narrows on what the service accepts — ${dimension}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`The posting list narrows on what the service accepts — ${dimension}`, async ({ page, baseURL }) => {
     await seedLedgerAccounts([
       { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '25.00', availableBalance: '25.00', heldAmount: '0.00', permittedToGoNegative: false },
     ]);

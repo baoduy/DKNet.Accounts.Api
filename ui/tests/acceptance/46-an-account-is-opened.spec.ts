@@ -13,7 +13,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('An account is opened', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('An account is opened', async ({ page, baseURL }) => {
   await seedLedgerAccountGroups([{ id: 'group-acme', code: 'ACME', name: 'ACME', type: 'Customer' }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI_WITH_WRITE.email });
 

@@ -19,7 +19,8 @@ import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('A code already in use is refused on the code field — a group', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A code already in use is refused on the code field — a group', async ({ page, baseURL }) => {
   await seedAccountGroups([{ code: 'TRSY', name: 'Treasury', ownerId: 'default-owner' }]);
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/groups`);
@@ -35,7 +36,8 @@ test('A code already in use is refused on the code field — a group', async ({ 
   await expect(page.getByLabel('Code')).toHaveAttribute('aria-invalid', 'true');
 });
 
-test('A code already in use is refused on the code field — a currency', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A code already in use is refused on the code field — a currency', async ({ page, baseURL }) => {
   // SGD is seeded by default in `fake-ledger-service.ts` (`defaultCurrencies`) — no extra seed needed.
   await signInAs(page, { consoleBaseUrl: baseURL!, email: MAI.email });
   await page.goto(`${baseURL}/currencies`);

@@ -3,10 +3,10 @@ import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
 import { AccountGroupsScreen } from '@/components/admin/AccountGroupsScreen';
 import { AppShell } from '@/components/shell/AppShell';
-import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
 import { scopesFromAccessToken } from '@/lib/oidc';
@@ -20,7 +20,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * `GET /groups` — DRK-1697 §3 row 13, a thin server wrapper: session + config check,
- * `AppShell` + the screen, as `app/page.tsx:24`. No screen logic lives here.
+ * `AppShell` + the breadcrumb + the screen, as `app/page.tsx:24`. No screen logic lives here —
+ * the page header is the screen's, because its action opens the screen's side panel.
  */
 export default async function GroupsPage(): Promise<JSX.Element> {
   const config = loadConfig();
@@ -43,6 +44,7 @@ export default async function GroupsPage(): Promise<JSX.Element> {
   return (
     <AppShell
       sidebar={<Sidebar active="groups" />}
+      breadcrumb={<Breadcrumb items={[{ label: 'Administration' }, { label: 'Account groups' }]} />}
       topbarRight={
         <>
           <TopBarSearch grantedScopes={grantedScopes} />
@@ -57,7 +59,6 @@ export default async function GroupsPage(): Promise<JSX.Element> {
         </>
       }
     >
-      <PageHeader title="Account groups" description="Organise every account and its number prefix." />
       <AccountGroupsScreen grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
     </AppShell>
   );

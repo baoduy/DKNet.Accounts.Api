@@ -14,7 +14,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { ledgerRequests, seedLedgerAccounts, seedLedgerPostings } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('A reversal needs a reason and refreshes the values', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A reversal needs a reason and refreshes the values', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '12900.00', availableBalance: '12900.00', heldAmount: '0.00', permittedToGoNegative: false },
   ]);

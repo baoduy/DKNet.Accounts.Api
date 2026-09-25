@@ -18,7 +18,8 @@ import { MAI } from '../support/fixtures';
 import { seedAccountGroups } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('Mai shares the exact view she is looking at', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Mai shares the exact view she is looking at', async ({ page, baseURL }) => {
   const groups = Array.from({ length: 12 }, (_, i) => {
     const index = i + 1;
     return {

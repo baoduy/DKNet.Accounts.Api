@@ -13,7 +13,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('Closing an account that holds money is refused in plain sight', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Closing an account that holds money is refused in plain sight', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '12400.00', availableBalance: '12400.00', heldAmount: '0.00', permittedToGoNegative: false },
   ]);

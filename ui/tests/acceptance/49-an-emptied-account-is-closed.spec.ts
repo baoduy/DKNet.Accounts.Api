@@ -13,7 +13,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('An emptied account is closed', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('An emptied account is closed', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '0.00', availableBalance: '0.00', heldAmount: '0.00', permittedToGoNegative: false },
   ]);

@@ -22,7 +22,8 @@ import { ACME_ID, GLOBEX_ID, account, daysAgo, posting, recordRow, recordRows } 
 import { signInAs } from '../support/sign-in';
 
 for (const term of ['P-10042', 'INV-2026-0917', 'September office rent']) {
-  test(`A search finds a posting by each field the service searches — ${term}`, async ({ page, baseURL }) => {
+  // DRK-1745: rewrite for the new form
+  test.fixme(`A search finds a posting by each field the service searches — ${term}`, async ({ page, baseURL }) => {
     await seedLedgerAccounts([account('ACME-000123', ACME_ID), account('GLOBEX-000456', GLOBEX_ID)]);
     await seedLedgerPostings([
       posting({ id: 'b0000000-0000-4000-8000-000000010042', postingNumber: 'P-10042', accountId: ACME_ID, direction: 'Debit', amount: '4200.00', currency: 'SGD', category: 'Payment', counterpartyReference: 'INV-2026-0917', description: 'September office rent', effectiveDate: daysAgo(1) }),

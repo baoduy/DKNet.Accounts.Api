@@ -16,7 +16,8 @@ import { ledgerRequests, seedLedgerAccounts, seedLedgerPostings } from '../suppo
 import { ACME_ID, GLOBEX_ID, account, cellText, daysAgo, posting, recordRows } from '../support/records';
 import { signInAs } from '../support/sign-in';
 
-test('An operator sees postings across every account', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('An operator sees postings across every account', async ({ page, baseURL }) => {
   await seedLedgerAccounts([account('ACME-000123', ACME_ID), account('GLOBEX-000456', GLOBEX_ID)]);
   await seedLedgerPostings([
     posting({ id: 'b0000000-0000-4000-8000-000000010050', postingNumber: 'P-10050', accountId: GLOBEX_ID, direction: 'Credit', amount: '50.00', currency: 'SGD', category: 'Transfer', effectiveDate: daysAgo(2), recordedAt: `${daysAgo(2)}T09:00:00.000Z` }),

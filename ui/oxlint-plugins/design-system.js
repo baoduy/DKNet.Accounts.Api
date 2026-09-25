@@ -69,6 +69,28 @@ const COMPONENT_SHAPES = {
   Currency: { props: ['code', 'showFlag', 'style'] },
   AccountBalanceShape: { props: ['balance', 'availableBalance', 'heldAmount', 'currency', 'decimalPlaces'] },
   LedgerError: { props: ['code', 'message', 'field'] },
+  // DRK-1747 §3 row 17 — the design-kit blocks this slice ships, from `Design/_adherence.oxlintrc.json`
+  // and each block's `.d.ts`. Extras beyond the `.d.ts`, each needed by a caller (R3): Chip's
+  // role/aria-selected/tabIndex (Tabs renders chips as tabs), Select's aria-label (the pager's
+  // `Rows per page`), Dialog's onOpenChange (screens still composing the Radix root, until
+  // stage 3) and onCloseAutoFocus (ConfirmMovement's focus return).
+  Chip: { props: ['selected', 'onClick', 'children', 'style', 'role', 'aria-selected', 'tabIndex'] },
+  Select: { props: ['options', 'value', 'onChange', 'disabled', 'label', 'style', 'aria-label'] },
+  Checkbox: { props: ['checked', 'onChange', 'disabled', 'label', 'style'] },
+  Switch: { props: ['checked', 'onChange', 'disabled', 'label', 'style'] },
+  Textarea: { props: ['value', 'defaultValue', 'placeholder', 'onChange', 'rows', 'readOnly', 'disabled', 'invalid', 'style'] },
+  Pagination: {
+    props: ['page', 'pageCount', 'pageSize', 'pageSizeOptions', 'onPageChange', 'onPageSizeChange', 'summary', 'position', 'canPrevious', 'canNext', 'style'],
+    literals: { position: '^(?:top|bottom)$' },
+  },
+  Breadcrumb: { props: ['items', 'onNavigate', 'style'] },
+  BreadcrumbItem: { props: ['label', 'href', 'id', 'style'] },
+  FilterField: { props: ['label', 'hint', 'children', 'style'] },
+  TabItem: { props: ['value', 'label'] },
+  Dialog: {
+    props: ['open', 'title', 'children', 'footer', 'onClose', 'width', 'tone', 'style', 'onOpenChange', 'onCloseAutoFocus'],
+    literals: { tone: '^(?:default|destructive)$' },
+  },
 };
 
 const ALWAYS_ALLOWED_PROPS = new Set(['key', 'ref', 'className', 'children']);

@@ -1,10 +1,40 @@
 /**
  * DRK-1696 §3 row 10 — permitted-to-go-negative, overdraft limit and smallest permitted
  * balance presented as one decision under one label. Not permitted to go negative → the
- * overdraft limit is disabled and any typed value is cleared, never left dangling.
+ * overdraft limit is unavailable and any typed value is cleared, never left dangling.
+ * DRK-1745 — laid out as the kit's `Floor policy` rows (Design/ui_kits/accounts-crud/Accounts.jsx).
  */
 import type { CSSProperties, JSX, ReactNode } from 'react';
-import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input, ReadOnlyField } from '@/components/ui/input';
+import { Caption, Note } from '@/components/ui/text';
+
+export interface FormRowProps {
+  label: ReactNode;
+  hint?: ReactNode;
+  required?: boolean;
+  children?: ReactNode;
+}
+
+/** One row of the kit's two-column form grid: the caption on the left, the control and its hint on the right. */
+export function FormRow({ label, hint, required = false, children }: FormRowProps): JSX.Element {
+  return (
+    <>
+      <Caption className="pt-2">
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-0.5 text-debit">
+            *
+          </span>
+        ) : null}
+      </Caption>
+      <div className="min-w-0">
+        {children}
+        {hint ? <Note className="mt-1.5">{hint}</Note> : null}
+      </div>
+    </>
+  );
+}
 
 export interface FloorSettingsValue {
   permittedToGoNegative: boolean;
@@ -15,6 +45,8 @@ export interface FloorSettingsValue {
 export interface FloorSettingsProps {
   value: FloorSettingsValue;
   currency: string;
+  /** The currency's scale, for the overdraft hint; omitted while it is unknown. */
+  decimalPlaces?: number;
   onChange: (value: FloorSettingsValue) => void;
   /** A field-less refusal (e.g. `OVERDRAFT_LIMIT_REQUIRED`), shown against this group. */
   refusal?: ReactNode;
@@ -28,6 +60,8 @@ export interface FloorSettingsProps {
 
 export function FloorSettings({
   value,
+  currency,
+  decimalPlaces,
   onChange,
   refusal,
   overdraftLimitError,
@@ -43,52 +77,64 @@ export function FloorSettings({
     });
   }
 
+  const scale = currency && decimalPlaces !== undefined ? `${currency} at ${decimalPlaces} decimal places.` : 'At the currency’s scale.';
+
   return (
+    // The form grid's own columns (`AccountForm`), so its rows line up with the rows around it.
     <fieldset
       role="group"
-      aria-label="Floor settings"
+      aria-label="Floor policy"
       data-testid="floor-settings"
       style={style}
-      className="flex flex-col gap-3 rounded-md border border-border p-4"
+      className="col-span-2 m-0 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 border-0 p-0"
     >
-      <legend className="px-1 font-semibold">Floor settings</legend>
-
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          aria-label="Permitted to go negative"
+      <FormRow
+        label="Floor policy"
+        hint={value.permittedToGoNegative ? 'An overdraft limit is required while this is on — the floor is −limit.' : 'The floor is the minimum balance, or zero when none is set.'}
+      >
+        <Checkbox
           checked={value.permittedToGoNegative}
           disabled={disabled}
           onChange={(event) => setPermittedToGoNegative(event.target.checked)}
+          label="Permitted to go negative"
         />
-        Permitted to go negative
-      </label>
+      </FormRow>
 
-      <label className="flex flex-col gap-1">
-        Overdraft limit
-        <Input
-          aria-label="Overdraft limit"
-          aria-invalid={overdraftLimitError ? 'true' : undefined}
-          value={value.overdraftLimit ?? ''}
-          disabled={disabled || !value.permittedToGoNegative}
-          onChange={(event) => onChange({ ...value, overdraftLimit: event.target.value === '' ? null : event.target.value })}
-        />
+      <FormRow label="Overdraft limit" required={value.permittedToGoNegative} hint={value.permittedToGoNegative ? `Unsigned. ${scale}` : null}>
+        {value.permittedToGoNegative ? (
+          <Input
+            numeric
+            aria-label="Overdraft limit"
+            placeholder="50000.00"
+            invalid={Boolean(overdraftLimitError)}
+            value={value.overdraftLimit ?? ''}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...value, overdraftLimit: event.target.value === '' ? null : event.target.value })}
+            className="w-40"
+          />
+        ) : (
+          <ReadOnlyField>
+            <Caption>Unavailable while the account may not go negative.</Caption>
+          </ReadOnlyField>
+        )}
         {overdraftLimitError ? <span role="alert">{overdraftLimitError}</span> : null}
-      </label>
+      </FormRow>
 
-      <label className="flex flex-col gap-1">
-        Smallest permitted balance
+      <FormRow label="Minimum balance" hint="Optional. Sent as null when left empty.">
         <Input
-          aria-label="Smallest permitted balance"
-          aria-invalid={minimumBalanceError ? 'true' : undefined}
+          numeric
+          aria-label="Minimum balance"
+          placeholder="0.00"
+          invalid={Boolean(minimumBalanceError)}
           value={value.minimumBalance ?? ''}
           disabled={disabled}
           onChange={(event) => onChange({ ...value, minimumBalance: event.target.value === '' ? null : event.target.value })}
+          className="w-40"
         />
         {minimumBalanceError ? <span role="alert">{minimumBalanceError}</span> : null}
-      </label>
+      </FormRow>
 
-      {refusal}
+      {refusal ? <div className="col-span-2">{refusal}</div> : null}
     </fieldset>
   );
 }

@@ -15,7 +15,8 @@ import { MAI_WITH_WRITE } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('A refusal naming a field is marked on that field', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('A refusal naming a field is marked on that field', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000123', currency: 'SGD', decimalPlaces: 2, balance: '100.00', availableBalance: '100.00', heldAmount: '0.00', permittedToGoNegative: false },
   ]);

@@ -23,15 +23,17 @@ export const CONSOLE_NAV: NavSection[] = [
     title: 'LEDGER',
     items: [
       { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: '/' },
-      { id: 'groups', label: 'Account groups', icon: 'folder', href: '/groups' },
       { id: 'accounts', label: 'Accounts', icon: 'wallet', href: '/accounts' },
-      { id: 'records', label: 'Records', icon: 'arrow-left-right', href: '/records' },
+      { id: 'records', label: 'Records', icon: 'file-text', href: '/records' },
     ],
   },
   {
     title: 'ADMINISTRATION',
     pinToBottom: true,
-    items: [{ id: 'currencies', label: 'Currencies', icon: 'coins', href: '/currencies' }],
+    items: [
+      { id: 'groups', label: 'Account groups', icon: 'folder', href: '/groups' },
+      { id: 'currencies', label: 'Currencies', icon: 'coins', href: '/currencies' },
+    ],
   },
 ];
 

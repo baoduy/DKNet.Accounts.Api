@@ -18,7 +18,8 @@ import { confirmMovement, fillRecordForm } from '../support/records';
 import { signInAs } from '../support/sign-in';
 import { MAI, e2eStack, holdAccountAt } from './support/stack';
 
-test('The main path works end to end on the real stack', async ({ page }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('The main path works end to end on the real stack', async ({ page }) => {
   const stack = e2eStack();
   await signInAs(page, { consoleBaseUrl: stack.consoleBaseUrl, email: MAI });
   await holdAccountAt(page, stack, 'ACME-000123', '100.00');

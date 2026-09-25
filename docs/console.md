@@ -286,6 +286,9 @@ are `.env.sample`'s shipped values.
 
 ### Entra app registration
 
+> Step-by-step, with the Azure CLI commands, the `.env` keys and `docker compose` launch:
+> [Local setup with Microsoft Entra ID](local-setup-entra.md).
+
 Create a **Web** app registration with a client secret (confidential client — the console holds
 the secret server-side, never in the browser):
 

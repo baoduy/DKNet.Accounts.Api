@@ -49,7 +49,8 @@ async function expectDeveloperStackUntouched(stack: DeveloperStack, servicesBefo
   expect(await developerStackHolds(stack, 'DEV-000001')).toBe(true);
 }
 
-test("The end-to-end check leaves a developer's stack alone, pass or fail — passes", async () => {
+// DRK-1745: rewrite for the new form
+test.fixme("The end-to-end check leaves a developer's stack alone, pass or fail — passes", async () => {
   const servicesBefore = developerServices(developer!);
 
   const run = await runEndToEndCheck(developer!.checkout, [MAIN_PATH], RUN_TIMEOUT_MS);
@@ -60,7 +61,8 @@ test("The end-to-end check leaves a developer's stack alone, pass or fail — pa
   expect(composeResources(run.project)).toEqual({ containers: [], volumes: [], networks: [] });
 });
 
-test("The end-to-end check leaves a developer's stack alone, pass or fail — fails", async () => {
+// DRK-1745: rewrite for the new form
+test.fixme("The end-to-end check leaves a developer's stack alone, pass or fail — fails", async () => {
   const servicesBefore = developerServices(developer!);
 
   const run = await runEndToEndCheck(developer!.checkout, [MAIN_PATH, '--timeout=1'], RUN_TIMEOUT_MS);

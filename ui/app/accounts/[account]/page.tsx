@@ -3,10 +3,10 @@ import { redirect } from 'next/navigation';
 import { Suspense, type JSX } from 'react';
 import { AccountDetailScreen } from '@/components/accounts/AccountDetailScreen';
 import { AppShell } from '@/components/shell/AppShell';
-import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
 import { scopesFromAccessToken } from '@/lib/oidc';
@@ -23,7 +23,8 @@ interface AccountDetailPageProps {
 }
 
 /** `GET /accounts/{account}` — a thin server page: session + granted scopes, then `AppShell`
- * around the client `AccountDetailScreen`. No fetching, no screen logic here (R6). */
+ * around the client `AccountDetailScreen`. No fetching, no screen logic here (R6). The page header
+ * lives in `AccountDetail`: its actions and description need the account and open its side panel. */
 export default async function AccountDetailPage({ params }: AccountDetailPageProps): Promise<JSX.Element> {
   const config = loadConfig();
   if (getConfigMode(config) === 'notConfigured') {
@@ -47,6 +48,7 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
   return (
     <AppShell
       sidebar={<Sidebar active="accounts" />}
+      breadcrumb={<Breadcrumb items={[{ label: 'Ledger', href: '/' }, { label: 'Accounts', href: '/accounts' }, { label: accountNumber }]} />}
       topbarRight={
         <>
           <TopBarSearch grantedScopes={grantedScopes} />
@@ -61,7 +63,6 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
         </>
       }
     >
-      <PageHeader title={accountNumber} description="Balance, floor and postings for this account." />
       <Suspense>
         <AccountDetailScreen accountNumber={accountNumber} grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
       </Suspense>
