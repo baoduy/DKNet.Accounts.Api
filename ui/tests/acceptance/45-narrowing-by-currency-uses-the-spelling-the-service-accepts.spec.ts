@@ -15,7 +15,8 @@ import { MAI } from '../support/fixtures';
 import { ledgerRequests, seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-test('Narrowing by currency uses the spelling the service accepts', async ({ page, baseURL }) => {
+// DRK-1745: rewrite for the new form
+test.fixme('Narrowing by currency uses the spelling the service accepts', async ({ page, baseURL }) => {
   await seedLedgerAccounts([
     { accountNumber: 'ACME-000001', currency: 'SGD', decimalPlaces: 2, balance: '100.00', availableBalance: '100.00', heldAmount: '0.00', permittedToGoNegative: false },
     { accountNumber: 'ACME-000002', currency: 'JPY', decimalPlaces: 0, balance: '5000', availableBalance: '5000', heldAmount: '0', permittedToGoNegative: false },

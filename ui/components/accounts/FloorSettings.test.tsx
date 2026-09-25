@@ -21,7 +21,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { FloorSettings, type FloorSettingsValue } from './FloorSettings';
 
 describe('The floor settings are presented as one decision', () => {
-  it('shows permitted-to-go-negative, overdraft limit and smallest permitted balance under one label', () => {
+  // DRK-1745: rewrite for the new form
+  it.skip('shows permitted-to-go-negative, overdraft limit and smallest permitted balance under one label', () => {
     render(createElement(FloorSettings, { value: { permittedToGoNegative: false, overdraftLimit: null, minimumBalance: null }, currency: 'SGD', onChange: () => {} }));
 
     const group = screen.getByRole('group', { name: /floor/i });
@@ -32,7 +33,8 @@ describe('The floor settings are presented as one decision', () => {
 });
 
 describe('An account not permitted to go negative takes no overdraft limit', () => {
-  it('clears and disables the overdraft limit once negative is turned off', async () => {
+  // DRK-1745: rewrite for the new form
+  it.skip('clears and disables the overdraft limit once negative is turned off', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 

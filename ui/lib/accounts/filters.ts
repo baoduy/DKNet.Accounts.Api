@@ -7,7 +7,10 @@ import type { LedgerColumn } from '@/components/ledger/LedgerTable';
 import type { AccountsTableRow } from '@/components/accounts/AccountsTable';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
 import { Money } from '@/components/ledger/Money';
+import { Currency } from '@/components/ledger/Currency';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
+import { Chip } from '@/components/ui/chip';
+import { Caption, Mono } from '@/components/ui/text';
 import type { ListViewState } from '@/lib/url-state';
 
 export const MIN_ACCOUNT_SEARCH_LENGTH = 2;
@@ -26,6 +29,8 @@ export function accountSearchError(term: string): string | null {
  */
 const FILTER_QUERY_FIELD: Record<string, string> = {
   currency: 'CurrencyCode',
+  group: 'GroupId',
+  status: 'Status',
 };
 
 /** Screen state → the service's query string. A too-short search term produces no query at all. */
@@ -52,32 +57,45 @@ export function toAccountsQuery(state: ListViewState, pageSize?: number): URLSea
   return params;
 }
 
-/** `availableBalance` and `openedOn` have no query counterpart — never sortable. */
+const OPENED_ON = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** `18 Sep 2026`, as the kit's Opened column; the service's own text when it is not a date. */
+export function formatOpenedOn(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : OPENED_ON.format(date);
+}
+
+/**
+ * The kit's columns in the kit's order (Design/ui_kits/accounts-crud/Accounts.jsx).
+ * `availableBalance` and `openedOn` have no query counterpart — never sortable. Group sorts
+ * nowhere: `orderBy=GroupId` would order by the group's id, not the code the cell shows.
+ */
 export const ACCOUNT_COLUMNS: LedgerColumn<AccountsTableRow>[] = [
   {
     key: 'accountNumber',
-    header: 'Account number',
-    sortable: false,
+    header: 'Account no.',
+    sortable: true,
     render: (row) => createElement(AccountNumber, { value: row.accountNumber, href: `/accounts/${row.accountNumber}` }),
   },
   { key: 'name', header: 'Name', sortable: true },
-  { key: 'currency', header: 'Currency', sortable: false, queryAs: 'CurrencyCode' },
+  { key: 'groupId', header: 'Group', sortable: false, render: (row) => (row.groupCode ? createElement(Mono, null, row.groupCode) : null) },
+  { key: 'classification', header: 'Classification', sortable: true, render: (row) => (row.classification ? createElement(Chip, null, row.classification) : null) },
+  { key: 'status', header: 'Status', sortable: true, render: (row) => createElement(StatusBadge, { status: row.status }) },
   {
     key: 'balance',
     header: 'Balance',
     sortable: true,
     align: 'right',
-    render: (row) =>
-      row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.balance, currency: row.currency, decimalPlaces: row.decimalPlaces, showCurrency: true }),
+    render: (row) => (row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.balance, currency: row.currency, decimalPlaces: row.decimalPlaces })),
   },
   {
     key: 'availableBalance',
-    header: 'Available balance',
+    header: 'Available',
     sortable: false,
     align: 'right',
     render: (row) =>
       row.decimalPlaces === undefined ? null : createElement(Money, { amount: row.availableBalance, currency: row.currency, decimalPlaces: row.decimalPlaces }),
   },
-  { key: 'openedOn', header: 'Opened', sortable: false },
-  { key: 'status', header: 'Status', render: (row) => createElement(StatusBadge, { status: row.status }) },
+  { key: 'currency', header: 'Currency', sortable: true, queryAs: 'CurrencyCode', render: (row) => createElement(Currency, { code: row.currency }) },
+  { key: 'openedOn', header: 'Opened', sortable: false, align: 'right', render: (row) => createElement(Caption, null, formatOpenedOn(row.openedOn)) },
 ];
