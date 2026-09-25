@@ -6,7 +6,7 @@
  *     Then the console frame renders in the typefaces the design system names
  *     And the console asks no third party for a typeface
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 

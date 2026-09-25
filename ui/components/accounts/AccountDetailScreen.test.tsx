@@ -1,9 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountDetailScreen } from './AccountDetailScreen';
+
+let mockSearch = '';
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(mockSearch),
+}));
 
 function jsonResponse(body: unknown, status = 200): { status: number; ok: boolean; text: () => Promise<string> } {
   return { status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body) };
@@ -108,12 +113,60 @@ describe('AccountDetailScreen', () => {
     expect(screen.queryByText(/not found/i)).toBeNull();
   });
 
-  it('shows a loading state before the account lookup settles', () => {
+  it('draws placeholders in the final layout, and no loading line, before the account lookup settles (DRK-1725 R1)', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+    const { container } = render(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })),
+    );
 
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByText(/^Loading/)).toBeNull();
+    expect(screen.getByTestId('account-balance').querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    expect(screen.queryByTestId('account-status')).toBeNull();
+    // The statement's headings are drawn, in a placeholder table hidden from assistive technology.
+    expect(screen.getByRole('columnheader', { name: 'Posting', hidden: true })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(container.querySelectorAll('[data-testid="postings-panel"] tbody [data-slot="skeleton"]')).toHaveLength(40);
+    // The edit form in its final shape: blank, and disabled until the account arrives.
+    for (const label of ['Name', 'Free-form notes', 'Account number', 'Outside reference', 'Overdraft limit', 'Smallest permitted balance']) {
+      expect(screen.getByLabelText(label, { exact: true })).toHaveValue('');
+      expect(screen.getByLabelText(label, { exact: true })).toBeDisabled();
+    }
+    for (const label of ['Group', 'Currency', 'Accounting classification']) expect(screen.getByLabelText(label, { exact: true })).toHaveTextContent(/^$/);
+    expect(screen.getByLabelText('Permitted to go negative')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('keeps the placeholders, and never breaks, when the groups answer before the account', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => (url.includes('/account-groups') ? Promise.resolve(jsonResponse({ items: GROUPS })) : new Promise(() => {})));
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/account-groups'))).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTestId('account-balance').querySelector('[data-slot="skeleton"]')).not.toBeNull();
+  });
+
+  it('keeps the statement loading while the postings are read, the account drawn', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => (url.includes('/postings') ? new Promise(() => {}) : dispatch(true)(url))));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })),
+    );
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+    expect(container.querySelectorAll('[data-testid="postings-panel"] tbody [data-slot="skeleton"]')).toHaveLength(40);
+  });
+
+  it('keeps the statement loading while the currency scale is read, the postings answered', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => (url.includes('/currencies') ? new Promise(() => {}) : dispatch(true)(url))));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })),
+    );
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText('PST0000000001')).toBeNull();
+    expect(container.querySelectorAll('[data-testid="postings-panel"] tbody [data-slot="skeleton"]')).toHaveLength(40);
   });
 
   it('makes no balance or postings call before the account has resolved an id (kills the accountId fallback mutant)', async () => {
@@ -171,7 +224,10 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByLabelText('Outside reference')).toHaveValue(''));
+    // The account itself, not the blank placeholder form drawn while it was read.
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
+    expect(screen.getByLabelText('Outside reference')).toHaveValue('');
+    expect(screen.getByLabelText('Outside reference')).toBeDisabled();
   });
 
   it('never throws, and shows notes blank, for an account with no metadata at all', async () => {
@@ -189,7 +245,9 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue(''));
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
+    expect(screen.getByLabelText('Free-form notes')).toHaveValue('');
+    expect(screen.getByLabelText('Free-form notes')).toBeEnabled();
   });
 
   it("shows a posting's own description and effective date, not blanked to empty", async () => {
@@ -236,7 +294,8 @@ describe('AccountDetailScreen', () => {
     await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
     expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
     expect(screen.getByTestId('account-floor')).toBeEmptyDOMElement();
-    expect(screen.queryByTestId('postings-panel')).toBeNull();
+    // Drawn loading while the postings are read, then gone: no posting at a guessed scale.
+    await waitFor(() => expect(screen.queryByTestId('postings-panel')).toBeNull());
   });
 
   it("finds the account's own currency by code, not merely the first one offered", async () => {
@@ -260,7 +319,7 @@ describe('AccountDetailScreen', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
 
-    await waitFor(() => expect(screen.getByTestId('account-balance')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('account-status')).toBeInTheDocument());
     // Exact match, not a substring one — SGD's own 2 decimal places, never USD's 4 (which
     // would also contain the substring "100.00").
     expect(screen.getByTestId('account-balance').textContent).toMatch(/100\.00(?!\d)/);
@@ -343,7 +402,7 @@ describe('AccountDetailScreen', () => {
     expect(screen.getByLabelText('Direction filter')).toHaveValue('Debit');
     expect(screen.getByLabelText('To')).toHaveValue('2026-09-10');
   });
-  it("shows a refused currency read in the service's own words, and no amount (review round 2 nit 4)", async () => {
+  it("shows a refused currency read in the service's own words, and the balance at the service's own digits, never a guessed scale (DRK-1725 R2)", async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
@@ -357,7 +416,8 @@ describe('AccountDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('The currency list is unavailable.')).toBeInTheDocument());
     expect(screen.getByText('CURRENCIES_DOWN')).toBeInTheDocument();
     expect(screen.getByText(/t-9/)).toBeInTheDocument();
-    expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance$/);
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent(/^Balance100\.00$/));
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('carries every metadata key through a notes change, never erasing the others (review round 2 B1)', async () => {
@@ -379,6 +439,28 @@ describe('AccountDetailScreen', () => {
 
     const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')!);
     expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { source: 'core-banking', region: 'SG', notes: 'Closed for audit' } });
+  });
+
+  it('writes metadata back exactly as the service sent it, even values that spell an enum member (DRK-1734 B1)', async () => {
+    // The service's own wire shape: camelCase enums on the account, free-form text in metadata.
+    const seeded = { ...ACCOUNT, status: 'active', classification: 'liability', metadata: { status: 'active', category: 'payment', type: 'customer', notes: 'Reconciled monthly' } };
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT' || init?.method === 'PATCH') return Promise.resolve(jsonResponse({ id: 'a1' }));
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [seeded] }));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: ['accounts.write'] })));
+
+    await waitFor(() => expect(screen.getByLabelText('Free-form notes')).toHaveValue('Reconciled monthly'));
+    await user.clear(screen.getByLabelText('Free-form notes'));
+    await user.type(screen.getByLabelText('Free-form notes'), 'Closed for audit');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const putCall = await waitFor(() => fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')!);
+    expect(JSON.parse((putCall[1] as RequestInit).body as string)).toEqual({ metadata: { status: 'active', category: 'payment', type: 'customer', notes: 'Closed for audit' } });
   });
 });
 
@@ -443,5 +525,192 @@ describe('AccountDetailScreen — a write refreshes the lookup keyed by account 
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/ledger/accounts/${GUID}`, expect.objectContaining({ method: 'PUT' })));
     await waitFor(() => expect(lookups()).toBeGreaterThan(1));
+  });
+});
+
+describe('AccountDetailScreen — the statement in the address (DRK-1725 §3 row 4)', () => {
+  const EMPTY_PAGE = { items: [], pageNumber: 9, pageSize: 10, pageCount: 3, totalItemCount: 25, hasNextPage: false };
+
+  function renderWith(search: string, postings: unknown, account: Record<string, unknown> = ACCOUNT): ReturnType<typeof vi.fn> {
+    mockSearch = search;
+    window.history.replaceState(null, '', `/accounts/ACME-000123${search ? `?${search}` : ''}`);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [account] }));
+      if (url.includes('/postings')) return Promise.resolve(jsonResponse(postings));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+    return fetchMock;
+  }
+
+  function postingQueries(fetchMock: ReturnType<typeof vi.fn>): URLSearchParams[] {
+    return fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/ledger/postings?')).map((url) => new URLSearchParams(url.split('?')[1]));
+  }
+
+  afterEach(() => {
+    mockSearch = '';
+  });
+
+  it('reads the period and page from the address, a page of 10', async () => {
+    const fetchMock = renderWith('from=2026-01-01&to=2026-01-31&page=2', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 });
+    await waitFor(() => expect(postingQueries(fetchMock)).toHaveLength(1));
+    const query = postingQueries(fetchMock)[0];
+    expect([query.get('from'), query.get('to'), query.get('pageNumber'), query.get('pageSize')]).toEqual(['2026-01-01', '2026-01-31', '2', '10']);
+  });
+
+  it('states a period it refuses to send in place of the statement, never loading', async () => {
+    const fetchMock = renderWith('from=2026-01-01', EMPTY_PAGE);
+    expect(await screen.findByRole('cell', { name: /^The period may span at most 90 days\.$|^The period start must not be after its end\.$/ })).toBeInTheDocument();
+    expect(postingQueries(fetchMock)).toHaveLength(0);
+  });
+
+  it('asks for no page at all when the address names none', async () => {
+    const fetchMock = renderWith('', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 });
+    await waitFor(() => expect(postingQueries(fetchMock)).toHaveLength(1));
+    expect(postingQueries(fetchMock)[0].get('pageNumber')).toBeNull();
+    expect(postingQueries(fetchMock)[0].get('pageSize')).toBe('10');
+  });
+
+  it('ignores a page in the address that is no page number', async () => {
+    const fetchMock = renderWith('page=zero', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 });
+    await waitFor(() => expect(postingQueries(fetchMock)).toHaveLength(1));
+    expect(postingQueries(fetchMock)[0].get('pageNumber')).toBeNull();
+  });
+
+  it('says the account has no postings when it never had one and no period was asked for', async () => {
+    renderWith('', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 }, { ...ACCOUNT, streamPosition: 0 });
+    expect(await screen.findByRole('cell', { name: 'No postings recorded on this account.' })).toBeInTheDocument();
+  });
+
+  it('names the default period when the account has postings, only none in it', async () => {
+    renderWith('', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 }, { ...ACCOUNT, streamPosition: 4 });
+    expect(await screen.findByRole('cell', { name: /^No postings between \d{1,2} [A-Z][a-z]{2} and \d{1,2} [A-Z][a-z]{2}\.$/ })).toBeInTheDocument();
+  });
+
+  it('names the period the address asked for, even for an account that never had a posting', async () => {
+    renderWith('from=2026-01-01&to=2026-01-31', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 }, { ...ACCOUNT, streamPosition: 0 });
+    expect(await screen.findByRole('cell', { name: 'No postings between 1 Jan and 31 Jan.' })).toBeInTheDocument();
+  });
+
+  const TODAY = new Date().toISOString().slice(0, 10);
+
+  it.each([`from=${TODAY}`, `to=${TODAY}`])('names the period when the address sets only %s, even for an account that never had a posting', async (search) => {
+    renderWith(search, { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 }, { ...ACCOUNT, streamPosition: 0 });
+    expect(await screen.findByRole('cell', { name: /^No postings between / })).toBeInTheDocument();
+  });
+
+  it('draws a posting at its currency scale, never at the digits the service wrote', async () => {
+    renderWith('', { ...EMPTY_PAGE, items: [{ ...POSTING, amount: '50' }], totalItemCount: 1, pageCount: 1 });
+    const row = (await screen.findByText('PST0000000001')).closest('tr')!;
+    expect(row).toHaveTextContent('50.00');
+  });
+
+  it('says there are no more postings past the last page, and links the pages there are', async () => {
+    renderWith('page=9', EMPTY_PAGE);
+    expect(await screen.findByRole('cell', { name: 'No more postings.' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Page \d$/ }).map((button) => button.textContent)).toEqual(['Page 1', 'Page 2', 'Page 3']);
+  });
+
+  it('opens a page into the address and reads it', async () => {
+    const fetchMock = renderWith('page=9', EMPTY_PAGE);
+    fireEvent.click(await screen.findByRole('button', { name: 'Page 2' }));
+    await waitFor(() => expect(postingQueries(fetchMock).at(-1)!.get('pageNumber')).toBe('2'));
+    expect(window.location.pathname + window.location.search).toBe('/accounts/ACME-000123?page=2');
+    expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Page 1' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('puts a changed period into the address and starts it on its first page', async () => {
+    const fetchMock = renderWith('page=9', EMPTY_PAGE);
+    await screen.findByRole('cell', { name: 'No more postings.' });
+    // A one-day period ending on the default period's last day — well inside the 90-day cap.
+    const to = (screen.getByLabelText('To', { exact: true }) as HTMLInputElement).value;
+    fireEvent.change(screen.getByLabelText('From', { exact: true }), { target: { value: to } });
+    await waitFor(() => expect(postingQueries(fetchMock).at(-1)!.get('from')).toBe(to));
+    expect(postingQueries(fetchMock).at(-1)!.get('pageNumber')).toBeNull();
+    expect(new URLSearchParams(window.location.search).get('from')).toBe(to);
+    expect(new URLSearchParams(window.location.search).get('to')).toBe(to);
+    expect(new URLSearchParams(window.location.search).get('page')).toBeNull();
+  });
+
+  it('says nothing matches a narrowing, and drops the page from the address', async () => {
+    const fetchMock = renderWith('page=9', EMPTY_PAGE);
+    await screen.findByRole('cell', { name: 'No more postings.' });
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ items: [ACCOUNT] }));
+      if (url.includes('/postings')) return Promise.resolve(jsonResponse({ ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 }));
+      return dispatch(true)(url);
+    });
+    await userEvent.selectOptions(screen.getByLabelText('Direction filter', { exact: true }), 'Debit');
+    expect(await screen.findByRole('cell', { name: 'No postings match this filter.' })).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe('/accounts/ACME-000123');
+  });
+
+  it('keeps the period in the address, dropping only the page, when a narrowing changes', async () => {
+    renderWith('from=2026-01-01&to=2026-01-31&page=9', EMPTY_PAGE);
+    await screen.findByRole('cell', { name: 'No more postings.' });
+    await userEvent.selectOptions(screen.getByLabelText('Direction filter', { exact: true }), 'Debit');
+    expect(window.location.search).toBe('?from=2026-01-01&to=2026-01-31');
+  });
+
+  it('keeps an address with no page when a narrowing changes', async () => {
+    renderWith('from=2026-01-01&to=2026-01-31', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 });
+    await screen.findByRole('cell', { name: 'No postings between 1 Jan and 31 Jan.' });
+    const pushState = vi.spyOn(window.history, 'pushState');
+    await userEvent.selectOptions(screen.getByLabelText('Direction filter', { exact: true }), 'Debit');
+    expect(window.location.search).toBe('?from=2026-01-01&to=2026-01-31');
+    expect(pushState).not.toHaveBeenCalled();
+    pushState.mockRestore();
+  });
+
+  it('states a failed statement read in the postings panel only, with a way to try again', async () => {
+    mockSearch = '';
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/postings')) return Promise.resolve(jsonResponse({ errors: [{ message: 'The ledger service cannot be reached.' }] }, 502));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    const panel = await screen.findByTestId('postings-panel');
+    await waitFor(() => expect(within(panel).getByRole('alert')).toHaveTextContent('The ledger service cannot be reached.'));
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+
+    fetchMock.mockImplementation(dispatch(true));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Retry' }));
+    expect(await within(panel).findByText('PST0000000001')).toBeInTheDocument();
+  });
+
+  it('states a failed account read where the account would be, with a way to try again', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/accounts?filter=')) return Promise.resolve(jsonResponse({ errors: [{ message: 'Ledger store unavailable' }] }, 503));
+      return dispatch(true)(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+    fetchMock.mockImplementation(dispatch(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByTestId('account-balance')).toHaveTextContent('100.00'));
+  });
+
+  it('offers Retry on a failed currency read, and draws the amounts at their scale once it answers', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      url.includes('/currencies') ? Promise.resolve(jsonResponse({ errors: [{ message: 'Currencies were refused.' }] }, 503)) : dispatch(true)(url),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountDetailScreen, { accountNumber: 'ACME-000123', grantedScopes: [] })));
+
+    await screen.findByText('Currencies were refused.');
+    fetchMock.mockImplementation(dispatch(true));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]);
+    await waitFor(() => expect(screen.queryByText('Currencies were refused.')).toBeNull());
   });
 });

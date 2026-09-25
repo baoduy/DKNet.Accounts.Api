@@ -8,7 +8,8 @@ reconcile against.
   group, open an account, post, read the balance back, page a statement.
 - **Machine-readable contract:** `GET /openapi/v1.json` on a running instance.
 - **Operations console:** [docs/console.md](docs/console.md) — a Next.js console for signing in
-  with Entra ID and running the service locally alongside it. No screen ships yet.
+  with Entra ID and running the service locally alongside it, opening on an Overview screen with
+  a routed top-bar search, and checked end-to-end against the real stack on every pull request.
 
 > **Delivery status at this commit.** Every route in [the API contract](#the-api-contract) is
 > implemented and exercised by the acceptance suite — reference currencies, account groups, accounts,
@@ -60,7 +61,9 @@ must be running before `dotnet test` — the scenarios are asserted against the 
 a deployment uses, not an in-memory stand-in.
 
 `docker-compose.yml` runs the whole local stack instead — Postgres, Redis, this API and the
-[operations console](docs/console.md) — from a copy of `.env.sample`.
+[operations console](docs/console.md), which opens on its Overview screen — from a copy of
+`.env.sample`. The console's own end-to-end check (`docs/console.md#end-to-end-check`) runs this
+same stack under its own compose project, standing in only for Entra ID.
 
 The `Development` profile turns authorization off, turns OpenAPI on, and migrates the database on start
 (`ApiEndpoints/DKNet.Accounts.Api/appsettings.Development.json`). Health is on `/healthz`; the OpenAPI
@@ -630,6 +633,9 @@ people who read `direction` as the sign.
   Reach for this first if you are integrating.
 - [Accounts client (.NET)](docs/accounts-client.md) — the `DKNet.Accounts.Client` NuGet package: a
   typed C# client for calling this service, route coverage by area.
+- [Operations console](docs/console.md) — the Next.js console for signing in and running the
+  service locally, and [its manual verification steps](docs/manual-verification.md) for what its
+  automated checks cannot reach.
 - [docs/index.md](docs/index.md) — the reference docs inherited from the DKNet solution template
   (pipeline, configuration, EF Core events, messaging). Reach for these when you are changing this
   service, not when you are calling it.

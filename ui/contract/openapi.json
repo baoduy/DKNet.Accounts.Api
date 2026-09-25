@@ -94,6 +94,24 @@
         }
       }
     },
+    "/accounts/status-counts": {
+      "get": {
+        "operationId": "getAccountStatusCounts",
+        "summary": "Count accounts per status — every status, a status nothing holds with 0. Only the created-on window narrows it.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StatusCount" } } } }
+          },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
     "/accounts/{id}/balance": {
       "get": {
         "operationId": "getAccountBalance",
@@ -199,7 +217,7 @@
         "summary": "List the reference currency set.",
         "security": [{ "bearer": ["accounts.read"] }],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } } } } }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedCurrencyResponse" } } } }
         }
       },
       "post": {
@@ -302,6 +320,24 @@
         }
       }
     },
+    "/account-groups/status-counts": {
+      "get": {
+        "operationId": "getAccountGroupStatusCounts",
+        "summary": "Count groups per status — every status, a status nothing holds with 0. Only the created-on window narrows it.",
+        "security": [{ "bearer": ["accounts.read"] }],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StatusCount" } } } }
+          },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
     "/account-groups/{id}": {
       "get": {
         "operationId": "getAccountGroup",
@@ -388,10 +424,21 @@
     "schemas": {
       "LedgerBalanceLineDto": {
         "type": "object",
-        "required": ["currency", "balance"],
+        "required": ["currency", "balance", "available", "held"],
         "properties": {
           "currency": { "type": "string" },
-          "balance": { "type": "string" }
+          "balance": { "type": "string" },
+          "available": { "type": "string" },
+          "held": { "type": "string" }
+        }
+      },
+      "StatusCount": {
+        "type": "object",
+        "required": ["type", "status", "count"],
+        "properties": {
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "count": { "type": "integer" }
         }
       },
       "AccountBalanceDto": {
@@ -427,13 +474,15 @@
       },
       "PagedPostingResponse": {
         "type": "object",
-        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/PostingDto" } },
-          "pageIndex": { "type": "integer" },
+          "pageNumber": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "pageCount": { "type": "integer" },
-          "hasNextPage": { "type": "boolean" }
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
         }
       },
       "RecordPostingRequest": {
@@ -441,7 +490,7 @@
         "required": ["accountId", "direction", "amount", "currency", "category"],
         "properties": {
           "accountId": { "type": "string", "format": "uuid" },
-          "direction": { "type": "string", "enum": ["Debit", "Credit"] },
+          "direction": { "type": "string", "enum": ["debit", "credit"] },
           "amount": { "type": "string" },
           "currency": { "type": "string" },
           "category": { "type": "string" },
@@ -478,8 +527,8 @@
           "accountNumber": { "type": "string" },
           "name": { "type": "string" },
           "currency": { "type": "string" },
-          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
-          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "classification": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
+          "status": { "type": "string", "enum": ["active", "frozen", "dormant", "closed"] },
           "balance": { "type": "string" },
           "availableBalance": { "type": "string" },
           "heldAmount": { "type": "string" },
@@ -513,7 +562,7 @@
           "groupId": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "currency": { "type": "string" },
-          "classification": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+          "classification": { "type": "string", "enum": ["asset", "liability", "equity", "income", "expense"] },
           "permittedToGoNegative": { "type": "boolean" },
           "overdraftLimit": { "type": "string" },
           "minimumBalance": { "type": "string" },
@@ -531,7 +580,7 @@
       "PatchAccountRequest": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "enum": ["Active", "Frozen", "Dormant", "Closed"] },
+          "status": { "type": "string", "enum": ["active", "frozen", "dormant", "closed"] },
           "overdraftLimit": { "type": "string" },
           "minimumBalance": { "type": "string" },
           "permittedToGoNegative": { "type": "boolean" }
@@ -546,11 +595,11 @@
       },
       "AccountGroupType": {
         "type": "string",
-        "enum": ["Customer", "Merchant", "Internal", "Suspense", "Settlement"]
+        "enum": ["customer", "merchant", "internal", "suspense", "settlement"]
       },
       "AccountGroupStatus": {
         "type": "string",
-        "enum": ["Active", "Closed"]
+        "enum": ["active", "closed"]
       },
       "AccountGroupDto": {
         "type": "object",
@@ -596,15 +645,30 @@
           "held": { "type": "string" }
         }
       },
-      "PagedAccountGroupResponse": {
+      "PagedCurrencyResponse": {
         "type": "object",
-        "required": ["items", "pageIndex", "pageSize", "pageCount", "hasNextPage"],
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
         "properties": {
-          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
-          "pageIndex": { "type": "integer" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/CurrencyDto" } },
+          "pageNumber": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "pageCount": { "type": "integer" },
-          "hasNextPage": { "type": "boolean" }
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
+        }
+      },
+      "PagedAccountGroupResponse": {
+        "type": "object",
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
+          "pageNumber": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
         }
       },
       "ErrorItem": {

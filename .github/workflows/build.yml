@@ -104,3 +104,52 @@ jobs:
       - name: Acceptance tests
         working-directory: ui
         run: pnpm run test:acceptance
+
+      - name: Upload acceptance traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-acceptance-traces
+          path: ui/test-results/
+          retention-days: 7
+
+  # DRK-1725 §3 "The end-to-end check": the repository's own stack (service, postgres, redis and
+  # the console, built from this commit) with only Microsoft Entra ID replaced by the acceptance
+  # suite's stand-in, which the check starts inside that stack. No directory credentials (R4).
+  console-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ui/package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: ui
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end check
+        working-directory: ui
+        run: pnpm run test:e2e
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-e2e-traces
+          path: ui/test-results/
+          retention-days: 7

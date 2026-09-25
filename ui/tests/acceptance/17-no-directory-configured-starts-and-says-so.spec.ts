@@ -6,11 +6,11 @@
  *     Then Mai sees a page stating that sign-in is not configured
  *     And Mai is not sent to Microsoft Entra ID
  */
-import { expect, test } from '@playwright/test';
-import { defaultConsoleEnv } from '../support/fixtures';
+import { expect, test } from '../support/test';
+import { defaultConsoleEnv, OWN_CONSOLE_PORT } from '../support/fixtures';
 import { startConsole, stopConsole } from '../support/console-process';
 
-const PORT = 3205;
+const PORT = OWN_CONSOLE_PORT;
 const BASE = `http://127.0.0.1:${PORT}`;
 
 test('A console with no directory configured starts and says so', async ({ page }) => {

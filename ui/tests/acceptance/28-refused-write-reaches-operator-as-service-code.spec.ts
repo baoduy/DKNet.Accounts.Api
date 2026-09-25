@@ -11,7 +11,7 @@
  * implemented yet (row 5 is a stub that always throws), so this is RED on the first
  * assertion.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

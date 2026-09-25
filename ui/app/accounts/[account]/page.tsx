@@ -5,6 +5,7 @@ import { AccountDetailScreen } from '@/components/accounts/AccountDetailScreen';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
+import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
@@ -47,19 +48,22 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
     <AppShell
       sidebar={<Sidebar active="accounts" />}
       topbarRight={
-        <UserMenu
-          name={session.displayName}
-          email={session.signInName}
-          tenant={session.tenantName}
-          scopes={grantedScopes}
-          missingScopes={missingScopes}
-          objectId={session.directoryObjectId}
-        />
+        <>
+          <TopBarSearch grantedScopes={grantedScopes} />
+          <UserMenu
+            name={session.displayName}
+            email={session.signInName}
+            tenant={session.tenantName}
+            scopes={grantedScopes}
+            missingScopes={missingScopes}
+            objectId={session.directoryObjectId}
+          />
+        </>
       }
     >
       <PageHeader title={accountNumber} description="Balance, floor and postings for this account." />
       <Suspense>
-        <AccountDetailScreen accountNumber={accountNumber} grantedScopes={grantedScopes} />
+        <AccountDetailScreen accountNumber={accountNumber} grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
       </Suspense>
     </AppShell>
   );

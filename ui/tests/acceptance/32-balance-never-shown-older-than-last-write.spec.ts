@@ -8,7 +8,7 @@
  * Proves row 9's "invalidate on success" behaviour (DRK-1679 §9 Q2: invalidate-and-refetch,
  * never an optimistic number). RED today: the harness page 500s before any balance renders.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

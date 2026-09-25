@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
-import { RefusalAlert } from './RefusalAlert';
+import { describe, expect, it, vi } from 'vitest';
+import { LedgerRefusalError } from '@/lib/api/refusal';
+import { FailedRead, RefusalAlert } from './RefusalAlert';
 
 describe('RefusalAlert', () => {
   it('always shows the refusal code when one is present', () => {
@@ -30,5 +31,34 @@ describe('RefusalAlert', () => {
   it('renders the retry affordance when one is passed', () => {
     render(createElement(RefusalAlert, { errors: [{ message: 'Timed out.' }], retry: createElement('button', null, 'Retry') }));
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('is announced as an alert, the service wording first and its code after it', () => {
+    render(createElement(RefusalAlert, { errors: [{ code: 'INVALID_DATE_RANGE', message: 'The period is too wide' }] }));
+    const alert = screen.getByRole('alert');
+    expect(alert.querySelector('li')).toHaveTextContent(/^The period is too wide INVALID_DATE_RANGE$/);
+    expect(screen.getByText('INVALID_DATE_RANGE')).toHaveClass('font-mono');
+  });
+
+  it('draws a line with no code as the wording alone', () => {
+    render(createElement(RefusalAlert, { errors: [{ message: 'Ledger store unavailable' }] }));
+    expect(screen.getByRole('alert').querySelector('li')).toHaveTextContent(/^Ledger store unavailable$/);
+  });
+});
+
+describe('FailedRead', () => {
+  it("states a refused read in the service's wording and code, with its trace and a Retry that tries again", () => {
+    const onRetry = vi.fn();
+    render(createElement(FailedRead, { error: new LedgerRefusalError('The period is too wide', 'INVALID_DATE_RANGE', 't-7'), onRetry }));
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('The period is too wide INVALID_DATE_RANGE');
+    expect(alert).toHaveTextContent('Trace: t-7');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('states a read that never reached the service as such', () => {
+    render(createElement(FailedRead, { error: new TypeError('Failed to fetch'), onRetry: vi.fn() }));
+    expect(screen.getByRole('alert').querySelector('li')).toHaveTextContent(/^The ledger service cannot be reached\.$/);
   });
 });

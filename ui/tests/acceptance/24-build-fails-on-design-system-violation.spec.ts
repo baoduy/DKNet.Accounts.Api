@@ -19,7 +19,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const UI_ROOT = path.resolve(TEST_DIR, '..', '..');

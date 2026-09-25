@@ -22,6 +22,7 @@
  *   PATCH  /v1/accounts/:id
  *   GET    /v1/accounts/:accountNumber/balance
  *   GET    /v1/accounts/balances
+ *   GET    /v1/accounts/status-counts        (?from=, ?to= on the account's opened date — DRK-1727 §3 row 2)
  *   GET    /v1/accounts/:accountNumber/statement
  *   GET    /v1/account-groups
  *   GET    /v1/postings                 (?from=, ?to= required; ?accountId=, ?direction=, ?category=, ?status=, ?search=,
@@ -36,6 +37,7 @@
  *   POST   /v1/currencies/:id/activate
  *   POST   /v1/currencies/:id/deactivate
  *   GET    /v1/account-groups            (?filter=, ?search=, ?orderBy=, ?desc=, ?pageNumber=, ?pageSize=)
+ *   GET    /v1/account-groups/status-counts  (?from=, ?to= on the group's created date — DRK-1727 §3 row 2)
  *   POST   /v1/account-groups
  *   GET    /v1/account-groups/:id
  *   PUT    /v1/account-groups/:id
@@ -53,11 +55,21 @@
  *                       written on, until the next reset (DRK-1713 "Controlled clock")
  *   POST   /__drop-next-answer — the next `POST /v1/postings` is recorded, then its connection is
  *                       dropped before any answer is written ("its answer never reached her")
+ *   POST   /__fail    — `{ method, path, unreachable: true }` or `{ method, path, status, errors }`:
+ *                       every request whose method matches and whose pathname matches `path` (a
+ *                       regular expression, anchored at both ends) is either dropped with no answer
+ *                       ("the service cannot be reached") or answered with that refusal, until
+ *                       `POST /__fail/clear` or the next reset (DRK-1729 "A failed read is stated
+ *                       where it happened")
+ *   POST   /__fail/clear — lifts every `/__fail` rule
+ *   POST   /__clear-currencies — the ledger holds no currency at all, until the next reset
  */
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
-const PORT = Number(process.env.FAKE_LEDGER_PORT ?? 4499);
+// The run's own port, always passed in by `playwright.config.ts` (DRK-1726 R1) — never a default.
+const PORT = Number(process.env.FAKE_LEDGER_PORT);
+if (!Number.isInteger(PORT) || PORT <= 0) throw new Error('FAKE_LEDGER_PORT is not set to a port');
 
 interface AccountFixture {
   id: string;
@@ -101,6 +113,8 @@ interface AccountGroupFixture {
   status: AccountGroupStatus;
   ownerId: string;
   metadata?: Record<string, string>;
+  /** DRK-1727 §3 row 2 — the date the service windows a group status count on (`CreatedOn`). */
+  createdOn?: string;
 }
 
 interface PostingRecord {
@@ -157,6 +171,21 @@ let requestLog: RequestLogEntry[] = [];
 let clockToday: string | null = null;
 let dropNextPostingAnswer = false;
 
+/** DRK-1729 — a read the test has made fail, set through `POST /__fail`. */
+interface FailureRule {
+  method: string;
+  path: RegExp;
+  unreachable: boolean;
+  status: number;
+  errors: ErrorItem[];
+}
+
+let failureRules: FailureRule[] = [];
+
+function failureFor(method: string | undefined, pathname: string): FailureRule | undefined {
+  return failureRules.find((rule) => rule.method === method && rule.path.test(pathname));
+}
+
 function today(): string {
   return clockToday ?? new Date().toISOString().slice(0, 10);
 }
@@ -178,6 +207,7 @@ function reset(): void {
   requestLog = [];
   clockToday = null;
   dropNextPostingAnswer = false;
+  failureRules = [];
 }
 
 /** Marks a value to be embedded as a raw, unquoted JSON numeric literal — never routed through `Number`. */
@@ -414,7 +444,9 @@ function pageOf<T>(records: T[], pageNumber: number, pageSize: number): { items:
   const clampedPageNumber = Math.max(1, pageNumber);
   const clampedPageSize = Math.min(1000, Math.max(1, pageSize));
   const pageCount = Math.max(1, Math.ceil(records.length / clampedPageSize));
-  const pageIndex = Math.min(clampedPageNumber, pageCount) - 1;
+  // A page past the last one is an empty page, never the last page again — README.md "Statement
+  // paging": "Reading past the end returns an empty page with 200, never an error" (DRK-1729).
+  const pageIndex = clampedPageNumber - 1;
   const items = records.slice(pageIndex * clampedPageSize, (pageIndex + 1) * clampedPageSize);
   return { items, pageIndex, pageSize: clampedPageSize, pageCount, hasNextPage: pageIndex + 1 < pageCount };
 }
@@ -452,6 +484,49 @@ function decimalPlacesOf(amount: string): number {
   return dot < 0 ? 0 : amount.length - dot - 1;
 }
 
+/** Per-currency lists of each account's balance, available and held text, in first-seen order. */
+function currencyTotals(records: AccountFixture[]): Map<string, { balance: string[]; available: string[]; held: string[] }> {
+  const byCurrency = new Map<string, { balance: string[]; available: string[]; held: string[] }>();
+  for (const account of records) {
+    const current = byCurrency.get(account.currency) ?? { balance: [], available: [], held: [] };
+    current.balance.push(account.balance);
+    current.available.push(account.availableBalance);
+    current.held.push(account.heldAmount);
+    byCurrency.set(account.currency, current);
+  }
+  return byCurrency;
+}
+
+const ACCOUNT_STATUSES = ['Active', 'Frozen', 'Dormant', 'Closed'];
+const GROUP_STATUSES = ['Active', 'Closed'];
+
+/**
+ * Mirrors `MapGetStatusCounts` (`StatusCountsEndpointMapperExtensions.cs`) and
+ * `GetStatusCounts` (`ModelSpecGenericStatusCounts.cs`): only `from`/`to` are accepted (any other
+ * key is refused with 400, `UnsupportedNarrowing`), both bounds inclusive on the record's created
+ * date, and every status of the enum is returned — a status no record holds with 0 — spelled
+ * upper-case, `type` naming the enum.
+ */
+function statusCounts(url: URL, type: string, statuses: string[], records: Array<{ status: string; createdOn: string }>): Response {
+  const unknownKeys = [...new Set(url.searchParams.keys())].filter((key) => !['from', 'to'].includes(key.toLowerCase()));
+  if (unknownKeys.length > 0) {
+    return jsonResponse(
+      { errors: [{ code: 'UnsupportedNarrowing', message: `Unsupported query parameter(s): ${unknownKeys.join(', ')}. Only 'from' and 'to' are accepted.` }] },
+      400,
+    );
+  }
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  if ((from !== null && Number.isNaN(Date.parse(from))) || (to !== null && Number.isNaN(Date.parse(to)))) {
+    return refusal(400, [{ message: 'The from/to window is not a date.' }]);
+  }
+  const inWindow = records.filter((record) => {
+    const created = Date.parse(record.createdOn);
+    return (from === null || created >= Date.parse(from)) && (to === null || created <= Date.parse(to));
+  });
+  return jsonResponse(statuses.map((status) => ({ type, status: status.toUpperCase(), count: inWindow.filter((record) => record.status === status).length })));
+}
+
 async function handle(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const segments = url.pathname.split('/').filter(Boolean);
@@ -480,6 +555,28 @@ async function handle(request: Request): Promise<Response> {
     return jsonResponse({ ok: true });
   }
 
+  if (segments[0] === '__fail' && segments[1] === 'clear' && request.method === 'POST') {
+    failureRules = [];
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__fail' && segments.length === 1 && request.method === 'POST') {
+    const body = (await request.json()) as { method?: string; path: string; unreachable?: boolean; status?: number; errors?: ErrorItem[] };
+    failureRules.push({
+      method: body.method ?? 'GET',
+      path: new RegExp(`^${body.path}$`),
+      unreachable: body.unreachable === true,
+      status: body.status ?? 500,
+      errors: body.errors ?? [],
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  if (segments[0] === '__clear-currencies' && request.method === 'POST') {
+    currencies = [];
+    return jsonResponse({ ok: true });
+  }
+
   if (segments[0] === '__seed' && request.method === 'POST') {
     const seed = (await request.json()) as {
       accounts?: AccountFixture[];
@@ -494,6 +591,7 @@ async function handle(request: Request): Promise<Response> {
         status?: AccountGroupStatus;
         ownerId: string;
         metadata?: Record<string, string>;
+        createdOn?: string;
       }>;
     };
     for (const account of seed.accounts ?? []) {
@@ -541,6 +639,7 @@ async function handle(request: Request): Promise<Response> {
         status: group.status ?? existing?.status ?? 'Active',
         ownerId: group.ownerId,
         metadata: group.metadata,
+        createdOn: group.createdOn ?? existing?.createdOn ?? new Date(0).toISOString(),
       };
       accountGroups.set(merged.id, merged);
     }
@@ -569,11 +668,24 @@ async function handle(request: Request): Promise<Response> {
   }
 
   if (segments[1] === 'accounts' && segments[2] === 'balances' && request.method === 'GET') {
-    const lines = [...accounts.values()].reduce<Map<string, number>>((sum, account) => {
-      sum.set(account.currency, (sum.get(account.currency) ?? 0) + Number(account.balance));
-      return sum;
-    }, new Map());
-    return jsonResponse([...lines.entries()].map(([currency, balance]) => ({ currency, balance: money(String(balance)) })));
+    // `LedgerBalanceLineDto` (`GetLedgerBalances.cs`): one line per currency across every
+    // account, summed as exact decimal text (DRK-1727 §3 row 2) — never through `Number`.
+    return jsonResponse(
+      [...currencyTotals([...accounts.values()]).entries()].map(([currency, totals]) => ({
+        currency,
+        balance: money(addDecimalStrings(totals.balance)),
+        available: money(addDecimalStrings(totals.available)),
+        held: money(addDecimalStrings(totals.held)),
+      })),
+    );
+  }
+
+  if (segments[1] === 'accounts' && segments[2] === 'status-counts' && segments.length === 3 && request.method === 'GET') {
+    return statusCounts(url, 'AccountStatus', ACCOUNT_STATUSES, [...accounts.values()].map((account) => ({ status: account.status, createdOn: account.openedOn })));
+  }
+
+  if (segments[1] === 'account-groups' && segments[2] === 'status-counts' && segments.length === 3 && request.method === 'GET') {
+    return statusCounts(url, 'AccountGroupStatus', GROUP_STATUSES, [...accountGroups.values()].map((group) => ({ status: group.status, createdOn: group.createdOn ?? new Date(0).toISOString() })));
   }
 
   if (segments[1] === 'accounts' && segments[3] === 'balance' && request.method === 'GET') {
@@ -738,7 +850,16 @@ async function handle(request: Request): Promise<Response> {
   // --- Currencies (DRK-1697 §3a) --------------------------------------------------------
 
   if (segments[1] === 'currencies' && segments.length === 2 && request.method === 'GET') {
-    return Response.json(currencies.map(currencyDto));
+    // A page, as the service's generated list route answers (`PagedCurrencyResponse`).
+    return Response.json({
+      items: currencies.map(currencyDto),
+      pageNumber: 1,
+      pageSize: 1000,
+      pageCount: 1,
+      totalItemCount: currencies.length,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    });
   }
 
   if (segments[1] === 'currencies' && segments.length === 2 && request.method === 'POST') {
@@ -806,7 +927,9 @@ async function handle(request: Request): Promise<Response> {
     }
     records = sortRecords(records, orderBy, desc);
     const paged = pageOf(records as unknown as AccountGroupFixture[], pageNumber, pageSize);
-    return Response.json({ ...paged, items: paged.items.map(accountGroupDto) });
+    // The service's own paging fields (`pageNumber`, `totalItemCount`), as `PagedAccountGroupResponse` declares them.
+    const { pageIndex, ...paging } = paged;
+    return Response.json({ ...paging, pageNumber: pageIndex + 1, totalItemCount: records.length, hasPreviousPage: pageIndex > 0, items: paged.items.map(accountGroupDto) });
   }
 
   if (segments[1] === 'account-groups' && segments.length === 2 && request.method === 'POST') {
@@ -955,7 +1078,17 @@ async function handle(request: Request): Promise<Response> {
     const ordered = orderBy ? sortPostings(items, orderBy, url.searchParams.get('desc') === 'true') : items;
 
     const page = pageOf(ordered, Number(url.searchParams.get('pageNumber') ?? '1'), Number(url.searchParams.get('pageSize') ?? '1000'));
-    return jsonResponse({ items: page.items.map(postingDto), pageIndex: page.pageIndex, pageSize: page.pageSize, pageCount: page.pageCount, hasNextPage: page.hasNextPage });
+    // `totalItemCount` is the service's exact count for the whole window, whatever the page size
+    // (`ListPostings.cs`) — the only figure a per-week count may be read from (DRK-1727 R1).
+    return jsonResponse({
+      items: page.items.map(postingDto),
+      pageIndex: page.pageIndex,
+      pageNumber: page.pageIndex + 1,
+      pageSize: page.pageSize,
+      pageCount: page.pageCount,
+      totalItemCount: ordered.length,
+      hasNextPage: page.hasNextPage,
+    });
   }
 
   if (segments[1] === 'postings' && segments.length === 2 && request.method === 'POST') {
@@ -1110,6 +1243,18 @@ async function handle(request: Request): Promise<Response> {
   return refusal(404, [{ message: 'Not found.' }]);
 }
 
+/**
+ * DRK-1732 §3 row 12 — the service writes every enum value camelCase (`SharedConsts.cs:47`), so
+ * this stand-in does too, on the wire only: fixtures, seeds and filters keep the enums' own
+ * spelling. Only a value that is exactly an enum member is rewritten.
+ */
+const WIRE_ENUM_VALUE =
+  /"(direction|category|status|classification|type)":"(Credit|Debit|Transfer|Payment|Fee|Interest|Adjustment|Refund|Reversal|OpeningBalance|Posted|Reversed|Active|Frozen|Dormant|Closed|Asset|Liability|Equity|Income|Expense|Customer|Merchant|Internal|Suspense|Settlement)"/g;
+
+function onTheWire(json: string): string {
+  return json.replace(WIRE_ENUM_VALUE, (_match, field: string, member: string) => `"${field}":"${member[0].toLowerCase()}${member.slice(1)}"`);
+}
+
 const server = createServer((req, res) => {
   const chunks: Buffer[] = [];
   req.on('data', (chunk) => chunks.push(chunk));
@@ -1121,6 +1266,17 @@ const server = createServer((req, res) => {
       body: ['GET', 'HEAD'].includes(req.method ?? 'GET') || body.length === 0 ? undefined : body,
     });
     try {
+      const failure = failureFor(req.method, new URL(request.url).pathname);
+      if (failure?.unreachable) {
+        // No answer at all: the caller's connection ends before a status line is written.
+        req.socket.destroy();
+        return;
+      }
+      if (failure) {
+        res.writeHead(failure.status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ status: failure.status, errors: failure.errors, traceId: randomUUID() }));
+        return;
+      }
       const dropAnswer = dropNextPostingAnswer && req.method === 'POST' && req.url === '/v1/postings';
       const response = await handle(request);
       if (dropAnswer) {
@@ -1130,7 +1286,9 @@ const server = createServer((req, res) => {
         return;
       }
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(Buffer.from(await response.arrayBuffer()));
+      // The service's own routes only: the `/__…` hooks report what the console sent, as sent.
+      const serviceJson = req.url?.startsWith('/v1/') && response.headers.get('content-type')?.includes('application/json');
+      res.end(serviceJson ? onTheWire(await response.text()) : Buffer.from(await response.arrayBuffer()));
     } catch (error) {
       res.writeHead(500, { 'content-type': 'text/plain' });
       res.end(String(error));

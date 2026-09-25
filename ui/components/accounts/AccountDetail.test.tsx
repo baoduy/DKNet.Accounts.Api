@@ -16,7 +16,7 @@
  * AccountDetail.tsx` does not exist yet, so this is RED for a different reason than
  * `Money.test.tsx`'s scenarios, not a duplicate of them).
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
@@ -58,3 +58,18 @@ describe('An amount keeps every digit the service sent', () => {
     expect(screen.getByTestId('account-balance')).toHaveTextContent('9,007,199,254,740,993.75');
   });
 });
+
+describe('AccountDetail — a chosen posting with no account id (DRK-1725)', () => {
+  it('offers no reverse surface when it has no account id to write against', () => {
+    render(
+      createElement(AccountDetail, {
+        account: account({}),
+        postings: [{ id: 'p1', postingNumber: 'PST-1', direction: 'Credit', amount: '5.00', currency: 'SGD', decimalPlaces: 2, effectiveDate: '2026-09-01' }],
+      }),
+    );
+    fireEvent.click(screen.getByText('PST-1'));
+    expect(screen.getByText('PST-1').closest('tr')).toHaveAttribute('data-state', 'selected');
+    expect(screen.queryByRole('button', { name: 'Reverse' })).toBeNull();
+  });
+});
+

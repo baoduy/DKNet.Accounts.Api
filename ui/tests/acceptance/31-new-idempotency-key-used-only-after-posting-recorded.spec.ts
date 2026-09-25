@@ -11,7 +11,7 @@
  * stub — the harness page 500s before a form ever renders, so this is RED on the first
  * assertion (the success step itself is unreachable).
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

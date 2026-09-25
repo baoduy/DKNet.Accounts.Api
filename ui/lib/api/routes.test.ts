@@ -33,7 +33,10 @@ describe('allowedLedgerRoutes', () => {
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/close' });
     expect(routes).toContainEqual({ method: 'POST', pathTemplate: '/account-groups/{id}/activate' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/{id}/balances' });
-    expect(routes).toHaveLength(26);
+    // DRK-1728 §3 row 1 — the two status counts Overview reads.
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts/status-counts' });
+    expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/status-counts' });
+    expect(routes).toHaveLength(28);
   });
 });
 

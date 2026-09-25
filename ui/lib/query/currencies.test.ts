@@ -20,6 +20,21 @@ describe('fetchCurrencies', () => {
     expect(currencies).toEqual([{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }]);
   });
 
+  it("reads the currencies from the service's page (DRK-1732 §3 row 10)", async () => {
+    const page = {
+      items: [{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }],
+      pageNumber: 1,
+      pageSize: 1000,
+      pageCount: 1,
+      totalItemCount: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, page)));
+
+    expect(await fetchCurrencies()).toEqual([{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }]);
+  });
+
   it('throws the service refusal message on a non-ok response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { errors: [{ message: 'Unexpected error.' }] })));
     await expect(fetchCurrencies()).rejects.toThrow('Unexpected error.');

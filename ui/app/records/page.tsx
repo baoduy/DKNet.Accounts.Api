@@ -5,6 +5,7 @@ import { RecordsScreen } from '@/components/records/RecordsScreen';
 import { AppShell } from '@/components/shell/AppShell';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Sidebar } from '@/components/shell/Sidebar';
+import { TopBarSearch } from '@/components/shell/TopBarSearch';
 import { UserMenu } from '@/components/shell/UserMenu';
 import { getConfigMode, loadConfig } from '@/lib/config';
 import { verifyCookieValue } from '@/lib/crypto';
@@ -41,19 +42,22 @@ export default async function RecordsPage(): Promise<JSX.Element> {
     <AppShell
       sidebar={<Sidebar active="records" />}
       topbarRight={
-        <UserMenu
-          name={session.displayName}
-          email={session.signInName}
-          tenant={session.tenantName}
-          scopes={grantedScopes}
-          missingScopes={missingScopes}
-          objectId={session.directoryObjectId}
-        />
+        <>
+          <TopBarSearch grantedScopes={grantedScopes} />
+          <UserMenu
+            name={session.displayName}
+            email={session.signInName}
+            tenant={session.tenantName}
+            scopes={grantedScopes}
+            missingScopes={missingScopes}
+            objectId={session.directoryObjectId}
+          />
+        </>
       }
     >
       <PageHeader title="Records" description="Postings across every account: narrow, search, record and reverse." />
       <Suspense>
-        <RecordsScreen grantedScopes={grantedScopes} />
+        <RecordsScreen grantedScopes={grantedScopes} directoryObjectId={session.directoryObjectId} />
       </Suspense>
     </AppShell>
   );

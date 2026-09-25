@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import type { LedgerAccountFixture, LedgerPostingFixture } from './ledger';
 
 /**
- * DRK-1713 — how the acceptance specs 63 onward drive the Records screen (`/records`). The
+ * DRK-1713 — how the acceptance specs 64 to 82 and 96 drive the Records screen (`/records`). The
  * names below are the screen's contract with these specs; every one follows a control the
  * account detail screen (`PostingsPanel`, `RecordPostingForm`, `ReversePostingForm`) or the
  * accounts screen (`AccountsScreen`) already names the same way:
@@ -41,6 +41,11 @@ export function account(accountNumber: string, id: string, overrides: Partial<Le
 
 let postingSequence = 0;
 
+/** Called before every check by `test.ts`, so a check's stream positions never depend on the checks before it. */
+export function resetPostingSequence(): void {
+  postingSequence = 0;
+}
+
 /** A posting fixture; `amount` is the magnitude, `signedAmount` follows the direction. */
 export function posting(fixture: Omit<LedgerPostingFixture, 'streamPosition' | 'signedAmount' | 'balanceAfter'> & Partial<LedgerPostingFixture>): LedgerPostingFixture {
   postingSequence += 1;
@@ -63,9 +68,10 @@ export async function setPeriod(page: Page, from: string, to: string): Promise<v
   await page.getByLabel('From', { exact: true }).fill(from);
 }
 
-/** The Records screen's table body rows. */
+/** The Records screen's posting rows — never the full-width row an empty list states itself in
+ * (a single cell spanning every column, DRK-1729 spec 140). */
 export function recordRows(page: Page): Locator {
-  return page.getByRole('main').locator('tbody tr');
+  return page.getByRole('main').locator('tbody tr:not(:has(> td[colspan]))');
 }
 
 export function recordRow(page: Page, postingNumber: string): Locator {
@@ -92,6 +98,9 @@ export async function fillRecordForm(
   movement: { accountTerm?: string; accountNumber?: string; direction: 'Credit' | 'Debit'; amount: string; category?: string },
 ): Promise<void> {
   const toggle = page.getByRole('button', { name: 'Record posting', exact: true });
+  // `isVisible` does not wait: read before the screen has drawn, a toggle not yet there would
+  // leave the form closed. Wait until either the toggle or the open form is on screen.
+  await expect(toggle.or(page.getByLabel('Direction', { exact: true })).first()).toBeVisible();
   if (await toggle.isVisible()) await toggle.click();
   if (movement.accountNumber) {
     const picker = page.getByLabel('Account', { exact: true });

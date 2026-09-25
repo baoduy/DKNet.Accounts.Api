@@ -9,7 +9,7 @@
  * Proves row 7's `refetchOnWindowFocus: true` for money-bearing queries. RED today: the
  * harness page 500s, so the first read never happens.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { seedLedgerAccounts } from '../support/ledger';
 import { signInAs } from '../support/sign-in';

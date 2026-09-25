@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DetailList, DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
-import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { emptyMessage, GROUPS_EMPTY } from '@/components/feedback/empty';
+import { FailedRead, RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { usePanelFocus } from '@/components/feedback/use-panel-focus';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { MetadataEditor, type MetadataEntry } from '@/components/forms/MetadataEditor';
 import { CurrencyBalanceList } from '@/components/ledger/CurrencyBalanceList';
@@ -13,12 +15,14 @@ import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable'
 import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { isZeroAmount } from '@/lib/api/money-json';
-import { ledgerErrorTraceId, routeRefusal, toLedgerError } from '@/lib/api/refusal';
+import { routeRefusal } from '@/lib/api/refusal';
 import { accountGroupBalancesKey, accountGroupKey, accountGroupsListKey } from '@/lib/query/keys';
 import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups, ACCOUNT_GROUPS_PAGE_SIZE } from '@/lib/query/groups';
 import type { AccountGroup, AccountGroupType } from '@/lib/query/groups';
 import { useActivateAccountGroup, useCloseAccountGroup, useCreateAccountGroup, useDeleteAccountGroup, useUpdateAccountGroup } from '@/lib/query/mutations';
+import { pushRecent } from '@/lib/recent/store';
 import { parseListViewState, toListViewSearchParams } from '@/lib/url-state';
 import type { ListViewState } from '@/lib/url-state';
 
@@ -28,6 +32,8 @@ import type { ListViewState } from '@/lib/url-state';
  */
 export interface AccountGroupsScreenProps {
   grantedScopes: string[];
+  /** Keys the operator's recently viewed list (DRK-1728 §3 row 8); unset, nothing is kept. */
+  directoryObjectId?: string;
 }
 
 export function AccountGroupsScreen(props: AccountGroupsScreenProps): JSX.Element {
@@ -68,7 +74,7 @@ function metadataToRecord(entries: MetadataEntry[]): Record<string, string> | un
   return nonEmpty.length === 0 ? undefined : Object.fromEntries(nonEmpty.map((entry) => [entry.key, entry.value]));
 }
 
-function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps): JSX.Element {
+function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: AccountGroupsScreenProps): JSX.Element {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // The list's filters/sort/page live in local state, seeded once from the address a fresh
@@ -99,8 +105,9 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
     updateState({ filters, page: undefined, pageSize: undefined });
   }
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelMode, setPanelMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  // `?open=<id>` (the search, a recently viewed entry) opens that group's panel on arrival.
+  const [selectedId, setSelectedId] = useState<string | null>(state.openRecordId ?? null);
+  const [panelMode, setPanelMode] = useState<'view' | 'edit' | 'create' | null>(state.openRecordId ? 'view' : null);
   const [draft, setDraft] = useState<GroupDraft>(BLANK_DRAFT);
   const [editOriginal, setEditOriginal] = useState<GroupEditSnapshot>({ name: '', description: '', metadata: [] });
   const [fieldErrors, setFieldErrors] = useState<Record<string, LedgerError>>({});
@@ -127,6 +134,12 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
   const balances = balancesQuery.data ?? [];
   const holdsBalance = balances.some((line) => !isZeroAmount(line.balance));
   const holdsAccount = balances.length > 0;
+  const panelRef = usePanelFocus<HTMLDivElement>(panelMode !== null);
+
+  // Kept as the group's panel is drawn — before paint, so an operator who moves straight on still has it.
+  useLayoutEffect(() => {
+    if (directoryObjectId && selectedId) pushRecent(directoryObjectId, 'AccountGroup', selectedId);
+  }, [directoryObjectId, selectedId]);
 
   const createGroup = useCreateAccountGroup();
   const updateGroup = useUpdateAccountGroup();
@@ -164,6 +177,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
   function closePanel(): void {
     setSelectedId(null);
     setPanelMode(null);
+    if (state.openRecordId) updateState({ openRecordId: undefined });
     resetFormState();
   }
 
@@ -286,25 +300,34 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
           </Button>
         </ScopeGate>
 
-        {panelMode === null ? (
-          <div className="flex items-end gap-4">
-            <label className="flex flex-col gap-1">
-              Status filter
-              <select aria-label="Status filter" value={state.filters.status ?? ''} onChange={(event) => setFilter('status', event.target.value)}>
-                <option value="">Any</option>
-                <option value="Active">Active</option>
-                <option value="Closed">Closed</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              Owner filter
-              <Input aria-label="Owner filter" value={state.filters.ownerId ?? ''} onChange={(event) => setFilter('ownerId', event.target.value)} />
-            </label>
-          </div>
-        ) : null}
+        <div className="flex items-end gap-4">
+          <label className="flex flex-col gap-1">
+            Status filter
+            <select aria-label="Status filter" value={state.filters.status ?? ''} onChange={(event) => setFilter('status', event.target.value)}>
+              <option value="">Any</option>
+              <option value="Active">Active</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            Type filter
+            <select aria-label="Type filter" value={state.filters.type ?? ''} onChange={(event) => setFilter('type', event.target.value)}>
+              <option value="">Any</option>
+              {GROUP_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            Owner filter
+            <Input aria-label="Owner filter" value={state.filters.ownerId ?? ''} onChange={(event) => setFilter('ownerId', event.target.value)} />
+          </label>
+        </div>
 
         {listQuery.isError ? (
-          <RefusalAlert errors={[toLedgerError(listQuery.error)]} traceId={ledgerErrorTraceId(listQuery.error)} />
+          <FailedRead error={listQuery.error} onRetry={() => void listQuery.refetch()} />
         ) : (
           <LedgerTable
             columns={columns}
@@ -315,7 +338,8 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
             orderBy={state.sort?.field}
             desc={state.sort?.desc}
             onSort={(field) => updateState({ sort: { field, desc: state.sort?.field === field && !state.sort.desc } })}
-            emptyMessage="No groups match this filter."
+            loading={listQuery.isPending}
+            emptyMessage={emptyMessage(GROUPS_EMPTY, { total: listQuery.data?.totalItemCount ?? 0, page: currentPage, filtered: Object.values(state.filters).some(Boolean) })}
           />
         )}
 
@@ -335,7 +359,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
       </div>
 
       {panelMode !== null ? (
-        <div data-testid="detail-panel" className="w-96 flex-none">
+        <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="w-96 flex-none">
           <DetailPanel
             title={panelTitle}
             onClose={closePanel}
@@ -417,7 +441,9 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                 ) : null}
                 <DetailSection>Balances</DetailSection>
                 {balancesQuery.isError ? (
-                  <RefusalAlert errors={[toLedgerError(balancesQuery.error)]} traceId={ledgerErrorTraceId(balancesQuery.error)} />
+                  <FailedRead error={balancesQuery.error} onRetry={() => void balancesQuery.refetch()} />
+                ) : balancesQuery.isPending ? (
+                  <Skeleton className="w-full" />
                 ) : (
                   <CurrencyBalanceList
                     balances={balances.map((line) => ({ currency: line.currency, amount: line.balance, decimalPlaces: fractionDigits(line.balance) }))}
@@ -427,7 +453,7 @@ function AccountGroupsScreenContent({ grantedScopes }: AccountGroupsScreenProps)
                 {alertErrors.length ? <RefusalAlert errors={alertErrors} traceId={traceId} /> : null}
               </>
             ) : panelMode === 'view' && viewQuery.isError ? (
-              <RefusalAlert errors={[toLedgerError(viewQuery.error)]} traceId={ledgerErrorTraceId(viewQuery.error)} />
+              <FailedRead error={viewQuery.error} onRetry={() => void viewQuery.refetch()} />
             ) : panelMode === 'edit' || panelMode === 'create' ? (
               <>
                 <label className="flex flex-col gap-1">

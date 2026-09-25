@@ -24,7 +24,7 @@
  *   light --badge-neutral-bg #f1f5f9 / --badge-neutral-fg #334155
  *   dark  --badge-neutral-bg #1e293b / --badge-neutral-fg #cbd5e1
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 type Theme = 'light' | 'dark';
 

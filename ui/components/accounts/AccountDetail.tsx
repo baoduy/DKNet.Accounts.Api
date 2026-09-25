@@ -18,10 +18,11 @@ import { FloorLine } from '@/components/ledger/FloorLine';
 import { Money } from '@/components/ledger/Money';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useChangeAccountDetails, useSetAccountControls } from '@/lib/accounts/mutations';
 import { AccountForm, type AccountFormValues } from './AccountForm';
 import { AccountStatusControl } from './AccountStatusControl';
-import { PostingsPanel, type PostingsPanelFilter, type PostingsPanelRow } from './PostingsPanel';
+import { PostingsPanel, type PostingsPanelFilter, type PostingsPanelProps, type PostingsPanelRow } from './PostingsPanel';
 import { RecordPostingForm } from './RecordPostingForm';
 import { ReversePostingForm } from './ReversePostingForm';
 
@@ -52,13 +53,21 @@ export interface AccountDetailAccount {
 }
 
 export interface AccountDetailProps {
-  /** `null` — never a fall-back to another account's data — when the address names no account. */
-  account: AccountDetailAccount | null;
+  /** `null` — never a fall-back to another account's data — when the address names no account;
+   * `undefined` while the account is still being read, drawn as placeholders in its final shape. */
+  account: AccountDetailAccount | null | undefined;
   /** The account's own guid. Gates the write surfaces (see file comment); absent in the
    * presentational unit test, always supplied by `AccountDetailScreen`. */
   accountId?: string;
   grantedScopes?: string[];
   postings?: PostingsPanelRow[];
+  /** The statement is still being read. */
+  postingsLoading?: boolean;
+  postingsFailure?: PostingsPanelProps['failure'];
+  postingsEmptyMessage?: string;
+  postingsPage?: number;
+  postingsPageCount?: number;
+  onPostingsPageChange?: (page: number) => void;
   postingsFrom?: string;
   postingsTo?: string;
   postingsFilter?: PostingsPanelFilter;
@@ -66,6 +75,19 @@ export interface AccountDetailProps {
   onPostingsPeriodChange?: (from: string, to: string) => void;
   style?: CSSProperties;
 }
+
+const BLANK_FORM_ACCOUNT = {
+  accountNumber: '',
+  groupName: '',
+  name: '',
+  currency: '',
+  classification: '',
+  externalReference: '',
+  notes: '',
+  overdraftLimit: null,
+  minimumBalance: null,
+  permittedToGoNegative: false,
+};
 
 function AccountEditPanel({ accountId, account, writeGranted }: { accountId: string; account: AccountDetailAccount; writeGranted: boolean }): JSX.Element {
   const [errors, setErrors] = useState<LedgerError[]>([]);
@@ -127,6 +149,12 @@ export function AccountDetail({
   accountId,
   grantedScopes = [],
   postings = [],
+  postingsLoading = false,
+  postingsFailure,
+  postingsEmptyMessage,
+  postingsPage,
+  postingsPageCount,
+  onPostingsPageChange,
   postingsFrom = '',
   postingsTo = '',
   postingsFilter,
@@ -136,7 +164,7 @@ export function AccountDetail({
 }: AccountDetailProps): JSX.Element {
   const [selectedPostingId, setSelectedPostingId] = useState<string | null>(null);
 
-  if (!account) {
+  if (account === null) {
     return (
       <div style={style}>
         <p>Account not found.</p>
@@ -144,30 +172,36 @@ export function AccountDetail({
     );
   }
 
-  const decimalPlaces = account.decimalPlaces;
+  const loading = account === undefined;
+  const decimalPlaces = account?.decimalPlaces;
   const scaleKnown = decimalPlaces !== undefined;
   const selectedPosting = postings.find((posting) => posting.id === selectedPostingId) ?? null;
   const writeGranted = grantedScopes.includes('accounts.write');
+  // While the account is read each value is a placeholder of the height it will take, so nothing
+  // moves when it arrives (DRK-1725 R1).
+  const tile = (amount: string | undefined): JSX.Element | null =>
+    loading ? <Skeleton className="w-32" /> : scaleKnown ? <Money amount={amount!} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null;
 
   return (
     <div style={style} className="flex flex-col gap-6">
       <div className="flex flex-wrap gap-6">
         <div className="flex flex-col gap-1" data-testid="account-balance">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Balance</span>
-          {scaleKnown ? <Money amount={account.balance} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
+          {tile(account?.balance)}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-available-balance">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Available</span>
-          {scaleKnown ? <Money amount={account.availableBalance} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
+          {tile(account?.availableBalance)}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-held-amount">
           <span className="text-[length:var(--text-label-size)] text-muted-foreground">Held</span>
-          {scaleKnown ? <Money amount={account.heldAmount} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null}
+          {tile(account?.heldAmount)}
         </div>
       </div>
 
       <div data-testid="account-floor">
-        {scaleKnown ? (
+        {loading ? <Skeleton className="w-64" /> : null}
+        {account && scaleKnown ? (
           <FloorLine
             account={{
               permittedToGoNegative: account.permittedToGoNegative,
@@ -183,10 +217,14 @@ export function AccountDetail({
       </div>
 
       <div className="flex items-center gap-3">
-        <span data-testid="account-status">
-          <StatusBadge status={account.status} />
-        </span>
-        {accountId ? (
+        {account ? (
+          <span data-testid="account-status">
+            <StatusBadge status={account.status} />
+          </span>
+        ) : (
+          <Skeleton className="h-9 w-40" />
+        )}
+        {account && accountId ? (
           <AccountStatusControl
             accountId={accountId}
             status={account.status}
@@ -199,11 +237,25 @@ export function AccountDetail({
         ) : null}
       </div>
 
-      {accountId ? <AccountEditPanel accountId={accountId} account={account} writeGranted={writeGranted} /> : null}
+      {account && accountId ? <AccountEditPanel accountId={accountId} account={account} writeGranted={writeGranted} /> : null}
+      {loading ? (
+        // The edit form in its final shape, disabled and blank until the account arrives.
+        <fieldset disabled className="contents">
+          <AccountForm mode="edit" account={BLANK_FORM_ACCOUNT} writeGranted={writeGranted} />
+        </fieldset>
+      ) : null}
 
-      {scaleKnown ? (
+      {/* Hidden only once the currency list has answered without this account's currency: no
+          posting is ever drawn at a guessed scale. */}
+      {loading || scaleKnown || postingsFailure || postingsLoading ? (
         <PostingsPanel
           rows={postings}
+          loading={loading || postingsLoading}
+          failure={postingsFailure}
+          emptyMessage={postingsEmptyMessage}
+          page={postingsPage}
+          pageCount={postingsPageCount}
+          onPageChange={onPostingsPageChange}
           from={postingsFrom}
           to={postingsTo}
           filter={postingsFilter}
@@ -214,7 +266,7 @@ export function AccountDetail({
         />
       ) : null}
 
-      {accountId ? (
+      {account && accountId ? (
         <RecordPostingForm
           accountId={accountId}
           accountNumber={account.accountNumber}
@@ -223,7 +275,7 @@ export function AccountDetail({
         />
       ) : null}
 
-      {accountId && selectedPosting ? (
+      {account && accountId && selectedPosting ? (
         <ReversePostingForm
           accountId={accountId}
           accountNumber={account.accountNumber}

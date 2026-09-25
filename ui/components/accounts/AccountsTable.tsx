@@ -25,10 +25,11 @@ export interface AccountsTableProps {
   desc?: boolean;
   onSort?: (field: string) => void;
   emptyMessage?: string;
+  loading?: boolean;
   style?: CSSProperties;
 }
 
-export function AccountsTable({ rows, orderBy, desc, onSort, emptyMessage = 'No accounts found.', style }: AccountsTableProps): JSX.Element {
+export function AccountsTable({ rows, orderBy, desc, onSort, emptyMessage = 'No accounts yet.', loading, style }: AccountsTableProps): JSX.Element {
   return (
     <LedgerTable<AccountsTableRow>
       columns={ACCOUNT_COLUMNS}
@@ -38,6 +39,7 @@ export function AccountsTable({ rows, orderBy, desc, onSort, emptyMessage = 'No 
       desc={desc}
       onSort={onSort}
       emptyMessage={emptyMessage}
+      loading={loading}
       style={style}
     />
   );

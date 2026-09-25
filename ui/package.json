@@ -13,6 +13,7 @@
     "verify:contract": "tsx scripts/verify-contract.ts",
     "test:unit": "vitest run",
     "test:acceptance": "playwright test",
+    "test:e2e": "playwright test -c playwright.e2e.config.ts",
     "test:mutation": "stryker run"
   },
   "packageManager": "pnpm@10.34.5",

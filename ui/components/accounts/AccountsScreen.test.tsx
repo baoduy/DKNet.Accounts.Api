@@ -118,3 +118,70 @@ describe('AccountsScreen', () => {
     expect(screen.getByLabelText('Group')).toBeInTheDocument();
   });
 });
+
+describe('AccountsScreen — screen states (DRK-1725 §3)', () => {
+  function withAccounts(page: unknown): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(url.includes('/api/ledger/accounts') ? jsonResponse(page) : fetchDispatcher(url)));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it.each([
+    { search: '', total: 0, message: 'No accounts yet.' },
+    { search: 'status=Frozen', total: 0, message: 'No accounts match this filter.' },
+    { search: 'search=zz', total: 0, message: 'No accounts match this filter.' },
+    { search: 'page=9', total: 25, message: 'No more accounts.' },
+  ])('says $message for an empty list at "$search"', async ({ search, total, message }) => {
+    mockSearch = search;
+    withAccounts({ items: [], pageNumber: 9, pageSize: 10, pageCount: 3, totalItemCount: total });
+    renderScreen();
+    expect(await screen.findByRole('cell', { name: message })).toHaveAttribute('colspan', '7');
+  });
+
+  it('never stands placeholders in for a search too short to send', async () => {
+    mockSearch = 'search=a';
+    withAccounts(ACCOUNTS_PAGE);
+    const { container } = renderScreen();
+    expect(await screen.findByRole('cell', { name: 'No accounts match this filter.' })).toBeInTheDocument();
+    expect(container.querySelector('tbody [data-slot="skeleton"]')).toBeNull();
+  });
+
+  it('offers Retry on a failed list read, keeping the search usable', async () => {
+    const fetchMock = withAccounts(ACCOUNTS_PAGE);
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(url.includes('/api/ledger/accounts') ? jsonResponse({ errors: [{ message: 'Ledger store unavailable' }] }, 503) : fetchDispatcher(url)),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ledger store unavailable');
+    expect(screen.getByLabelText('Search accounts')).toBeEnabled();
+
+    fetchMock.mockImplementation((url: string) => Promise.resolve(fetchDispatcher(url)));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Operating account')).toBeInTheDocument();
+  });
+
+  it('offers Retry on a failed currency read', async () => {
+    const fetchMock = withAccounts(ACCOUNTS_PAGE);
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(url.includes('/api/ledger/currencies') ? jsonResponse({ errors: [{ message: 'Currencies were refused.' }] }, 503) : fetchDispatcher(url)),
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Currencies were refused.');
+
+    fetchMock.mockImplementation((url: string) => Promise.resolve(fetchDispatcher(url)));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.getByRole('option', { name: 'SGD' })).toBeInTheDocument();
+  });
+
+  it('keeps the currency filter on screen, set to all currencies, while the open-account form is up', async () => {
+    withAccounts(ACCOUNTS_PAGE);
+    const user = userEvent.setup();
+    renderScreen(['accounts.write']);
+    expect((screen.getByLabelText('Currency filter', { selector: 'select' }) as HTMLSelectElement).selectedOptions[0]).toHaveTextContent(/^All currencies$/);
+    await user.click(await screen.findByRole('button', { name: 'Open account' }));
+    expect(screen.getByLabelText('Currency filter', { selector: 'select' })).toBeInTheDocument();
+  });
+});

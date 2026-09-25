@@ -298,6 +298,58 @@ describe('RecordPostingForm', () => {
     expect(keyOf(1)).toBe(keyOf(0));
   });
 
+  it("keeps the idempotency key when the pass-through says the service could not be reached, and says it did not answer", async () => {
+    const unreachable = { ok: false, status: 502, json: async () => ({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
+    const fetchMock = vi.fn().mockResolvedValueOnce(unreachable).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Record posting' }));
+    await user.type(screen.getByLabelText('Amount', { exact: true }), '10.00');
+    await recordAndConfirm(user);
+    await waitFor(() => expect(screen.getByText('The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.')).toBeInTheDocument());
+    expect(screen.queryByText('The ledger service cannot be reached.')).toBeNull();
+
+    await recordAndConfirm(user);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const keyOf = (call: number): string => ((fetchMock.mock.calls[call][1] as RequestInit).headers as Record<string, string>)['Idempotency-Key'];
+    expect(keyOf(1)).toBe(keyOf(0));
+  });
+
+  it('closes the confirmation and the form on Escape, records nothing, and puts focus back on Record posting (DRK-1725 §3 row 7)', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Record posting' }));
+    await user.type(screen.getByLabelText('Amount', { exact: true }), '10.00');
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByLabelText('Amount', { exact: true })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Record posting' })).toHaveFocus());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the form open, as typed, on Back', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Record posting' }));
+    await user.type(screen.getByLabelText('Amount', { exact: true }), '10.00');
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByLabelText('Amount', { exact: true })).toHaveValue('10.00');
+    expect(screen.queryByRole('button', { name: 'Record posting' })).toBeNull();
+  });
+
   describe('with no account passed (the Records screen)', () => {
     const ACME = { id: 'a0000000-0000-4000-8000-000000000123', accountNumber: 'ACME-000123', name: 'Acme Operating', currency: 'SGD' };
 

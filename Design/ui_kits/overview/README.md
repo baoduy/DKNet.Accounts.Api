@@ -11,29 +11,22 @@ that way is silently wrong above that.
    posting; `ACME-000123` becomes `filter=AccountNumber:Equal:`; anything else searches
    accounts and groups together. Below two characters nothing is sent, and the field says
    so — the API's `search` has a two-character minimum and would answer `400`.
-2. **Position by currency** — one row per currency carrying a balance. Each row shows
-   Balance, Available and Held, with a bar showing the available/held split. The bar is
+2. **Position by currency** — one row per currency carrying a balance, ledger-wide. Each row
+   shows Balance, Available and Held, with a bar showing the available/held split. The bar is
    scaled to its own row's balance, so the split compares within a currency and never
    across rows. There is no total, and the note says why.
-   Source: `GET /v1/account-groups/{id}/balances`.
-3. **Accounts by status** — donut plus legend, hover to thicken a segment. Blocked on one
-   API addition: `MapGetStatusCounts<Account>` exists in the codebase but is mapped to no
-   route. Counts shown are illustrative and labelled as such.
-4. **Account groups** — status split in the head, type distribution as bars scaled to the
-   largest type. `type` and `status` are both queryable, so each bar is a real filter.
+   Source: `GET /v1/accounts/balances`.
+3. **Accounts by status** and **groups by status** — a table per resource, one row per
+   status. Source: `GET /v1/accounts/status-counts` and `GET /v1/account-groups/status-counts`
+   (`group.MapGetStatusCounts<T>`), each also windowed by `from`/`to` for accounts opened per
+   month, below.
+4. **Postings per week, accounts opened per month** — 13 weekly and 12 monthly bars. Source:
+   `GET /v1/postings?from=…&to=…&pageSize=1` read for its `totalItemCount` (never a count of
+   listed rows), and `GET /v1/accounts/status-counts?from=…&to=…` per month.
 5. **Recently viewed** — last 10, held in `localStorage`, ids resolved on render.
-6. **Not charted, and why** — posting volume over time (no list route), accounts opened
-   per month (`openedOn` is computed, so `orderBy` is a `400`), and one headline total
-   (no rate source). Stated on the screen rather than left as a gap someone fills with a
-   wrong number later.
-
-## What the first version would need to go live
-
-| Insight | Needs |
-|---|---|
-| Accounts by status, groups by status | `group.MapGetStatusCounts<Account>("status", …)` mapped for accounts and groups |
-| Position by currency, ledger-wide | A per-currency aggregate above group scope, or N group-balance reads |
-| Posting volume | `GET /v1/postings` or a postings-count route |
+6. **Not charted, and why** — one headline total across currencies (no rate source, so
+   currencies are never added together). Stated on the screen rather than left as a gap
+   someone fills with a wrong number later.
 
 ## Files
 

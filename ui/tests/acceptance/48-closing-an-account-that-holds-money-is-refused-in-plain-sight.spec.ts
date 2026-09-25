@@ -21,7 +21,7 @@ test('Closing an account that holds money is refused in plain sight', async ({ p
 
   await page.goto(`${baseURL}/accounts/ACME-000123`);
 
-  const closeButton = page.getByRole('button', { name: /close/i });
+  const closeButton = page.getByRole('button', { name: 'Close', exact: true });
   await expect(closeButton).toBeVisible();
   await expect(closeButton).toBeDisabled();
   await expect(page.getByText('12,400.00 SGD')).toBeVisible();

@@ -32,7 +32,9 @@ export function AppShell({
   style,
 }: AppShellProps): JSX.Element {
   return (
-    <div style={style} className="relative flex min-h-full overflow-hidden bg-background">
+    // `overflow-clip`, not `overflow-hidden`: it clips the same without becoming a scroll container,
+    // so the sidebar stays fixed while the page scrolls (Design/README.md "Fixed 224px sidebar").
+    <div style={style} className="relative flex min-h-full overflow-clip bg-background">
       <div
         className="flex min-w-0 flex-1 transition-[padding-right] duration-[var(--duration-panel)] ease-[var(--easing-panel)]"
         style={panelOpen && panelBehavior === 'shift' ? { paddingRight: 'var(--drawer-width)' } : undefined}

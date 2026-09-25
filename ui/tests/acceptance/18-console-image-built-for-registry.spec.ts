@@ -15,13 +15,23 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
+import { RUN_ID } from '../support/fixtures';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
 // Same registry and repository the service image publishes to (docker-publish.yml),
-// with a test-only tag standing in for the pipeline-computed version.
+// with a test-only tag standing in for the pipeline-computed version — this run's own, so a
+// run beside it never overwrites it, and removed once the check is done (DRK-1726 R1, R2).
 const IMAGE_REPOSITORY = 'ghcr.io/baoduy/dknet.accounts-console';
-const IMAGE_TAG = `${IMAGE_REPOSITORY}:acceptance-test`;
+const IMAGE_TAG = `${IMAGE_REPOSITORY}:acceptance-${RUN_ID}`;
+
+test.afterAll(() => {
+  try {
+    execFileSync('docker', ['image', 'rm', IMAGE_TAG], { stdio: 'ignore' });
+  } catch {
+    // Never built — the check failed before its build finished.
+  }
+});
 
 test('The console image is built for the registry the service image uses', async () => {
   const dockerfilePath = path.join(REPO_ROOT, 'ui', 'Dockerfile');

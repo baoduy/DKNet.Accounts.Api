@@ -3,19 +3,17 @@
  *
  * These scenarios drive the real `startConsole`/`stopConsole` (a real `next dev` on scratch
  * ports), not a mock of them — the defect is in what those functions do to an OS-level port,
- * which a mock cannot reproduce. Scratch ports 3301-3303 are chosen outside the ranges already
- * claimed by the shared webServer (3100) and specs 08/15/16/17 (3200-3205), and outside the
- * fake OIDC/Redis fixture ports (4488, 16532) reused below as shared infrastructure.
+ * which a mock cannot reproduce. Every port, the cache container and the sign-in server here
+ * are this file's own (DRK-1726 R1): nothing is adopted from, or stopped for, another run (R2).
  */
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { type ConsoleHandle, startConsole, stopConsole } from '../support/console-process';
-import { FAKE_OIDC_PORT, FAKE_REDIS_PORT, TENANT_DRUNK_CODING, TENANT_OTHER_DIRECTORY, defaultConsoleEnv } from '../support/fixtures';
-
-const UI_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+import { FAKE_OIDC_PORT, FAKE_REDIS_CONTAINER, FAKE_REDIS_PORT, TENANT_DRUNK_CODING, TENANT_OTHER_DIRECTORY, defaultConsoleEnv } from '../support/fixtures';
+import { UI_ROOT, currentRun, freePorts, restoreCheckout } from '../support/run';
 
 function isPortOpen(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -40,54 +38,57 @@ async function waitForPortOpen(port: number, timeoutMs: number): Promise<void> {
   }
 }
 
-/**
- * Kills whatever OS process holds a scratch port, by port rather than by the handle this
- * test happened to spawn — `stopConsole`'s own process-tree bug (the thing under test) means
- * a handle-based kill can leave a real `next-server` child listening after the test ends,
- * which would otherwise poison every later test and leak a process past this run.
- */
-function forceFreePort(port: number): void {
-  try {
-    execFileSync('fuser', ['-k', '-9', `${port}/tcp`], { stdio: 'ignore' });
-  } catch {
-    // fuser exits non-zero when nothing was listening on the port — nothing to clean up.
+async function waitForPortFree(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (await isPortOpen(port)) {
+    if (Date.now() > deadline) {
+      throw new Error(`port ${port} still answered after ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
   }
 }
 
-/** Reuses the shared fake Redis container the acceptance suite also targets — starts it only if absent. */
-async function ensureFakeRedisRunning(): Promise<void> {
-  if (await isPortOpen(FAKE_REDIS_PORT)) return;
-  spawn('docker', ['run', '--rm', '-p', `${FAKE_REDIS_PORT}:6379`, '--name', 'drk1673-fake-redis', 'redis:8-alpine'], {
+/**
+ * Kills the whole process group a console handle leads (`startConsole` spawns `next` detached)
+ * — the handle this file started, never whatever holds a port: `stopConsole`'s own
+ * process-tree bug (the thing under test) could otherwise leave a `next-server` child
+ * listening past this run.
+ */
+function killConsoleGroup(handle: ConsoleHandle): void {
+  if (handle.process.pid === undefined) return;
+  try {
+    process.kill(-handle.process.pid, 'SIGKILL');
+  } catch {
+    // ESRCH — the group already exited.
+  }
+}
+
+const SCRATCH_PORTS = freePorts(4);
+let fakeOidcChild: ChildProcess | undefined;
+
+beforeAll(async () => {
+  spawn('docker', ['run', '--rm', '-p', `127.0.0.1:${FAKE_REDIS_PORT}:6379`, '--name', FAKE_REDIS_CONTAINER, 'redis:8-alpine'], {
     stdio: 'ignore',
     detached: true,
   }).unref();
-  await waitForPortOpen(FAKE_REDIS_PORT, 30_000);
-}
-
-let fakeOidcChild: ChildProcess | undefined;
-
-/** Reuses a fake OIDC issuer already listening (e.g. from the acceptance suite) — starts one only if absent. */
-async function ensureFakeOidcRunning(): Promise<void> {
-  if (await isPortOpen(FAKE_OIDC_PORT)) return;
   fakeOidcChild = spawn('pnpm', ['exec', 'tsx', 'tests/fakes/fake-oidc-issuer.ts'], {
     cwd: UI_ROOT,
     env: { ...process.env, FAKE_OIDC_PORT: String(FAKE_OIDC_PORT) },
     stdio: 'ignore',
+    detached: true,
   });
-  await waitForPortOpen(FAKE_OIDC_PORT, 30_000);
-}
-
-beforeAll(async () => {
-  await ensureFakeRedisRunning();
-  await ensureFakeOidcRunning();
+  await Promise.all([waitForPortOpen(FAKE_REDIS_PORT, 30_000), waitForPortOpen(FAKE_OIDC_PORT, 30_000)]);
 }, 60_000);
 
 afterAll(() => {
-  fakeOidcChild?.kill('SIGKILL');
-  forceFreePort(FAKE_OIDC_PORT);
+  if (fakeOidcChild?.pid !== undefined) process.kill(-fakeOidcChild.pid, 'SIGKILL');
+  try {
+    execFileSync('docker', ['rm', '-f', FAKE_REDIS_CONTAINER], { stdio: 'ignore' });
+  } catch {
+    // Already gone — `--rm` removed it when it stopped.
+  }
+  restoreCheckout(currentRun().tsconfig, SCRATCH_PORTS);
 });
-
-const SCRATCH_PORTS = [3301, 3302, 3303];
 
 function closeServer(server: net.Server): Promise<void> {
   return new Promise((resolve) => server.close(() => resolve()));
@@ -97,21 +98,47 @@ let activeHandles: ConsoleHandle[] = [];
 let activeServers: net.Server[] = [];
 
 afterEach(async () => {
-  for (const handle of activeHandles) {
-    if (!handle.process.killed) handle.process.kill('SIGKILL');
-  }
-  // In-process listeners (the scenario's own `net.createServer()`) must be fully closed
-  // BEFORE forceFreePort runs below — otherwise `fuser -k` finds this very worker process
-  // still holding the port and kills it too, not just the spawned `next dev` child.
+  for (const handle of activeHandles) killConsoleGroup(handle);
   await Promise.all(activeServers.map(closeServer));
   activeHandles = [];
   activeServers = [];
-  for (const port of SCRATCH_PORTS) forceFreePort(port);
 });
 
 describe('console restart harness', () => {
+  test('A console does not outlive the worker that started it', async () => {
+    // DRK-1734 B3: a check that runs out of time never reaches its own `stopConsole`. The
+    // worker (here: a process that starts a console and exits without stopping it) must take
+    // the console down with it, or the next check finds the port taken.
+    const PORT = SCRATCH_PORTS[3];
+    const script = path.join(UI_ROOT, 'tests', `tmp-exits-with-console-${PORT}.ts`);
+    fs.writeFileSync(
+      script,
+      `import { startConsole } from './support/console-process';
+import { defaultConsoleEnv } from './support/fixtures';
+const handle = await startConsole(defaultConsoleEnv(${PORT}), ${PORT});
+process.stdout.write(String(handle.process.pid));
+process.exit(0);
+`,
+    );
+    let consolePid: number | undefined;
+    try {
+      consolePid = Number(execFileSync(path.join(UI_ROOT, 'node_modules', '.bin', 'tsx'), [script], { cwd: UI_ROOT, encoding: 'utf8' }));
+      expect(consolePid).toBeGreaterThan(0);
+      await waitForPortFree(PORT, 10_000);
+    } finally {
+      fs.rmSync(script, { force: true });
+      if (consolePid) {
+        try {
+          process.kill(-consolePid, 'SIGKILL');
+        } catch {
+          // ESRCH — gone, as it should be.
+        }
+      }
+    }
+  }, 90_000);
+
   test('Stopping a console frees its port', async () => {
-    const PORT = 3301;
+    const PORT = SCRATCH_PORTS[0];
 
     const handle = await startConsole(defaultConsoleEnv(PORT), PORT);
     activeHandles.push(handle);
@@ -130,7 +157,7 @@ describe('console restart harness', () => {
   }, 90_000);
 
   test('The harness refuses a port it does not own', async () => {
-    const PORT = 3302;
+    const PORT = SCRATCH_PORTS[1];
 
     const foreign = net.createServer();
     activeServers.push(foreign);
@@ -155,7 +182,7 @@ describe('console restart harness', () => {
   }, 40_000);
 
   test('A replacement console serves its own directory', async () => {
-    const PORT = 3303;
+    const PORT = SCRATCH_PORTS[2];
     const BASE = `http://127.0.0.1:${PORT}`;
 
     let handle = await startConsole(defaultConsoleEnv(PORT), PORT);

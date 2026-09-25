@@ -41,4 +41,8 @@ test('A posting is recorded against the account on screen', async ({ page, baseU
   const body = calls[0] as unknown as { body: { accountId: string; currency: string } };
   expect(body.body.accountId).toBe('ACME-000123');
   expect(body.body.currency).toBe('SGD');
+
+  // The console reads the account again after a recording; let those reads land before the
+  // next check resets the ledger, so none reaches the ledger after it.
+  await page.waitForLoadState('networkidle');
 });

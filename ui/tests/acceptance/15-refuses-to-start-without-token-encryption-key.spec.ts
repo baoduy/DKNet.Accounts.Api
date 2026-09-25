@@ -6,11 +6,11 @@
  *     Then the console does not start
  *     And the console states that the token encryption key is missing
  */
-import { expect, test } from '@playwright/test';
-import { defaultConsoleEnv } from '../support/fixtures';
+import { expect, test } from '../support/test';
+import { defaultConsoleEnv, OWN_CONSOLE_PORT } from '../support/fixtures';
 import { startConsoleExpectingExit } from '../support/console-process';
 
-const PORT = 3203;
+const PORT = OWN_CONSOLE_PORT;
 
 test('The console refuses to start without a token encryption key', async () => {
   const env = defaultConsoleEnv(PORT);

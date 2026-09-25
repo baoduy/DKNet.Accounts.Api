@@ -256,4 +256,19 @@ describe('ReversePostingForm', () => {
     expect(keyOf(1)).toBe(keyOf(0));
     await waitFor(() => expect(screen.queryByLabelText('Reason')).toBeNull());
   });
+
+  it("says the service did not answer when the pass-through could not reach it, keeping the reason (DRK-1725 §3 row 6)", async () => {
+    const unreachable = { ok: false, status: 502, json: async () => ({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(unreachable));
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Reverse' }));
+    await user.type(screen.getByLabelText('Reason'), 'duplicate');
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('The ledger service did not answer. Confirm again to retry; the same idempotency key is sent.')).toBeInTheDocument();
+    expect(screen.queryByText('The ledger service cannot be reached.')).toBeNull();
+    expect(screen.getByLabelText('Reason')).toHaveValue('duplicate');
+  });
 });

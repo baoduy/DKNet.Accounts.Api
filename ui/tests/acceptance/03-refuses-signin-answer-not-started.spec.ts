@@ -6,7 +6,7 @@
  *     Then the console refuses the answer
  *     And no session is opened for Nam
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 
 test('The console refuses a sign-in answer it did not start', async ({ request, baseURL }) => {
   // A callback carrying a `state` the console never issued (R4) — nothing upstream of

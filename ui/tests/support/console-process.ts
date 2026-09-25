@@ -21,6 +21,14 @@ const UI_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
 const NEXT_BIN = path.join(UI_ROOT, 'node_modules', '.bin', 'next');
 const STOP_GRACE_MS = 5_000;
 
+// A check that runs out of time never reaches its own `finally { stopConsole(…) }`, and a
+// detached console outlives the worker that started it — still holding the port the next
+// check starts its console on. The worker kills every console it started when it exits.
+const started = new Set<ChildProcess>();
+process.once('exit', () => {
+  for (const child of started) killConsoleGroup(child, 'SIGKILL');
+});
+
 export interface ConsoleHandle {
   process: ChildProcess;
   stdout: string;
@@ -106,12 +114,14 @@ function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
 }
 
 function spawnNextDev(env: NodeJS.ProcessEnv, port: number): ChildProcess {
-  return spawn(NEXT_BIN, ['dev', '-p', String(port)], {
+  const child = spawn(NEXT_BIN, ['dev', '-p', String(port)], {
     cwd: UI_ROOT,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
+  started.add(child);
+  return child;
 }
 
 /**

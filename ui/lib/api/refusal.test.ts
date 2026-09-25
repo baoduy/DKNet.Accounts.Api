@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LedgerRefusalError, RECORD_POSTING_CODE_FIELDS, ledgerErrorTraceId, refusalError, routeRefusal, toLedgerError } from './refusal';
+import { isUnreachable, LedgerRefusalError, RECORD_POSTING_CODE_FIELDS, ledgerErrorTraceId, refusalError, routeRefusal, toLedgerError, UNREACHABLE_MESSAGE, unreachableBody } from './refusal';
 
 describe('routeRefusal', () => {
   it('routes an entry with a field to fieldErrors, keyed by that field', () => {
@@ -116,5 +116,25 @@ describe('routeRefusal — the record form\'s codes (DRK-1713 §3 row 13)', () =
   it('prefers the entry\'s own field over its code', () => {
     const error = { message: 'Too precise.', code: 'INVALID_POSTING_AMOUNT', field: 'Currency' };
     expect(routeRefusal([error], RECORD_POSTING_CODE_FIELDS).fieldErrors).toEqual({ currency: error });
+  });
+});
+
+describe('the ledger service cannot be reached (DRK-1725 §3 row 6)', () => {
+  it('reads a browser fetch failure as the service not reached, never as its own wording', () => {
+    expect(toLedgerError(new TypeError('Failed to fetch'))).toEqual({ message: 'The ledger service cannot be reached.' });
+  });
+
+  it("builds the pass-through's own 502 answer in the service's refusal shape, with no code", () => {
+    expect(unreachableBody('t-1')).toEqual({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't-1' });
+    expect(UNREACHABLE_MESSAGE).toBe('The ledger service cannot be reached.');
+  });
+
+  it("tells the pass-through's unreachable answer apart from a refusal the service sent", () => {
+    expect(isUnreachable([{ message: 'The ledger service cannot be reached.' }])).toBe(true);
+    expect(isUnreachable([{ message: 'The ledger service cannot be reached.', code: 'SOMETHING' }])).toBe(false);
+    expect(isUnreachable([{ message: 'Ledger store unavailable' }])).toBe(false);
+    expect(isUnreachable([{ message: 'The ledger service cannot be reached.' }, { message: 'The ledger service cannot be reached.' }])).toBe(false);
+    expect(isUnreachable([])).toBe(false);
+    expect(isUnreachable(undefined)).toBe(false);
   });
 });

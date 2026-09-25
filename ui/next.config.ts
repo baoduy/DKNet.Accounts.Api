@@ -24,8 +24,17 @@ export default function config(phase: string): NextConfig {
     // Without this they'd all write into the same `.next/`, corrupting each other's dev
     // build manifests. Production always runs one prebuilt image — never `next dev` — so
     // this never applies there.
+    //
+    // `onDemandEntries`: `next dev` throws away a route's compiled bundle once no request has
+    // reached it for 60 s (beyond the 5 most recent) and compiles it again on the next visit.
+    // Across the suite that recompile landed inside a check's 8 s navigation budget — measured
+    // at up to 9.3 s on one CPU (DRK-1734 B3). Keeping every route this console compiled for
+    // as long as it runs means each route is compiled once per run.
     ...(phase === PHASE_DEVELOPMENT_SERVER && process.env.CONSOLE_PORT
-      ? { distDir: `.next-${process.env.CONSOLE_PORT}` }
+      ? {
+          distDir: `.next-${process.env.CONSOLE_PORT}`,
+          onDemandEntries: { maxInactiveAge: 24 * 60 * 60 * 1000, pagesBufferLength: 100 },
+        }
       : {}),
     // A folder named `__a11y-harness__` is a Next.js "private folder" (leading underscore)
     // and is excluded from routing entirely, so the page lives at `a11y-harness-internal/`

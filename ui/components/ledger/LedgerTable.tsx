@@ -1,6 +1,6 @@
 import type { CSSProperties, JSX, ReactNode } from 'react';
 import { cn } from '@/components/ui/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableEmptyRow, TableHead, TableHeader, TablePlaceholderRows, TableRow, fixedLayout, loadingTableProps, selectableRowProps } from '@/components/ui/table';
 
 export interface LedgerColumn<T = unknown> {
   /** The DTO field name. */
@@ -24,8 +24,15 @@ export interface LedgerTableProps<T = unknown> {
   desc?: boolean;
   onSort?: (field: string) => void;
   emptyMessage?: ReactNode;
+  /** The rows are still being read: the headings stay and placeholder rows stand in (R1). */
+  loading?: boolean;
+  /** How many placeholder rows stand in while loading — the list's page size. */
+  placeholderRows?: number;
   style?: CSSProperties;
 }
+
+/** The console's list page size (`AccountsScreen`, `RecordsScreen`, `ACCOUNT_GROUPS_PAGE_SIZE`). */
+export const LIST_PLACEHOLDER_ROWS = 10;
 
 function keyOf<T>(row: T, rowKey: LedgerTableProps<T>['rowKey'], index: number): string {
   if (typeof rowKey === 'function') return rowKey(row);
@@ -43,14 +50,13 @@ export function LedgerTable<T = unknown>({
   desc = false,
   onSort,
   emptyMessage = 'No rows.',
+  loading = false,
+  placeholderRows = LIST_PLACEHOLDER_ROWS,
   style,
 }: LedgerTableProps<T>): JSX.Element {
-  if (rows.length === 0) {
-    return <p style={style}>{emptyMessage}</p>;
-  }
-
+  const layout = fixedLayout(columns.length);
   return (
-    <Table style={style}>
+    <Table className={layout.className} style={{ ...layout.style, ...style }} {...loadingTableProps(loading)}>
       <TableHeader>
         <TableRow>
           {columns.map((column) => {
@@ -84,14 +90,15 @@ export function LedgerTable<T = unknown>({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((row, index) => {
+        {loading ? <TablePlaceholderRows columns={columns.length} count={placeholderRows} /> : null}
+        {!loading && rows.length === 0 ? <TableEmptyRow columns={columns.length}>{emptyMessage}</TableEmptyRow> : null}
+        {(loading ? [] : rows).map((row, index) => {
           const id = keyOf(row, rowKey, index);
           return (
             <TableRow
               key={id}
               data-state={selectedId != null && String(selectedId) === id ? 'selected' : undefined}
-              className={onSelectRow ? 'cursor-pointer' : undefined}
-              onClick={onSelectRow ? () => onSelectRow(row) : undefined}
+              {...selectableRowProps(onSelectRow ? () => onSelectRow(row) : undefined)}
             >
               {columns.map((column) => (
                 <TableCell key={column.key} className={cn(column.align === 'right' && 'text-right')}>

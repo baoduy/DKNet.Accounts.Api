@@ -6,7 +6,7 @@
  *     Then Mai lands on a page of the console
  *     And Mai is not sent to the other site
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/test';
 import { MAI } from '../support/fixtures';
 import { signInAs } from '../support/sign-in';
 
