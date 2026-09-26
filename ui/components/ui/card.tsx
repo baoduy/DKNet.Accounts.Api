@@ -50,7 +50,7 @@ export function CardTitle({ className, ...props }: ComponentProps<'div'>): JSX.E
 }
 
 export function CardDescription({ className, ...props }: ComponentProps<'div'>): JSX.Element {
-  return <div data-slot="card-description" className={cn('text-muted-foreground text-sm', className)} {...props} />;
+  return <div data-slot="card-description" className={cn('text-caption text-muted-foreground', className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: ComponentProps<'div'>): JSX.Element {

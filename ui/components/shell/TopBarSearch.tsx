@@ -13,6 +13,7 @@ import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Caption } from '@/components/ui/text';
 import { cn } from '@/components/ui/utils';
 import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 import {
@@ -153,9 +154,9 @@ export function TopBarSearch({ grantedScopes, variant = 'topbar' }: TopBarSearch
           if (event.key === 'Escape') dismiss();
         }}
       />
-      <span id={captionId} className="text-[length:var(--text-caption-size)] text-muted-foreground">
+      <Caption id={captionId}>
         {typed.trim().length > 0 ? SEARCH_CAPTIONS[classified.route] : null}
-      </span>
+      </Caption>
       {outcome ? (
         <section
           aria-label="Search results"

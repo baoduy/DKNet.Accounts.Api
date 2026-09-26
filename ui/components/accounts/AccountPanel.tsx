@@ -129,7 +129,7 @@ function PanelBody({
     ) : account ? (
       <span className="flex min-w-0 flex-col gap-1.5">
         <Mono>{account.accountNumber}</Mono>
-        <span className="text-[length:var(--text-table-size)] font-normal text-muted-foreground">{account.name}</span>
+        <span className="text-table font-normal text-muted-foreground">{account.name}</span>
         <span className="inline-flex items-center gap-2">
           <Chip>{account.classification}</Chip>
           <StatusBadge status={account.status} />
@@ -195,7 +195,7 @@ function PanelBody({
         value === undefined || value === null ? notSet : decimalPlaces === undefined ? <>{value}</> : <Money amount={value} decimalPlaces={decimalPlaces} align="left" />;
       return (
         <>
-          <DetailSection divider={false} style={{ marginTop: 0 }}>
+          <DetailSection divider={false}>
             Balances
           </DetailSection>
           {decimalPlaces === undefined ? null : (
@@ -234,7 +234,7 @@ function PanelBody({
           />
           {decimalPlaces === undefined ? null : (
             <FloorLine
-              style={{ marginTop: 'var(--space-3)' }}
+              className="mt-3"
               account={{
                 permittedToGoNegative: account.permittedToGoNegative,
                 overdraftLimit: account.overdraftLimit ?? null,

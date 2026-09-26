@@ -197,11 +197,11 @@ export function ReversePostingForm({
           Required, at most {MAX_REVERSAL_REASON_LENGTH} characters. Stored as the reversal&apos;s description and shown in the reversal lineage — this is the audit trail for the correction.
         </Note>
         {shownReasonError ? (
-          <span role="alert" className="mt-3 block text-[length:var(--text-caption-size)] text-destructive-solid">
+          <span role="alert" className="mt-3 block text-caption text-destructive-solid">
             {shownReasonError.message}
           </span>
         ) : null}
-        <RefusalAlert errors={alertErrors} style={{ marginTop: 'var(--space-3)' }} />
+        <RefusalAlert errors={alertErrors} className="mt-3" />
       </Dialog>
 
       <ConfirmMovement

@@ -161,7 +161,7 @@ export function AccountForm({
         submit();
       }}
     >
-      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-table">
         <FormRow label="Group" required hint={mode === 'open' ? 'The group code becomes the prefix of the account number.' : null}>
           {mode === 'open' ? (
             <>

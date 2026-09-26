@@ -1,6 +1,7 @@
 import type { CSSProperties, JSX, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/components/ui/utils';
 import { ledgerErrorTraceId, toLedgerError } from '@/lib/api/refusal';
 
 export interface LedgerError {
@@ -18,15 +19,16 @@ export interface RefusalAlertProps {
   /** A way to try again — every failed read offers one (DRK-1725 §3, brief Q2). */
   retry?: ReactNode;
   style?: CSSProperties;
+  className?: string;
 }
 
 /** The service's wording, then its code when one came (Design/components/feedback/RefusalAlert.jsx). */
-export function RefusalAlert({ errors, traceId, retry, style }: RefusalAlertProps): JSX.Element | null {
+export function RefusalAlert({ errors, traceId, retry, style, className }: RefusalAlertProps): JSX.Element | null {
   const blockErrors = errors.filter((error) => !error.field);
   if (blockErrors.length === 0) return null;
 
   return (
-    <Card role="alert" style={style} className="border-destructive-solid bg-destructive/5">
+    <Card role="alert" style={style} className={cn('border-destructive-solid bg-destructive/5', className)}>
       <ul className="flex flex-col gap-2">
         {blockErrors.map((error, index) => (
           <li key={index}>
@@ -40,7 +42,7 @@ export function RefusalAlert({ errors, traceId, retry, style }: RefusalAlertProp
           </li>
         ))}
       </ul>
-      {traceId ? <p className="text-[length:var(--text-caption-size)] text-muted-foreground">Trace: {traceId}</p> : null}
+      {traceId ? <p className="text-caption text-muted-foreground">Trace: {traceId}</p> : null}
       {retry ? <div>{retry}</div> : null}
     </Card>
   );

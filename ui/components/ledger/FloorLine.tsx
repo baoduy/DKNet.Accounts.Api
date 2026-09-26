@@ -1,6 +1,7 @@
 import type { CSSProperties, JSX } from 'react';
 import { formatAmount, isNegativeAmount } from '@/components/ledger/Money';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/components/ui/utils';
 
 export interface FloorPolicy {
   permittedToGoNegative: boolean;
@@ -14,6 +15,7 @@ export interface FloorLineProps {
   account: FloorPolicy;
   decimalPlaces?: number;
   style?: CSSProperties;
+  className?: string;
   /**
    * DRK-1684 §3 row 11c — the service's own `AccountBalanceDto.Floor`, exact text. DRK-1760 §3
    * row 11 — the only floor ever drawn: absent while the balance read has not answered, the line
@@ -24,11 +26,17 @@ export interface FloorLineProps {
   failed?: boolean;
 }
 
-export function FloorLine({ account, decimalPlaces = 2, style, floor, failed = false }: FloorLineProps): JSX.Element {
+export function FloorLine({ account, decimalPlaces = 2, style, className, floor, failed = false }: FloorLineProps): JSX.Element {
   // The service's own text, kept exact end to end — never routed through `Number`, which
   // loses digits past `Number.MAX_SAFE_INTEGER` (a real money figure).
   if (floor === undefined) {
-    return failed ? <p style={style}>Floor unavailable — the balance could not be read.</p> : <Skeleton style={style} className="w-64" />;
+    return failed ? (
+      <p style={style} className={className}>
+        Floor unavailable — the balance could not be read.
+      </p>
+    ) : (
+      <Skeleton style={style} className={cn('w-64', className)} />
+    );
   }
 
   const negative = isNegativeAmount(floor);
@@ -39,6 +47,6 @@ export function FloorLine({ account, decimalPlaces = 2, style, floor, failed = f
     : 'not permitted to go negative';
 
   return (
-    <p style={style}>{`Floor ${sign}${formatted} ${account.currency} — ${detail}.`}</p>
+    <p style={style} className={className}>{`Floor ${sign}${formatted} ${account.currency} — ${detail}.`}</p>
   );
 }

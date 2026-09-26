@@ -26,7 +26,7 @@ export function FormRow({ label, hint, required = false, error, children }: Form
       <div className="min-w-0">
         {children}
         {error ? (
-          <p role="alert" className="mt-1.5 text-[length:var(--text-caption-size)] text-destructive-solid">
+          <p role="alert" className="mt-1.5 text-caption text-destructive-solid">
             <span className="font-mono">{error.code}</span> {error.message}
           </p>
         ) : null}
@@ -36,4 +36,4 @@ export function FormRow({ label, hint, required = false, error, children }: Form
   );
 }
 
-export const FORM_GRID = 'grid grid-cols-[92px_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]';
+export const FORM_GRID = 'grid grid-cols-[92px_minmax(0,1fr)] gap-x-4 gap-y-3 text-table';

@@ -32,7 +32,7 @@ export function MetadataEditor({ entries, onChange, readOnly = false, style }: M
 
   if (readOnly) {
     return (
-      <p className="font-mono text-[length:var(--text-caption-size)]" style={style}>
+      <p className="font-mono text-caption" style={style}>
         {entries.map((entry) => `${entry.key}=${entry.value}`).join(' · ')}
       </p>
     );

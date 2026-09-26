@@ -51,7 +51,7 @@ function Tile({ label, granted, results, value, line }: { label: string; granted
         >
           {() => (
             <>
-              <div className="mt-1 text-[length:var(--text-tile-amount-size)] leading-[var(--text-tile-amount-leading)] font-bold tabular-nums">{formatCount(value())}</div>
+              <div className="mt-1 text-tile-amount font-bold tabular-nums">{formatCount(value())}</div>
               <Note className={`mt-0.5 ${LINE_HEIGHT}`}>{line()}</Note>
             </>
           )}
@@ -120,7 +120,7 @@ export function HeadlineTiles({ canReadAccounts, canReadPostings, activity, now 
         line={() => (
           <>
             {`${status(accountCounts, 'Dormant')} dormant · ${status(accountCounts, 'Frozen')} frozen — `}
-            <Mono className="text-[length:var(--text-caption-size)] break-all">{`filter=${ATTENTION_FILTER}`}</Mono>
+            <Mono className="text-caption break-all">{`filter=${ATTENTION_FILTER}`}</Mono>
           </>
         )}
       />

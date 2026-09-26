@@ -402,7 +402,7 @@ function RecentlyViewedPanel({ grantedScopes, directoryObjectId }: { grantedScop
           {entries.map((entry, index) => (
             <li
               key={`${entry.kind}:${entry.id}`}
-              className="flex flex-wrap items-center gap-4 border-t border-border px-(--cell-padding-x) py-(--cell-padding-y) text-[length:var(--text-table-size)] first:border-t-0"
+              className="flex flex-wrap items-center gap-4 border-t border-border px-(--cell-padding-x) py-(--cell-padding-y) text-table first:border-t-0"
             >
               <RecentEntryLine entry={entry} lookup={lookups[index]} granted={grantedScopes.includes(RECENT_KINDS[entry.kind].scope)} />
               <Caption className="ml-auto text-right">{seenAt(entry.openedAt)}</Caption>
@@ -467,9 +467,9 @@ function NotCharted(): JSX.Element {
     <Card role="note" aria-label="Not charted">
       <div>
         <Label>Not charted, and why</Label>
-        <div className="mt-1.5 text-[length:var(--text-table-size)]">One figure an operations dashboard usually carries cannot be drawn against this service.</div>
+        <div className="mt-1.5 text-table">One figure an operations dashboard usually carries cannot be drawn against this service.</div>
       </div>
-      <div className="text-[length:var(--text-table-size)]">
+      <div className="text-table">
         <div className="font-semibold">One headline total</div>
         <Note>Balances are held per currency. A single figure across currencies would need an exchange-rate source this service does not have, so currencies are never added together.</Note>
       </div>

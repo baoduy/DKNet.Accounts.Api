@@ -208,7 +208,7 @@ export function AccountDetail({
   // While the account is read each value is a placeholder of the height it will take, so nothing
   // moves when it arrives (DRK-1725 R1).
   const tile = (amount: string | undefined): JSX.Element | null =>
-    loading ? <Skeleton className="w-32" /> : scaleKnown ? <Money amount={amount!} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null;
+    loading ? <Skeleton className="h-(--text-tile-amount-leading) w-32" /> : scaleKnown ? <Money amount={amount!} decimalPlaces={decimalPlaces} size="tile" align="left" /> : null;
 
   let panel: JSX.Element | null = null;
   if (account && accountId && open === OPEN_EDIT) {
@@ -308,15 +308,15 @@ export function AccountDetail({
 
       <div className="flex flex-wrap gap-6">
         <div className="flex flex-col gap-1" data-testid="account-balance">
-          <span className="text-[length:var(--text-label-size)] text-muted-foreground">Balance</span>
+          <span className="text-label text-muted-foreground">Balance</span>
           {tile(account?.balance)}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-available-balance">
-          <span className="text-[length:var(--text-label-size)] text-muted-foreground">Available</span>
+          <span className="text-label text-muted-foreground">Available</span>
           {tile(account?.availableBalance)}
         </div>
         <div className="flex flex-col gap-1" data-testid="account-held-amount">
-          <span className="text-[length:var(--text-label-size)] text-muted-foreground">Held</span>
+          <span className="text-label text-muted-foreground">Held</span>
           {tile(account?.heldAmount)}
         </div>
       </div>

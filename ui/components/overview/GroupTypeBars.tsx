@@ -56,7 +56,7 @@ export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
                 {GROUP_TYPES.map((type, index) => {
                   const count = typeCounts[index].data!;
                   return (
-                    <li key={type} className="grid grid-cols-[--spacing(24)_minmax(0,1fr)_--spacing(9)] items-center gap-3 text-[length:var(--text-table-size)] leading-(--text-table-leading)">
+                    <li key={type} className="grid grid-cols-[--spacing(24)_minmax(0,1fr)_--spacing(9)] items-center gap-3 text-table">
                       <span>{type}</span>
                       <span role="img" aria-label={`${type}: ${formatCount(count)} groups`} className="block h-2 overflow-hidden rounded-sm bg-muted">
                         <span className="block h-full bg-chart-2" style={{ width: heightOf(count, max) }} />
@@ -74,7 +74,7 @@ export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
       )}
       <Note>
         Bars are scaled to the largest type. Each bar is the service&apos;s count for its type:{' '}
-        <Mono className="text-[length:var(--text-caption-size)]">filter=Type:Equal:Customer</Mono>.
+        <Mono className="text-caption">filter=Type:Equal:Customer</Mono>.
       </Note>
     </Panel>
   );

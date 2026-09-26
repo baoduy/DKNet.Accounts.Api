@@ -21,7 +21,7 @@ export function Switch({ checked = false, onChange, disabled = false, label, sty
       data-field-shell=""
       style={style}
       className={cn(
-        'relative inline-flex items-center gap-2 rounded-sm text-[length:var(--text-table-size)] has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus-ring',
+        'relative inline-flex items-center gap-2 rounded-sm text-table has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus-ring',
         disabled ? 'text-text-disabled' : 'text-foreground',
         className,
       )}

@@ -30,7 +30,7 @@ export function CurrencyBalanceList({ balances, emptyMessage = 'No balances.', s
           </li>
         ))}
       </ul>
-      <p className="text-[length:var(--text-caption-size)] text-muted-foreground">
+      <p className="text-caption text-muted-foreground">
         These balances are not combined into a total — each currency is its own line.
       </p>
     </div>

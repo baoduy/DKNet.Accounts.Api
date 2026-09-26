@@ -380,7 +380,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
         >
           {panelMode === 'view' && viewingGroup ? (
             <>
-              <DetailSection divider={false} style={{ marginTop: 0 }}>
+              <DetailSection divider={false}>
                 Details
               </DetailSection>
               <DetailList

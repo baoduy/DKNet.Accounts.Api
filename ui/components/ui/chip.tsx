@@ -25,7 +25,7 @@ export function Chip({ selected = false, onClick, onKeyDown, className, ...props
         }
       }}
       className={cn(
-        'inline-block rounded-full px-2 py-0.5 text-[length:var(--text-label-size)] leading-[var(--text-label-leading)] whitespace-nowrap',
+        'inline-block rounded-full px-2 py-0.5 text-label whitespace-nowrap',
         selected ? 'bg-surface-selected font-semibold text-foreground' : 'bg-muted text-muted-foreground',
         interactive &&
           'cursor-pointer transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',

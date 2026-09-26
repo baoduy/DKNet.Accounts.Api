@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Money } from '@/components/ledger/Money';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
+import { Note } from '@/components/ui/text';
 
 export interface MovementLeg {
   direction: 'Credit' | 'Debit';
@@ -121,7 +122,7 @@ export function ConfirmMovement({
           .
         </p>
       )}
-      {consequence ? <div className="mt-3 text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-muted-foreground">{consequence}</div> : null}
+      {consequence ? <Note className="mt-3">{consequence}</Note> : null}
     </Dialog>
   );
 }

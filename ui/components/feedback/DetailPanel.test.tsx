@@ -56,14 +56,14 @@ describe('DetailSection', () => {
   it.skip('draws a divider by default and pushes the heading down from it', () => {
     const { container } = render(createElement(DetailSection, null, 'Balances'));
     expect(container.querySelector('[data-slot="separator"]')).not.toBeNull();
-    expect(screen.getByText('Balances')).toHaveClass('text-[length:var(--text-section-size)]', 'font-semibold', 'mt-3');
+    expect(screen.getByText('Balances')).toHaveClass('text-section', 'font-semibold', 'mt-3');
   });
 
   // DRK-1745: rewrite for the new form
   it.skip("omits the divider and the top margin on a panel's first section", () => {
     const { container } = render(createElement(DetailSection, { divider: false }, 'Balances'));
     expect(container.querySelector('[data-slot="separator"]')).toBeNull();
-    expect(screen.getByText('Balances')).toHaveClass('text-[length:var(--text-section-size)]', 'font-semibold');
+    expect(screen.getByText('Balances')).toHaveClass('text-section', 'font-semibold');
     expect(screen.getByText('Balances')).not.toHaveClass('mt-3');
   });
 });

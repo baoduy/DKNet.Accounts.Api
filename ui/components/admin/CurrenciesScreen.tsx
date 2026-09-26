@@ -323,7 +323,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
         >
           {panelMode === 'view' && selected ? (
             <>
-              <DetailSection divider={false} style={{ marginTop: 0 }}>
+              <DetailSection divider={false}>
                 Details
               </DetailSection>
               <DetailList

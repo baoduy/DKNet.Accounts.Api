@@ -105,7 +105,7 @@ function FormRow({ label, hint, required = false, children }: { label: string; h
 function FieldRefusal({ error }: { error?: LedgerError }): JSX.Element | null {
   if (!error) return null;
   return (
-    <span role="alert" className="mt-1.5 block text-[length:var(--text-caption-size)] text-destructive-solid">
+    <span role="alert" className="mt-1.5 block text-caption text-destructive-solid">
       {error.code ? <span className="font-mono font-semibold">{error.code}</span> : null} {error.message}
     </span>
   );
@@ -198,7 +198,7 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
           </>
         }
       >
-        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-table">
           <FormRow
             label="Account"
             required
@@ -268,7 +268,7 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
         <div className="mt-5">
           <IdempotencyKeyField value={idempotency.value} note="Prevents a duplicate posting if this request is retried." />
         </div>
-        <RefusalAlert errors={alertErrors} style={{ marginTop: 'var(--space-4)' }} />
+        <RefusalAlert errors={alertErrors} className="mt-4" />
       </DetailPanel>
 
       <ConfirmMovement
