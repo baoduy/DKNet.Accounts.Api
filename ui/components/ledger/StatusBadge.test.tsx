@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { STATUS_TONE, StatusBadge } from './StatusBadge';
 
-const BASE_CLASS = 'inline-flex w-fit items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
+const BASE_CLASS = 'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-caption font-medium whitespace-nowrap w-fit';
 
 const TONE_CLASS: Record<string, string> = {
   credit: 'bg-badge-credit-bg text-badge-credit-fg',

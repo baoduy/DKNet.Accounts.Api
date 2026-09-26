@@ -1,5 +1,6 @@
 import type { CSSProperties, JSX, ReactNode } from 'react';
 import { CONSOLE_ICONS } from '@/components/shell/icons';
+import { Note } from '@/components/ui/text';
 
 export interface PageHeaderProps {
   icon?: string;
@@ -16,12 +17,12 @@ export function PageHeader({ icon, title, meta, description, actions, style }: P
   return (
     <div style={style} className="flex items-start gap-3">
       <div className="min-w-0">
-        <h1 className="m-0 flex items-center gap-2 text-[length:var(--text-page-title-size)] leading-[var(--text-page-title-leading)] font-bold tracking-[var(--tracking-title)]">
+        <h1 className="m-0 flex items-center gap-2 text-page-title font-bold tracking-[var(--tracking-title)]">
           {IconComponent ? <IconComponent size={20} aria-hidden="true" data-icon={icon} /> : null}
           {title}
         </h1>
         {meta ? <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div> : null}
-        {description ? <div className="mt-1 text-[length:var(--text-caption-size)] text-muted-foreground">{description}</div> : null}
+        {description ? <Note className="mt-1">{description}</Note> : null}
       </div>
       {actions ? <div className="ml-auto flex items-center gap-3">{actions}</div> : null}
     </div>

@@ -44,14 +44,14 @@ export function Dialog({ title, footer, onClose, width = 520, tone = 'default', 
         {title ? (
           <DialogTitle
             className={cn(
-              'm-0 text-[length:var(--text-section-size)] leading-[var(--text-section-leading)] font-semibold',
+              'm-0 text-section font-semibold',
               tone === 'destructive' ? 'text-destructive-solid' : 'text-foreground',
             )}
           >
             {title}
           </DialogTitle>
         ) : null}
-        <div className={cn('text-[length:var(--text-body-size)] leading-[var(--text-section-leading)]', title ? 'mt-3' : undefined)}>{children}</div>
+        <div className={cn('text-body leading-[var(--text-section-leading)]', title ? 'mt-3' : undefined)}>{children}</div>
         {footer !== undefined ? (
           <div data-slot="dialog-footer" className="mt-4 flex gap-2">
             {footer}

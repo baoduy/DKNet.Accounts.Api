@@ -52,12 +52,12 @@ export function Sidebar({ sections = CONSOLE_NAV, active, onNavigate, style }: S
       // whatever the content below holds, and never moves when a screen's data arrives (DRK-1725 R1).
       className="sticky top-0 flex h-dvh w-(--sidebar-width) flex-none flex-col self-start overflow-y-auto border-r border-sidebar-border bg-sidebar p-2 text-sidebar-foreground"
     >
-      <div className="px-2 pt-1 pb-2.5 text-[length:var(--text-panel-title-size)] font-extrabold tracking-[var(--tracking-title)]">
+      <div className="px-2 pt-1 pb-2.5 text-panel-title font-extrabold tracking-[var(--tracking-title)]">
         Accounts
       </div>
       {sections.map((section) => (
         <div key={section.title} className={section.pinToBottom ? 'mt-auto' : undefined}>
-          <div className="px-2 pt-3.5 pb-1 text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-section-label)] text-muted-foreground">
+          <div className="px-2 pt-3.5 pb-1 text-label font-semibold tracking-[var(--tracking-section-label)] text-muted-foreground">
             {section.title}
           </div>
           {section.items.map((item) => (
@@ -84,7 +84,7 @@ function NavItem({ item, active, onNavigate }: { item: NavEntry; active: boolean
           : undefined
       }
       className={cn(
-        'flex items-center gap-2 rounded-md p-2 text-[length:var(--text-table-size)] no-underline',
+        'flex items-center gap-2 rounded-md p-2 text-table no-underline',
         active ? 'bg-surface-selected font-semibold text-foreground' : 'font-normal text-foreground hover:bg-muted',
       )}
     >

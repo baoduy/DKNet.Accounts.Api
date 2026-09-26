@@ -1,5 +1,7 @@
 import type { CSSProperties, JSX } from 'react';
 import { formatAmount, isNegativeAmount } from '@/components/ledger/Money';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/components/ui/utils';
 
 export interface FloorPolicy {
   permittedToGoNegative: boolean;
@@ -9,46 +11,32 @@ export interface FloorPolicy {
   decimalPlaces?: number;
 }
 
-/**
- * The computed floor, mirroring `AccountFloorPolicy.Floor` (`AccountFloorPolicy.cs:32-34`):
- *
- * | permittedToGoNegative | overdraftLimit | floor |
- * |---|---|---|
- * | false | — | `Math.max(0, minimumBalance ?? 0)` |
- * | true  | set | `Math.max(-overdraftLimit, minimumBalance ?? MinValue)` |
- * | true  | **null** | invalid — refused with OVERDRAFT_LIMIT_REQUIRED |
- */
-export function computeFloor(
-  policy: Pick<FloorPolicy, 'permittedToGoNegative' | 'overdraftLimit' | 'minimumBalance'>,
-): number | null {
-  if (policy.permittedToGoNegative) {
-    if (policy.overdraftLimit === null || policy.overdraftLimit === undefined) return null;
-    const minimum = policy.minimumBalance === null || policy.minimumBalance === undefined ? Number.MIN_SAFE_INTEGER : Number(policy.minimumBalance);
-    return Math.max(-Number(policy.overdraftLimit), minimum);
-  }
-  const minimum = policy.minimumBalance === null || policy.minimumBalance === undefined ? 0 : Number(policy.minimumBalance);
-  return Math.max(0, minimum);
-}
-
 export interface FloorLineProps {
   account: FloorPolicy;
   decimalPlaces?: number;
   style?: CSSProperties;
+  className?: string;
   /**
-   * DRK-1684 §3 row 11c — the service's own `AccountBalanceDto.Floor`, exact text, no local
-   * recomputation. Takes precedence over `computeFloor`, which is the fallback for callers
-   * with no balance response.
+   * DRK-1684 §3 row 11c — the service's own `AccountBalanceDto.Floor`, exact text. DRK-1760 §3
+   * row 11 — the only floor ever drawn: absent while the balance read has not answered, the line
+   * is a placeholder, never a figure worked out here.
    */
   floor?: string;
+  /** The balance read failed: the floor is stated as unavailable. */
+  failed?: boolean;
 }
 
-export function FloorLine({ account, decimalPlaces = 2, style, floor: floorProp }: FloorLineProps): JSX.Element {
+export function FloorLine({ account, decimalPlaces = 2, style, className, floor, failed = false }: FloorLineProps): JSX.Element {
   // The service's own text, kept exact end to end — never routed through `Number`, which
   // loses digits past `Number.MAX_SAFE_INTEGER` (a real money figure).
-  const floor = floorProp ?? computeFloor(account);
-
-  if (floor === null) {
-    return <p style={style}>Floor OVERDRAFT_LIMIT_REQUIRED — permitted to go negative with no overdraft limit set.</p>;
+  if (floor === undefined) {
+    return failed ? (
+      <p style={style} className={className}>
+        Floor unavailable — the balance could not be read.
+      </p>
+    ) : (
+      <Skeleton style={style} className={cn('w-64', className)} />
+    );
   }
 
   const negative = isNegativeAmount(floor);
@@ -59,6 +47,6 @@ export function FloorLine({ account, decimalPlaces = 2, style, floor: floorProp 
     : 'not permitted to go negative';
 
   return (
-    <p style={style}>{`Floor ${sign}${formatted} ${account.currency} — ${detail}.`}</p>
+    <p style={style} className={className}>{`Floor ${sign}${formatted} ${account.currency} — ${detail}.`}</p>
   );
 }

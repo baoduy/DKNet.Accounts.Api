@@ -1,11 +1,9 @@
 'use client';
 
-import { useQueries, useQuery } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Mono, Note } from '@/components/ui/text';
-import { listTotalKey, statusCountsKey } from '@/lib/query/keys';
-import { fetchListTotal, fetchStatusCounts } from '@/lib/query/overview';
+import { useListTotals, useStatusCounts } from '@/lib/query/overview';
 import { countOf, formatCount, heightOf, MissingScope, Panel, Ready } from './parts';
 
 /**
@@ -24,14 +22,8 @@ function statusLine(counts: Array<{ status: string; count: number }>, status: st
 }
 
 export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
-  const statusCounts = useQuery({ queryKey: statusCountsKey('account-groups'), queryFn: () => fetchStatusCounts('account-groups'), enabled: granted });
-  const typeCounts = useQueries({
-    queries: GROUP_TYPES.map((type) => ({
-      queryKey: listTotalKey('account-groups', typeFilter(type)),
-      queryFn: () => fetchListTotal('account-groups', typeFilter(type)),
-      enabled: granted,
-    })),
-  });
+  const statusCounts = useStatusCounts('account-groups', granted);
+  const typeCounts = useListTotals('account-groups', GROUP_TYPES.map(typeFilter), granted);
 
   return (
     <Panel
@@ -56,7 +48,7 @@ export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
                 {GROUP_TYPES.map((type, index) => {
                   const count = typeCounts[index].data!;
                   return (
-                    <li key={type} className="grid grid-cols-[--spacing(24)_minmax(0,1fr)_--spacing(9)] items-center gap-3 text-[length:var(--text-table-size)] leading-(--text-table-leading)">
+                    <li key={type} className="grid grid-cols-[--spacing(24)_minmax(0,1fr)_--spacing(9)] items-center gap-3 text-table">
                       <span>{type}</span>
                       <span role="img" aria-label={`${type}: ${formatCount(count)} groups`} className="block h-2 overflow-hidden rounded-sm bg-muted">
                         <span className="block h-full bg-chart-2" style={{ width: heightOf(count, max) }} />
@@ -74,7 +66,7 @@ export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
       )}
       <Note>
         Bars are scaled to the largest type. Each bar is the service&apos;s count for its type:{' '}
-        <Mono className="text-[length:var(--text-caption-size)]">filter=Type:Equal:Customer</Mono>.
+        <Mono className="text-caption">filter=Type:Equal:Customer</Mono>.
       </Note>
     </Panel>
   );

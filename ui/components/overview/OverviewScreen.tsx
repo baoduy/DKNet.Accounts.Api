@@ -1,6 +1,6 @@
 'use client';
 
-import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useMemo, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
 import { ArrowRight, Plus, Wallet, type LucideIcon } from 'lucide-react';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
@@ -15,17 +15,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TablePlaceholderRows, TableRow, loadingTableProps } from '@/components/ui/table';
 import { Tabs } from '@/components/ui/tabs';
 import { Caption, Label, Mono, Note } from '@/components/ui/text';
-import { useCurrencies } from '@/lib/accounts/query';
 import { fractionDigitsOf, shareBasisPoints } from '@/lib/api/money-json';
-import { fetchLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
-import { ledgerBalancesKey, postingCountKey, recentRecordKey, statusCountsKey } from '@/lib/query/keys';
+import { useCurrencies, useDecimalPlaces, useLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
 import {
   ACTIVITY_WINDOWS,
-  fetchPostingCount,
-  fetchStatusCounts,
-  lookupRecord,
   openedMonths,
   postingWeeks,
+  usePostingCounts,
+  useRecordLookups,
+  useStatusCountsPerWindow,
   type AccountDto,
   type AccountGroupDto,
   type ActivityWindow,
@@ -101,7 +99,7 @@ export function OverviewScreen({ grantedScopes, directoryObjectId }: OverviewScr
   const [now] = useState(() => new Date());
   const [activity, setActivity] = useState<ActivityWindow>('30');
   // The same read the position draws — its answer time is the balances' true "as at".
-  const balances = useQuery({ queryKey: ledgerBalancesKey(), queryFn: fetchLedgerBalances, enabled: canReadAccounts });
+  const balances = useLedgerBalances(canReadAccounts);
   const asAt = balances.isSuccess ? utcStamp(new Date(balances.dataUpdatedAt), true) : null;
 
   return (
@@ -186,6 +184,7 @@ function PositionBar({ line }: { line: LedgerBalanceLine }): JSX.Element {
 
 function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQueryResult<LedgerBalanceLine[]> }): JSX.Element {
   const currencies = useCurrencies();
+  const decimalPlacesOf = useDecimalPlaces();
   const failed = [balances, currencies].find((result) => result.isError);
   const loading = balances.isPending || currencies.isPending;
 
@@ -223,10 +222,9 @@ function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQ
               <TablePlaceholderRows columns={5} count={POSITION_PLACEHOLDER_ROWS} />
             ) : (
               (() => {
-                const decimals = new Map(currencies.data!.map((currency) => [currency.code, currency.decimalPlaces]));
                 // Drawn at the currency's own scale; a currency the list does not know keeps the service's digits.
                 const money = (line: LedgerBalanceLine, amount: string): JSX.Element => (
-                  <Money amount={amount} decimalPlaces={decimals.get(line.currency) ?? fractionDigitsOf(amount)} />
+                  <Money amount={amount} decimalPlaces={decimalPlacesOf(line.currency) ?? fractionDigitsOf(amount)} />
                 );
                 return balances.data!.map((line) => (
                   <TableRow key={line.currency}>
@@ -263,9 +261,7 @@ function ChartPlaceholder({ bars }: { bars: number }): JSX.Element {
 
 function PostingsPerWeekPanel({ granted, now }: { granted: boolean; now: Date }): JSX.Element {
   const weeks = postingWeeks(now);
-  const counts = useQueries({
-    queries: weeks.map((week) => ({ queryKey: postingCountKey(week), queryFn: () => fetchPostingCount(week), enabled: granted })),
-  });
+  const counts = usePostingCounts(weeks, granted);
 
   return (
     <Panel title="Postings per week" sub={`13 weeks of 7 days in UTC, ${weeks[0].from} to ${weeks[weeks.length - 1].to}.`}>
@@ -307,12 +303,7 @@ const ACCOUNT_STATUSES = [
 
 function AccountsOpenedPanel({ granted, now }: { granted: boolean; now: Date }): JSX.Element {
   const months = openedMonths(now);
-  const counts = useQueries({
-    queries: months.map((month) => {
-      const opened = { from: month.from, to: month.to };
-      return { queryKey: statusCountsKey('accounts', opened), queryFn: () => fetchStatusCounts('accounts', opened), enabled: granted };
-    }),
-  });
+  const counts = useStatusCountsPerWindow('accounts', months, granted);
   const shown = (value: number | undefined): string => (value === undefined ? '—' : formatCount(value));
 
   return (
@@ -380,13 +371,9 @@ function RecentlyViewedPanel({ grantedScopes, directoryObjectId }: { grantedScop
   // The list lives in the browser: the server render draws nothing for it (`undefined`).
   const text = useSyncExternalStore(subscribeRecent, () => readRecentText(directoryObjectId), () => undefined);
   const entries = useMemo(() => (text === undefined ? null : parseRecent(text)), [text]);
-  const lookups = useQueries({
-    queries: (entries ?? []).map((entry) => ({
-      queryKey: recentRecordKey(entry.kind, entry.id),
-      queryFn: () => lookupRecord<AccountDto | AccountGroupDto | PostingDto>(RECENT_KINDS[entry.kind].path(entry.id)),
-      enabled: grantedScopes.includes(RECENT_KINDS[entry.kind].scope),
-    })),
-  });
+  const lookups = useRecordLookups<AccountDto | AccountGroupDto | PostingDto>(
+    (entries ?? []).map((entry) => ({ kind: entry.kind, id: entry.id, path: RECENT_KINDS[entry.kind].path(entry.id), enabled: grantedScopes.includes(RECENT_KINDS[entry.kind].scope) })),
+  );
 
   return (
     <Card role="region" aria-labelledby={headingId} padded={false}>
@@ -403,7 +390,7 @@ function RecentlyViewedPanel({ grantedScopes, directoryObjectId }: { grantedScop
           {entries.map((entry, index) => (
             <li
               key={`${entry.kind}:${entry.id}`}
-              className="flex flex-wrap items-center gap-4 border-t border-border px-(--cell-padding-x) py-(--cell-padding-y) text-[length:var(--text-table-size)] first:border-t-0"
+              className="flex flex-wrap items-center gap-4 border-t border-border px-(--cell-padding-x) py-(--cell-padding-y) text-table first:border-t-0"
             >
               <RecentEntryLine entry={entry} lookup={lookups[index]} granted={grantedScopes.includes(RECENT_KINDS[entry.kind].scope)} />
               <Caption className="ml-auto text-right">{seenAt(entry.openedAt)}</Caption>
@@ -468,9 +455,9 @@ function NotCharted(): JSX.Element {
     <Card role="note" aria-label="Not charted">
       <div>
         <Label>Not charted, and why</Label>
-        <div className="mt-1.5 text-[length:var(--text-table-size)]">One figure an operations dashboard usually carries cannot be drawn against this service.</div>
+        <div className="mt-1.5 text-table">One figure an operations dashboard usually carries cannot be drawn against this service.</div>
       </div>
-      <div className="text-[length:var(--text-table-size)]">
+      <div className="text-table">
         <div className="font-semibold">One headline total</div>
         <Note>Balances are held per currency. A single figure across currencies would need an exchange-rate source this service does not have, so currencies are never added together.</Note>
       </div>

@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef } from 'react';
 import type { CSSProperties, JSX, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Note } from '@/components/ui/text';
 import { cn } from '@/components/ui/utils';
 
 /**
@@ -69,18 +70,18 @@ export function DetailPanel({
       )}
     >
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <h3 className="m-0 text-[length:var(--text-panel-title-size)] leading-[var(--text-panel-title-leading)] font-bold">{title}</h3>
-        <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close details" className="ml-auto text-[length:var(--text-caption-size)] text-muted-foreground">
+        <h3 className="m-0 text-panel-title font-bold">{title}</h3>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close details" className="ml-auto text-muted-foreground">
           Esc <X size={13} aria-hidden="true" />
         </Button>
       </header>
       <div className="flex-1 overflow-auto p-(--card-padding)">{children}</div>
       {hasFooter ? (
         <footer className="flex flex-col gap-3 border-t border-border bg-background px-4 py-3">
-          {footnote ? <div className="text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-muted-foreground">{footnote}</div> : null}
+          {footnote ? <Note>{footnote}</Note> : null}
           <div className="flex flex-wrap items-center justify-end gap-2">
             {moreHref ? (
-              <a href={moreHref} className="mr-auto text-[length:var(--text-table-size)] font-semibold text-link hover:underline">
+              <a href={moreHref} className="mr-auto text-table font-semibold text-link hover:underline">
                 {moreLabel} →
               </a>
             ) : null}
@@ -105,7 +106,7 @@ export interface DetailListProps {
 /** The panel's key/value grid: a 132px label column, the value taking the rest. */
 export function DetailList({ items, style }: DetailListProps): JSX.Element {
   return (
-    <dl style={style} className="m-0 grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-[length:var(--text-table-size)] leading-[var(--text-table-leading)]">
+    <dl style={style} className="m-0 grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-table">
       {items.map((item, index) => (
         <Fragment key={index}>
           <dt className="m-0 text-muted-foreground">{item.label}</dt>
@@ -123,14 +124,14 @@ export interface DetailSectionProps {
   style?: CSSProperties;
 }
 
-/** The 11px tracked heading between groups of panel fields. */
+/** The 11px tracked heading between groups of panel fields; a panel's first section (no divider) sits flush at the top. */
 export function DetailSection({ children, divider = true, style }: DetailSectionProps): JSX.Element {
   return (
     <h4
       style={style}
       className={cn(
-        'mx-0 mt-4.5 mb-2 text-[length:var(--text-label-size)] leading-[var(--text-label-leading)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase',
-        divider && 'mt-5 border-t border-border pt-4',
+        'mx-0 mb-2 text-label font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase',
+        divider ? 'mt-5 border-t border-border pt-4' : 'mt-0',
       )}
     >
       {children}

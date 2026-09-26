@@ -83,7 +83,7 @@ export function FilterMenu({ activeCount = 0, onClear, label = 'Filter', childre
         <Filter size={14} aria-hidden="true" />
         {label}
         {activeCount > 0 ? (
-          <span id={countId} className="min-w-4.5 rounded-full bg-primary px-1.25 text-center text-[length:var(--text-label-size)] leading-4.5 font-semibold text-primary-foreground tabular-nums">
+          <span id={countId} className="min-w-4.5 rounded-full bg-primary px-1.25 text-center text-label leading-4.5 font-semibold text-primary-foreground tabular-nums">
             {activeCount}
           </span>
         ) : null}

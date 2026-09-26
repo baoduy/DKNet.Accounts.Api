@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-r
 import type { LucideIcon } from 'lucide-react';
 import { CardBar } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
+import { Caption } from '@/components/ui/text';
 
 export interface PaginationProps {
   /** 1-based current page. */
@@ -62,23 +63,22 @@ export function Pagination({
   const previousOk = canPrevious ?? current > 1;
   const nextOk = canNext ?? current < last;
   const go = (target: number): void => onPageChange?.(Math.min(Math.max(1, target), last));
-  const caption = 'text-[length:var(--text-caption-size)] whitespace-nowrap text-muted-foreground';
   return (
     <CardBar position={position} role="navigation" aria-label="Pagination" style={style}>
-      <span className={caption} aria-hidden="true">
+      <Caption className="whitespace-nowrap" aria-hidden="true">
         Rows per page
-      </span>
+      </Caption>
       <Select
         options={pageSizeOptions.map(String)}
         value={String(pageSize)}
         aria-label="Rows per page"
         onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
       />
-      {summary ? <span className={`${caption} ml-4`}>{summary}</span> : null}
+      {summary ? <Caption className="ml-4 whitespace-nowrap">{summary}</Caption> : null}
       <span className="ml-auto flex items-center gap-5">
-        <span className={caption}>
+        <Caption className="whitespace-nowrap">
           Page {current} of {last}
-        </span>
+        </Caption>
         <span className="flex items-center gap-2">
           <PagerButton icon={ChevronsLeft} label="First page" disabled={!previousOk} onClick={() => go(1)} />
           <PagerButton icon={ChevronLeft} label="Previous page" disabled={!previousOk} onClick={() => go(current - 1)} />

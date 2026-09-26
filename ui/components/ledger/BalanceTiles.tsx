@@ -20,7 +20,7 @@ export interface BalanceTilesProps {
 function Tile({ label, amount, currency, decimalPlaces }: { label: string; amount: number | string; currency: string; decimalPlaces?: number }): JSX.Element {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[length:var(--text-label-size)] text-muted-foreground">{label}</span>
+      <span className="text-label text-muted-foreground">{label}</span>
       <Money amount={amount} currency={currency} decimalPlaces={decimalPlaces} size="tile" align="left" />
     </div>
   );

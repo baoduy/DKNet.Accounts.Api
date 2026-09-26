@@ -17,7 +17,7 @@ export interface BreadcrumbProps {
 /** The top-bar trail of every detail screen: `Groups / ACME / ACME-000123`. Ported from Design/components/core/Breadcrumb.jsx. */
 export function Breadcrumb({ items, onNavigate, style }: BreadcrumbProps): JSX.Element {
   return (
-    <nav aria-label="Breadcrumb" style={style} className="truncate text-[length:var(--text-table-size)] whitespace-nowrap text-muted-foreground">
+    <nav aria-label="Breadcrumb" style={style} className="truncate text-table whitespace-nowrap text-muted-foreground">
       {items.map((item, index) => {
         const last = index === items.length - 1;
         return (

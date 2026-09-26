@@ -13,7 +13,7 @@ export interface IdProps {
  * scanned by eye (DRK-1679 §3 row 3). The one base control shadcn does not supply.
  */
 export function Id({ value, href, onNavigate, style }: IdProps): JSX.Element {
-  const className = cn('font-mono text-[length:var(--text-caption-size)] tabular-nums');
+  const className = cn('font-mono text-caption tabular-nums');
 
   if (href || onNavigate) {
     return (

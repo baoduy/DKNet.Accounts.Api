@@ -1,11 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Caption, Mono, Note } from '@/components/ui/text';
-import { listTotalKey, statusCountsKey } from '@/lib/query/keys';
-import { fetchListTotal, fetchStatusCounts } from '@/lib/query/overview';
+import { useListTotal, useStatusCounts } from '@/lib/query/overview';
 import { countOf, formatCount, MissingScope, Panel, Ready } from './parts';
 
 /**
@@ -63,13 +61,13 @@ function Ring({ lines, total }: { lines: Array<{ status: string; colour: string;
           </g>
         </svg>
         <div aria-hidden="true" className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-[length:var(--text-tile-amount-size)] font-bold tabular-nums">{formatCount(total)}</div>
+          <div className="text-tile-amount font-bold tabular-nums">{formatCount(total)}</div>
           <Caption>accounts</Caption>
         </div>
       </div>
       <ul className="m-0 flex min-w-45 flex-1 basis-50 list-none flex-col p-0">
         {lines.map((line) => (
-          <li key={line.status} className="grid grid-cols-[--spacing(4)_minmax(--spacing(14),1fr)_--spacing(11)_--spacing(12)] items-center gap-2 px-2 py-1.5 text-[length:var(--text-table-size)] leading-(--text-table-leading)">
+          <li key={line.status} className="grid grid-cols-[--spacing(4)_minmax(--spacing(14),1fr)_--spacing(11)_--spacing(12)] items-center gap-2 px-2 py-1.5 text-table">
             <span aria-hidden="true" className="size-2 rounded-sm" style={{ background: line.colour }} />
             <span className="truncate">{line.status}</span>
             <span className="text-right font-semibold tabular-nums">{shown(line.count)}</span>
@@ -82,9 +80,9 @@ function Ring({ lines, total }: { lines: Array<{ status: string; colour: string;
 }
 
 export function StatusRing({ granted }: { granted: boolean }): JSX.Element {
-  const counts = useQuery({ queryKey: statusCountsKey('accounts'), queryFn: () => fetchStatusCounts('accounts'), enabled: granted });
-  const accountTotal = useQuery({ queryKey: listTotalKey('accounts'), queryFn: () => fetchListTotal('accounts'), enabled: granted });
-  const groupTotal = useQuery({ queryKey: listTotalKey('account-groups'), queryFn: () => fetchListTotal('account-groups'), enabled: granted });
+  const counts = useStatusCounts('accounts', granted);
+  const accountTotal = useListTotal('accounts', {}, { enabled: granted });
+  const groupTotal = useListTotal('account-groups', {}, { enabled: granted });
 
   return (
     <Panel
@@ -113,7 +111,7 @@ export function StatusRing({ granted }: { granted: boolean }): JSX.Element {
         <MissingScope scope="accounts.read" />
       )}
       <Note className="border-t border-border pt-3">
-        Each figure is the service&apos;s own count per status (<Mono className="text-[length:var(--text-caption-size)]">GET /v1/accounts/status-counts</Mono>), never a count over a listing.
+        Each figure is the service&apos;s own count per status (<Mono className="text-caption">GET /v1/accounts/status-counts</Mono>), never a count over a listing.
       </Note>
     </Panel>
   );

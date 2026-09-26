@@ -10,6 +10,7 @@ import {
   useCreateAccountGroup,
   useDeactivateCurrency,
   useDeleteAccountGroup,
+  useLedgerMutation,
   useRecordPosting,
   useRegisterCurrency,
   useRenameCurrency,
@@ -31,7 +32,7 @@ afterEach(() => {
 
 describe('useRecordPosting', () => {
   it('posts to /api/ledger/postings with the idempotency key header, invalidates the account balance and mints a new key on success', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({}) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -75,7 +76,7 @@ describe('useRecordPosting', () => {
   it('returns the service refusal unchanged, invalidates nothing and never mints a new key on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ errors: [{ message: 'The debit would take the account past its floor.', code: 'INSUFFICIENT_FUNDS' }], traceId: 't-1' }),
+      text: async () => JSON.stringify({ errors: [{ message: 'The debit would take the account past its floor.', code: 'INSUFFICIENT_FUNDS' }], traceId: 't-1' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -108,7 +109,7 @@ describe('useRecordPosting', () => {
 
 describe('useReversePosting', () => {
   it('posts to /api/ledger/postings/:id/reverse with the idempotency key header, invalidates postings and mints a new key on success', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({}) });
     vi.stubGlobal('fetch', fetchMock);
 
     const queryClient = new QueryClient();
@@ -140,7 +141,7 @@ describe('useReversePosting', () => {
   it('returns the service refusal unchanged and never mints a new key on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ errors: [{ message: 'Already reversed.', code: 'POSTING_ALREADY_REVERSED' }], traceId: 't-2' }),
+      text: async () => JSON.stringify({ errors: [{ message: 'Already reversed.', code: 'POSTING_ALREADY_REVERSED' }], traceId: 't-2' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -434,5 +435,40 @@ describe('useRenameCurrency / useActivateCurrency / useDeactivateCurrency', () =
     expect(response.ok).toBe(false);
     expect(response.errors).toEqual([{ message: 'An account in USD still holds a balance.', code: 'CURRENCY_HOLDS_BALANCE' }]);
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('useLedgerMutation (DRK-1760 §3 row 2)', () => {
+  it('sends one request for a second mutate made while the first is in flight, and hands both the same answer', async () => {
+    let answer!: (result: string) => void;
+    const mutationFn = vi.fn(() => new Promise<string>((resolve) => (answer = resolve)));
+    const { result } = renderHook(() => useLedgerMutation({ mutationFn }), { wrapper: wrapper(new QueryClient()) });
+
+    const first = result.current.mutate('create');
+    const second = result.current.mutate('create');
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+    answer('created');
+
+    expect(await first).toBe('created');
+    expect(await second).toBe('created');
+    expect(mutationFn).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+
+  it('sends again once the first request has answered', async () => {
+    const mutationFn = vi.fn(async (input: string) => `${input} done`);
+    const { result } = renderHook(() => useLedgerMutation({ mutationFn }), { wrapper: wrapper(new QueryClient()) });
+
+    await result.current.mutate('one');
+    expect(await result.current.mutate('two')).toBe('two done');
+    expect(mutationFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends again after a request that failed outright', async () => {
+    const mutationFn = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce('sent');
+    const { result } = renderHook(() => useLedgerMutation({ mutationFn }), { wrapper: wrapper(new QueryClient()) });
+
+    await expect(result.current.mutate('x')).rejects.toThrow('fetch failed');
+    expect(await result.current.mutate('x')).toBe('sent');
   });
 });

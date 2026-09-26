@@ -29,7 +29,7 @@ export function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          'z-50 rounded-md bg-foreground px-3 py-1.5 text-xs text-background',
+          'z-50 rounded-md bg-foreground px-3 py-1.5 text-caption text-background',
           className,
         )}
         {...props}
