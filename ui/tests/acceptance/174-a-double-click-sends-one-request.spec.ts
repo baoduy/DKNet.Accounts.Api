@@ -89,7 +89,9 @@ for (const row of ROWS) {
     const creates = (await ledgerRequests()).filter((request) => request.method === 'POST' && request.path === row.servicePath);
     expect(creates, `POST ${row.servicePath} requests the service received`).toHaveLength(1);
 
-    // And no refusal is shown for the <thing> just created
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    // And no refusal is shown for the <thing> just created — anywhere the console draws one (the
+    // page, the side panel, a dialog). Next's own route announcer is a `role="alert"` region on
+    // every app-router page and never carries a refusal, so it is left out.
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
   });
 }

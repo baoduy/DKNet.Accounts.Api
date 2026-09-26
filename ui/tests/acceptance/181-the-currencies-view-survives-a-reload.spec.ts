@@ -64,6 +64,9 @@ test('The currencies view survives a reload', async ({ page, baseURL }) => {
   await expect(bodyRows(page).locator('td:first-child')).toHaveText(['JPY', 'KRW']);
   // And closed currency JPY is still open in the side panel
   await expect(panel.getByText('JPY · Japanese Yen', { exact: true })).toBeVisible();
-  // Read last: the filter menu opens over the table, and the panel must already be proven open.
+  // Read last, with the panel closed by its own control: the open panel sits over the Filter
+  // button (layout, out of scope — DRK-1763 §4), and it must already be proven open above.
+  await panel.getByRole('button', { name: 'Close details' }).click();
+  await expect(panel).toHaveCount(0);
   await expect(await statusFilter(page)).toHaveValue('Closed');
 });
