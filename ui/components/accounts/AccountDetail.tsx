@@ -23,11 +23,12 @@ import { Pencil, Plus } from 'lucide-react';
 import { FloorLine } from '@/components/ledger/FloorLine';
 import { Money } from '@/components/ledger/Money';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
-import { Acknowledgement } from '@/components/feedback/Acknowledgement';
 import { DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
+import { useFlash } from '@/components/feedback/use-flash';
 import { usePanelFocus } from '@/components/feedback/use-panel-focus';
+import { DISCARD_RECORD, usePanelState } from '@/components/feedback/use-panel-state';
 import { PostingDetails } from '@/components/records/PostingDetails';
 import { formatDate } from '@/components/records/RecordsTable';
 import { PageHeader } from '@/components/shell/PageHeader';
@@ -39,7 +40,7 @@ import type { PostingDto } from '@/lib/accounts/query';
 import { AccountForm, type AccountFormValues } from './AccountForm';
 import { AccountStatusControl } from './AccountStatusControl';
 import { PostingsPanel, type PostingsPanelFilter, type PostingsPanelProps, type PostingsPanelRow } from './PostingsPanel';
-import { RecordPostingForm, recordedText, useUnsentGuard } from './RecordPostingForm';
+import { RecordPostingForm, recordedText } from './RecordPostingForm';
 import { reversedText } from './ReversePostingForm';
 
 export interface AccountDetailAccount {
@@ -52,9 +53,11 @@ export interface AccountDetailAccount {
   balance: string;
   availableBalance: string;
   heldAmount: string;
-  /** Absent while the balance read is pending or refused — `FloorLine` falls back to its own
-   * `computeFloor` off the floor-policy fields below rather than showing a guessed `0`. */
+  /** The service's own floor — absent while the balance read is pending or refused, when
+   * `FloorLine` draws a placeholder or states it unavailable, never a guessed figure. */
   floor?: string;
+  /** The balance read failed. */
+  floorFailed?: boolean;
   status: string;
   permittedToGoNegative: boolean;
   overdraftLimit?: string | null;
@@ -122,7 +125,7 @@ function AccountEditPanel({ accountId, account, writeGranted, onSaved }: { accou
 
   async function handleSubmit(values: AccountFormValues): Promise<void> {
     // `lib/accounts/mutations.ts` `useSaveAccountEdit`: `PUT` only for a changed name or notes, then `PATCH`.
-    const errors = await saveEdit({ ...values, accountId, current: { name: account.name, notes: account.notes ?? '', metadata: account.metadata } });
+    const errors = await saveEdit.mutate({ ...values, accountId, current: { name: account.name, notes: account.notes ?? '', metadata: account.metadata } });
     setErrors(errors);
     if (errors.length === 0) onSaved();
   }
@@ -179,8 +182,8 @@ export function AccountDetail({
   openPosting,
   style,
 }: AccountDetailProps): JSX.Element {
-  const [flash, setFlash] = useState<{ title: string; text: JSX.Element | string } | null>(null);
-  const unsent = useUnsentGuard(open === OPEN_NEW);
+  const flash = useFlash();
+  const unsent = usePanelState({ copy: DISCARD_RECORD });
   const writable = Boolean(account && accountId);
   const panelOpen = writable && (open === OPEN_NEW || open === OPEN_EDIT || openPosting !== undefined);
   const panelRef = usePanelFocus<HTMLDivElement>(panelOpen);
@@ -217,7 +220,7 @@ export function AccountDetail({
           writeGranted={writeGranted}
           onSaved={() => {
             closePanel();
-            setFlash({ title: 'Changes saved', text: `Updated ${account.accountNumber}. Group, account number and currency are unchanged; no posting was made.` });
+            flash.show({ title: 'Changes saved', text: `Updated ${account.accountNumber}. Group, account number and currency are unchanged; no posting was made.` });
           }}
         />
         <DetailSection>Close or reopen</DetailSection>
@@ -240,9 +243,8 @@ export function AccountDetail({
         onClose={() => unsent.guard(closePanel)}
         onDirtyChange={unsent.onDirtyChange}
         onRecorded={(recorded) => {
-          unsent.clear();
           closePanel();
-          setFlash({ title: 'Record posted', text: recordedText(recorded) });
+          flash.show({ title: 'Record posted', text: recordedText(recorded) });
         }}
       />
     );
@@ -256,7 +258,7 @@ export function AccountDetail({
         showAccount={false}
         reverseGranted={grantedScopes.includes('postings.reverse')}
         onClose={closePanel}
-        onReversed={(reversed) => setFlash({ title: 'Record reversed', text: reversedText(reversed) })}
+        onReversed={(reversed) => flash.show({ title: 'Record reversed', text: reversedText(reversed) })}
       />
     );
   }
@@ -302,11 +304,7 @@ export function AccountDetail({
         </Note>
       ) : null}
 
-      {flash ? (
-        <Acknowledgement title={flash.title} onDismiss={() => setFlash(null)}>
-          {flash.text}
-        </Acknowledgement>
-      ) : null}
+      {flash.card}
 
       <div className="flex flex-wrap gap-6">
         <div className="flex flex-col gap-1" data-testid="account-balance">
@@ -336,6 +334,7 @@ export function AccountDetail({
             }}
             decimalPlaces={decimalPlaces}
             floor={account.floor}
+            failed={account.floorFailed}
           />
         ) : null}
       </div>

@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { FORM_GRID, FormRow } from '@/components/admin/FormRow';
-import { Acknowledgement } from '@/components/feedback/Acknowledgement';
 import { DetailList, DetailPanel, DetailSection } from '@/components/feedback/DetailPanel';
 import { CURRENCIES_EMPTY } from '@/components/feedback/empty';
 import { FailedRead, RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { useFlash } from '@/components/feedback/use-flash';
 import { usePanelFocus } from '@/components/feedback/use-panel-focus';
+import { usePanelState } from '@/components/feedback/use-panel-state';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
 import { formatAmount } from '@/components/ledger/Money';
@@ -25,15 +25,16 @@ import { TableCard } from '@/components/ui/table-card';
 import { Caption, Mono, Note } from '@/components/ui/text';
 import { isZeroAmount } from '@/lib/api/money-json';
 import { routeRefusal } from '@/lib/api/refusal';
-import { currenciesQueryOptions, ledgerBalancesKey } from '@/lib/query/keys';
-import { fetchCurrencies, fetchLedgerBalances } from '@/lib/query/currencies';
+import { useCurrencies, useLedgerBalances } from '@/lib/query/currencies';
 import type { Currency } from '@/lib/query/currencies';
 import { useActivateCurrency, useDeactivateCurrency, useRegisterCurrency, useRenameCurrency } from '@/lib/query/mutations';
+import { useListViewState, withFilter } from '@/lib/url-state';
 
 /**
  * DRK-1697 §3 row 12 — list (code, name, decimal places, status); registration form with the
  * live worked example; rename; close (deactivate) and reopen (activate). Laid out as
- * Design/ui_kits/currencies-crud (DRK-1750).
+ * Design/ui_kits/currencies-crud (DRK-1750). DRK-1760 §3 row 6 — the view (`?status=`, `?q=`,
+ * `?sort=`, `?page=`, `?pageSize=`, `?open=`) lives in the page address like every list screen's.
  */
 export interface CurrenciesScreenProps {
   grantedScopes: string[];
@@ -47,8 +48,7 @@ interface CurrencyDraft {
 
 const BLANK_DRAFT: CurrencyDraft = { code: '', name: '', decimalPlaces: '' };
 const DEFAULT_PAGE_SIZE = 10;
-
-type DialogState = { kind: 'close' } | { kind: 'discard'; proceed: () => void } | null;
+type SortField = 'code' | 'name' | 'decimalPlaces' | 'status';
 
 /** A currency's `decimalPlaces` is a single digit 0-6 (§6 R3: fixed for its whole lifetime, so it must be right on entry). */
 function isValidDecimalPlaces(value: string): boolean {
@@ -63,29 +63,28 @@ function statusOf(currency: Currency): 'Active' | 'Closed' {
 export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.Element {
   const canWrite = grantedScopes.includes('accounts.write');
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelMode, setPanelMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const [view, navigate] = useListViewState('/currencies');
+  const selectedId = view.openRecordId ?? null;
   const [draft, setDraft] = useState<CurrencyDraft>(BLANK_DRAFT);
   const [editOriginal, setEditOriginal] = useState<CurrencyDraft>(BLANK_DRAFT);
   const [fieldErrors, setFieldErrors] = useState<Record<string, LedgerError>>({});
   const [alertErrors, setAlertErrors] = useState<LedgerError[]>([]);
   const [traceId, setTraceId] = useState<string | undefined>(undefined);
-  const [dialog, setDialog] = useState<DialogState>(null);
-  const [flash, setFlash] = useState<{ title: string; text: string } | null>(null);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [sort, setSort] = useState<{ field: 'code' | 'name' | 'decimalPlaces' | 'status'; desc: boolean } | undefined>(undefined);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const flash = useFlash();
+  // `?open=<id>` (a reload, a shared link) opens that currency's panel on arrival.
+  const panelState = usePanelState({ initialMode: selectedId ? 'view' : null, dirty: JSON.stringify(draft) !== JSON.stringify(editOriginal) });
+  // Back can take the open record out of the address: a view with nothing to view is no panel.
+  const panelMode = panelState.mode === 'create' || selectedId ? panelState.mode : null;
+  const query = view.filters.q ?? '';
+  const statusFilter = view.filters.status ?? '';
+  const pageSize = view.pageSize ?? DEFAULT_PAGE_SIZE;
+  const sort = view.sort as { field: SortField; desc: boolean } | undefined;
 
-  const listQuery = useQuery({ ...currenciesQueryOptions(), queryFn: fetchCurrencies });
+  const listQuery = useCurrencies();
   const selected = listQuery.data?.find((currency) => currency.id === selectedId) ?? null;
 
-  const balancesQuery = useQuery({
-    queryKey: ledgerBalancesKey(),
-    queryFn: fetchLedgerBalances,
-    enabled: panelMode === 'view' && selected != null,
-  });
+  const balancesQuery = useLedgerBalances(panelMode === 'view' && selected != null);
   const holdsBalance = selected != null && (balancesQuery.data ?? []).some((line) => line.currency === selected.code && !isZeroAmount(line.balance));
   const panelRef = usePanelFocus<HTMLDivElement>(panelMode !== null);
 
@@ -110,16 +109,8 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     });
   }
   const pageCount = Math.max(1, Math.ceil(matching.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
+  const currentPage = Math.min(view.page ?? 1, pageCount);
   const visible = matching.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const dirty = (panelMode === 'create' || panelMode === 'edit') && JSON.stringify(draft) !== JSON.stringify(editOriginal);
-
-  /** Runs `proceed` at once, or after "Discard unsaved changes?" when a form holds unsent edits. */
-  function guardDirty(proceed: () => void): void {
-    if (dirty) setDialog({ kind: 'discard', proceed });
-    else proceed();
-  }
 
   function resetFormState(): void {
     setFieldErrors({});
@@ -127,17 +118,22 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     setTraceId(undefined);
   }
 
+  /** The open record, as the address carries it. */
+  function select(id: string | undefined): void {
+    if (id !== view.openRecordId) navigate({ ...view, openRecordId: id });
+  }
+
   function openCreate(): void {
-    setSelectedId(null);
+    select(undefined);
     setDraft(BLANK_DRAFT);
     setEditOriginal(BLANK_DRAFT);
-    setPanelMode('create');
+    panelState.show('create');
     resetFormState();
   }
 
   function openView(row: Currency): void {
-    setSelectedId(row.id);
-    setPanelMode('view');
+    select(row.id);
+    panelState.show('view');
     resetFormState();
   }
 
@@ -145,13 +141,13 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
     const snapshot: CurrencyDraft = { code: currency.code, name: currency.name, decimalPlaces: String(currency.decimalPlaces) };
     setDraft(snapshot);
     setEditOriginal(snapshot);
-    setPanelMode('edit');
+    panelState.show('edit');
     resetFormState();
   }
 
   function closePanel(): void {
-    setSelectedId(null);
-    setPanelMode(null);
+    select(undefined);
+    panelState.show(null);
     resetFormState();
   }
 
@@ -183,10 +179,10 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       applyRefusal(result.errors, result.traceId);
       return;
     }
-    if (result.currency) setSelectedId(result.currency.id);
-    setPanelMode('view');
+    if (result.currency) select(result.currency.id);
+    panelState.show('view');
     const places = Number(draft.decimalPlaces);
-    setFlash({ title: 'Currency registered', text: `Registered ${draft.code} at ${places} decimal place${places === 1 ? '' : 's'}. Accounts can now be opened in it.` });
+    flash.show({ title: 'Currency registered', text: `Registered ${draft.code} at ${places} decimal place${places === 1 ? '' : 's'}. Accounts can now be opened in it.` });
   }
 
   async function handleSave(): Promise<void> {
@@ -197,8 +193,8 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       applyRefusal(result.errors, result.traceId);
       return;
     }
-    setPanelMode('view');
-    setFlash({ title: 'Changes saved', text: `Updated ${draft.code} — name. Stored balances are unaffected.` });
+    panelState.show('view');
+    flash.show({ title: 'Changes saved', text: `Updated ${draft.code} — name. Stored balances are unaffected.` });
   }
 
   async function handleReopen(): Promise<void> {
@@ -209,19 +205,20 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       applyViewRefusal(result.errors, result.traceId);
       return;
     }
-    setFlash({ title: 'Currency reopened', text: `${selected.code} is active again. Accounts can be opened in it.` });
+    flash.show({ title: 'Currency reopened', text: `${selected.code} is active again. Accounts can be opened in it.` });
   }
 
   async function handleClose(): Promise<void> {
-    setDialog(null);
     if (!selected) return;
     resetFormState();
+    // The dialog stays up, its confirm disabled, until the service has answered.
     const result = await deactivateCurrency.mutate({ currencyId: selected.id });
+    setConfirmingClose(false);
     if (!result.ok) {
       applyViewRefusal(result.errors, result.traceId);
       return;
     }
-    setFlash({ title: 'Currency closed', text: `${selected.code} is closed. Existing balances stay readable; no new account can be opened in it.` });
+    flash.show({ title: 'Currency closed', text: `${selected.code} is closed. Existing balances stay readable; no new account can be opened in it.` });
   }
 
   function minorUnit(decimalPlaces: number): string {
@@ -279,7 +276,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       <div ref={panelRef} tabIndex={-1} data-testid="detail-panel" className="outline-none">
         <DetailPanel
           title={panelTitle}
-          onClose={() => guardDirty(closePanel)}
+          onClose={() => panelState.guard(closePanel)}
           footnote={footnote}
           style={{ width: '100%', maxWidth: '100%' }}
           actions={
@@ -287,13 +284,13 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
               <>
                 {selected.isActive ? (
                   <ScopeGate scope="accounts.write" granted={canWrite}>
-                    <Button type="button" variant="destructive" size="sm" disabled={holdsBalance || !balancesQuery.isSuccess} onClick={() => setDialog({ kind: 'close' })}>
+                    <Button type="button" variant="destructive" size="sm" disabled={holdsBalance || !balancesQuery.isSuccess} onClick={() => setConfirmingClose(true)}>
                       Close currency
                     </Button>
                   </ScopeGate>
                 ) : (
                   <ScopeGate scope="accounts.write" granted={canWrite}>
-                    <Button type="button" variant="primary" size="sm" onClick={handleReopen}>
+                    <Button type="button" variant="primary" size="sm" disabled={activateCurrency.isPending} onClick={handleReopen}>
                       Reopen currency
                     </Button>
                   </ScopeGate>
@@ -306,7 +303,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
               </>
             ) : editing ? (
               <>
-                <Button type="button" size="sm" onClick={() => guardDirty(closePanel)}>
+                <Button type="button" size="sm" onClick={() => panelState.guard(closePanel)}>
                   Cancel
                 </Button>
                 <ScopeGate scope="accounts.write" granted={canWrite}>
@@ -314,7 +311,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
                     type="button"
                     variant="primary"
                     size="sm"
-                    disabled={panelMode === 'create' && !isValidDecimalPlaces(draft.decimalPlaces)}
+                    disabled={(panelMode === 'create' && !isValidDecimalPlaces(draft.decimalPlaces)) || registerCurrency.isPending || renameCurrency.isPending}
                     onClick={panelMode === 'create' ? handleCreate : handleSave}
                   >
                     {panelMode === 'create' ? 'Register currency' : 'Save changes'}
@@ -436,7 +433,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
         description="Every account is denominated in one of these. The decimal places fix how amounts are stored and shown."
         actions={
           <ScopeGate scope="accounts.write" granted={canWrite}>
-            <Button type="button" variant="primary" onClick={() => guardDirty(openCreate)}>
+            <Button type="button" variant="primary" onClick={() => panelState.guard(openCreate)}>
               <Plus size={14} aria-hidden="true" />
               New currency
             </Button>
@@ -444,32 +441,22 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
         }
       />
 
-      {flash ? (
-        <Acknowledgement title={flash.title} onDismiss={() => setFlash(null)}>
-          {flash.text}
-        </Acknowledgement>
-      ) : null}
+      {flash.card}
 
       <TableCard
         searchPlaceholder="Search code or name"
         searchValue={query}
-        onSearchChange={(value) => {
-          setQuery(value);
-          setPage(1);
-        }}
+        onSearchChange={(value) => navigate(withFilter(view, 'q', value))}
         rows={listQuery.data ? matching.length : undefined}
         total={listQuery.data ? all.length : undefined}
         filter={
-          <FilterMenu activeCount={statusFilter ? 1 : 0} onClear={() => setStatusFilter('')}>
+          <FilterMenu activeCount={statusFilter ? 1 : 0} onClear={() => navigate(withFilter(view, 'status', ''))}>
             <FilterField label="Status">
               <Select
                 options={[{ value: '', label: 'Any' }, 'Active', 'Closed']}
                 value={statusFilter}
                 className="w-full"
-                onChange={(event) => {
-                  setStatusFilter(event.target.value);
-                  setPage(1);
-                }}
+                onChange={(event) => navigate(withFilter(view, 'status', event.target.value))}
               />
             </FilterField>
           </FilterMenu>
@@ -479,11 +466,8 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
           pageCount,
           pageSize,
           pageSizeOptions: [5, 10, 25, 50],
-          onPageChange: setPage,
-          onPageSizeChange: (size) => {
-            setPageSize(size);
-            setPage(1);
-          },
+          onPageChange: (page) => navigate({ ...view, page }),
+          onPageSizeChange: (size) => navigate({ ...view, pageSize: size, page: undefined }),
         }}
         panel={panel}
       >
@@ -495,10 +479,10 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
             rows={visible}
             rowKey="id"
             selectedId={selectedId}
-            onSelectRow={(row) => guardDirty(() => openView(row))}
+            onSelectRow={(row) => panelState.guard(() => openView(row))}
             orderBy={sort?.field}
             desc={sort?.desc}
-            onSort={(field) => setSort((current) => ({ field: field as NonNullable<typeof sort>['field'], desc: current?.field === field && !current.desc }))}
+            onSort={(field) => navigate({ ...view, sort: { field, desc: sort?.field === field && !sort.desc } })}
             loading={listQuery.isPending}
             placeholderRows={pageSize}
             emptyMessage={all.length === 0 ? CURRENCIES_EMPTY : 'No currencies match this filter.'}
@@ -507,16 +491,16 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
       </TableCard>
 
       <Dialog
-        open={dialog?.kind === 'close' && selected !== null}
+        open={confirmingClose && selected !== null}
         tone="destructive"
         title="Close currency"
-        onClose={() => setDialog(null)}
+        onClose={() => setConfirmingClose(false)}
         footer={
           <>
-            <Button type="button" onClick={() => setDialog(null)}>
+            <Button type="button" onClick={() => setConfirmingClose(false)}>
               Keep currency open
             </Button>
-            <Button type="button" variant="destructive" onClick={handleClose}>
+            <Button type="button" variant="destructive" disabled={deactivateCurrency.isPending} onClick={handleClose}>
               Close currency
             </Button>
           </>
@@ -532,30 +516,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
         ) : null}
       </Dialog>
 
-      <Dialog
-        open={dialog?.kind === 'discard'}
-        title="Discard unsaved changes?"
-        onClose={() => setDialog(null)}
-        footer={
-          <>
-            <Button type="button" onClick={() => setDialog(null)}>
-              Keep editing
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                if (dialog?.kind === 'discard') dialog.proceed();
-                setDialog(null);
-              }}
-            >
-              Discard changes
-            </Button>
-          </>
-        }
-      >
-        This form has edits that have not been sent. Closing the panel drops them.
-      </Dialog>
+      {panelState.dialog}
     </>
   );
 }

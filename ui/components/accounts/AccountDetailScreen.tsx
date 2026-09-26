@@ -14,16 +14,18 @@
  */
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { useLayoutEffect, useState, type JSX } from 'react';
 import { emptyMessage, NO_POSTINGS_ON_ACCOUNT, postingsEmpty } from '@/components/feedback/empty';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { AccountDetail, type AccountDetailAccount } from './AccountDetail';
 import type { PostingsPanelFilter, PostingsPanelRow } from './PostingsPanel';
 import { fractionDigitsOf } from '@/lib/api/money-json';
-import { useAccount, useAccountBalance, useAccountGroups, useCurrencies, usePosting, usePostings } from '@/lib/accounts/query';
+import { useAccount, useAccountBalance, usePosting, usePostings } from '@/lib/accounts/query';
 import { DEFAULT_POSTING_PERIOD, MIN_POSTING_SEARCH_LENGTH, postingPeriod, postingPeriodRange, type PostingsFilterState } from '@/lib/accounts/postings-filter';
+import { useCurrencies, useDecimalPlaces } from '@/lib/query/currencies';
+import { useAccountGroups } from '@/lib/query/groups';
 import { pushRecent } from '@/lib/recent/store';
+import { useAddressState } from '@/lib/url-state';
 
 /** The statement's page size — the console's list page size. */
 export const STATEMENT_PAGE_SIZE = 10;
@@ -58,6 +60,11 @@ function readView(params: URLSearchParams): StatementView {
   };
 }
 
+/** The statement's address: this page, with the view's own query. */
+function viewHref(view: StatementView): string {
+  return `${window.location.pathname}${viewSearch(view)}`;
+}
+
 function viewSearch(view: StatementView): string {
   const params = new URLSearchParams();
   if (view.period !== undefined && view.period !== DEFAULT_POSTING_PERIOD) params.set('period', view.period);
@@ -71,19 +78,11 @@ function viewSearch(view: StatementView): string {
 const NO_NARROWING: PostingsPanelFilter = { direction: '', category: '', status: '' };
 
 export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObjectId }: AccountDetailScreenProps): JSX.Element {
-  const searchParams = useSearchParams();
-  const [view, setView] = useState<StatementView>(() => readView(searchParams));
+  const [view, navigate] = useAddressState(readView, viewHref);
   const [narrowing, setNarrowing] = useState<PostingsPanelFilter>(NO_NARROWING);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<{ field: string; desc: boolean } | undefined>(undefined);
   const [now] = useState(() => new Date());
-
-  // Same reasoning as `AccountsScreen.navigate`: local state first, the address bar mirrored
-  // through the History API, so rapid changes never race a router round trip.
-  function navigate(next: StatementView): void {
-    setView(next);
-    window.history.pushState(null, '', `${window.location.pathname}${viewSearch(next)}`);
-  }
 
   const period = postingPeriod(view.period);
   const pageSize = view.pageSize ?? STATEMENT_PAGE_SIZE;
@@ -108,6 +107,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
 
   const balanceQuery = useAccountBalance(accountId);
   const currenciesQuery = useCurrencies();
+  const decimalPlacesOf = useDecimalPlaces();
   const groupsQuery = useAccountGroups();
   const postingsQuery = usePostings(accountId, filter, pageSize);
   const listedPosting = postingsQuery.data?.items.find((posting) => posting.id === view.open);
@@ -134,7 +134,7 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
 
   // No amount is drawn until the currency's own scale is known — never a guessed 2 places. A
   // refused currency read is stated on its own, and amounts are then drawn at the service's digits.
-  const scale = account ? currenciesQuery.data?.find((currency) => currency.code === account.currency)?.decimalPlaces : undefined;
+  const scale = account ? decimalPlacesOf(account.currency) : undefined;
   const decimalPlaces = scale ?? (account && currenciesQuery.isError ? fractionDigitsOf(account.balance) : undefined);
   const balance = balanceQuery.data;
   const group = (groupsQuery.data ?? []).find((candidate) => candidate.id === account?.groupId);
@@ -149,10 +149,10 @@ export function AccountDetailScreen({ accountNumber, grantedScopes, directoryObj
         balance: balance?.balance ?? account.balance,
         availableBalance: balance?.availableBalance ?? account.availableBalance,
         heldAmount: balance?.heldAmount ?? account.heldAmount,
-        // No default of '0' while the balance read is pending or refused (DRK-1704 finding 5) —
-        // `FloorLine` falls back to its own `computeFloor` off the account's own floor policy
-        // fields when the service hasn't stated the exact figure yet.
+        // No default of '0' while the balance read is pending or refused (DRK-1704 finding 5):
+        // only the service's own figure is ever drawn (DRK-1760 §3 row 11).
         floor: balance?.floor,
+        floorFailed: balanceQuery.isError,
         status: account.status,
         permittedToGoNegative: account.permittedToGoNegative,
         overdraftLimit: account.overdraftLimit ?? null,

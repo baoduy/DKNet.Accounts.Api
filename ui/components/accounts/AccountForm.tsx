@@ -8,8 +8,9 @@
  */
 'use client';
 
-import { useEffect, useState, type CSSProperties, type JSX } from 'react';
+import { useState, type CSSProperties, type JSX } from 'react';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { Button } from '@/components/ui/button';
 import { Input, ReadOnlyField } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -130,7 +131,7 @@ export function AccountForm({
     floor.permittedToGoNegative !== account.permittedToGoNegative ||
     floor.overdraftLimit !== account.overdraftLimit ||
     floor.minimumBalance !== account.minimumBalance;
-  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+  useReportDirty(dirty, onDirtyChange);
 
   const { fieldErrors, alertErrors } = routeRefusal(errors);
   const editLocked = mode === 'edit' && !writeGranted;

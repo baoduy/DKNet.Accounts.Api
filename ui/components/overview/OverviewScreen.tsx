@@ -1,6 +1,6 @@
 'use client';
 
-import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import { useId, useMemo, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
 import { ArrowRight, Plus, Wallet, type LucideIcon } from 'lucide-react';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
@@ -15,10 +15,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TablePlaceholderRows, TableRow, loadingTableProps } from '@/components/ui/table';
 import { Tabs } from '@/components/ui/tabs';
 import { Caption, Label, Mono, Note } from '@/components/ui/text';
-import { useCurrencies } from '@/lib/accounts/query';
 import { fractionDigitsOf, shareBasisPoints } from '@/lib/api/money-json';
-import { fetchLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
-import { ledgerBalancesKey, postingCountKey, recentRecordKey, statusCountsKey } from '@/lib/query/keys';
+import { useCurrencies, useDecimalPlaces, useLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
+import { postingCountKey, recentRecordKey, statusCountsKey } from '@/lib/query/keys';
 import {
   ACTIVITY_WINDOWS,
   fetchPostingCount,
@@ -101,7 +100,7 @@ export function OverviewScreen({ grantedScopes, directoryObjectId }: OverviewScr
   const [now] = useState(() => new Date());
   const [activity, setActivity] = useState<ActivityWindow>('30');
   // The same read the position draws — its answer time is the balances' true "as at".
-  const balances = useQuery({ queryKey: ledgerBalancesKey(), queryFn: fetchLedgerBalances, enabled: canReadAccounts });
+  const balances = useLedgerBalances(canReadAccounts);
   const asAt = balances.isSuccess ? utcStamp(new Date(balances.dataUpdatedAt), true) : null;
 
   return (
@@ -186,6 +185,7 @@ function PositionBar({ line }: { line: LedgerBalanceLine }): JSX.Element {
 
 function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQueryResult<LedgerBalanceLine[]> }): JSX.Element {
   const currencies = useCurrencies();
+  const decimalPlacesOf = useDecimalPlaces();
   const failed = [balances, currencies].find((result) => result.isError);
   const loading = balances.isPending || currencies.isPending;
 
@@ -223,10 +223,9 @@ function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQ
               <TablePlaceholderRows columns={5} count={POSITION_PLACEHOLDER_ROWS} />
             ) : (
               (() => {
-                const decimals = new Map(currencies.data!.map((currency) => [currency.code, currency.decimalPlaces]));
                 // Drawn at the currency's own scale; a currency the list does not know keeps the service's digits.
                 const money = (line: LedgerBalanceLine, amount: string): JSX.Element => (
-                  <Money amount={amount} decimalPlaces={decimals.get(line.currency) ?? fractionDigitsOf(amount)} />
+                  <Money amount={amount} decimalPlaces={decimalPlacesOf(line.currency) ?? fractionDigitsOf(amount)} />
                 );
                 return balances.data!.map((line) => (
                   <TableRow key={line.currency}>

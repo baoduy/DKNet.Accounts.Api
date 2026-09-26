@@ -593,6 +593,21 @@ describe('AccountDetailScreen — the statement in the address (DRK-1725 §3 row
     expect(postingQueries(fetchMock)[0].get('pageSize')).toBe('10');
   });
 
+  it("adds one history entry per page change, at this account's own address (DRK-1760 §3 row 5)", async () => {
+    window.history.replaceState(null, '', '/accounts/ACME-000123');
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderWith('', { ...EMPTY_PAGE, pageNumber: 1, pageCount: 3, hasNextPage: true });
+    const next = await screen.findByRole('button', { name: 'Next page' });
+    await waitFor(() => expect(next).toBeEnabled());
+
+    await userEvent.click(next);
+
+    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(pushState).toHaveBeenCalledWith(null, '', '/accounts/ACME-000123?page=2');
+    pushState.mockRestore();
+    window.history.replaceState(null, '', '/');
+  });
+
   it('ignores a page in the address that is no page number', async () => {
     const fetchMock = renderWith('page=zero', { ...EMPTY_PAGE, totalItemCount: 0, pageCount: 1 });
     await waitFor(() => expect(postingQueries(fetchMock)).toHaveLength(1));

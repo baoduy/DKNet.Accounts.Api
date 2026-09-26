@@ -31,7 +31,8 @@ export interface ButtonProps extends ComponentProps<'button'>, VariantProps<type
   asChild?: boolean;
 }
 
-export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps): JSX.Element {
+/** A plain action unless marked: inside a form, only a `type="submit"` button submits it. */
+export function Button({ className, variant, size, asChild = false, type, ...props }: ButtonProps): JSX.Element {
   const Comp = asChild ? Slot : 'button';
-  return <Comp data-slot="button" className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <Comp data-slot="button" type={asChild ? type : (type ?? 'button')} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }

@@ -1,11 +1,11 @@
 'use client';
 
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Mono, Note } from '@/components/ui/text';
-import { listTotalKey, statusCountsKey } from '@/lib/query/keys';
-import { fetchListTotal, fetchStatusCounts } from '@/lib/query/overview';
+import { listTotalKey } from '@/lib/query/keys';
+import { fetchListTotal, useStatusCounts } from '@/lib/query/overview';
 import { countOf, formatCount, heightOf, MissingScope, Panel, Ready } from './parts';
 
 /**
@@ -24,7 +24,7 @@ function statusLine(counts: Array<{ status: string; count: number }>, status: st
 }
 
 export function GroupTypeBars({ granted }: { granted: boolean }): JSX.Element {
-  const statusCounts = useQuery({ queryKey: statusCountsKey('account-groups'), queryFn: () => fetchStatusCounts('account-groups'), enabled: granted });
+  const statusCounts = useStatusCounts('account-groups', granted);
   const typeCounts = useQueries({
     queries: GROUP_TYPES.map((type) => ({
       queryKey: listTotalKey('account-groups', typeFilter(type)),

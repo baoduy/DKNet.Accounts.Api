@@ -1,8 +1,10 @@
 /**
- * DRK-1697 §3 row 8 — typed read layer over `/api/ledger/currencies*`.
+ * DRK-1697 §3 row 8 — typed read layer over `/api/ledger/currencies*`. DRK-1760 §3 rows 3, 9 — the
+ * hooks below are the only way a screen reads a currency, a ledger-wide balance or a scale.
  */
-import { readLedgerJson } from '@/lib/api/money-json';
-import { refusalError } from '@/lib/api/refusal';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { readLedger } from '@/lib/api/ledger-request';
+import { currenciesQueryOptions, ledgerBalancesKey } from './keys';
 
 export interface Currency {
   id: string;
@@ -32,9 +34,7 @@ export function toCurrency(raw: unknown): Currency {
 }
 
 export async function fetchCurrencies(): Promise<Currency[]> {
-  const response = await fetch('/api/ledger/currencies');
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
+  const body = await readLedger('/api/ledger/currencies');
   // DRK-1732 §3 row 10: the service answers with a page (`PagedCurrencyResponse`). A bare list
   // is still read, because the component tests (`components/**`, not this cycle's to change)
   // stub the old shape.
@@ -42,10 +42,7 @@ export async function fetchCurrencies(): Promise<Currency[]> {
 }
 
 export async function fetchCurrency(currencyId: string): Promise<Currency> {
-  const response = await fetch(`/api/ledger/currencies/${encodeURIComponent(currencyId)}`);
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return toCurrency(body);
+  return toCurrency(await readLedger(`/api/ledger/currencies/${encodeURIComponent(currencyId)}`));
 }
 
 /**
@@ -54,8 +51,24 @@ export async function fetchCurrency(currencyId: string): Promise<Currency> {
  * Overview's position by currency (DRK-1728 §3 row 6); never displayed as a combined figure (R2).
  */
 export async function fetchLedgerBalances(): Promise<LedgerBalanceLine[]> {
-  const response = await fetch('/api/ledger/accounts/balances');
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return body as LedgerBalanceLine[];
+  return (await readLedger('/api/ledger/accounts/balances')) as LedgerBalanceLine[];
+}
+
+/** The currency list — reference data for the session (`currenciesQueryOptions`). */
+export function useCurrencies(): UseQueryResult<Currency[]> {
+  return useQuery({ ...currenciesQueryOptions(), queryFn: fetchCurrencies });
+}
+
+export function useLedgerBalances(enabled: boolean): UseQueryResult<LedgerBalanceLine[]> {
+  return useQuery({ queryKey: ledgerBalancesKey(), queryFn: fetchLedgerBalances, enabled });
+}
+
+/**
+ * DRK-1760 §3 row 9 — a currency code's decimal places, from the one currency read every screen
+ * shares; `undefined` until that read has answered or for a code it does not carry, so no amount
+ * is ever drawn at a guessed scale.
+ */
+export function useDecimalPlaces(): (code: string) => number | undefined {
+  const currencies = useCurrencies().data ?? [];
+  return (code) => currencies.find((currency) => currency.code === code)?.decimalPlaces;
 }

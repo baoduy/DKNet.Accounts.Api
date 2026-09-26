@@ -42,16 +42,16 @@ function renderScreen(grantedScopes: string[] = ['accounts.read', 'accounts.writ
   return render(createElement(QueryClientProvider, { client: queryClient }, createElement(AccountGroupsScreen, { grantedScopes })));
 }
 
-let historyReplaceSpy: ReturnType<typeof vi.spyOn>;
+let historyPushSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   setSearchParams('');
-  historyReplaceSpy = vi.spyOn(window.history, 'replaceState');
+  historyPushSpy = vi.spyOn(window.history, 'pushState');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  historyReplaceSpy.mockRestore();
+  historyPushSpy.mockRestore();
 });
 
 describe('AccountGroupsScreen', () => {
@@ -74,7 +74,7 @@ describe('AccountGroupsScreen', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Status filter'), 'Closed');
 
-    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?status=Closed');
+    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?status=Closed');
   });
 
   // DRK-1745: rewrite for the new form
@@ -85,7 +85,7 @@ describe('AccountGroupsScreen', () => {
 
     await userEvent.type(screen.getByLabelText('Owner filter'), 'partner-bank-01');
 
-    const lastCall = historyReplaceSpy.mock.calls.at(-1);
+    const lastCall = historyPushSpy.mock.calls.at(-1);
     expect(lastCall?.[2]).toContain('ownerId=');
   });
 
@@ -96,7 +96,7 @@ describe('AccountGroupsScreen', () => {
 
     await userEvent.click(within(screen.getByRole('columnheader', { name: 'Name' })).getByRole('button'));
 
-    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?sort=name');
+    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?sort=name');
   });
 
   it('Next page is disabled with no further page and enabled once the server reports one', async () => {
@@ -118,7 +118,7 @@ describe('AccountGroupsScreen', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
 
-    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?page=2&pageSize=10');
+    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?page=2&pageSize=10');
   });
 
   it('opening a row fetches its detail and balances, showing one line per currency and no combined total', async () => {
@@ -448,7 +448,7 @@ describe('AccountGroupsScreen', () => {
 
     await userEvent.click(previousButton);
 
-    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?page=1&pageSize=10');
+    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?page=1&pageSize=10');
   });
 });
 
@@ -464,7 +464,7 @@ describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
     renderScreen();
     await userEvent.selectOptions(await screen.findByLabelText('Type filter'), 'Internal');
 
-    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/groups?type=Internal');
+    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?type=Internal');
     await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain('/api/ledger/account-groups?filter=Type%3AEqual%3AInternal&pageNumber=1'));
     expect(screen.getAllByRole('option').filter((option) => option.closest('select') === screen.getByLabelText('Type filter')).map((option) => option.textContent)).toEqual([
       'Any',

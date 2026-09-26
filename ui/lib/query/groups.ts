@@ -1,12 +1,14 @@
 /**
  * DRK-1697 §3 row 8 — typed read layer over `/api/ledger/account-groups*`. Maps a
  * `ListViewState` to the list query surface (`filter=…`, `orderBy`, `desc`, `pageNumber`) and
- * parses every response body through `readLedgerJson` (row 7), so a balance never passes
- * through a JS `number`.
+ * reads every response through `readLedger` (row 7), so a balance never passes through a JS
+ * `number`. DRK-1760 §3 row 3 — the hooks below are the only way a screen reads a group.
  */
-import { readLedgerJson } from '@/lib/api/money-json';
-import { refusalError } from '@/lib/api/refusal';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { AccountGroupDto } from '@/lib/accounts/query';
+import { readLedger } from '@/lib/api/ledger-request';
 import type { ListViewState } from '@/lib/url-state';
+import { accountGroupBalancesKey, accountGroupKey, accountGroupsKey, accountGroupsListKey } from './keys';
 
 export type AccountGroupType = 'Customer' | 'Merchant' | 'Internal' | 'Suspense' | 'Settlement';
 export type AccountGroupStatus = 'Active' | 'Closed';
@@ -88,22 +90,37 @@ function toPagedAccountGroups(raw: unknown): PagedAccountGroups {
 }
 
 export async function fetchAccountGroups(state: ListViewState): Promise<PagedAccountGroups> {
-  const response = await fetch(`/api/ledger/account-groups?${buildGroupsSearchParams(state).toString()}`);
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return toPagedAccountGroups(body);
+  return toPagedAccountGroups(await readLedger(`/api/ledger/account-groups?${buildGroupsSearchParams(state).toString()}`));
 }
 
 export async function fetchAccountGroup(groupId: string): Promise<AccountGroup> {
-  const response = await fetch(`/api/ledger/account-groups/${encodeURIComponent(groupId)}`);
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return body as AccountGroup;
+  return (await readLedger(`/api/ledger/account-groups/${encodeURIComponent(groupId)}`)) as AccountGroup;
 }
 
 export async function fetchAccountGroupBalances(groupId: string): Promise<AccountGroupBalance[]> {
-  const response = await fetch(`/api/ledger/account-groups/${encodeURIComponent(groupId)}/balances`);
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return body as AccountGroupBalance[];
+  return (await readLedger(`/api/ledger/account-groups/${encodeURIComponent(groupId)}/balances`)) as AccountGroupBalance[];
+}
+
+/** One page of the groups list, as the screen's view (filters, sort, page, page size) asks for it. */
+export function useAccountGroupsPage(state: ListViewState & { pageSize: number }): UseQueryResult<PagedAccountGroups> {
+  return useQuery({
+    queryKey: accountGroupsListKey({ ...state.filters, sort: state.sort, page: state.page, pageSize: state.pageSize }),
+    queryFn: () => fetchAccountGroups(state),
+  });
+}
+
+export function useAccountGroup(groupId: string | null | undefined): UseQueryResult<AccountGroup> {
+  return useQuery({ queryKey: accountGroupKey(groupId ?? ''), queryFn: () => fetchAccountGroup(groupId as string), enabled: groupId != null });
+}
+
+export function useAccountGroupBalances(groupId: string | null | undefined, enabled: boolean): UseQueryResult<AccountGroupBalance[]> {
+  return useQuery({ queryKey: accountGroupBalancesKey(groupId ?? ''), queryFn: () => fetchAccountGroupBalances(groupId as string), enabled: enabled && groupId != null });
+}
+
+/** Every group the service answers with unpaged — the choices a filter or an open-account form offers. */
+export function useAccountGroups(): UseQueryResult<AccountGroupDto[]> {
+  return useQuery({
+    queryKey: accountGroupsKey(),
+    queryFn: async () => ((await readLedger('/api/ledger/account-groups')) as { items: AccountGroupDto[] }).items,
+  });
 }

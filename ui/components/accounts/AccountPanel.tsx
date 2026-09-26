@@ -20,12 +20,11 @@ import { StatusBadge } from '@/components/ledger/StatusBadge';
 import { formatDate } from '@/components/records/RecordsTable';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
-import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Caption, Mono, Note } from '@/components/ui/text';
 import { useOpenAccount, useSaveAccountEdit } from '@/lib/accounts/mutations';
 import { useAccount, useAccountBalance, type AccountDto, type AccountGroupDto, type AccountLookup } from '@/lib/accounts/query';
-import type { Currency } from '@/lib/query/currencies';
+import { useDecimalPlaces, type Currency } from '@/lib/query/currencies';
 import { AccountForm, type AccountFormValues } from './AccountForm';
 import { AccountStatusControl } from './AccountStatusControl';
 
@@ -88,43 +87,38 @@ function PanelBody({
   onDirtyChange,
 }: AccountPanelProps & { accountQuery?: UseQueryResult<AccountLookup> }): JSX.Element {
   const [errors, setErrors] = useState<LedgerError[]>([]);
-  const [pending, setPending] = useState(false);
   const focusRef = usePanelFocus<HTMLDivElement>(true);
   const balanceQuery = useAccountBalance(mode === 'view' ? accountId : '');
   const openAccount = useOpenAccount();
   const saveEdit = useSaveAccountEdit();
+  const decimalPlacesOf = useDecimalPlaces();
 
   const canWrite = grantedScopes.includes('accounts.write');
   const account = accountQuery?.data?.account;
-  const decimalPlaces = account ? currencies.find((currency) => currency.code === account.currency)?.decimalPlaces : undefined;
+  const decimalPlaces = account ? decimalPlacesOf(account.currency) : undefined;
   const groupCode = account ? (groups.find((group) => group.id === account.groupId)?.code ?? '') : '';
   const notes = account?.metadata?.notes ?? '';
 
   async function submit(values: AccountFormValues): Promise<void> {
-    setPending(true);
-    try {
-      if (mode === 'open') {
-        const result = await openAccount.mutate({
-          groupId: values.groupId!,
-          name: values.name,
-          currency: values.currency!,
-          classification: values.classification!,
-          permittedToGoNegative: values.floor.permittedToGoNegative,
-          overdraftLimit: values.floor.overdraftLimit,
-          minimumBalance: values.floor.minimumBalance,
-          metadata: values.notes ? { notes: values.notes } : undefined,
-        });
-        setErrors(result.ok ? [] : (result.errors ?? []));
-        if (result.ok && result.account) onOpened(result.account);
-        return;
-      }
-      if (!account) return;
-      const found = await saveEdit({ ...values, accountId: account.id, current: { name: account.name, notes, metadata: account.metadata } });
-      setErrors(found);
-      if (found.length === 0) onSaved(account);
-    } finally {
-      setPending(false);
+    if (mode === 'open') {
+      const result = await openAccount.mutate({
+        groupId: values.groupId!,
+        name: values.name,
+        currency: values.currency!,
+        classification: values.classification!,
+        permittedToGoNegative: values.floor.permittedToGoNegative,
+        overdraftLimit: values.floor.overdraftLimit,
+        minimumBalance: values.floor.minimumBalance,
+        metadata: values.notes ? { notes: values.notes } : undefined,
+      });
+      setErrors(result.ok ? [] : (result.errors ?? []));
+      if (result.ok && result.account) onOpened(result.account);
+      return;
     }
+    if (!account) return;
+    const found = await saveEdit.mutate({ ...values, accountId: account.id, current: { name: account.name, notes, metadata: account.metadata } });
+    setErrors(found);
+    if (found.length === 0) onSaved(account);
   }
 
   const title =
@@ -174,7 +168,7 @@ function PanelBody({
           Cancel
         </Button>
         <ScopeGate scope="accounts.write" granted={canWrite}>
-          <Button type="submit" form={FORM_ID} size="sm" variant="primary" disabled={pending}>
+          <Button type="submit" form={FORM_ID} size="sm" variant="primary" disabled={openAccount.isPending || saveEdit.isPending}>
             {mode === 'open' ? 'Open account' : 'Save changes'}
           </Button>
         </ScopeGate>
@@ -250,6 +244,7 @@ function PanelBody({
               }}
               decimalPlaces={decimalPlaces}
               floor={balanceQuery.data?.floor}
+              failed={balanceQuery.isError}
             />
           )}
 
@@ -309,32 +304,5 @@ function PanelBody({
         {body()}
       </div>
     </DetailPanel>
-  );
-}
-
-export interface DiscardChangesDialogProps {
-  onKeepEditing: () => void;
-  onDiscard: () => void;
-}
-
-/** The kit's "Discard unsaved changes?" — only ever mounted while an edited form would be dropped. */
-export function DiscardChangesDialog({ onKeepEditing, onDiscard }: DiscardChangesDialogProps): JSX.Element {
-  return (
-    <Dialog
-      title="Discard unsaved changes?"
-      onClose={onKeepEditing}
-      footer={
-        <>
-          <Button type="button" onClick={onKeepEditing}>
-            Keep editing
-          </Button>
-          <Button type="button" variant="destructive" onClick={onDiscard}>
-            Discard changes
-          </Button>
-        </>
-      }
-    >
-      This form has edits that have not been sent. Closing the panel drops them.
-    </Dialog>
   );
 }

@@ -1,11 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Caption, Mono, Note } from '@/components/ui/text';
-import { listTotalKey, statusCountsKey } from '@/lib/query/keys';
-import { fetchListTotal, fetchStatusCounts } from '@/lib/query/overview';
+import { useListTotal, useStatusCounts } from '@/lib/query/overview';
 import { countOf, formatCount, MissingScope, Panel, Ready } from './parts';
 
 /**
@@ -82,9 +80,9 @@ function Ring({ lines, total }: { lines: Array<{ status: string; colour: string;
 }
 
 export function StatusRing({ granted }: { granted: boolean }): JSX.Element {
-  const counts = useQuery({ queryKey: statusCountsKey('accounts'), queryFn: () => fetchStatusCounts('accounts'), enabled: granted });
-  const accountTotal = useQuery({ queryKey: listTotalKey('accounts'), queryFn: () => fetchListTotal('accounts'), enabled: granted });
-  const groupTotal = useQuery({ queryKey: listTotalKey('account-groups'), queryFn: () => fetchListTotal('account-groups'), enabled: granted });
+  const counts = useStatusCounts('accounts', granted);
+  const accountTotal = useListTotal('accounts', {}, { enabled: granted });
+  const groupTotal = useListTotal('account-groups', {}, { enabled: granted });
 
   return (
     <Panel

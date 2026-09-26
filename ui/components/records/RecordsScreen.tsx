@@ -12,23 +12,23 @@
  */
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { useLayoutEffect, useState, type JSX } from 'react';
 import { Plus } from 'lucide-react';
-import { RecordPostingForm, recordedText, useUnsentGuard } from '@/components/accounts/RecordPostingForm';
+import { RecordPostingForm, recordedText } from '@/components/accounts/RecordPostingForm';
 import { reversedText } from '@/components/accounts/ReversePostingForm';
-import { Acknowledgement } from '@/components/feedback/Acknowledgement';
 import { emptyMessage, postingsEmpty } from '@/components/feedback/empty';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
+import { useFlash } from '@/components/feedback/use-flash';
 import { usePanelFocus } from '@/components/feedback/use-panel-focus';
+import { DISCARD_RECORD, usePanelState } from '@/components/feedback/use-panel-state';
 import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { TableCard } from '@/components/ui/table-card';
 import { Mono, Note } from '@/components/ui/text';
-import { useAccountsById, useCurrencies, usePosting, useRecords } from '@/lib/accounts/query';
+import { useAccountsById, usePosting, useRecords } from '@/lib/accounts/query';
 import {
   DEFAULT_POSTING_PERIOD,
   MIN_POSTING_SEARCH_LENGTH,
@@ -40,8 +40,9 @@ import {
   postingPeriodRange,
   type PostingsFilterState,
 } from '@/lib/accounts/postings-filter';
+import { useCurrencies, useDecimalPlaces } from '@/lib/query/currencies';
 import { pushRecent } from '@/lib/recent/store';
-import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
+import { useListViewState, withFilter, type ListViewState } from '@/lib/url-state';
 import { PostingDetails } from './PostingDetails';
 import { RecordsTable, type RecordsTableRow } from './RecordsTable';
 
@@ -57,17 +58,9 @@ export interface RecordsScreenProps {
   directoryObjectId?: string;
 }
 
-interface Flash {
-  title: string;
-  text: JSX.Element | string;
-}
-
 /** A narrowing left empty (or the default period) is dropped from the address. */
 function setFilter(state: ListViewState, key: string, value: string): ListViewState {
-  const filters = { ...state.filters };
-  if (value && !(key === 'period' && value === DEFAULT_POSTING_PERIOD)) filters[key] = value;
-  else delete filters[key];
-  return { ...state, filters, page: undefined };
+  return withFilter(state, key, key === 'period' && value === DEFAULT_POSTING_PERIOD ? '' : value);
 }
 
 /** A select over the service's own values, `Any` first. */
@@ -76,21 +69,13 @@ function anyOf(values: readonly string[]): { value: string; label: string }[] {
 }
 
 export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScreenProps): JSX.Element {
-  const searchParams = useSearchParams();
-  const [state, setState] = useState<ListViewState>(() => parseListViewState(searchParams));
+  const [state, navigate] = useListViewState('/records');
   const [now] = useState(() => new Date());
-  const [flash, setFlash] = useState<Flash | null>(null);
-
-  // Same reasoning as `AccountsScreen.navigate`: local state first, the address bar mirrored
-  // through the History API, so rapid changes never race a router round trip.
-  function navigate(next: ListViewState): void {
-    setState(next);
-    window.history.pushState(null, '', `/records?${toListViewSearchParams(next).toString()}`);
-  }
+  const flash = useFlash();
 
   const creating = state.openRecordId === NEW_RECORD;
   // An unsent record is never dropped without asking (DRK-1745 §3 row 9).
-  const unsent = useUnsentGuard(creating);
+  const unsent = usePanelState({ copy: DISCARD_RECORD });
 
   const period = postingPeriod(state.filters.period);
   const sort = state.sort ?? DEFAULT_ORDER;
@@ -108,6 +93,7 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
 
   const recordsQuery = useRecords(filter, pageSize);
   const currenciesQuery = useCurrencies();
+  const decimalPlacesOf = useDecimalPlaces();
   const viewedId = creating ? undefined : state.openRecordId;
   const openQuery = usePosting(viewedId);
   const items = recordsQuery.data?.items ?? [];
@@ -125,7 +111,6 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
   for (const query of accountQueries) {
     if (query.data?.account) accounts.set(query.data.account.id, query.data.account);
   }
-  const decimalPlacesByCurrency = new Map((currenciesQuery.data ?? []).map((currency) => [currency.code, currency.decimalPlaces]));
   // Rows are drawn only once every account number and currency scale is known — never a guid in
   // the Account column or an amount at a guessed scale. A refused currency read is stated on its
   // own and the amounts are then drawn as the service sent them, never left loading.
@@ -144,7 +129,7 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
     category: posting.category,
     amount: posting.amount,
     currency: posting.currency,
-    decimalPlaces: decimalPlacesByCurrency.get(posting.currency),
+    decimalPlaces: decimalPlacesOf(posting.currency),
     effectiveDate: posting.effectiveDate,
     status: posting.status,
   }));
@@ -166,9 +151,8 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
         onClose={() => unsent.guard(closePanel)}
         onDirtyChange={unsent.onDirtyChange}
         onRecorded={(recorded) => {
-          unsent.clear();
           closePanel();
-          setFlash({ title: 'Record posted', text: recordedText(recorded) });
+          flash.show({ title: 'Record posted', text: recordedText(recorded) });
         }}
       />
     );
@@ -179,10 +163,10 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
         posting={openPosting}
         accountNumber={account?.accountNumber ?? openPosting.accountId}
         accountName={account?.name}
-        decimalPlaces={decimalPlacesByCurrency.get(openPosting.currency)}
+        decimalPlaces={decimalPlacesOf(openPosting.currency)}
         reverseGranted={grantedScopes.includes('postings.reverse')}
         onClose={closePanel}
-        onReversed={(reversed) => setFlash({ title: 'Record reversed', text: reversedText(reversed) })}
+        onReversed={(reversed) => flash.show({ title: 'Record reversed', text: reversedText(reversed) })}
       />
     );
   }
@@ -203,11 +187,7 @@ export function RecordsScreen({ grantedScopes, directoryObjectId }: RecordsScree
         }
       />
 
-      {flash ? (
-        <Acknowledgement title={flash.title} onDismiss={() => setFlash(null)}>
-          {flash.text}
-        </Acknowledgement>
-      ) : null}
+      {flash.card}
 
       {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 

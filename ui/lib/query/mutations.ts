@@ -6,13 +6,39 @@
  */
 'use client';
 
+import { useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LedgerError } from '@/components/feedback/RefusalAlert';
-import { readLedgerJson } from '@/lib/api/money-json';
+import { sendLedgerWrite } from '@/lib/api/ledger-request';
 import type { Currency } from './currencies';
 import { toCurrency } from './currencies';
 import type { AccountGroup, AccountGroupType } from './groups';
 import { accountBalanceKey, accountGroupBalancesKey, accountGroupKey, accountGroupsListKey, currenciesKey, currencyKey, postingsListKey } from './keys';
+
+/** DRK-1760 §3 row 2 — what every write hook returns. */
+export interface LedgerMutation<Input, Result> {
+  mutate: (input: Input) => Promise<Result>;
+  /** True while the write is in flight — the action that sent it is disabled meanwhile (row 10). */
+  isPending: boolean;
+}
+
+/**
+ * Every write hook's one shape. A second `mutate` while the first is still in flight is handed the
+ * first one's answer instead of sending again, so a double-click sends one request.
+ */
+export function useLedgerMutation<Input, Result>(options: { mutationFn: (input: Input) => Promise<Result>; onSuccess?: (result: Result, input: Input) => void }): LedgerMutation<Input, Result> {
+  const mutation = useMutation<Result, Error, Input>(options);
+  const inFlight = useRef<Promise<Result> | null>(null);
+  return {
+    mutate: (input) => {
+      inFlight.current ??= mutation.mutateAsync(input).finally(() => {
+        inFlight.current = null;
+      });
+      return inFlight.current;
+    },
+    isPending: mutation.isPending,
+  };
+}
 
 export interface RecordPostingInput {
   accountId: string;
@@ -50,12 +76,11 @@ export interface ReversePostingResult {
   traceId?: string;
 }
 
-export function useRecordPosting(): { mutate: (input: RecordPostingInput) => Promise<RecordPostingResult> } {
+export function useRecordPosting(): LedgerMutation<RecordPostingInput, RecordPostingResult> {
   const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: async (input: RecordPostingInput): Promise<RecordPostingResult & { accountId: string }> => {
-      const response = await fetch('/api/ledger/postings', {
+  return useLedgerMutation({
+    mutationFn: async (input: RecordPostingInput): Promise<RecordPostingResult> => {
+      const result = await sendLedgerWrite('/api/ledger/postings', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'Idempotency-Key': input.idempotencyKey },
         body: JSON.stringify({
@@ -68,44 +93,29 @@ export function useRecordPosting(): { mutate: (input: RecordPostingInput) => Pro
           effectiveDate: input.effectiveDate,
         }),
       });
-
-      if (response.ok) {
-        return { ok: true, accountId: input.accountId };
-      }
-
-      const body = (await response.json()) as { errors?: LedgerError[]; traceId?: string };
-      return { ok: false, errors: body.errors, traceId: body.traceId, accountId: input.accountId };
+      return result.ok ? { ok: true } : { ok: false, errors: result.errors, traceId: result.traceId };
     },
     // TanStack already hands the original variables back as the second argument — no need to
     // round-trip `regenerateIdempotencyKey` through the mutation's own result for this.
     onSuccess: (result, variables) => {
       if (!result.ok) return;
-      queryClient.invalidateQueries({ queryKey: accountBalanceKey(result.accountId) });
+      queryClient.invalidateQueries({ queryKey: accountBalanceKey(variables.accountId) });
       queryClient.invalidateQueries({ queryKey: postingsListKey({}) });
       variables.regenerateIdempotencyKey();
     },
   });
-
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useReversePosting(): { mutate: (input: ReversePostingInput) => Promise<ReversePostingResult> } {
+export function useReversePosting(): LedgerMutation<ReversePostingInput, ReversePostingResult> {
   const queryClient = useQueryClient();
-
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: async (input: ReversePostingInput): Promise<ReversePostingResult> => {
-      const response = await fetch(`/api/ledger/postings/${input.postingId}/reverse`, {
+      const result = await sendLedgerWrite(`/api/ledger/postings/${input.postingId}/reverse`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'Idempotency-Key': input.idempotencyKey },
         body: JSON.stringify({ reason: input.reason }),
       });
-
-      if (response.ok) {
-        return { ok: true };
-      }
-
-      const body = (await response.json()) as { errors?: LedgerError[]; traceId?: string };
-      return { ok: false, errors: body.errors, traceId: body.traceId };
+      return result.ok ? { ok: true } : { ok: false, errors: result.errors, traceId: result.traceId };
     },
     onSuccess: (result, variables) => {
       if (!result.ok) return;
@@ -114,8 +124,6 @@ export function useReversePosting(): { mutate: (input: ReversePostingInput) => P
       variables.regenerateIdempotencyKey();
     },
   });
-
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
 /**
@@ -158,28 +166,20 @@ export interface UpdateAccountGroupInput {
 }
 
 async function sendGroupRequest(url: string, init: RequestInit): Promise<AccountGroupMutationResult> {
-  const response = await fetch(url, init);
-  const body = await readLedgerJson(response);
-  if (!response.ok) {
-    const refusal = body as { errors?: LedgerError[]; traceId?: string };
-    return { ok: false, errors: refusal.errors, traceId: refusal.traceId };
-  }
-  return { ok: true, group: response.status === 204 ? undefined : (body as AccountGroup) };
+  const result = await sendLedgerWrite(url, init);
+  if (!result.ok) return result;
+  return { ok: true, group: result.status === 204 ? undefined : (result.body as AccountGroup) };
 }
 
 async function sendCurrencyRequest(url: string, init: RequestInit): Promise<CurrencyMutationResult> {
-  const response = await fetch(url, init);
-  const body = await readLedgerJson(response);
-  if (!response.ok) {
-    const refusal = body as { errors?: LedgerError[]; traceId?: string };
-    return { ok: false, errors: refusal.errors, traceId: refusal.traceId };
-  }
-  return { ok: true, currency: toCurrency(body) };
+  const result = await sendLedgerWrite(url, init);
+  if (!result.ok) return result;
+  return { ok: true, currency: toCurrency(result.body) };
 }
 
-export function useCreateAccountGroup(): { mutate: (input: CreateAccountGroupInput) => Promise<AccountGroupMutationResult> } {
+export function useCreateAccountGroup(): LedgerMutation<CreateAccountGroupInput, AccountGroupMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: CreateAccountGroupInput) =>
       sendGroupRequest('/api/ledger/account-groups', {
         method: 'POST',
@@ -198,12 +198,11 @@ export function useCreateAccountGroup(): { mutate: (input: CreateAccountGroupInp
       queryClient.invalidateQueries({ queryKey: accountGroupsListKey({}) });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useUpdateAccountGroup(): { mutate: (input: UpdateAccountGroupInput) => Promise<AccountGroupMutationResult> } {
+export function useUpdateAccountGroup(): LedgerMutation<UpdateAccountGroupInput, AccountGroupMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: UpdateAccountGroupInput) =>
       sendGroupRequest(`/api/ledger/account-groups/${encodeURIComponent(input.groupId)}`, {
         method: 'PUT',
@@ -216,12 +215,11 @@ export function useUpdateAccountGroup(): { mutate: (input: UpdateAccountGroupInp
       queryClient.invalidateQueries({ queryKey: accountGroupsListKey({}) });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useCloseAccountGroup(): { mutate: (input: { groupId: string }) => Promise<AccountGroupMutationResult> } {
+export function useCloseAccountGroup(): LedgerMutation<{ groupId: string }, AccountGroupMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: { groupId: string }) =>
       sendGroupRequest(`/api/ledger/account-groups/${encodeURIComponent(input.groupId)}/close`, { method: 'POST' }),
     onSuccess: (result, variables) => {
@@ -230,12 +228,11 @@ export function useCloseAccountGroup(): { mutate: (input: { groupId: string }) =
       queryClient.invalidateQueries({ queryKey: accountGroupsListKey({}) });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useActivateAccountGroup(): { mutate: (input: { groupId: string }) => Promise<AccountGroupMutationResult> } {
+export function useActivateAccountGroup(): LedgerMutation<{ groupId: string }, AccountGroupMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: { groupId: string }) =>
       sendGroupRequest(`/api/ledger/account-groups/${encodeURIComponent(input.groupId)}/activate`, { method: 'POST' }),
     onSuccess: (result, variables) => {
@@ -244,12 +241,11 @@ export function useActivateAccountGroup(): { mutate: (input: { groupId: string }
       queryClient.invalidateQueries({ queryKey: accountGroupsListKey({}) });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useDeleteAccountGroup(): { mutate: (input: { groupId: string }) => Promise<LedgerMutationResult> } {
+export function useDeleteAccountGroup(): LedgerMutation<{ groupId: string }, LedgerMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: { groupId: string }) =>
       sendGroupRequest(`/api/ledger/account-groups/${encodeURIComponent(input.groupId)}`, { method: 'DELETE' }),
     onSuccess: (result, variables) => {
@@ -258,7 +254,6 @@ export function useDeleteAccountGroup(): { mutate: (input: { groupId: string }) 
       queryClient.invalidateQueries({ queryKey: accountGroupsListKey({}) });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
 export interface RegisterCurrencyInput {
@@ -272,9 +267,9 @@ export interface RenameCurrencyInput {
   name: string;
 }
 
-export function useRegisterCurrency(): { mutate: (input: RegisterCurrencyInput) => Promise<CurrencyMutationResult> } {
+export function useRegisterCurrency(): LedgerMutation<RegisterCurrencyInput, CurrencyMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: RegisterCurrencyInput) =>
       sendCurrencyRequest('/api/ledger/currencies', {
         method: 'POST',
@@ -286,12 +281,11 @@ export function useRegisterCurrency(): { mutate: (input: RegisterCurrencyInput) 
       queryClient.invalidateQueries({ queryKey: currenciesKey() });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useRenameCurrency(): { mutate: (input: RenameCurrencyInput) => Promise<CurrencyMutationResult> } {
+export function useRenameCurrency(): LedgerMutation<RenameCurrencyInput, CurrencyMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: RenameCurrencyInput) =>
       sendCurrencyRequest(`/api/ledger/currencies/${encodeURIComponent(input.currencyId)}`, {
         method: 'PUT',
@@ -304,12 +298,11 @@ export function useRenameCurrency(): { mutate: (input: RenameCurrencyInput) => P
       queryClient.invalidateQueries({ queryKey: currenciesKey() });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useActivateCurrency(): { mutate: (input: { currencyId: string }) => Promise<CurrencyMutationResult> } {
+export function useActivateCurrency(): LedgerMutation<{ currencyId: string }, CurrencyMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: { currencyId: string }) =>
       sendCurrencyRequest(`/api/ledger/currencies/${encodeURIComponent(input.currencyId)}/activate`, { method: 'POST' }),
     onSuccess: (result, variables) => {
@@ -318,12 +311,11 @@ export function useActivateCurrency(): { mutate: (input: { currencyId: string })
       queryClient.invalidateQueries({ queryKey: currenciesKey() });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }
 
-export function useDeactivateCurrency(): { mutate: (input: { currencyId: string }) => Promise<CurrencyMutationResult> } {
+export function useDeactivateCurrency(): LedgerMutation<{ currencyId: string }, CurrencyMutationResult> {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
+  return useLedgerMutation({
     mutationFn: (input: { currencyId: string }) =>
       sendCurrencyRequest(`/api/ledger/currencies/${encodeURIComponent(input.currencyId)}/deactivate`, { method: 'POST' }),
     onSuccess: (result, variables) => {
@@ -332,5 +324,4 @@ export function useDeactivateCurrency(): { mutate: (input: { currencyId: string 
       queryClient.invalidateQueries({ queryKey: currenciesKey() });
     },
   });
-  return { mutate: (input) => mutation.mutateAsync(input) };
 }

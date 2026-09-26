@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { accountKeyPrefix, accountsListKey } from '@/lib/query/keys';
-import { useChangeAccountDetails, useOpenAccount, useSetAccountControls } from './mutations';
+import { useChangeAccountDetails, useOpenAccount, useSaveAccountEdit, useSetAccountControls } from './mutations';
 
 function wrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -173,5 +173,91 @@ describe('useSetAccountControls', () => {
     const response = await result.current.mutate({ accountId: 'ACME-000123', status: 'Closed' });
 
     expect(response).toEqual({ ok: false, errors: undefined, traceId: undefined });
+  });
+});
+
+describe('useSaveAccountEdit (DRK-1760 §3 row 2)', () => {
+  const FLOOR = { permittedToGoNegative: false, overdraftLimit: null, minimumBalance: null };
+
+  function ok(): { ok: boolean; status: number; text: () => Promise<string> } {
+    return { ok: true, status: 200, text: async () => JSON.stringify({ id: 'a1' }) };
+  }
+
+  it('sends only the PATCH when neither the name nor the notes changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok());
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+
+    const errors = await result.current.mutate({ accountId: 'a1', current: { name: 'Acme', notes: '' }, name: 'Acme', notes: '', floor: FLOOR });
+
+    expect(errors).toEqual([]);
+    expect(fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method)).toEqual(['PATCH']);
+  });
+
+  it('sends the PUT with the new name only, then the PATCH, when the name changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok());
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+
+    await result.current.mutate({ accountId: 'a1', current: { name: 'Acme', notes: 'n' }, name: 'Acme treasury', notes: 'n', floor: FLOOR });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => `${(init as RequestInit).method} ${url as string}`)).toEqual(['PUT /api/ledger/accounts/a1', 'PATCH /api/ledger/accounts/a1']);
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({ name: 'Acme treasury' });
+  });
+
+  it('resends every metadata key with the new notes when only the notes changed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok());
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+
+    await result.current.mutate({ accountId: 'a1', current: { name: 'Acme', notes: 'old', metadata: { desk: 'fx', notes: 'old' } }, name: 'Acme', notes: 'new', floor: FLOOR });
+
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({ metadata: { desk: 'fx', notes: 'new' } });
+  });
+
+  it('resolves to every refusal both calls returned', async () => {
+    const refusal = (message: string) => ({ ok: false, status: 422, text: async () => JSON.stringify({ errors: [{ message }] }) });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(refusal('Name is taken.')).mockResolvedValueOnce(refusal('Floor refused.')));
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+
+    const errors = await result.current.mutate({ accountId: 'a1', current: { name: 'Acme', notes: '' }, name: 'Acme 2', notes: '', floor: FLOOR });
+
+    expect(errors).toEqual([{ message: 'Name is taken.' }, { message: 'Floor refused.' }]);
+  });
+
+  it('is pending from the first request until the last one has answered', async () => {
+    let answerPatch!: (response: unknown) => void;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok())
+      .mockReturnValueOnce(new Promise((resolve) => (answerPatch = resolve)));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+    expect(result.current.isPending).toBe(false);
+
+    const saved = result.current.mutate({ accountId: 'a1', current: { name: 'Acme', notes: '' }, name: 'Acme 2', notes: '', floor: FLOOR });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(result.current.isPending).toBe(true);
+
+    answerPatch(ok());
+    await saved;
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+});
+
+describe('useSaveAccountEdit — a refusal with no errors', () => {
+  it('resolves to no errors rather than throwing when a refusal carries none', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => '' }));
+    const { result } = renderHook(() => useSaveAccountEdit(), { wrapper: wrapper(new QueryClient()) });
+
+    const errors = await result.current.mutate({
+      accountId: 'a1',
+      current: { name: 'Acme', notes: '' },
+      name: 'Acme 2',
+      notes: '',
+      floor: { permittedToGoNegative: false, overdraftLimit: null, minimumBalance: null },
+    });
+
+    expect(errors).toEqual([]);
   });
 });
