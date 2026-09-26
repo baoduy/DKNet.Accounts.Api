@@ -114,3 +114,29 @@ describe('Account detail — editing the account', () => {
     expect(JSON.parse((put![1] as RequestInit).body as string)).toEqual({ name: 'Operating account 2' });
   });
 });
+
+describe('Account detail — a save in flight (DRK-1762 finding 1)', () => {
+  it('disables Save while the save is in flight, and enables it again once the service answers', async () => {
+    let answerPut!: (answer: Answer) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (init?.method === 'PUT') return new Promise<Answer>((resolve) => (answerPut = resolve));
+        if (init?.method === 'PATCH') return Promise.resolve(answer({ id: 'a1' }));
+        if (url.startsWith('/api/ledger/currencies')) return Promise.resolve(answer([{ id: 'c1', code: 'SGD', name: 'Singapore Dollar', decimalPlaces: 2, isActive: true }]));
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit ACME-000123' }));
+    await userEvent.type(within(panel()).getByLabelText('Name'), ' 2');
+    const save = within(panel()).getByRole('button', { name: 'Save' });
+
+    await userEvent.click(save);
+    await waitFor(() => expect(save).toBeDisabled());
+
+    answerPut(answer({ errors: [{ message: 'The name is taken.', code: 'DUPLICATE_ACCOUNT_NAME' }] }, 422));
+    expect(await within(panel()).findByText(/The name is taken\./)).toBeInTheDocument();
+    await waitFor(() => expect(save).toBeEnabled());
+  });
+});

@@ -4,12 +4,12 @@
  * free-text search. Every figure is the service's own count (R1): a posting count is one read of
  * `pageSize=1` whose `totalItemCount` is taken as the figure, never a count of listed rows.
  */
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { ledgerFetch, readLedger } from '@/lib/api/ledger-request';
 import { type AsRead, readLedgerJson } from '@/lib/api/money-json';
 import { LedgerRefusalError, refusalError } from '@/lib/api/refusal';
 import type { components } from '@/lib/api/schema';
-import { listTotalKey, postingCountKey, statusCountsKey } from './keys';
+import { listTotalKey, postingCountKey, recentRecordKey, statusCountsKey } from './keys';
 
 export type StatusCountResource = 'accounts' | 'account-groups';
 
@@ -80,6 +80,41 @@ export function useListTotal(resource: TotalResource, params: Record<string, str
 /** How many postings took effect in a window that can change (the activity window), so it keeps the last answer. */
 export function usePostingCount(window: DateWindow, enabled: boolean): UseQueryResult<number> {
   return useQuery({ queryKey: postingCountKey(window), queryFn: () => fetchPostingCount(window), enabled, placeholderData: keepPreviousData });
+}
+
+/** DRK-1762 finding 2 — the service's count per status in each window, one read per window. */
+export function useStatusCountsPerWindow(resource: StatusCountResource, windows: DateWindow[], enabled: boolean): UseQueryResult<StatusCount[]>[] {
+  return useQueries({
+    queries: windows.map((window) => {
+      const range = { from: window.from, to: window.to };
+      return { queryKey: statusCountsKey(resource, range), queryFn: () => fetchStatusCounts(resource, range), enabled };
+    }),
+  });
+}
+
+/** How many postings took effect in each window, one read per window. */
+export function usePostingCounts(windows: DateWindow[], enabled: boolean): UseQueryResult<number>[] {
+  return useQueries({ queries: windows.map((window) => ({ queryKey: postingCountKey(window), queryFn: () => fetchPostingCount(window), enabled })) });
+}
+
+/** The service's total for `resource` under each set of params, one read per set. */
+export function useListTotals(resource: TotalResource, paramSets: Record<string, string>[], enabled: boolean): UseQueryResult<number>[] {
+  return useQueries({ queries: paramSets.map((params) => ({ queryKey: listTotalKey(resource, params), queryFn: () => fetchListTotal(resource, params), enabled })) });
+}
+
+/** One record read by id at `path`, only when `enabled` (the operator holds the scope that reads it). */
+export interface RecordLookupRequest {
+  kind: string;
+  id: string;
+  path: string;
+  enabled: boolean;
+}
+
+/** Each record read again, under the operator's own permissions (`lookupRecord`). */
+export function useRecordLookups<T>(records: RecordLookupRequest[]): UseQueryResult<LedgerRecordLookup<T>>[] {
+  return useQueries({
+    queries: records.map((record) => ({ queryKey: recentRecordKey(record.kind, record.id), queryFn: () => lookupRecord<T>(record.path), enabled: record.enabled })),
+  });
 }
 
 /** The Overview's activity window (DRK-1745 §3): a number of days, or `all`. */

@@ -86,19 +86,6 @@ describe('AccountGroupsScreen — ?open= and recently viewed', () => {
     expect(pushState).toHaveBeenLastCalledWith(null, '', '/groups?');
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('leaves the address alone when closing a panel the list opened', async () => {
-    renderScreen(MAI);
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('cell', { name: 'INITECH' }));
-    pushState.mockClear();
-
-    await user.click(within(screen.getByTestId('detail-panel')).getByRole('button', { name: 'Close' }));
-
-    expect(screen.queryByTestId('detail-panel')).toBeNull();
-    expect(pushState).not.toHaveBeenCalled();
-  });
-
   it('keeps nothing when no operator is named', async () => {
     mockSearch = `open=${GROUP.id}`;
     renderScreen();

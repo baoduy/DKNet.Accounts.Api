@@ -174,3 +174,24 @@ describe('Records — reversing a posting (DRK-1760 §3 row 8)', () => {
     expect(card).toHaveTextContent('PST-000456');
   });
 });
+
+describe('Records — a reversal in flight (DRK-1762 finding 3)', () => {
+  it('disables Reverse while the reversal is in flight, and enables it again once the service answers', async () => {
+    let answerReverse!: (answer: Answer) => void;
+    stubLedger(() => new Promise((resolve) => (answerReverse = resolve)));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client: queryClient }, createElement(RecordsScreen, { grantedScopes: ['accounts.read', 'postings.read', 'postings.reverse'] })));
+    await userEvent.click(await screen.findByText('PST-000456'));
+    const reverse = await within(screen.getByTestId('detail-panel')).findByRole('button', { name: 'Reverse' });
+
+    await userEvent.click(reverse);
+    await userEvent.type(screen.getByPlaceholderText('Why this record is being reversed.'), 'Entered twice.');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reverse record' }));
+    await waitFor(() => expect(reverse).toBeDisabled());
+
+    answerReverse(answer({ errors: [{ code: 'POSTING_ALREADY_REVERSED', message: 'Already reversed.' }] }, 409));
+    expect(await screen.findByText('Already reversed.', { exact: false })).toBeInTheDocument();
+    await waitFor(() => expect(reverse).toBeEnabled());
+  });
+});

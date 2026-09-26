@@ -77,6 +77,8 @@ export interface AccountFormProps {
   /** Set when the submit buttons live outside the form (the side panel's footer): the form
    * takes this id and draws no submit button of its own. */
   formId?: string;
+  /** The save is in flight: the form's own submit button is disabled until it answers (DRK-1760 §3 row 10). */
+  submitting?: boolean;
   /** Edit mode — the Status select. The side panel closes and reopens from its footer instead. */
   showStatus?: boolean;
   /** Fires whenever the form moves between untouched and edited. */
@@ -99,6 +101,7 @@ export function AccountForm({
   errors = [],
   writeGranted = true,
   formId,
+  submitting = false,
   showStatus = true,
   onDirtyChange,
   onSubmit,
@@ -278,7 +281,7 @@ export function AccountForm({
 
       {formId === undefined ? (
         <div className="flex items-center gap-2">
-          <Button type="submit" variant="primary" disabled={editLocked}>
+          <Button type="submit" variant="primary" disabled={editLocked || submitting}>
             {mode === 'open' ? 'Open' : 'Save'}
           </Button>
           {editLocked ? <Caption>requires accounts.write</Caption> : null}

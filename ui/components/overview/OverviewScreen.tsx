@@ -1,6 +1,6 @@
 'use client';
 
-import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useMemo, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
 import { ArrowRight, Plus, Wallet, type LucideIcon } from 'lucide-react';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
@@ -17,14 +17,13 @@ import { Tabs } from '@/components/ui/tabs';
 import { Caption, Label, Mono, Note } from '@/components/ui/text';
 import { fractionDigitsOf, shareBasisPoints } from '@/lib/api/money-json';
 import { useCurrencies, useDecimalPlaces, useLedgerBalances, type LedgerBalanceLine } from '@/lib/query/currencies';
-import { postingCountKey, recentRecordKey, statusCountsKey } from '@/lib/query/keys';
 import {
   ACTIVITY_WINDOWS,
-  fetchPostingCount,
-  fetchStatusCounts,
-  lookupRecord,
   openedMonths,
   postingWeeks,
+  usePostingCounts,
+  useRecordLookups,
+  useStatusCountsPerWindow,
   type AccountDto,
   type AccountGroupDto,
   type ActivityWindow,
@@ -262,9 +261,7 @@ function ChartPlaceholder({ bars }: { bars: number }): JSX.Element {
 
 function PostingsPerWeekPanel({ granted, now }: { granted: boolean; now: Date }): JSX.Element {
   const weeks = postingWeeks(now);
-  const counts = useQueries({
-    queries: weeks.map((week) => ({ queryKey: postingCountKey(week), queryFn: () => fetchPostingCount(week), enabled: granted })),
-  });
+  const counts = usePostingCounts(weeks, granted);
 
   return (
     <Panel title="Postings per week" sub={`13 weeks of 7 days in UTC, ${weeks[0].from} to ${weeks[weeks.length - 1].to}.`}>
@@ -306,12 +303,7 @@ const ACCOUNT_STATUSES = [
 
 function AccountsOpenedPanel({ granted, now }: { granted: boolean; now: Date }): JSX.Element {
   const months = openedMonths(now);
-  const counts = useQueries({
-    queries: months.map((month) => {
-      const opened = { from: month.from, to: month.to };
-      return { queryKey: statusCountsKey('accounts', opened), queryFn: () => fetchStatusCounts('accounts', opened), enabled: granted };
-    }),
-  });
+  const counts = useStatusCountsPerWindow('accounts', months, granted);
   const shown = (value: number | undefined): string => (value === undefined ? '—' : formatCount(value));
 
   return (
@@ -379,13 +371,9 @@ function RecentlyViewedPanel({ grantedScopes, directoryObjectId }: { grantedScop
   // The list lives in the browser: the server render draws nothing for it (`undefined`).
   const text = useSyncExternalStore(subscribeRecent, () => readRecentText(directoryObjectId), () => undefined);
   const entries = useMemo(() => (text === undefined ? null : parseRecent(text)), [text]);
-  const lookups = useQueries({
-    queries: (entries ?? []).map((entry) => ({
-      queryKey: recentRecordKey(entry.kind, entry.id),
-      queryFn: () => lookupRecord<AccountDto | AccountGroupDto | PostingDto>(RECENT_KINDS[entry.kind].path(entry.id)),
-      enabled: grantedScopes.includes(RECENT_KINDS[entry.kind].scope),
-    })),
-  });
+  const lookups = useRecordLookups<AccountDto | AccountGroupDto | PostingDto>(
+    (entries ?? []).map((entry) => ({ kind: entry.kind, id: entry.id, path: RECENT_KINDS[entry.kind].path(entry.id), enabled: grantedScopes.includes(RECENT_KINDS[entry.kind].scope) })),
+  );
 
   return (
     <Card role="region" aria-labelledby={headingId} padded={false}>

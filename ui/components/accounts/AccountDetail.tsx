@@ -148,6 +148,7 @@ function AccountEditPanel({ accountId, account, writeGranted, onSaved }: { accou
       }}
       errors={errors}
       writeGranted={writeGranted}
+      submitting={saveEdit.isPending}
       onSubmit={handleSubmit}
     />
   );

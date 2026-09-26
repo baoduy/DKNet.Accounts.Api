@@ -87,7 +87,6 @@ export function ReversePostingForm({
   style,
 }: ReversePostingFormProps): JSX.Element {
   const [step, setStep] = useState<Step>('closed');
-  const [pending, setPending] = useState(false);
   const [reason, setReason] = useState('');
   const [localReasonError, setLocalReasonError] = useState<LedgerError | null>(null);
   const [errors, setErrors] = useState<LedgerError[]>([]);
@@ -112,7 +111,6 @@ export function ReversePostingForm({
 
   async function handleConfirm(): Promise<void> {
     setStep('closed');
-    setPending(true);
     try {
       const result = await reverse.mutate({
         postingId,
@@ -133,8 +131,6 @@ export function ReversePostingForm({
     } catch {
       setErrors([NO_ANSWER_ERROR]);
       setStep('reason');
-    } finally {
-      setPending(false);
     }
   }
 
@@ -147,7 +143,7 @@ export function ReversePostingForm({
   return (
     <span style={style} className="contents">
       <ScopeGate scope="postings.reverse" granted={granted}>
-        <Button ref={reverseButton} type="button" size="sm" variant="destructive" disabled={pending || refused} onClick={() => setStep('reason')}>
+        <Button ref={reverseButton} type="button" size="sm" variant="destructive" disabled={reverse.isPending || refused} onClick={() => setStep('reason')}>
           <RotateCcw size={14} aria-hidden="true" />
           Reverse
         </Button>
