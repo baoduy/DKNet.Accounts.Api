@@ -13,24 +13,25 @@
  */
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { useRef, useState, type JSX, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, ReadOnlyField } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Caption, Mono, Note } from '@/components/ui/text';
-import { Dialog } from '@/components/ui/dialog';
 import { Currency } from '@/components/ledger/Currency';
 import { Money } from '@/components/ledger/Money';
 import { IdempotencyKeyField } from '@/components/forms/IdempotencyKeyField';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { ConfirmMovement } from '@/components/feedback/ConfirmMovement';
 import { DetailPanel } from '@/components/feedback/DetailPanel';
+import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { formatDate } from '@/components/records/RecordsTable';
 import { isUnreachable, NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
 import { POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
-import { useAccounts, useCurrencies } from '@/lib/accounts/query';
+import { useAccounts } from '@/lib/accounts/query';
+import { useDecimalPlaces } from '@/lib/query/currencies';
 import { useRecordPosting } from '@/lib/query/mutations';
 
 // ponytail: the Records screen's account select lists the service's first 1000 accounts (its
@@ -104,7 +105,7 @@ function FormRow({ label, hint, required = false, children }: { label: string; h
 function FieldRefusal({ error }: { error?: LedgerError }): JSX.Element | null {
   if (!error) return null;
   return (
-    <span role="alert" className="mt-1.5 block text-[length:var(--text-caption-size)] text-destructive-solid">
+    <span role="alert" className="mt-1.5 block text-caption text-destructive-solid">
       {error.code ? <span className="font-mono font-semibold">{error.code}</span> : null} {error.message}
     </span>
   );
@@ -126,64 +127,8 @@ function AccountSelect({ value, invalid, onChoose }: { value: string; invalid: b
   );
 }
 
-/** "Discard unsent record?" — dropping an unsent record drops its idempotency key with it. */
-export function DiscardRecordDialog({ open, onKeep, onDiscard }: { open: boolean; onKeep: () => void; onDiscard: () => void }): JSX.Element {
-  return (
-    <Dialog
-      open={open}
-      title="Discard unsent record?"
-      onClose={onKeep}
-      footer={
-        <>
-          <Button type="button" onClick={onKeep}>
-            Keep editing
-          </Button>
-          <Button type="button" variant="destructive" className="ml-auto" onClick={onDiscard}>
-            Discard record
-          </Button>
-        </>
-      }
-    >
-      This record has not been sent. Closing the panel drops it, and the idempotency key is discarded with it.
-    </Dialog>
-  );
-}
-
-export interface UnsentGuard {
-  /** Runs `next` at once, or — while an entered record is unsent — only once discarding is confirmed. */
-  guard: (next: () => void) => void;
-  onDirtyChange: (dirty: boolean) => void;
-  /** The record was sent: nothing is left to discard. */
-  clear: () => void;
-  dialog: JSX.Element;
-}
-
-/** DRK-1745 §3 row 9 — the panel host's "Discard unsent record?" step, shared by both screens. */
-export function useUnsentGuard(creating: boolean): UnsentGuard {
-  const [dirty, setDirty] = useState(false);
-  const [then, setThen] = useState<(() => void) | null>(null);
-  const onDirtyChange = useCallback((next: boolean) => setDirty(next), []);
-  return {
-    guard: (next) => (creating && dirty ? setThen(() => next) : next()),
-    onDirtyChange,
-    clear: () => setDirty(false),
-    dialog: (
-      <DiscardRecordDialog
-        open={then !== null}
-        onKeep={() => setThen(null)}
-        onDiscard={() => {
-          setThen(null);
-          setDirty(false);
-          then?.();
-        }}
-      />
-    ),
-  };
-}
-
 export function RecordPostingForm({ account: lockedAccount, granted = true, onClose, onDirtyChange, onRecorded }: RecordPostingFormProps): JSX.Element {
   const [confirming, setConfirming] = useState(false);
-  const [pending, setPending] = useState(false);
   const [chosen, setChosen] = useState<PostingAccount | null>(null);
   const [direction, setDirection] = useState<'Credit' | 'Debit'>('Credit');
   const [amount, setAmount] = useState('');
@@ -195,19 +140,18 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
 
   const idempotency = useIdempotencyKey();
   const record = useRecordPosting();
-  const currencies = useCurrencies().data;
+  const decimalPlacesOf = useDecimalPlaces();
   const { fieldErrors, alertErrors } = routeRefusal(errors, RECORD_POSTING_CODE_FIELDS);
   const account = lockedAccount ?? chosen;
-  const decimalPlaces = account ? currencies?.find((currency) => currency.code === account.currency)?.decimalPlaces : undefined;
+  const decimalPlaces = account ? decimalPlacesOf(account.currency) : undefined;
   const status = account?.status?.toLowerCase();
 
   const dirty = Boolean(amount || description || chosen || direction !== 'Credit' || category !== DEFAULT_CATEGORY || effectiveDate !== today());
-  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+  useReportDirty(dirty, onDirtyChange);
 
   async function handleConfirm(): Promise<void> {
     if (!account) return;
     setConfirming(false);
-    setPending(true);
     try {
       const result = await record.mutate({
         accountId: account.id,
@@ -229,8 +173,6 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
       }
     } catch {
       setErrors([NO_ANSWER_ERROR]);
-    } finally {
-      setPending(false);
     }
   }
 
@@ -250,13 +192,13 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
             <Button type="button" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button ref={reviewButton} type="button" size="sm" variant="primary" disabled={pending || !account || !granted} onClick={() => setConfirming(true)}>
+            <Button ref={reviewButton} type="button" size="sm" variant="primary" disabled={record.isPending || !account || !granted} onClick={() => setConfirming(true)}>
               Review movement
             </Button>
           </>
         }
       >
-        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-table">
           <FormRow
             label="Account"
             required
@@ -326,7 +268,7 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
         <div className="mt-5">
           <IdempotencyKeyField value={idempotency.value} note="Prevents a duplicate posting if this request is retried." />
         </div>
-        <RefusalAlert errors={alertErrors} style={{ marginTop: 'var(--space-4)' }} />
+        <RefusalAlert errors={alertErrors} className="mt-4" />
       </DetailPanel>
 
       <ConfirmMovement

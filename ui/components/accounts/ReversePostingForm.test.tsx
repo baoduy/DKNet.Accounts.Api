@@ -32,7 +32,7 @@ afterEach(() => {
 describe('ReversePostingForm', () => {
   // DRK-1745: rewrite for the new form
   it.skip('reverses the posting with the typed reason', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1', status: 'Reversed' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1', status: 'Reversed' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -55,7 +55,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('closes the dialog and resets the reason once the reversal succeeds', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1', status: 'Reversed' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1', status: 'Reversed' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -69,7 +69,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('keeps the dialog open with the typed reason and shows the refusal when it fails', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ errors: [{ code: 'POSTING_ALREADY_REVERSED', message: 'Already reversed.' }] }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ code: 'POSTING_ALREADY_REVERSED', message: 'Already reversed.' }] }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -86,7 +86,7 @@ describe('ReversePostingForm', () => {
   it.skip('shows a field-named refusal on its control rather than in the general alert', async () => {
     // DRK-1713 §3 row 12: an empty reason is now refused before sending, so a reason is typed
     // for the service to refuse by field.
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ errors: [{ message: 'Required.', field: 'Reason' }] }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'Required.', field: 'Reason' }] }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -122,8 +122,8 @@ describe('ReversePostingForm', () => {
   it.skip('clears the reason to blank, not a placeholder string, once a later attempt succeeds', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ errors: [{ code: 'POSTING_ALREADY_REVERSED', message: 'Already reversed.' }] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1', status: 'Reversed' }) });
+      .mockResolvedValueOnce({ ok: false, text: async () => JSON.stringify({ errors: [{ code: 'POSTING_ALREADY_REVERSED', message: 'Already reversed.' }] }) })
+      .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p1', status: 'Reversed' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -143,7 +143,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('never throws, and shows no refusal card, on a failure carrying no errors array', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -172,7 +172,7 @@ describe('ReversePostingForm', () => {
     // reaches it anyway.
     expect(screen.getByRole('button', { name: 'Reverse', hidden: true })).toBeDisabled();
 
-    resolveFetch({ ok: true, json: async () => ({ id: 'p1' }) });
+    resolveFetch({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reverse' })).toBeEnabled());
   });
 
@@ -197,7 +197,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('sends a reason of exactly 500 characters', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p2' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p2' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -253,7 +253,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('keeps the dialog and the idempotency key when the service never answers, and says so (DRK-1717 F2)', async () => {
-    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p2' }) });
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p2' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -274,7 +274,7 @@ describe('ReversePostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip("says the service did not answer when the pass-through could not reach it, keeping the reason (DRK-1725 §3 row 6)", async () => {
-    const unreachable = { ok: false, status: 502, json: async () => ({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
+    const unreachable = { ok: false, status: 502, text: async () => JSON.stringify({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(unreachable));
     const user = userEvent.setup();
     renderForm();

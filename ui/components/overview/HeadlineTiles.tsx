@@ -1,19 +1,18 @@
 'use client';
 
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, type JSX, type ReactNode } from 'react';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label, Mono, Note } from '@/components/ui/text';
-import { listTotalKey, postingCountKey, statusCountsKey } from '@/lib/query/keys';
 import {
   activityFromDate,
   activityPostingWindow,
-  fetchListTotal,
-  fetchPostingCount,
-  fetchStatusCounts,
   LONGEST_POSTING_DAYS,
+  useListTotal,
+  usePostingCount,
+  useStatusCounts,
   type ActivityWindow,
   type StatusCount,
 } from '@/lib/query/overview';
@@ -52,7 +51,7 @@ function Tile({ label, granted, results, value, line }: { label: string; granted
         >
           {() => (
             <>
-              <div className="mt-1 text-[length:var(--text-tile-amount-size)] leading-[var(--text-tile-amount-leading)] font-bold tabular-nums">{formatCount(value())}</div>
+              <div className="mt-1 text-tile-amount font-bold tabular-nums">{formatCount(value())}</div>
               <Note className={`mt-0.5 ${LINE_HEIGHT}`}>{line()}</Note>
             </>
           )}
@@ -73,22 +72,18 @@ function postingSpan(activity: ActivityWindow): string {
 
 export function HeadlineTiles({ canReadAccounts, canReadPostings, activity, now }: HeadlineTilesProps): JSX.Element {
   const accounts = { enabled: canReadAccounts };
-  const accountTotal = useQuery({ queryKey: listTotalKey('accounts'), queryFn: () => fetchListTotal('accounts'), ...accounts });
-  const groupTotal = useQuery({ queryKey: listTotalKey('account-groups'), queryFn: () => fetchListTotal('account-groups'), ...accounts });
-  const currencyTotal = useQuery({ queryKey: listTotalKey('currencies'), queryFn: () => fetchListTotal('currencies'), ...accounts });
-  const attentionTotal = useQuery({
-    queryKey: listTotalKey('accounts', { filter: ATTENTION_FILTER }),
-    queryFn: () => fetchListTotal('accounts', { filter: ATTENTION_FILTER }),
-    ...accounts,
-  });
-  const accountCounts = useQuery({ queryKey: statusCountsKey('accounts'), queryFn: () => fetchStatusCounts('accounts'), ...accounts });
-  const groupCounts = useQuery({ queryKey: statusCountsKey('account-groups'), queryFn: () => fetchStatusCounts('account-groups'), ...accounts });
+  const accountTotal = useListTotal('accounts', {}, accounts);
+  const groupTotal = useListTotal('account-groups', {}, accounts);
+  const currencyTotal = useListTotal('currencies', {}, accounts);
+  const attentionTotal = useListTotal('accounts', { filter: ATTENTION_FILTER }, accounts);
+  const accountCounts = useStatusCounts('accounts', canReadAccounts);
+  const groupCounts = useStatusCounts('account-groups', canReadAccounts);
 
   // The previous window's line stays drawn while the next one is read, so the tile never blanks (R2).
   const postingWindow = activityPostingWindow(now, activity);
-  const windowPostings = useQuery({ queryKey: postingCountKey(postingWindow), queryFn: () => fetchPostingCount(postingWindow), enabled: canReadPostings, placeholderData: keepPreviousData });
+  const windowPostings = usePostingCount(postingWindow, canReadPostings);
   const fromDate = activityFromDate(now, activity);
-  const windowGroups = useQuery({ queryKey: listTotalKey('account-groups', { fromDate }), queryFn: () => fetchListTotal('account-groups', { fromDate }), ...accounts, placeholderData: keepPreviousData });
+  const windowGroups = useListTotal('account-groups', { fromDate }, { ...accounts, keepPrevious: true });
 
   const status = (result: UseQueryResult<StatusCount[]>, name: string): string => {
     const count = countOf(result.data!, name);
@@ -125,7 +120,7 @@ export function HeadlineTiles({ canReadAccounts, canReadPostings, activity, now 
         line={() => (
           <>
             {`${status(accountCounts, 'Dormant')} dormant · ${status(accountCounts, 'Frozen')} frozen — `}
-            <Mono className="text-[length:var(--text-caption-size)] break-all">{`filter=${ATTENTION_FILTER}`}</Mono>
+            <Mono className="text-caption break-all">{`filter=${ATTENTION_FILTER}`}</Mono>
           </>
         )}
       />

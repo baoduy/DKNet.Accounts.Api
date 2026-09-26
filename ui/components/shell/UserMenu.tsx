@@ -1,6 +1,7 @@
 import { ChevronDown, ArrowRight } from 'lucide-react';
 import type { CSSProperties, JSX } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Label, Note } from '@/components/ui/text';
 import { cn } from '@/components/ui/utils';
 import { SCOPE_CONSEQUENCES } from '@/lib/scopes';
 
@@ -49,11 +50,11 @@ export function UserMenu({
       <summary
         role="button"
         aria-label="Account menu"
-        className="flex max-w-55 list-none items-center gap-2 rounded-md p-1 pr-2 text-[length:var(--text-table-size)] font-[inherit] text-foreground [&::-webkit-details-marker]:hidden [&::marker]:hidden"
+        className="flex max-w-55 list-none items-center gap-2 rounded-md p-1 pr-2 text-table font-[inherit] text-foreground [&::-webkit-details-marker]:hidden [&::marker]:hidden"
       >
         <span
           aria-hidden="true"
-          className="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-md bg-muted font-mono text-[length:var(--text-label-size)] font-semibold text-muted-foreground"
+          className="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-md bg-muted font-mono text-label font-semibold text-muted-foreground"
         >
           {initialsOf(name)}
         </span>
@@ -65,21 +66,17 @@ export function UserMenu({
         role="menu"
         className="absolute top-[calc(100%+var(--space-2))] right-0 z-40 w-72 rounded-lg border border-border bg-popover p-4 text-left text-popover-foreground shadow-overlay"
       >
-        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
-          Signed in
-        </div>
-        <div className="mt-1 text-[length:var(--text-table-size)] font-semibold">{name}</div>
-        <div className="text-[length:var(--text-caption-size)] text-muted-foreground">
+        <Label>Signed in</Label>
+        <div className="mt-1 text-table font-semibold">{name}</div>
+        <Note>
           <span className="font-mono">{email}</span>
-        </div>
-        <div className="mt-1.5 text-[length:var(--text-caption-size)] text-muted-foreground">{provider}</div>
+        </Note>
+        <Note className="mt-1.5">{provider}</Note>
 
         <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
 
-        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
-          Directory
-        </div>
-        <div className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-[length:var(--text-caption-size)]">
+        <Label>Directory</Label>
+        <div className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-caption">
           <span className="text-muted-foreground">Tenant</span>
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">
             {tenant || <span className="text-muted-foreground">Not stated.</span>}
@@ -94,9 +91,7 @@ export function UserMenu({
 
         <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
 
-        <div className="text-[length:var(--text-label-size)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase">
-          Scopes on this token
-        </div>
+        <Label>Scopes on this token</Label>
         <div className="mt-2 flex flex-wrap gap-2">
           {scopes.map((s) => (
             <Badge key={s} variant="selected" className="font-mono">
@@ -110,11 +105,11 @@ export function UserMenu({
           ))}
         </div>
         {missingScopes.length ? (
-          <div className="mt-2 text-[length:var(--text-caption-size)] text-muted-foreground">
+          <Note className="mt-2">
             {missingScopes.map((s) => (
               <div key={s}>You cannot {SCOPE_CONSEQUENCES[s] ?? 'do this'} without this permission.</div>
             ))}
-          </div>
+          </Note>
         ) : null}
 
         <div role="separator" aria-orientation="horizontal" className="my-4 h-px w-full bg-border" />
@@ -123,7 +118,7 @@ export function UserMenu({
           <button
             type="submit"
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-md border border-border-control bg-card px-3 py-1 text-[length:var(--text-caption-size)] font-semibold text-foreground',
+              'flex w-full items-center justify-center gap-2 rounded-md border border-border-control bg-card px-3 py-1 text-caption font-semibold text-foreground',
             )}
           >
             <ArrowRight size={14} />

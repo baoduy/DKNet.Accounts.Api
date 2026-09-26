@@ -4,9 +4,12 @@
  * free-text search. Every figure is the service's own count (R1): a posting count is one read of
  * `pageSize=1` whose `totalItemCount` is taken as the figure, never a count of listed rows.
  */
+import { keepPreviousData, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { ledgerFetch, readLedger } from '@/lib/api/ledger-request';
 import { type AsRead, readLedgerJson } from '@/lib/api/money-json';
 import { LedgerRefusalError, refusalError } from '@/lib/api/refusal';
 import type { components } from '@/lib/api/schema';
+import { listTotalKey, postingCountKey, recentRecordKey, statusCountsKey } from './keys';
 
 export type StatusCountResource = 'accounts' | 'account-groups';
 
@@ -26,13 +29,6 @@ export interface MonthWindow extends DateWindow {
   label: string;
 }
 
-async function getLedgerJson(path: string): Promise<unknown> {
-  const response = await fetch(path);
-  const body = await readLedgerJson(response);
-  if (!response.ok) throw refusalError(body);
-  return body;
-}
-
 /**
  * The service's count per status (§3a `StatusCount`). A status comes back upper-case, as the
  * service spells it; `type` is not read (brief Q1). Only `from`/`to` are ever sent (R3).
@@ -40,14 +36,14 @@ async function getLedgerJson(path: string): Promise<unknown> {
  */
 export async function fetchStatusCounts(resource: StatusCountResource, window?: DateWindow): Promise<StatusCount[]> {
   const query = window ? `?${new URLSearchParams({ from: window.from, to: window.to }).toString()}` : '';
-  const body = (await getLedgerJson(`/api/ledger/${resource}/status-counts${query}`)) as Array<{ status: string; count: string }>;
+  const body = (await readLedger(`/api/ledger/${resource}/status-counts${query}`)) as Array<{ status: string; count: string }>;
   return body.map((line) => ({ status: line.status, count: Number(line.count) }));
 }
 
 /** How many postings took effect in `window` (both days inclusive) — the service's `totalItemCount`. */
 export async function fetchPostingCount(window: DateWindow): Promise<number> {
   const params = new URLSearchParams({ from: window.from, to: window.to, pageSize: '1' });
-  const body = (await getLedgerJson(`/api/ledger/postings?${params.toString()}`)) as { totalItemCount: string };
+  const body = (await readLedger(`/api/ledger/postings?${params.toString()}`)) as { totalItemCount: string };
   return Number(body.totalItemCount);
 }
 
@@ -60,8 +56,65 @@ export type TotalResource = 'accounts' | 'account-groups' | 'currencies';
  */
 export async function fetchListTotal(resource: TotalResource, params: Record<string, string> = {}): Promise<number> {
   const query = resource === 'currencies' ? '' : `?${new URLSearchParams({ ...params, pageSize: '1' }).toString()}`;
-  const body = (await getLedgerJson(`/api/ledger/${resource}${query}`)) as { totalItemCount: string };
+  const body = (await readLedger(`/api/ledger/${resource}${query}`)) as { totalItemCount: string };
   return Number(body.totalItemCount);
+}
+
+/**
+ * DRK-1760 §3 row 3 — the Overview's reads as hooks, each key built once. `keepPrevious` holds the
+ * last answer drawn while a changed window is read, so a tile never blanks (R2).
+ */
+export function useStatusCounts(resource: StatusCountResource, enabled: boolean): UseQueryResult<StatusCount[]> {
+  return useQuery({ queryKey: statusCountsKey(resource), queryFn: () => fetchStatusCounts(resource), enabled });
+}
+
+export function useListTotal(resource: TotalResource, params: Record<string, string>, { enabled, keepPrevious = false }: { enabled: boolean; keepPrevious?: boolean }): UseQueryResult<number> {
+  return useQuery({
+    queryKey: listTotalKey(resource, params),
+    queryFn: () => fetchListTotal(resource, params),
+    enabled,
+    placeholderData: keepPrevious ? keepPreviousData : undefined,
+  });
+}
+
+/** How many postings took effect in a window that can change (the activity window), so it keeps the last answer. */
+export function usePostingCount(window: DateWindow, enabled: boolean): UseQueryResult<number> {
+  return useQuery({ queryKey: postingCountKey(window), queryFn: () => fetchPostingCount(window), enabled, placeholderData: keepPreviousData });
+}
+
+/** DRK-1762 finding 2 — the service's count per status in each window, one read per window. */
+export function useStatusCountsPerWindow(resource: StatusCountResource, windows: DateWindow[], enabled: boolean): UseQueryResult<StatusCount[]>[] {
+  return useQueries({
+    queries: windows.map((window) => {
+      const range = { from: window.from, to: window.to };
+      return { queryKey: statusCountsKey(resource, range), queryFn: () => fetchStatusCounts(resource, range), enabled };
+    }),
+  });
+}
+
+/** How many postings took effect in each window, one read per window. */
+export function usePostingCounts(windows: DateWindow[], enabled: boolean): UseQueryResult<number>[] {
+  return useQueries({ queries: windows.map((window) => ({ queryKey: postingCountKey(window), queryFn: () => fetchPostingCount(window), enabled })) });
+}
+
+/** The service's total for `resource` under each set of params, one read per set. */
+export function useListTotals(resource: TotalResource, paramSets: Record<string, string>[], enabled: boolean): UseQueryResult<number>[] {
+  return useQueries({ queries: paramSets.map((params) => ({ queryKey: listTotalKey(resource, params), queryFn: () => fetchListTotal(resource, params), enabled })) });
+}
+
+/** One record read by id at `path`, only when `enabled` (the operator holds the scope that reads it). */
+export interface RecordLookupRequest {
+  kind: string;
+  id: string;
+  path: string;
+  enabled: boolean;
+}
+
+/** Each record read again, under the operator's own permissions (`lookupRecord`). */
+export function useRecordLookups<T>(records: RecordLookupRequest[]): UseQueryResult<LedgerRecordLookup<T>>[] {
+  return useQueries({
+    queries: records.map((record) => ({ queryKey: recentRecordKey(record.kind, record.id), queryFn: () => lookupRecord<T>(record.path), enabled: record.enabled })),
+  });
 }
 
 /** The Overview's activity window (DRK-1745 §3): a number of days, or `all`. */
@@ -120,7 +173,7 @@ export type LedgerRecordLookup<T> = { state: 'found'; record: T } | { state: 'no
 
 /** Reads one record by id: 404 is "not found", 403 "not permitted"; any other refusal throws. */
 export async function lookupRecord<T>(path: string): Promise<LedgerRecordLookup<T>> {
-  const response = await fetch(path);
+  const response = await ledgerFetch(path);
   if (response.status === 404) return { state: 'notFound' };
   const body = await readLedgerJson(response);
   if (response.status === 403) return { state: 'forbidden', error: refusalError(body) };
@@ -142,7 +195,7 @@ export const SEARCH_PAGE_SIZE = 10;
 
 async function searchList<T>(resource: StatusCountResource, text: string): Promise<SearchMatches<T>> {
   const params = new URLSearchParams({ search: text, pageSize: String(SEARCH_PAGE_SIZE) });
-  const body = (await getLedgerJson(`/api/ledger/${resource}?${params.toString()}`)) as { items: T[]; totalItemCount: string };
+  const body = (await readLedger(`/api/ledger/${resource}?${params.toString()}`)) as { items: T[]; totalItemCount: string };
   return { items: body.items, total: Number(body.totalItemCount) };
 }
 
@@ -155,6 +208,6 @@ export async function searchAccountsAndGroups(text: string): Promise<{ accounts:
 /** Whether any account carries exactly this account number. */
 export async function accountNumberExists(accountNumber: string): Promise<boolean> {
   const params = new URLSearchParams({ filter: `AccountNumber:Equal:${accountNumber}`, pageSize: '1' });
-  const body = (await getLedgerJson(`/api/ledger/accounts?${params.toString()}`)) as { totalItemCount: string };
+  const body = (await readLedger(`/api/ledger/accounts?${params.toString()}`)) as { totalItemCount: string };
   return Number(body.totalItemCount) > 0;
 }

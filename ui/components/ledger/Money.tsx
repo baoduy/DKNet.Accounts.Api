@@ -50,7 +50,7 @@ export function Money({
     <span
       className={cn(
         'tabular-nums',
-        size === 'tile' ? 'text-[length:var(--text-tile-amount-size)]' : 'text-[length:var(--text-amount-size)]',
+        size === 'tile' ? 'text-tile-amount' : 'text-amount',
         align === 'left' && 'text-left',
         align === 'right' && 'text-right',
         struck ? 'text-reversed line-through' : resolvedTone === 'credit' ? 'text-credit' : 'text-debit',

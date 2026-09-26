@@ -1,5 +1,6 @@
 import { cloneElement, isValidElement } from 'react';
 import type { CSSProperties, JSX, ReactElement, ReactNode } from 'react';
+import { Caption } from '@/components/ui/text';
 
 /**
  * Gates an action on a granted OAuth scope. The UI gates on the **granted** scopes the
@@ -21,7 +22,7 @@ export function ScopeGate({ scope, granted = false, reason, children, style }: S
   return (
     <span className="inline-flex items-center gap-2" style={style}>
       {gated}
-      {!granted ? <span className="text-[length:var(--text-caption-size)] text-muted-foreground">{reason ?? `requires ${scope}`}</span> : null}
+      {!granted ? <Caption>{reason ?? `requires ${scope}`}</Caption> : null}
     </span>
   );
 }

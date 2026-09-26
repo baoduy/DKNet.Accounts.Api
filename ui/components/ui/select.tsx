@@ -40,7 +40,7 @@ export function Select({ options, disabled = false, label, style, className, ...
       )}
     >
       {label ? (
-        <span id={prefixId} className="text-[length:var(--text-table-size)] whitespace-nowrap text-muted-foreground">
+        <span id={prefixId} className="text-table whitespace-nowrap text-muted-foreground">
           {label}
         </span>
       ) : null}
@@ -48,7 +48,7 @@ export function Select({ options, disabled = false, label, style, className, ...
         disabled={disabled}
         aria-labelledby={labelledBy}
         className={cn(
-          'min-w-0 flex-1 appearance-none border-0 bg-transparent py-1.75 text-[length:var(--text-table-size)] leading-[var(--text-table-leading)] text-inherit outline-none',
+          'min-w-0 flex-1 appearance-none border-0 bg-transparent py-1.75 text-table text-inherit outline-none',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         )}
         {...props}

@@ -39,17 +39,17 @@ function renderScreen(directoryObjectId?: string): ReturnType<typeof vi.fn> {
   return fetchMock;
 }
 
-let replaceState: ReturnType<typeof vi.spyOn>;
+let pushState: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   const items = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => items.get(key) ?? null, setItem: (key: string, value: string) => void items.set(key, value) });
-  replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+  pushState = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  replaceState.mockRestore();
+  pushState.mockRestore();
   mockSearch = '';
 });
 
@@ -83,20 +83,7 @@ describe('AccountGroupsScreen — ?open= and recently viewed', () => {
     await userEvent.setup().click(within(screen.getByTestId('detail-panel')).getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByTestId('detail-panel')).toBeNull();
-    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/groups?');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('leaves the address alone when closing a panel the list opened', async () => {
-    renderScreen(MAI);
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('cell', { name: 'INITECH' }));
-    replaceState.mockClear();
-
-    await user.click(within(screen.getByTestId('detail-panel')).getByRole('button', { name: 'Close' }));
-
-    expect(screen.queryByTestId('detail-panel')).toBeNull();
-    expect(replaceState).not.toHaveBeenCalled();
+    expect(pushState).toHaveBeenLastCalledWith(null, '', '/groups?');
   });
 
   it('keeps nothing when no operator is named', async () => {

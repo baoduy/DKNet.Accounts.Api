@@ -32,7 +32,7 @@ export function Panel({ title, sub, right, className, children }: { title: strin
           <Label id={headingId} role="heading" aria-level={2}>
             {title}
           </Label>
-          {sub ? <div className="mt-1.5 text-[length:var(--text-table-size)] leading-(--text-table-leading)">{sub}</div> : null}
+          {sub ? <div className="mt-1.5 text-table">{sub}</div> : null}
         </div>
         {right ? <div className="ml-auto flex-none">{right}</div> : null}
       </div>

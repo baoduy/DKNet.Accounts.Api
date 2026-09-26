@@ -8,8 +8,9 @@
  */
 'use client';
 
-import { useEffect, useState, type CSSProperties, type JSX } from 'react';
+import { useState, type CSSProperties, type JSX } from 'react';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
+import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { Button } from '@/components/ui/button';
 import { Input, ReadOnlyField } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -76,6 +77,8 @@ export interface AccountFormProps {
   /** Set when the submit buttons live outside the form (the side panel's footer): the form
    * takes this id and draws no submit button of its own. */
   formId?: string;
+  /** The save is in flight: the form's own submit button is disabled until it answers (DRK-1760 §3 row 10). */
+  submitting?: boolean;
   /** Edit mode — the Status select. The side panel closes and reopens from its footer instead. */
   showStatus?: boolean;
   /** Fires whenever the form moves between untouched and edited. */
@@ -98,6 +101,7 @@ export function AccountForm({
   errors = [],
   writeGranted = true,
   formId,
+  submitting = false,
   showStatus = true,
   onDirtyChange,
   onSubmit,
@@ -130,7 +134,7 @@ export function AccountForm({
     floor.permittedToGoNegative !== account.permittedToGoNegative ||
     floor.overdraftLimit !== account.overdraftLimit ||
     floor.minimumBalance !== account.minimumBalance;
-  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+  useReportDirty(dirty, onDirtyChange);
 
   const { fieldErrors, alertErrors } = routeRefusal(errors);
   const editLocked = mode === 'edit' && !writeGranted;
@@ -160,7 +164,7 @@ export function AccountForm({
         submit();
       }}
     >
-      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-[length:var(--text-table-size)]">
+      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-table">
         <FormRow label="Group" required hint={mode === 'open' ? 'The group code becomes the prefix of the account number.' : null}>
           {mode === 'open' ? (
             <>
@@ -277,7 +281,7 @@ export function AccountForm({
 
       {formId === undefined ? (
         <div className="flex items-center gap-2">
-          <Button type="submit" variant="primary" disabled={editLocked}>
+          <Button type="submit" variant="primary" disabled={editLocked || submitting}>
             {mode === 'open' ? 'Open' : 'Save'}
           </Button>
           {editLocked ? <Caption>requires accounts.write</Caption> : null}

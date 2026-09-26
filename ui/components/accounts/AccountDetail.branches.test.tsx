@@ -117,7 +117,8 @@ describe('AccountDetail — the write surfaces it composes', () => {
     expect(screen.getByRole('button', { name: 'Reverse' })).toBeDisabled();
   });
 
-  it('computes the floor locally from the floor policy when the service has not stated one', () => {
+  // DRK-1760 §3 row 11: the browser never works a floor out — no service figure, no figure.
+  it('draws a placeholder, not a floor worked out from the policy, when the service has not stated one', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       createElement(
@@ -129,7 +130,23 @@ describe('AccountDetail — the write surfaces it composes', () => {
         }),
       ),
     );
-    expect(screen.getByTestId('account-floor')).toHaveTextContent('500.00');
+    expect(screen.getByTestId('account-floor')).not.toHaveTextContent('500.00');
+    expect(screen.getByTestId('account-floor').querySelector('[data-slot="skeleton"]')).not.toBeNull();
+  });
+
+  it('states the floor unavailable when the balance read failed', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(AccountDetail, {
+          account: { ...ACCOUNT, floor: undefined, floorFailed: true, permittedToGoNegative: true, overdraftLimit: '500.00', minimumBalance: null },
+          accountId: 'a1',
+        }),
+      ),
+    );
+    expect(screen.getByTestId('account-floor')).toHaveTextContent(/^Floor unavailable — the balance could not be read\.$/);
   });
 
   // DRK-1745: rewrite for the new form

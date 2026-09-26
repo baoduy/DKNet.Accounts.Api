@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useAccount, useAccountBalance, useAccountGroups, useAccounts, useCurrencies, usePostings } from './query';
+import { useCurrencies } from '@/lib/query/currencies';
+import { useAccountGroups } from '@/lib/query/groups';
+import { useAccount, useAccountBalance, useAccounts, usePostings } from './query';
 import { defaultPostingsFilter } from './postings-filter';
 
 function wrapper(queryClient: QueryClient) {

@@ -45,9 +45,9 @@ describe("An account shows three values and its floor", () => {
   });
 
   it('states the floor as -5,000.00 SGD', () => {
-    // computeFloor's contract returns a number (FloorLine.d.ts) — the rendered,
-    // string-formatted assertion below is what actually proves the floor, per R1.
-    render(createElement(FloorLine, { account: FLOOR_POLICY }));
+    // The floor is the service's own figure for this policy (DRK-1760 §3 row 11) — the rendered,
+    // string-formatted assertion below is what actually proves it, per R1.
+    render(createElement(FloorLine, { account: FLOOR_POLICY, floor: '-5000.00' }));
     expect(screen.getByText(/−5,000\.00\s*SGD/)).toBeInTheDocument();
   });
 });

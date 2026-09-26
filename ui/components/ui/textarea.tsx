@@ -16,7 +16,7 @@ export function Textarea({ rows = 3, readOnly = false, disabled = false, invalid
       disabled={disabled}
       aria-invalid={invalid || undefined}
       className={cn(
-        'w-full resize-y rounded-md border px-3 py-2 text-[length:var(--text-table-size)] leading-[var(--text-body-leading)] outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
+        'w-full resize-y rounded-md border px-3 py-2 text-table leading-[var(--text-body-leading)] outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
         invalid ? 'border-destructive' : 'border-border-control',
         readOnly || disabled ? 'bg-muted text-muted-foreground' : 'bg-card text-foreground',
         className,

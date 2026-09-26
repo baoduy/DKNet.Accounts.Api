@@ -89,7 +89,7 @@ export function PostingDetails({ posting, accountNumber, accountName, decimalPla
         />
       }
     >
-      <DetailSection divider={false} style={{ marginTop: 0 }}>
+      <DetailSection divider={false}>
         Movement
       </DetailSection>
       <DetailList
@@ -106,7 +106,7 @@ export function PostingDetails({ posting, accountNumber, accountName, decimalPla
       {posting.reversedByPostingId || posting.reversesPostingId ? (
         <>
           <DetailSection>Reversal lineage</DetailSection>
-          <div className="border-l-3 border-l-primary pl-3 text-[length:var(--text-table-size)]">
+          <div className="border-l-3 border-l-primary pl-3 text-table">
             {posting.reversedByPostingId ? (
               <>
                 Reversed by <Mono>{linkedNumber}</Mono>. Both rows stay on the account; the balance reflects the pair.

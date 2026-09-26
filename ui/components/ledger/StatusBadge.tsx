@@ -1,4 +1,5 @@
 import type { CSSProperties, JSX } from 'react';
+import { badgeVariants } from '@/components/ui/badge';
 import { cn } from '@/components/ui/utils';
 
 export type LedgerStatus = 'Active' | 'Dormant' | 'Frozen' | 'Closed' | 'Inactive' | 'Posted' | 'Reversed';
@@ -32,13 +33,7 @@ export function StatusBadge({ status, tone, style }: StatusBadgeProps): JSX.Elem
   const resolvedTone = tone ?? STATUS_TONE[status as LedgerStatus] ?? 'neutral';
 
   return (
-    <span
-      className={cn(
-        'inline-flex w-fit items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
-        TONE_CLASSES[resolvedTone],
-      )}
-      style={style}
-    >
+    <span className={cn(badgeVariants({ className: TONE_CLASSES[resolvedTone] }))} style={style}>
       {status}
     </span>
   );

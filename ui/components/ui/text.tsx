@@ -7,7 +7,7 @@ export function Label({ className, ...props }: ComponentProps<'div'>): JSX.Eleme
     <div
       data-slot="label"
       className={cn(
-        'text-[length:var(--text-label-size)] leading-[var(--text-label-leading)] font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase',
+        'text-label font-semibold tracking-[var(--tracking-label)] text-muted-foreground uppercase',
         className,
       )}
       {...props}
@@ -17,7 +17,7 @@ export function Label({ className, ...props }: ComponentProps<'div'>): JSX.Eleme
 
 /** 12px secondary prose — field captions, timestamps, row sub-text. */
 export function Caption({ className, ...props }: ComponentProps<'span'>): JSX.Element {
-  return <span data-slot="caption" className={cn('text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-muted-foreground', className)} {...props} />;
+  return <span data-slot="caption" className={cn('text-caption text-muted-foreground', className)} {...props} />;
 }
 
 /** The explanatory paragraph that sits under a card and says why something is the way it is. */
@@ -25,7 +25,7 @@ export function Note({ className, ...props }: ComponentProps<'div'>): JSX.Elemen
   return (
     <div
       data-slot="note"
-      className={cn('text-[length:var(--text-caption-size)] leading-[var(--text-caption-leading)] text-pretty text-muted-foreground', className)}
+      className={cn('text-caption text-pretty text-muted-foreground', className)}
       {...props}
     />
   );

@@ -36,7 +36,7 @@ describe('Money — branches not covered by the frozen acceptance tests', () => 
 
   it('renders the tile size at the tile amount scale', () => {
     render(createElement(Money, { amount: '100.00', decimalPlaces: 2, size: 'tile' }));
-    expect(screen.getByText('100.00')).toHaveClass('text-[length:var(--text-tile-amount-size)]');
+    expect(screen.getByText('100.00')).toHaveClass('text-tile-amount');
   });
 
   it('aligns left when asked', () => {
@@ -52,13 +52,13 @@ describe('Money — branches not covered by the frozen acceptance tests', () => 
   it('defaults to the credit tone, row size, tabular numerals and no forced alignment', () => {
     render(createElement(Money, { amount: '100.00', decimalPlaces: 2 }));
     const el = screen.getByText('100.00');
-    expect(el.className).toBe('tabular-nums text-[length:var(--text-amount-size)] text-credit');
+    expect(el.className).toBe('tabular-nums text-amount text-credit');
   });
 
   it('carries the exact class set for a struck, right-aligned tile amount', () => {
     render(createElement(Money, { amount: '100.00', decimalPlaces: 2, struck: true, align: 'right', size: 'tile' }));
     const el = screen.getByText('100.00');
-    expect(el.className).toBe('tabular-nums text-[length:var(--text-tile-amount-size)] text-right text-reversed line-through');
+    expect(el.className).toBe('tabular-nums text-tile-amount text-right text-reversed line-through');
   });
 
   it('pads a fractional amount shorter than the currency scale, not one exactly matching it', () => {

@@ -28,6 +28,27 @@
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 
+  /* Type roles (Design/tokens/typography.css): `text-caption`, `text-table`, ... set the role's
+     size and its leading together. */
+  --text-page-title: var(--text-page-title-size);
+  --text-page-title--line-height: var(--text-page-title-leading);
+  --text-section: var(--text-section-size);
+  --text-section--line-height: var(--text-section-leading);
+  --text-panel-title: var(--text-panel-title-size);
+  --text-panel-title--line-height: var(--text-panel-title-leading);
+  --text-body: var(--text-body-size);
+  --text-body--line-height: var(--text-body-leading);
+  --text-table: var(--text-table-size);
+  --text-table--line-height: var(--text-table-leading);
+  --text-caption: var(--text-caption-size);
+  --text-caption--line-height: var(--text-caption-leading);
+  --text-label: var(--text-label-size);
+  --text-label--line-height: var(--text-label-leading);
+  --text-amount: var(--text-amount-size);
+  --text-amount--line-height: var(--text-amount-leading);
+  --text-tile-amount: var(--text-tile-amount-size);
+  --text-tile-amount--line-height: var(--text-tile-amount-leading);
+
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);

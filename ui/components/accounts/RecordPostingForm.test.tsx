@@ -66,13 +66,13 @@ describe('RecordPostingForm', () => {
     await recordAndConfirm(user);
     expect(screen.getByRole('button', { name: 'Record posting' })).toBeDisabled();
 
-    resolveFetch({ ok: true, json: async () => ({ id: 'p1' }) });
+    resolveFetch({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Record posting' })).toBeEnabled());
   });
 
   // DRK-1745: rewrite for the new form
   it.skip('submits the direction the operator actually picked, not only the Credit default', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -90,7 +90,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('records a posting and collapses back to the toggle', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -112,7 +112,7 @@ describe('RecordPostingForm', () => {
   it.skip('shows the service refusal when the write is rejected', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'The debit would take the account past its floor.' }] }),
+      text: async () => JSON.stringify({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'The debit would take the account past its floor.' }] }),
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
@@ -135,7 +135,7 @@ describe('RecordPostingForm', () => {
     renderForm();
 
     // Refusal first: reopening afterwards must still show what was typed.
-    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'Over the floor.' }] }) });
+    fetchMock.mockResolvedValueOnce({ ok: false, text: async () => JSON.stringify({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'Over the floor.' }] }) });
     await user.click(screen.getByRole('button', { name: 'Record posting' }));
     await user.type(screen.getByLabelText('Amount', { exact: true }), '20000.00');
     await user.selectOptions(screen.getByLabelText('Category', { exact: true }), 'Transfer');
@@ -146,7 +146,7 @@ describe('RecordPostingForm', () => {
     expect(screen.getByLabelText('Amount', { exact: true })).toHaveValue('20000.00');
 
     // Now succeed: reopening afterwards must show the fields cleared.
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1' }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     await recordAndConfirm(user);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Record posting' })).toBeEnabled());
 
@@ -157,7 +157,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('marks the amount field invalid on a field-named refusal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ errors: [{ message: 'Must be positive.', field: 'Amount' }] }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ message: 'Must be positive.', field: 'Amount' }] }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -180,7 +180,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('submits the initial Credit direction and blank category untouched, not a placeholder string', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -197,7 +197,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('never throws, and shows no refusal, on a failure with no errors array', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -215,8 +215,8 @@ describe('RecordPostingForm', () => {
   it.skip('clears a prior refusal and the typed category, not to a bogus string, once a later attempt succeeds', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'Over the floor.' }] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1' }) });
+      .mockResolvedValueOnce({ ok: false, text: async () => JSON.stringify({ errors: [{ code: 'INSUFFICIENT_FUNDS', message: 'Over the floor.' }] }) })
+      .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -236,7 +236,7 @@ describe('RecordPostingForm', () => {
 
     // Re-submit with no category re-picked: the body proves the internal state actually
     // cleared to '' rather than a bogus placeholder string a native `<select>` would mask.
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p2' }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p2' }) });
     await user.click(screen.getByRole('button', { name: 'Record posting' }));
     await user.type(screen.getByLabelText('Amount', { exact: true }), '1.00');
     await recordAndConfirm(user);
@@ -247,7 +247,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('shows a generic refusal when the service answers with no errors array', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({}) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -263,7 +263,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('sends nothing until Confirm, restating the movement with the amount as typed; Back returns to the form', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p1' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -282,7 +282,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('marks the account control with the code and wording of an account status refusal', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ errors: [{ code: 'ACCOUNT_FROZEN', message: 'The account is frozen.' }] }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, text: async () => JSON.stringify({ errors: [{ code: 'ACCOUNT_FROZEN', message: 'The account is frozen.' }] }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     const { container } = renderForm();
@@ -299,7 +299,7 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip('keeps the idempotency key when the service never answers, and says so', async () => {
-    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1' }) });
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -317,8 +317,8 @@ describe('RecordPostingForm', () => {
 
   // DRK-1745: rewrite for the new form
   it.skip("keeps the idempotency key when the pass-through says the service could not be reached, and says it did not answer", async () => {
-    const unreachable = { ok: false, status: 502, json: async () => ({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
-    const fetchMock = vi.fn().mockResolvedValueOnce(unreachable).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'p1' }) });
+    const unreachable = { ok: false, status: 502, text: async () => JSON.stringify({ status: 502, errors: [{ message: 'The ledger service cannot be reached.' }], traceId: 't' }) };
+    const fetchMock = vi.fn().mockResolvedValueOnce(unreachable).mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ id: 'p1' }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderForm();
@@ -379,7 +379,7 @@ describe('RecordPostingForm', () => {
           const body = { items: [ACME], pageNumber: 1, pageSize: 10, pageCount: 1, totalItemCount: 1 };
           return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body });
         }
-        return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'p1' }) });
+        return Promise.resolve({ ok: true, status: 201, text: async () => JSON.stringify({ id: 'p1' }) });
       });
       vi.stubGlobal('fetch', fetchMock);
       return fetchMock;
@@ -441,7 +441,7 @@ describe('RecordPostingForm', () => {
       await user.type(screen.getByLabelText('Account', { exact: true }), 'ACME');
       await user.click(await screen.findByRole('option', { name: 'ACME-000123 Acme Operating' }));
       await user.type(screen.getByLabelText('Amount', { exact: true }), '10.00');
-      fetchMock.mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ errors: [{ code: 'ACCOUNT_CLOSED', message: 'The account is closed.' }] }) });
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 422, text: async () => JSON.stringify({ errors: [{ code: 'ACCOUNT_CLOSED', message: 'The account is closed.' }] }) });
 
       await recordAndConfirm(user);
 

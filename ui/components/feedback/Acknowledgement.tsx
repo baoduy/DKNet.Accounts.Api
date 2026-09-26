@@ -17,7 +17,7 @@ export function Acknowledgement({ title, children, onDismiss, style }: Acknowled
     <Card role="status" style={style} className="flex-row items-start gap-4 border-l-3 border-l-credit">
       <div className="min-w-0">
         <Label>{title}</Label>
-        {children ? <div className="mt-1.5 text-[length:var(--text-table-size)]">{children}</div> : null}
+        {children ? <div className="mt-1.5 text-table">{children}</div> : null}
       </div>
       {onDismiss ? (
         <Button type="button" size="sm" variant="ghost" aria-label="Dismiss" className="ml-auto text-muted-foreground" onClick={onDismiss}>

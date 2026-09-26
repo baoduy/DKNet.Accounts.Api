@@ -14,7 +14,7 @@ export function IdempotencyKeyField({ value, onRegenerate, note, style }: Idempo
   return (
     <div className="flex flex-col gap-1" style={style}>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[length:var(--text-caption-size)]">{value}</span>
+        <span className="font-mono text-caption">{value}</span>
         <Button variant="ghost" size="sm" onClick={() => navigator.clipboard?.writeText(value)}>
           Copy
         </Button>
@@ -24,7 +24,7 @@ export function IdempotencyKeyField({ value, onRegenerate, note, style }: Idempo
           </Button>
         ) : null}
       </div>
-      {note ? <p className="text-[length:var(--text-caption-size)] text-muted-foreground">{note}</p> : null}
+      {note ? <p className="text-caption text-muted-foreground">{note}</p> : null}
     </div>
   );
 }

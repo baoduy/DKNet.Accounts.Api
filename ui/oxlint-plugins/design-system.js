@@ -20,6 +20,18 @@ const LITERAL_PATTERNS = [
 ];
 
 /**
+ * DRK-1761 §3 row 7 — console type comes from the named roles `app/globals.css` maps into `@theme`
+ * (`text-caption`, `text-table`, ...), never a spelled-out token or Tailwind's default scale.
+ * Checked in `components/` and `app/` only.
+ * @type {{ pattern: string; message: string }[]}
+ */
+const TYPE_ROLE_PATTERNS = [
+  { pattern: '(?<![\\w-])text-\\[length:var\\(--text-', message: 'Spelled-out type token — use the named type role (text-caption, text-table, ...).' },
+  { pattern: '(?<![\\w-])text-(?:xs|sm|base)(?![\\w-])', message: "Tailwind's default type scale — use the named type role (text-caption, text-table, ...)." },
+];
+const TYPE_ROLE_SCOPE = /(?:^|[\\/])(?:components|app)[\\/]/;
+
+/**
  * Only the elements whose contract this ticket itself pins are checked here — the console's
  * own new base controls (row 3) and the frame components whose declared prop set row 5-8
  * require to stay unchanged. Design's own richer catalogue (Button, Card, Money, ...) belongs
@@ -104,6 +116,9 @@ const noRestrictedLiteral = {
   meta: { docs: { description: 'Disallow literal values the design system already tokenises.' } },
   create(context) {
     const matchers = LITERAL_PATTERNS.map((entry) => ({ regex: new RegExp(entry.pattern, entry.flags), message: entry.message }));
+    if (TYPE_ROLE_SCOPE.test(context.filename)) {
+      for (const entry of TYPE_ROLE_PATTERNS) matchers.push({ regex: new RegExp(entry.pattern), message: entry.message });
+    }
     return {
       Literal(node) {
         if (!isStringLiteral(node)) return;

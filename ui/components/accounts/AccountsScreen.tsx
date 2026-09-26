@@ -7,15 +7,15 @@
  */
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useState, type JSX } from 'react';
+import type { JSX } from 'react';
 import { Plus } from 'lucide-react';
-import { AccountPanel, DiscardChangesDialog } from '@/components/accounts/AccountPanel';
+import { AccountPanel } from '@/components/accounts/AccountPanel';
 import { AccountsTable, type AccountsTableRow } from '@/components/accounts/AccountsTable';
-import { Acknowledgement } from '@/components/feedback/Acknowledgement';
 import { ACCOUNTS_EMPTY, emptyMessage } from '@/components/feedback/empty';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
+import { useFlash } from '@/components/feedback/use-flash';
+import { usePanelState } from '@/components/feedback/use-panel-state';
 import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,10 @@ import { TableCard } from '@/components/ui/table-card';
 import { Mono, Note } from '@/components/ui/text';
 import { accountSearchError } from '@/lib/accounts/filters';
 import type { AccountDto } from '@/lib/accounts/query';
-import { useAccountGroups, useAccounts, useCurrencies } from '@/lib/accounts/query';
-import { parseListViewState, toListViewSearchParams, type ListViewState } from '@/lib/url-state';
+import { useAccounts } from '@/lib/accounts/query';
+import { useCurrencies, useDecimalPlaces } from '@/lib/query/currencies';
+import { useAccountGroups } from '@/lib/query/groups';
+import { useListViewState, withFilter } from '@/lib/url-state';
 import { ACCOUNT_STATUSES } from './AccountForm';
 
 /** The design kit's default page size, and the sizes its pager offers. */
@@ -44,44 +46,18 @@ interface PanelTarget {
   editing: boolean;
 }
 
-interface Flash {
-  title: string;
-  text: string;
-}
-
-function setFilter(state: ListViewState, key: string, value: string): ListViewState {
-  const filters = { ...state.filters };
-  if (value) filters[key] = value;
-  else delete filters[key];
-  return { ...state, filters, page: undefined };
-}
-
 export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Element {
-  const searchParams = useSearchParams();
-  const [state, setState] = useState<ListViewState>(() => parseListViewState(searchParams));
-  const [editing, setEditing] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [pendingTarget, setPendingTarget] = useState<PanelTarget | null>(null);
-  const [flash, setFlash] = useState<Flash | null>(null);
-
-  // Next's `router.push` updates the address bar asynchronously (a real round trip to fetch
-  // the destination's RSC payload) — a rapid sequence of clicks (filter, then sort, then
-  // page) would race that latency and drop whichever change lands first. View state instead
-  // lives in local state (synchronous, always builds on the change just made) and is mirrored
-  // to the address bar via the History API directly, so a copied link still reproduces it.
-  function navigate(next: ListViewState): void {
-    setState(next);
-    window.history.pushState(null, '', `/accounts?${toListViewSearchParams(next).toString()}`);
-  }
+  const [state, navigate] = useListViewState('/accounts');
+  const flash = useFlash();
 
   const pageSize = state.pageSize ?? ACCOUNTS_PAGE_SIZE;
   const accountsQuery = useAccounts(state, pageSize);
   const currenciesQuery = useCurrencies();
+  const decimalPlacesOf = useDecimalPlaces();
   const groupsQuery = useAccountGroups();
   const groups = groupsQuery.data ?? [];
   const currencies = currenciesQuery.data ?? [];
 
-  const decimalPlacesByCurrency = new Map(currencies.map((currency) => [currency.code, currency.decimalPlaces]));
   const groupCodeById = new Map(groups.map((group) => [group.id, group.code]));
   const rows: AccountsTableRow[] = (accountsQuery.data?.items ?? []).map((account) => ({
     id: account.id,
@@ -90,7 +66,7 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
     classification: account.classification,
     name: account.name,
     currency: account.currency,
-    decimalPlaces: decimalPlacesByCurrency.get(account.currency),
+    decimalPlaces: decimalPlacesOf(account.currency),
     balance: account.balance,
     availableBalance: account.availableBalance,
     openedOn: account.openedOn,
@@ -101,20 +77,20 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
   const currentPage = state.page ?? 1;
   const canWrite = grantedScopes.includes('accounts.write');
   const open = state.openRecordId;
+  // Which account is open lives in the address; whether it is being edited, in the panel's state.
+  const panel = usePanelState();
+  const editing = panel.mode === 'edit';
   const panelMode = open === OPEN_NEW ? 'open' : open ? (editing ? 'edit' : 'view') : null;
   const activeFilters = FILTER_KEYS.filter((key) => state.filters[key]).length;
 
   function showPanel(target: PanelTarget): void {
-    setPendingTarget(null);
-    setDirty(false);
-    setEditing(target.editing);
+    panel.show(target.editing ? 'edit' : 'view');
     if (target.open !== state.openRecordId) navigate({ ...state, openRecordId: target.open });
   }
 
   /** Every way of closing or swapping the panel: an edited form asks before it is dropped. */
   function requestPanel(target: PanelTarget): void {
-    if (dirty && panelMode !== 'view') setPendingTarget(target);
-    else showPanel(target);
+    panel.guard(() => showPanel(target));
   }
 
   function filterSelect(key: string, options: Array<{ value: string; label: string }>): JSX.Element {
@@ -122,14 +98,14 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
       <Select
         options={[{ value: '', label: 'Any' }, ...options]}
         value={state.filters[key] ?? ''}
-        onChange={(event) => navigate(setFilter(state, key, event.target.value))}
+        onChange={(event) => navigate(withFilter(state, key, event.target.value))}
         className="w-full"
       />
     );
   }
 
   function statusChanged(account: AccountDto, status: string): void {
-    setFlash(
+    flash.show(
       status === 'Closed'
         ? { title: 'Account closed', text: `${account.accountNumber} is closed. Its statement stays readable; no posting can be recorded against it.` }
         : { title: 'Account reopened', text: `${account.accountNumber} is active again. Postings can be recorded against it.` },
@@ -152,18 +128,14 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
         }
       />
 
-      {flash ? (
-        <Acknowledgement title={flash.title} onDismiss={() => setFlash(null)}>
-          {flash.text}
-        </Acknowledgement>
-      ) : null}
+      {flash.card}
 
       {currenciesQuery.isError ? <FailedRead error={currenciesQuery.error} onRetry={() => void currenciesQuery.refetch()} /> : null}
 
       <TableCard
         searchPlaceholder="Search number, name or reference"
         searchValue={state.filters.search ?? ''}
-        onSearchChange={(value) => navigate(setFilter(state, 'search', value))}
+        onSearchChange={(value) => navigate(withFilter(state, 'search', value))}
         rows={rows.length}
         total={Number(accountsQuery.data?.totalItemCount ?? 0)}
         filter={
@@ -197,20 +169,20 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
               onEdit={() => showPanel({ open, editing: true })}
               onOpened={(account) => {
                 showPanel({ open: account.id, editing: false });
-                setFlash({
+                flash.show({
                   title: 'Account opened',
                   text: `Opened ${account.accountNumber} in ${account.currency} at a zero balance. The account number was assigned by the service and is permanent.`,
                 });
               }}
               onSaved={(account) => {
                 showPanel({ open, editing: false });
-                setFlash({
+                flash.show({
                   title: 'Changes saved',
                   text: `Updated ${account.accountNumber}. Group, account number, currency and external reference are unchanged; no posting was made.`,
                 });
               }}
               onStatusChange={statusChanged}
-              onDirtyChange={setDirty}
+              onDirtyChange={panel.onDirtyChange}
             />
           ) : null
         }
@@ -243,7 +215,7 @@ export function AccountsScreen({ grantedScopes }: AccountsScreenProps): JSX.Elem
         entity, so <Mono>orderBy</Mono> on either answers 400. Balances are reported per currency and are never combined into a single total.
       </Note>
 
-      {pendingTarget ? <DiscardChangesDialog onKeepEditing={() => setPendingTarget(null)} onDiscard={() => showPanel(pendingTarget)} /> : null}
+      {panel.dialog}
     </>
   );
 }
