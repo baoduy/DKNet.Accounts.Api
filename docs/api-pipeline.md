@@ -1,27 +1,22 @@
 # API Request Pipeline
 
 This page traces everything that happens to a request before it reaches a handler, in the order it
-actually runs. The feature guides cover what each handler does; this page covers only the pipeline
-stages upstream of it, which aren't visible from reading a single handler.
-
-> **Worked examples on this page use the `Product` sample, which is fictional.** It comes from the
-> `DKNet.Templates` solution template this service was scaffolded from; **no `Product` entity and no
-> `/v1/products` route exists in this repository**. The pipeline stages described are real and every
-> request to this service crosses them — only the illustrative payloads are borrowed. This service's
-> routes are listed in [the README's API contract](../README.md#the-api-contract).
+actually runs. The [feature guides](index.md#features) cover what each handler does; this page covers
+only the pipeline stages upstream of it, which aren't visible from reading a single handler. This
+service's routes are listed in [the README's API contract](../README.md#the-api-contract).
 
 ## At a glance
 
 Every `Default` below is the value the shipped base `appsettings.json` produces — that is what an
-unmodified deployed service runs with, since the template ships no `appsettings.Production.json`.
-Where an environment overlay relaxes it, the row says so. Full flag matrix:
-[`docs/template-features.md`](template-features.md#featuremanagement-flags).
+unmodified deployed service runs with, since it ships no `appsettings.Production.json`. Where an
+environment overlay relaxes it, the row says so. Full flag matrix:
+[`docs/configuration-reference.md`](configuration-reference.md#featuremanagement-flags).
 
 | # | Stage | Default |
 |---|---|---|
-| 0 | Kestrel request limits — max body size, header-read timeout, no `Server` header | `FeatureManagement:EnableRequestBounds` = `true` (`false` in Development); server-level, not middleware |
-| 1 | Forwarded headers (`X-Forwarded-For`, `X-Forwarded-Proto`) | `FeatureManagement:EnableForwardedHeaders` = `true` (`false` in Development), `Security:TrustedProxies` empty — forwarded values ignored |
-| 2 | Security response headers | `FeatureManagement:EnableSecurityHeaders` = `true` (`false` in Development) |
+| 0 | Kestrel request limits — max body size, header-read timeout, no `Server` header | `FeatureManagement:EnableRequestBounds` = `true` (stays `true` in Development); server-level, not middleware |
+| 1 | Forwarded headers (`X-Forwarded-For`, `X-Forwarded-Proto`) | `FeatureManagement:EnableForwardedHeaders` = `true` (stays `true` in Development), `Security:TrustedProxies` empty — forwarded values ignored |
+| 2 | Security response headers | `FeatureManagement:EnableSecurityHeaders` = `true` (stays `true` in Development) |
 | 3 | Antiforgery cookie middleware | `FeatureManagement:EnableAntiforgery` = `false` — not wired |
 | 4 | CORS | `Cors:AllowedOrigins` empty — CORS not wired |
 | 5 | HSTS and HTTPS redirect | `FeatureManagement:EnableHttps` = `true` (`false` in Development/Testing) |
@@ -33,7 +28,7 @@ Where an environment overlay relaxes it, the row says so. Full flag matrix:
 | 11 | Global exception handling and OpenAPI/Scalar | `EnableSwagger` = `false` |
 | 12 | `[FromClaim]` population (endpoint filter) | — |
 | 13 | FluentValidation auto-validation (endpoint filter) | — |
-| 14 | Idempotency on POST (endpoint filter) | opt-in per route |
+| 14 | Idempotency (hand-written, inside the handler — not a filter stage) | `Record`/`RecordBatch`/`Reverse` only |
 | 15 | Handler | — |
 
 Rows 1–15 are registration order in `DKNet.Accounts.Api/Configs/AppConfig.cs`'s `UseAppConfig`, which is
@@ -59,12 +54,43 @@ result is serialized — see
 **API versioning** is absent from the table because it is not a middleware. It shapes the route
 template when the group is registered — see [API versioning](#api-versioning) below.
 
-![Workflow diagram of the request pipeline: a request passes the edge middleware that applies forwarded headers, security response headers and CORS, then routing with the request bounds and the rate limiter, then authentication with its default-deny fallback, then the endpoint filters that populate FromClaim members and run FluentValidation, and finally the handler; opt-in routes take a detour through the idempotency filter, and each stage has its own short-circuit response — 413 for an oversized body, 429 or 504, 401 or 403, 400, and the 500 problem+json the global exception handler writes.](diagrams/templates-request-pipeline.svg)
+```mermaid
+graph TD
+    Req["Request"] --> K["0. Kestrel limits\nmax body size, header timeout, no Server header"]
+    K -->|"413 over body size"| K413["413 Payload Too Large"]
+    K --> FH["1. Forwarded headers"]
+    FH --> SH["2. Security response headers"]
+    SH --> AF["3. Antiforgery (not wired)"]
+    AF --> CORS["4. CORS"]
+    CORS --> HSTS["5. HSTS / HTTPS redirect"]
+    HSTS --> HC["6. Health-check endpoints"]
+    HC --> Route["7. Routing + endpoint registration"]
+    Route --> RT["8. Request timeouts"]
+    RT -->|"504 over timeout"| RT504["504 Gateway Timeout"]
+    RT --> RL["9. Rate limiting"]
+    RL -->|"429 over limit"| RL429["429 Too Many Requests"]
+    RL --> Auth["10. Authentication / authorization"]
+    Auth -->|"401 / 403"| Auth4xx["401 Unauthenticated / 403 Forbidden"]
+    Auth --> Swagger["11. Global exception handling registered here;\nOpenAPI/Scalar mapped here"]
+    Swagger --> Claim["12. [FromClaim]/[FromRequestHeader] population"]
+    Claim --> Val["13. FluentValidation auto-validation"]
+    Val -->|"400 on failure"| Val400["400 Bad Request"]
+    Val --> Idem["14. Idempotency filter (opt-in per route)"]
+    Idem --> H["15. Handler"]
+    H -->|"unhandled exception"| H500["500 problem+json\n(global exception handler)"]
+```
+
+Every short-circuit response above still passes back through the security-headers `OnStarting` hook
+and, once registered, the global exception handler's shape — see
+[Security response headers](#security-response-headers) and
+[Global exception handling](#global-exception-handling) below for why a `404`, a `429` and a `500` all
+carry the same header set and the same error-body shape.
 
 ## Forwarded headers
 
 `DKNet.Accounts.Api/Configs/ForwardedHeadersConfig.cs` is the first middleware in the pipeline, gated on
-`FeatureManagement:EnableForwardedHeaders` (default `true`; `false` in the `Development` overlay). It
+`FeatureManagement:EnableForwardedHeaders` (default `true`; stays `true` in the `Development` overlay
+too). It
 reads the trusted-proxy list from `Security:TrustedProxies` — **empty in the shipped base file** —
 and:
 
@@ -87,7 +113,7 @@ Entries are single IP addresses parsed with `IPAddress.Parse`; a CIDR range is n
 ## Security response headers
 
 `DKNet.Accounts.Api/Configs/SecurityHeadersConfig.cs` (`FeatureManagement:EnableSecurityHeaders`, default
-`true`, `false` in the `Development` overlay) adds the `OwaspHeaders.Core` header set:
+`true`, stays `true` in the `Development` overlay) adds the `OwaspHeaders.Core` header set:
 `X-Frame-Options`, `X-Content-Type-Options`, a default `Content-Security-Policy`,
 `X-Permitted-Cross-Domain-Policies`, `Referrer-Policy`, `Cache-Control`, `X-XSS-Protection` and
 `Cross-Origin-Resource-Policy`.
@@ -105,7 +131,7 @@ only at 365 days or more). One owner, so the header is never sent twice.
 ## Request bounds
 
 `DKNet.Accounts.Api/Configs/RequestBoundsConfig.cs` (`FeatureManagement:EnableRequestBounds`, default
-`true`, `false` in the `Development` overlay) states three bounds the template would otherwise
+`true`, stays `true` in the `Development` overlay) states three bounds the service would otherwise
 inherit from Kestrel, all from the `RequestBounds` section:
 
 | Bound | Default | Over the bound |
@@ -129,8 +155,9 @@ it to the calling page. This is "not wired", not "wired but permissive". When th
 non-empty, the default policy allows exactly those origins and exactly the methods and headers
 enumerated in `Cors:AllowedMethods` (default `GET, POST, PUT, PATCH` — **no `DELETE`**, so a browser
 front-end calling the service's one delete route, `DELETE /v1/account-groups/{id}`, has to add it) and
-`Cors:AllowedHeaders` (default `Authorization`, `Content-Type`, `Accept`, `X-Idempotency-Key`, the
-header the template's own create route requires); an origin, method or header that isn't listed is
+`Cors:AllowedHeaders` (default `Authorization`, `Content-Type`, `Accept`, `Idempotency-Key`, the
+header the posting routes actually read — not `DKNet.AspCore.Idempotency`'s `X-Idempotency-Key`
+default, which this service doesn't use); an origin, method or header that isn't listed is
 never reflected back, so its preflight fails. Credentials are never allowed — `AllowCredentials()`
 is not called on any path.
 
@@ -141,8 +168,8 @@ means "nothing allowed" and is not widened back. Per-key detail:
 Entries are absolute origins: scheme included, no trailing slash and no path —
 `https://app.example.com`, not `app.example.com` or `https://app.example.com/`.
 
-The checked-in `DKNet.Accounts.Api/appsettings.json` ships an empty list, so a service deployed with the
-template defaults is closed to browsers. `DKNet.Accounts.Api/appsettings.Development.json` lists the local
+The checked-in `DKNet.Accounts.Api/appsettings.json` ships an empty list, so this service deployed with
+its shipped defaults is closed to browsers. `DKNet.Accounts.Api/appsettings.Development.json` lists the local
 SPA dev-server origins `http://localhost:3000` and `http://localhost:5173`:
 
 ```json
@@ -154,10 +181,10 @@ SPA dev-server origins `http://localhost:3000` and `http://localhost:5173`:
 `UseCrosConfig()` runs from `DKNet.Accounts.Api/Configs/AppConfig.cs` before `UseRouting()`, so the policy
 covers every endpoint including the CORS preflight `OPTIONS` request.
 
-> **Breaking behavioural change when you regenerate from the template.** The previous revision
+> **Breaking behavioural change from an earlier revision.** A previous revision of this service
 > registered `AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()` unconditionally, so any web page
-> could call a scaffolded service. A browser front-end that used to work must now have its origin
-> listed in `Cors:AllowedOrigins` for the environment it talks to.
+> could call it. A browser front-end that used to work must now have its origin listed in
+> `Cors:AllowedOrigins` for the environment it talks to.
 
 ## Routing and endpoint registration
 
@@ -171,7 +198,7 @@ For each one it builds a versioned route group and calls its `Map(RouteGroupBuil
 
 `FeatureManagement:EnableVersioning` (default `true`) is read in `DKNet.Accounts.Api/Program.cs` and
 passed as `o.EnableVersioning` to `UseEndpointConfigs`. When enabled, each group's route becomes
-`/v{version:apiVersion}{GroupEndpoint}` — for example `/v1/purchase-orders`. The host must already
+`/v{version:apiVersion}{GroupEndpoint}` — for example `/v1/account-groups`. The host must already
 have called `AddAppVersioning()` (`DKNet.Accounts.Api/Configs/VersioningConfig.cs`); otherwise registration
 throws at startup, before any endpoint is even discovered.
 
@@ -231,9 +258,11 @@ The registration exists to run `[FromRequestHeader]` population and carries no f
 ## Role-aware sensitive-property filtering
 
 `[FromClaim]` decides what a caller may *send*. This decides what a caller may *see*: a property
-declared `[SensitiveData(...)]` on an entity, and carried onto the generated DTO (see
-[`docs/crud-attributes.md`](crud-attributes.md#declaring-a-sensitive-property)), is **omitted from
-the JSON payload** unless the caller holds one of the roles the declaration names.
+declared `[SensitiveData(...)]` on an entity, and carried onto the generated DTO, is **omitted from
+the JSON payload** unless the caller holds one of the roles the declaration names. **No entity in
+this service currently declares `[SensitiveData(...)]`** — `Currency`, `AccountGroup`, `Account` and
+`Posting` carry none — so nothing is filtered by this mechanism today; the wiring below stays in
+place for the first feature that needs it.
 
 It happens at the very end of the request, while the response is serialized, and it is **opt-in per
 `JsonSerializerOptions` instance**. Nothing is filtered until the host turns it on — which is two
@@ -262,7 +291,7 @@ an `AsyncLocal` on every read.
 ### 2. The start-up opt-in
 
 Registered in `DKNet.Accounts.Api/Configs/ServiceConfigs.cs`, alongside the `ConfigureHttpJsonOptions` call
-that already sets this template's naming policy and converters. DKNet.Accounts APIs serialize with
+that already sets this service's naming policy and converters. It serializes with
 `Microsoft.AspNetCore.Http.Json.JsonOptions`, and the opt-in needs the container to resolve the
 accessor, so it goes in as an `IConfigureOptions<JsonOptions>`:
 
@@ -283,39 +312,15 @@ them, and a model with no sensitive property serializes byte-for-byte as it did 
 a frozen instance rejects the resolver change with `InvalidOperationException` — so the call belongs
 in service registration, never in an endpoint filter or a request handler.
 
-### What the caller sees
+### What a caller would see, once a field is declared
 
-`GET /v1/products/{id}` — the template's sample route, not one this service serves — for an
-authenticated caller **in the `pricing` role** (audit fields
-`id`/`createdBy`/`createdOn`/`updatedBy`/`updatedOn` elided for length):
+No route in this service filters anything today, since no entity declares `[SensitiveData(...)]`.
+When one does, a property so declared is **absent** from the JSON payload for a caller who lacks the
+named role — not `null`, not `"***"`. Nothing in the payload hints that a property was withheld, and
+a client deserializing into a type with a nullable property simply sees `null` because nothing was
+assigned.
 
-```json
-{
-  "name": "Espresso Machine",
-  "price": 899.00,
-  "supplierCostPrice": 412.50,
-  "supplierReferenceCode": "SUP-88231",
-  "isDiscontinued": false
-}
-```
-
-The same row, for an authenticated caller **holding no roles**:
-
-```json
-{
-  "name": "Espresso Machine",
-  "price": 899.00,
-  "supplierReferenceCode": "SUP-88231",
-  "isDiscontinued": false
-}
-```
-
-`supplierCostPrice` is **absent** — not `null`, not `"***"`. Nothing in the payload hints that a
-property was withheld, and a client deserializing into a type with a nullable property simply sees
-`null` because nothing was assigned. `supplierReferenceCode` survives because its declaration names
-no role and this caller is authenticated.
-
-Because this template sets `DefaultIgnoreCondition = WhenWritingNull` on the same options
+Because this service sets `DefaultIgnoreCondition = WhenWritingNull` on the same options
 (`SharedConsts.JsonSerializerOptions`), a nullable property that is simply unset is absent too — so
 a caller cannot tell "withheld from you" from "never recorded". That is the intended shape, not a
 leak to close.
@@ -335,7 +340,7 @@ whichever roles were named — the role-less form included. The check runs per p
 serialization, reading the accessor as the payload is written, so two callers on the same endpoint
 through the same options instance are judged independently and nothing is cached.
 
-Two consequences worth planning for in this template:
+Two consequences worth planning for in this service:
 
 - **`FeatureManagement:RequireAuthorization` is `false` in `appsettings.Development.json` and
   `appsettings.Testing.json`**, so no authentication middleware runs there and `HttpContext.User` is
@@ -362,26 +367,24 @@ the same ones a refused command and an unhandled error answer through.
 
 ## Idempotency on POST
 
-Idempotency is opt-in per route, not automatic for every POST. A hand-mapped create route can chain
-`.RequiredIdempotentKey()`, which enforces the idempotency key header (default
-`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. A
-route built from the generated CRUD composite (`Map<Entity>Crud()`, e.g. `AccountGroupsV1Endpoint`'s
-`MapAccountGroupCrud()`) makes no such call. Add `.RequiredIdempotentKey()` yourself on any
-hand-mapped route where duplicate submissions matter.
+This service does not use `DKNet.AspCore.Idempotency`'s route-level filter — no route calls
+`.RequiredIdempotentKey()` anywhere in this codebase. `DKNet.Accounts.Api/Configs/AppConfig.cs` still
+registers the package's store (Redis-backed when `ConnectionStrings:Redis` is configured, an
+in-process store otherwise, both set to `IdempotentConflictHandling.ConflictResponse`), but with no
+route opted in via `.RequiredIdempotentKey()`, that registration currently has no observable effect.
 
-Store selection happens once in `DKNet.Accounts.Api/Configs/AppConfig.cs`, based on whether
-`ConnectionStrings:Redis` is configured:
+The real idempotency mechanism is hand-written, on the three postings write routes:
+`POST /v1/postings`, `POST /v1/postings/batch` and `POST /v1/postings/{id}/reverse` each declare
+`IdempotencyKey` as `[FromRequestHeader("Idempotency-Key")]` on their own request type
+(`Postings/V1/Actions/Record.cs:47`, `RecordBatch.cs:55`, `Reverse.cs:28`). The handler looks the key
+up itself (`SpecGetPosting(byCallingSystem, byIdempotencyKey)`), compares a content signature
+(`PostingSignature`) against any existing row, and answers accordingly — the same key with the same
+content returns the original posting, the same key with different content is refused
+`409 IDEMPOTENCY_KEY_CONFLICT`. Full mechanics: [Postings' architecture](features/postings/architecture.md#the-per-account-lock).
 
-- **Redis configured** — `AddIdempotencyWithRedisStore(redisConnectionString, o =>
-  o.ConflictHandling = IdempotentConflictHandling.CachedResult)`: keys are tracked in Redis, so
-  idempotency works correctly across multiple app instances.
-- **No Redis** — falls back to the non-generic `AddIdempotentKey(...)` (same `CachedResult`
-  conflict handling), an in-process store. Fine for local development, not for a multi-instance
-  deployment.
-
-With `IdempotentConflictHandling.CachedResult` (this template's setting), a replayed request with
-the same key returns the original cached response rather than re-running the handler or returning a
-conflict error.
+The key is **required** on `Reverse` (`RuleFor(r => r.IdempotencyKey).NotEmpty()`) and **optional** on
+`Record`/`RecordBatch` — omitting it on either of those two simply skips the replay/conflict check
+entirely (`Record.cs:119`), so a retry with no key records a second posting rather than deduplicating.
 
 ## Rate limiting
 
@@ -405,8 +408,8 @@ in `Security:TrustedProxies`, and the immediate peer itself otherwise. The provi
 `X-Forwarded-For` on its own, so an untrusted peer's forwarded claim spends that peer's own budget
 rather than someone else's. Behind an ingress that is not listed — the shipped default, since the
 list is empty — every client shares one partition; list the ingress and they are separated again.
-Both providers are public interfaces you can replace; see
-[`extension-points.md`](extension-points.md#rate-limiting).
+Both providers are public interfaces you can replace, both registered in
+`DKNet.Accounts.Api/Configs/RateLimits/RateLimitConfig.cs`.
 
 Limits come from the `RateLimit` section. The base `appsettings.json` sets it explicitly
 (`DefaultRequestLimit: 100`, `DefaultConcurrentLimit: 20`, `TimeWindowInSeconds: 1`) — without that

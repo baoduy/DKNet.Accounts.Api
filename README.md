@@ -638,9 +638,9 @@ people who read `direction` as the sign.
   automated checks cannot reach.
 - [Local setup with Microsoft Entra ID](docs/local-setup-entra.md) — register the API and console
   apps in Entra, fill in `.env`, and run the whole stack with `docker compose` and authorization on.
-- [docs/index.md](docs/index.md) — the reference docs inherited from the DKNet solution template
-  (pipeline, configuration, EF Core events, messaging). Reach for these when you are changing this
-  service, not when you are calling it.
+- [docs/index.md](docs/index.md) — this service's docs index: feature docs (currencies, account
+  groups, accounts, postings) plus the request pipeline, configuration reference and generic list
+  contract.
 - [AGENTS.md](AGENTS.md) — the architecture conventions this solution is held to.
 
 ## License
