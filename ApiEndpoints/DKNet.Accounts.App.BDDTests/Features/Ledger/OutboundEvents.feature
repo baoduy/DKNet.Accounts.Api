@@ -16,9 +16,9 @@ Feature: Ledger changes are published as events
       | change                                                  | event                 |
       | registers currency "SGD" with 2 decimal places          | currency-created      |
       | deactivates currency "SGD"                              | currency-updated      |
-      | creates account group "OPS-SG"                          | account-group-created |
-      | closes account group "OPS-SG"                           | account-group-updated |
-      | deletes the empty account group "OPS-TMP"               | account-group-deleted |
+      | creates account group "OPSSG"                           | account-group-created |
+      | closes account group "OPSSG"                            | account-group-updated |
+      | deletes the empty account group "OPTMP"                 | account-group-deleted |
       | opens account "Ops float" in SGD                        | account-created       |
       | renames account "Ops float" to "Ops float SG"           | account-updated       |
       | sets the overdraft limit of "Ops float" to 500.00 SGD   | account-updated       |
@@ -71,9 +71,9 @@ Feature: Ledger changes are published as events
 
   @new @integration
   Scenario: A delete event carries the group as it was
-    Given account group "OPS-TMP" is empty and active
-    When treasury-ops deletes account group "OPS-TMP"
-    Then the account-group-deleted event carries code "OPS-TMP" and status active
+    Given account group "OPTMP" is empty and active
+    When treasury-ops deletes account group "OPTMP"
+    Then the account-group-deleted event carries code "OPTMP" and status active
 
   @new @integration
   Scenario: With the bus off, nothing is stored or sent

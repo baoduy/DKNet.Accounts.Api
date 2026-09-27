@@ -118,9 +118,9 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         [global::NUnit.Framework.CategoryAttribute("integration")]
         [global::NUnit.Framework.TestCaseAttribute("registers currency \"SGD\" with 2 decimal places", "currency-created", "0", null)]
         [global::NUnit.Framework.TestCaseAttribute("deactivates currency \"SGD\"", "currency-updated", "1", null)]
-        [global::NUnit.Framework.TestCaseAttribute("creates account group \"OPS-SG\"", "account-group-created", "2", null)]
-        [global::NUnit.Framework.TestCaseAttribute("closes account group \"OPS-SG\"", "account-group-updated", "3", null)]
-        [global::NUnit.Framework.TestCaseAttribute("deletes the empty account group \"OPS-TMP\"", "account-group-deleted", "4", null)]
+        [global::NUnit.Framework.TestCaseAttribute("creates account group \"OPSSG\"", "account-group-created", "2", null)]
+        [global::NUnit.Framework.TestCaseAttribute("closes account group \"OPSSG\"", "account-group-updated", "3", null)]
+        [global::NUnit.Framework.TestCaseAttribute("deletes the empty account group \"OPTMP\"", "account-group-deleted", "4", null)]
         [global::NUnit.Framework.TestCaseAttribute("opens account \"Ops float\" in SGD", "account-created", "5", null)]
         [global::NUnit.Framework.TestCaseAttribute("renames account \"Ops float\" to \"Ops float SG\"", "account-updated", "6", null)]
         [global::NUnit.Framework.TestCaseAttribute("sets the overdraft limit of \"Ops float\" to 500.00 SGD", "account-updated", "7", null)]
@@ -460,13 +460,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 74
-    await testRunner.GivenAsync("account group \"OPS-TMP\" is empty and active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync("account group \"OPTMP\" is empty and active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 75
-    await testRunner.WhenAsync("treasury-ops deletes account group \"OPS-TMP\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+    await testRunner.WhenAsync("treasury-ops deletes account group \"OPTMP\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 76
-    await testRunner.ThenAsync("the account-group-deleted event carries code \"OPS-TMP\" and status active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+    await testRunner.ThenAsync("the account-group-deleted event carries code \"OPTMP\" and status active", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
