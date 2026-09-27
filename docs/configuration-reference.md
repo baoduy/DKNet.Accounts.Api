@@ -1,20 +1,8 @@
 # Configuration Reference
 
-> **Sample code on this page is fictional.** `Product`/`AutomatedSample` and
-> `PurchaseOrder`/`ManualSample` come from the `DKNet.Templates` solution template this service was
-> scaffolded from; neither entity, nor a `/v1/products` route, exists in this repository. The
-> mechanics described are real — the payloads and route names are not. This service's own slices are
-> `AccountGroups`, `Accounts`, `Postings` and `Currencies`; its routes are listed in
-> [the README's API contract](../README.md#the-api-contract).
-
-Every configuration key a scaffolded solution reads, what it means, what it defaults to, what it
-changes, and the code path that reads it. Feature flags are the one section this page does not
-restate — they have their own table in
-[`template-features.md`](template-features.md#featuremanagement-flags), which is the source of
-truth for class default versus each environment overlay.
-
-Paths below use the template's own project names (`DKNet.Accounts.Api`, `DKNet.Accounts.Infra`, …). A generated
-solution renames them to `<YourApp>.*`.
+Every configuration key this service reads, what it means, what it defaults to, what it changes, and
+the code path that reads it. This service's own slices are `Currencies`, `AccountGroups`, `Accounts`
+and `Postings`; its routes are listed in [the README's API contract](../README.md#the-api-contract).
 
 ## Where configuration comes from
 
@@ -87,7 +75,7 @@ The scope side is not a sample: `AuthConfig` registers one authorization policy 
 `HasScopeRequirement` it carries. Every route group applies one of these policies —
 `AccountsV1Endpoint`/`AccountGroupsV1Endpoint`/`CurrenciesV1Endpoint` via `[EndpointGroupScope]`,
 `PostingsV1Endpoint` via `.RequireScope(...)`. See
-[`extension-points.md`](extension-points.md#authorization-and-claims).
+[`endpoint-scope-declarations.md`](endpoint-scope-declarations.md).
 
 ## `Cors`
 
@@ -193,8 +181,8 @@ second — an outage, not a rate limit.
 `DKNet.Accounts.App.Tests/Architecture/SecureDefaultAppSettingsTests.cs` asserts it stays there. The
 shipped production numbers are a placeholder ceiling to tune, not a researched limit.
 
-Both `IRateLimitKeyProvider` and `IRateLimitOptionsProvider` are public interfaces you can replace
-— see [`extension-points.md`](extension-points.md#rate-limiting).
+Both `IRateLimitKeyProvider` and `IRateLimitOptionsProvider` are public interfaces you can replace,
+both registered in `DKNet.Accounts.Api/Configs/RateLimits/RateLimitConfig.cs`.
 
 ## `AzureAppConfig`
 
@@ -234,31 +222,77 @@ tracing and metrics instrumentation, with a console exporter in `DEBUG` builds o
 
 Both exporter keys are additive: set both and both exporters run.
 
-## `SampleData`
+## `DKNet.Accounts.AppHost`
 
-The one section on this page that is **not** an API key. It lives in
-`DKNet.Accounts.AppHost/appsettings.json` — the Aspire application host's own configuration — and is read
-by `DKNet.Accounts.AppHost/AppHost.cs`. The deployed API never reads it: the application host orchestrates
-a local development environment and is not part of what gets published, so this key has no effect
-on, and no presence in, a deployed service.
+The Aspire application host (`DKNet.Accounts.AppHost/AppHost.cs`) carries no business logic and reads
+no `SampleData` or other feature key: it provisions a `Redis` container and a `Postgres` container,
+adds the `AppDb` database to the Postgres resource, and starts `DKNet.Accounts.Api` wired to both
+connection strings. It is not part of what gets published — `dotnet run --project DKNet.Accounts.Api`
+on its own skips it, so `ConnectionStrings:AppDb` and `ConnectionStrings:Redis` become yours to
+supply directly.
 
-| Key | Type | Shipped default | Effect | Read by |
+## FeatureManagement flags
+
+Class defaults come from `DKNet.Accounts.Share/Options/FeatureOptions.cs`. The remaining columns are
+what the shipped config files actually set. `—` means the file does not name the key, so the value
+falls through to the column on its left.
+
+| Flag | Class default | base `appsettings.json` (Production) | `appsettings.Development.json` | `appsettings.Testing.json` |
 |---|---|---|---|---|
-| `SampleData:RecordsPerEntity` | int | `10000` | How many records to generate per sample entity (`Product` and `PurchaseOrder`) once the application host has started its resources. `0` — or any negative value — skips generation entirely, without even opening a database connection, and leaves the database exactly as the migration left it. That is how you get an empty database to test empty-state behaviour; there is no separate on/off flag, the volume *is* the switch. | `DKNet.Accounts.AppHost/AppHost.cs`, which passes it to `DKNet.Accounts.AppHost/SampleData/SampleDataGenerator.cs` |
+| `EnableAntiforgery` | `false` | `false` | `false` | — |
+| `EnableAzureAppConfig` | `false` | `false` | `false` | — |
+| `EnableForwardedHeaders` | `true` | `true` | **`false`** | — |
+| `EnableHealthCheck` | `true` | — | — | — |
+| `EnableHttps` | `false` | **`true`** | `false` | `false` |
+| `EnableOpenTelemetry` | `false` | `false` | — | — |
+| `EnableRateLimit` | `true` | `true` | `false` | `false` |
+| `EnableRequestBounds` | `true` | `true` | **`false`** | — |
+| `EnableSecurityHeaders` | `true` | `true` | **`false`** | — |
+| `EnableServiceBus` | `false` | `true` | `false` | — |
+| `EnableSwagger` | `false` | `false` | `true` | — |
+| `EnableVersioning` | `true` | `true` | — | — |
+| `RequireAuthorization` | `false` | **`true`** | `false` | `false` |
+| `RunDbMigrationWhenAppStart` | `false` | `false` | `true` | — |
 
-Two of its edges are worth knowing before you change it. Generation writes into the schema the
-API's startup migration creates, so with
-[`FeatureManagement:RunDbMigrationWhenAppStart`](template-features.md#featuremanagement-flags) off
-there is no schema to write into: generation polls for up to 60 seconds waiting for that schema —
-the host process itself starts immediately and is unaffected, only sample-data generation waits —
-then gives up, and a warning in the host's logs names that flag, alongside the last poll failure
-observed, as the likely reason. And generation never accumulates into a
-database that already holds sample rows — products are skipped if the table holds any row, purchase
-orders if it holds more than the three the migration seeds, so a database you chose to retain is
-skipped rather than topped up and no row you created by hand is ever deleted or modified.
+`RequireAuthorization`, `EnableHttps`, `EnableRateLimit`, `EnableSecurityHeaders`,
+`EnableForwardedHeaders` and `EnableRequestBounds` are the secure-by-default set: this service
+deployed without a config change authenticates every request, applies HSTS, rate-limits, redirects to
+HTTPS when an HTTPS port is configured, sends the security response headers, bounds every request, and
+honours forwarded caller information only from a proxy you listed. Where each control sits in the
+pipeline: [`api-pipeline.md`](api-pipeline.md).
 
-What generation produces is described in
-[`template-features.md`](template-features.md#aspire-topology).
+The redirect is the one conditional part. `EnableHttps` always adds both `UseHsts()` and
+`UseHttpsRedirection()` (`DKNet.Accounts.Api/Configs/HttpsConfig.cs`), but `UseHttpsRedirection` only
+redirects when ASP.NET Core can determine an HTTPS port — from `ASPNETCORE_HTTPS_PORT`, from
+`HttpsRedirectionOptions`, or from the server's own listening addresses. The container this service
+publishes to (`mcr.microsoft.com/dotnet/aspnet:10.0-alpine`, set as `ContainerBaseImage` in
+`DKNet.Accounts.Api.csproj`) carries none of them, so a service running HTTP-only behind a
+TLS-terminating ingress logs `Failed to determine the https port for redirect` and passes the request
+through unredirected. Set `ASPNETCORE_HTTPS_PORT` if you need the redirect itself; HSTS is unaffected.
+
+`dotnet run` locally picks up `appsettings.Development.json`, and both test suites boot under the
+`Testing` environment (`DKNet.Accounts.App.TestSupport/TestApiFactoryBase.cs` calls
+`UseEnvironment("Testing")`), so neither is affected. That `appsettings.Testing.json` overlay sets
+`RequireAuthorization`, `EnableHttps` and `EnableRateLimit` all to `false`. Never run a deployed
+instance with `ASPNETCORE_ENVIRONMENT=Testing`: it drops all three protections at once. It does
+**not** name `EnableSecurityHeaders`, `EnableForwardedHeaders` or `EnableRequestBounds`, so those
+three fall through to the base file and stay on under `Testing` — the `Development` overlay is the
+only shipped file that relaxes them. To relax a flag for an environment, add it to that environment's
+overlay — or set the `FeatureManagement__<Flag>` environment variable, which outranks every JSON file.
+
+Because `EnableRateLimit` is on in the base file, the base file also carries an explicit `RateLimit`
+section so the limiter never falls back to `RateLimitOptions`'s 2-requests-per-second class defaults —
+see [`RateLimit`](#ratelimit) above.
+
+`EnableServiceBus` is the one flag whose `true` in the base file is not sufficient on its own: it
+gates the **Azure** Service Bus child bus, which `DKNet.Accounts.Infra/Extensions/ServiceBusSetup.cs`
+adds only when the flag is on **and** `ConnectionStrings:AzureBus` is non-empty. This service declares
+no `Produce`/`Consume` topology on that child bus today — no domain event is forwarded externally —
+so turning the flag on with no topology added has no observable effect yet; the in-memory child bus
+that carries internal command/query dispatch is registered unconditionally regardless of the flag.
+
+> CORS is deliberately absent from this table. It is configured by the `Cors:AllowedOrigins` array,
+> not by a flag — an empty array is its off switch. See [`Cors`](#cors) above.
 
 ## Framework-owned keys
 

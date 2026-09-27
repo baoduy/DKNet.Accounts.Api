@@ -166,5 +166,3 @@ refusal before you push.
 
 - [API Request Pipeline](api-pipeline.md) — where authentication and authorization sit in the request
   sequence, and what `FeatureManagement:RequireAuthorization` switches.
-- [Extension Points](extension-points.md) — how `HasScopeRequirement`/`HasScopeHandler` evaluate a
-  scope, and where to attach your own authorization rule.
