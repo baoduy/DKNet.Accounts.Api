@@ -48,7 +48,7 @@ Opens an account. **Entirely hand-written** — `Account` carries no `[CrudCreat
   | `externalReference` | string | — | ≤ 200 characters — a **column limit only**, not validated (see below) | body |
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
-- **Response:** `201 Created` — `AccountDto`, `status: "Active"`, `balance: 0`
+- **Response:** `201 Created` — `AccountDto`, `status: "active"`, `balance: 0`
 - **Errors:** `422 UNSUPPORTED_CURRENCY` (unknown or inactive currency) · `422 OVERDRAFT_LIMIT_REQUIRED`
   · `404` unknown group · `400` malformed body · `409` a caller-chosen suffix already used with this
   group's code

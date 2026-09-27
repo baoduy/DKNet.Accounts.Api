@@ -185,8 +185,10 @@ that route's URL, but its data and handler (`GetAccountStatementQueryHandler`) b
 
 - **Response:** `200 OK` — `PagedResponse<PostingDto>` in stream order. Reading past the end returns
   an empty page with `200`, never an error
-- **Errors:** `404` — this route is mapped `{id:guid}`, so a non-GUID `{id}` never matches the route
-  at all, the same as an unknown-but-valid id
+- **Errors:** `404` for a non-GUID `{id}` — this route is mapped `{id:guid}`, so a malformed segment
+  never matches the route at all. An **unknown but valid** id is not an error: the handler never looks
+  the account up, so it answers `200` with an empty page, the same as a real account with no postings
+  in the requested window
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \

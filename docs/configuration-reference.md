@@ -117,7 +117,8 @@ a CIDR range such as `10.0.0.0/8` is **not** accepted and fails at startup with 
 seeded loopback entry is gone too: `127.0.0.1` is trusted only if you list it.
 
 The whole module is gated on `FeatureManagement:EnableForwardedHeaders` (default `true`, and it stays
-`true` in the `Development` overlay too — only `Security:TrustedProxies` is empty locally). Turning
+`true` in the `Development` overlay too — `Security:TrustedProxies` is simply empty everywhere by
+default, base file included). Turning
 the flag off and leaving the list empty are equivalent in effect; the flag exists so the middleware
 can be taken out of the pipeline entirely, for local work or otherwise.
 
@@ -251,7 +252,7 @@ falls through to the column on its left.
 | `EnableServiceBus` | `false` | `true` | `false` | — |
 | `EnableSwagger` | `false` | `false` | `true` | — |
 | `EnableVersioning` | `true` | `true` | — | — |
-| `RequireAuthorization` | `false` | **`true`** | `false` | `false` |
+| `RequireAuthorization` | `false` | **`true`** | **`false`** | `false` |
 | `RunDbMigrationWhenAppStart` | `false` | `false` | `true` | — |
 
 `RequireAuthorization`, `EnableHttps`, `EnableRateLimit`, `EnableSecurityHeaders`,

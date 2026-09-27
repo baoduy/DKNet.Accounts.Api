@@ -42,7 +42,7 @@ Creates a group. Generated route; validation is `CreateAccountGroupCommandValida
   | `ownerId` | string | ✓ | non-empty, ≤ 100 characters | body |
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
-- **Response:** `201 Created` — `AccountGroupDto`, `status: "Active"`
+- **Response:** `201 Created` — `AccountGroupDto`, `status: "active"`
 - **Errors:** `422 DUPLICATE_GROUP_CODE` · `400` malformed body
 - **Enforcement:** FluentValidation enforces `code`, `name`, `ownerId` and `type`. `description` has
   no validator rule at all — its 1000-character bound is the database column length
@@ -121,7 +121,7 @@ aggregate.
 
 - **Auth:** `accounts.write`
 - **Request:** none
-- **Response:** `200 OK` — `AccountGroupDto`, `status: "Closed"`
+- **Response:** `200 OK` — `AccountGroupDto`, `status: "closed"`
 - **Errors:** `422 GROUP_HOLDS_BALANCE` — any account it holds carries a non-zero balance or held
   amount · `400` malformed id · `404` unknown id
 
@@ -134,7 +134,7 @@ curl -X POST "https://accounts.example.com/v1/account-groups/{id}/close" -H "Aut
 Reactivates a closed group. No request body, no guard on the entity method.
 
 - **Auth:** `accounts.write`
-- **Response:** `200 OK` — `AccountGroupDto`, `status: "Active"`
+- **Response:** `200 OK` — `AccountGroupDto`, `status: "active"`
 - **Errors:** `400` malformed id · `404` unknown id
 
 ```bash
