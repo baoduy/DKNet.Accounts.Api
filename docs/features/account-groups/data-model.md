@@ -20,7 +20,7 @@ erDiagram
     }
     ACCOUNTS {
         uuid Id PK
-        uuid GroupId FK
+        uuid GroupId "Plain indexed column, no FK constraint — see note below"
     }
     ACCOUNT_GROUPS ||--o{ ACCOUNTS : "holds"
 ```

@@ -14,9 +14,9 @@ environment overlay relaxes it, the row says so. Full flag matrix:
 
 | # | Stage | Default |
 |---|---|---|
-| 0 | Kestrel request limits — max body size, header-read timeout, no `Server` header | `FeatureManagement:EnableRequestBounds` = `true` (`false` in Development); server-level, not middleware |
-| 1 | Forwarded headers (`X-Forwarded-For`, `X-Forwarded-Proto`) | `FeatureManagement:EnableForwardedHeaders` = `true` (`false` in Development), `Security:TrustedProxies` empty — forwarded values ignored |
-| 2 | Security response headers | `FeatureManagement:EnableSecurityHeaders` = `true` (`false` in Development) |
+| 0 | Kestrel request limits — max body size, header-read timeout, no `Server` header | `FeatureManagement:EnableRequestBounds` = `true` (stays `true` in Development); server-level, not middleware |
+| 1 | Forwarded headers (`X-Forwarded-For`, `X-Forwarded-Proto`) | `FeatureManagement:EnableForwardedHeaders` = `true` (stays `true` in Development), `Security:TrustedProxies` empty — forwarded values ignored |
+| 2 | Security response headers | `FeatureManagement:EnableSecurityHeaders` = `true` (stays `true` in Development) |
 | 3 | Antiforgery cookie middleware | `FeatureManagement:EnableAntiforgery` = `false` — not wired |
 | 4 | CORS | `Cors:AllowedOrigins` empty — CORS not wired |
 | 5 | HSTS and HTTPS redirect | `FeatureManagement:EnableHttps` = `true` (`false` in Development/Testing) |
@@ -28,7 +28,7 @@ environment overlay relaxes it, the row says so. Full flag matrix:
 | 11 | Global exception handling and OpenAPI/Scalar | `EnableSwagger` = `false` |
 | 12 | `[FromClaim]` population (endpoint filter) | — |
 | 13 | FluentValidation auto-validation (endpoint filter) | — |
-| 14 | Idempotency on POST (endpoint filter) | opt-in per route |
+| 14 | Idempotency (hand-written, inside the handler — not a filter stage) | `Record`/`RecordBatch`/`Reverse` only |
 | 15 | Handler | — |
 
 Rows 1–15 are registration order in `DKNet.Accounts.Api/Configs/AppConfig.cs`'s `UseAppConfig`, which is
@@ -89,7 +89,8 @@ carry the same header set and the same error-body shape.
 ## Forwarded headers
 
 `DKNet.Accounts.Api/Configs/ForwardedHeadersConfig.cs` is the first middleware in the pipeline, gated on
-`FeatureManagement:EnableForwardedHeaders` (default `true`; `false` in the `Development` overlay). It
+`FeatureManagement:EnableForwardedHeaders` (default `true`; stays `true` in the `Development` overlay
+too). It
 reads the trusted-proxy list from `Security:TrustedProxies` — **empty in the shipped base file** —
 and:
 
@@ -112,7 +113,7 @@ Entries are single IP addresses parsed with `IPAddress.Parse`; a CIDR range is n
 ## Security response headers
 
 `DKNet.Accounts.Api/Configs/SecurityHeadersConfig.cs` (`FeatureManagement:EnableSecurityHeaders`, default
-`true`, `false` in the `Development` overlay) adds the `OwaspHeaders.Core` header set:
+`true`, stays `true` in the `Development` overlay) adds the `OwaspHeaders.Core` header set:
 `X-Frame-Options`, `X-Content-Type-Options`, a default `Content-Security-Policy`,
 `X-Permitted-Cross-Domain-Policies`, `Referrer-Policy`, `Cache-Control`, `X-XSS-Protection` and
 `Cross-Origin-Resource-Policy`.
@@ -130,7 +131,7 @@ only at 365 days or more). One owner, so the header is never sent twice.
 ## Request bounds
 
 `DKNet.Accounts.Api/Configs/RequestBoundsConfig.cs` (`FeatureManagement:EnableRequestBounds`, default
-`true`, `false` in the `Development` overlay) states three bounds the service would otherwise
+`true`, stays `true` in the `Development` overlay) states three bounds the service would otherwise
 inherit from Kestrel, all from the `RequestBounds` section:
 
 | Bound | Default | Over the bound |
@@ -154,8 +155,9 @@ it to the calling page. This is "not wired", not "wired but permissive". When th
 non-empty, the default policy allows exactly those origins and exactly the methods and headers
 enumerated in `Cors:AllowedMethods` (default `GET, POST, PUT, PATCH` — **no `DELETE`**, so a browser
 front-end calling the service's one delete route, `DELETE /v1/account-groups/{id}`, has to add it) and
-`Cors:AllowedHeaders` (default `Authorization`, `Content-Type`, `Accept`, `X-Idempotency-Key`, the
-header the posting routes require); an origin, method or header that isn't listed is
+`Cors:AllowedHeaders` (default `Authorization`, `Content-Type`, `Accept`, `Idempotency-Key`, the
+header the posting routes actually read — not `DKNet.AspCore.Idempotency`'s `X-Idempotency-Key`
+default, which this service doesn't use); an origin, method or header that isn't listed is
 never reflected back, so its preflight fails. Credentials are never allowed — `AllowCredentials()`
 is not called on any path.
 
@@ -365,26 +367,24 @@ the same ones a refused command and an unhandled error answer through.
 
 ## Idempotency on POST
 
-Idempotency is opt-in per route, not automatic for every POST. A hand-mapped create route can chain
-`.RequiredIdempotentKey()`, which enforces the idempotency key header (default
-`X-Idempotency-Key`) on that route — a request missing it is rejected before the handler runs. A
-route built from the generated CRUD composite (`Map<Entity>Crud()`, e.g. `AccountGroupsV1Endpoint`'s
-`MapAccountGroupCrud()`) makes no such call. Add `.RequiredIdempotentKey()` yourself on any
-hand-mapped route where duplicate submissions matter.
+This service does not use `DKNet.AspCore.Idempotency`'s route-level filter — no route calls
+`.RequiredIdempotentKey()` anywhere in this codebase. `DKNet.Accounts.Api/Configs/AppConfig.cs` still
+registers the package's store (Redis-backed when `ConnectionStrings:Redis` is configured, an
+in-process store otherwise, both set to `IdempotentConflictHandling.ConflictResponse`), but with no
+route opted in via `.RequiredIdempotentKey()`, that registration currently has no observable effect.
 
-Store selection happens once in `DKNet.Accounts.Api/Configs/AppConfig.cs`, based on whether
-`ConnectionStrings:Redis` is configured:
+The real idempotency mechanism is hand-written, on the three postings write routes:
+`POST /v1/postings`, `POST /v1/postings/batch` and `POST /v1/postings/{id}/reverse` each declare
+`IdempotencyKey` as `[FromRequestHeader("Idempotency-Key")]` on their own request type
+(`Postings/V1/Actions/Record.cs:47`, `RecordBatch.cs:55`, `Reverse.cs:28`). The handler looks the key
+up itself (`SpecGetPosting(byCallingSystem, byIdempotencyKey)`), compares a content signature
+(`PostingSignature`) against any existing row, and answers accordingly — the same key with the same
+content returns the original posting, the same key with different content is refused
+`409 IDEMPOTENCY_KEY_CONFLICT`. Full mechanics: [Postings' architecture](features/postings/architecture.md#the-per-account-lock).
 
-- **Redis configured** — `AddIdempotencyWithRedisStore(redisConnectionString, o =>
-  o.ConflictHandling = IdempotentConflictHandling.CachedResult)`: keys are tracked in Redis, so
-  idempotency works correctly across multiple app instances.
-- **No Redis** — falls back to the non-generic `AddIdempotentKey(...)` (same `CachedResult`
-  conflict handling), an in-process store. Fine for local development, not for a multi-instance
-  deployment.
-
-With `IdempotentConflictHandling.CachedResult` (this service's setting), a replayed request with
-the same key returns the original cached response rather than re-running the handler or returning a
-conflict error.
+The key is **required** on `Reverse` (`RuleFor(r => r.IdempotencyKey).NotEmpty()`) and **optional** on
+`Record`/`RecordBatch` — omitting it on either of those two simply skips the replay/conflict check
+entirely (`Record.cs:119`), so a retry with no key records a second posting rather than deduplicating.
 
 ## Rate limiting
 

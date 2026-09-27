@@ -197,7 +197,7 @@ A service that configures its own values keeps them — the figures above are on
 used when a service configures nothing.
 
 **This service configures one of them.**
-`ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:64` sets `DefaultActivityWindowMonths = 0`, so the
+`ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:62` sets `DefaultActivityWindowMonths = 0`, so the
 default activity window described above is **off** on `GET /v1/account-groups` and `GET /v1/accounts`: a
 bare listing here returns the caller's full history, not the last three months. A ledger that quietly
 withheld older records would answer a question it was not asked. `DefaultPageSize` and `MaxPageSize` are

@@ -45,14 +45,18 @@ Opens an account. **Entirely hand-written** — `Account` carries no `[CrudCreat
   | `permittedToGoNegative` | bool | ✓ | if `true`, `overdraftLimit` becomes required | body |
   | `overdraftLimit` | decimal | — | required when `permittedToGoNegative` is `true`; decimal places ≤ currency's | body |
   | `minimumBalance` | decimal | — | decimal places ≤ currency's | body |
-  | `externalReference` | string | — | ≤ 200 characters | body |
+  | `externalReference` | string | — | ≤ 200 characters — a **column limit only**, not validated (see below) | body |
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
 - **Response:** `201 Created` — `AccountDto`, `status: "Active"`, `balance: 0`
 - **Errors:** `422 UNSUPPORTED_CURRENCY` (unknown or inactive currency) · `422 OVERDRAFT_LIMIT_REQUIRED`
   · `404` unknown group · `400` malformed body · `409` a caller-chosen suffix already used with this
   group's code
-- **Enforcement:** FluentValidation, enforced
+- **Enforcement:** FluentValidation enforces `accountNumber` (length, when supplied), `name`,
+  `currency`, `classification`, and `overdraftLimit`/`minimumBalance` (decimal places against the
+  currency). `externalReference` has no validator rule — its 200-character bound is the database
+  column length (`AccountConfigs.cs`), so an over-long value is not refused with `400`; it fails when
+  the row is saved instead
 
 ```bash
 curl -X POST "https://accounts.example.com/v1/accounts" \
@@ -80,7 +84,10 @@ Generic `MapGetStatusCounts<Account>` helper.
 
 - **Auth:** `accounts.read`
 - **Request:** `from`/`to` (RFC 3339, optional) — narrows by `CreatedOn`
-- **Response:** `200 OK` — `[{ status, count }]`, every `AccountStatus` value included even at zero
+- **Response:** `200 OK` — `[{ type, status, count }]`. `type` is the enum's type name
+  (`"AccountStatus"`); `status` is **upper-cased** (`"ACTIVE"`, not `"active"` — unlike every other
+  enum this API returns) via `StatusCountsResult` (`AppServices/Share/Generics/ModelSpecGenericStatusCounts.cs:37,116`).
+  Every `AccountStatus` value is included even at zero
 - **Errors:** `400` a narrowing other than the date window
 
 ```bash
@@ -133,8 +140,9 @@ curl -X PUT "https://accounts.example.com/v1/accounts/{id}" \
 Narrow read: the three money fields plus currency and the account's live floor.
 
 - **Auth:** `accounts.read`
-- **Response:** `200 OK` — `{ currency, balance, availableBalance, heldAmount }`. `heldAmount` is
-  always `0` and `availableBalance` always equals `balance` in this delivery
+- **Response:** `200 OK` — `{ currency, balance, availableBalance, heldAmount, floor }`. `heldAmount`
+  is always `0` and `availableBalance` always equals `balance` in this delivery. `floor` is computed
+  live from `AccountFloorPolicy.Floor(...)`, never stored
 - **Errors:** `404` unknown id
 
 ```bash

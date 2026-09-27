@@ -37,14 +37,17 @@ Creates a group. Generated route; validation is `CreateAccountGroupCommandValida
   |---|---|---|---|---|
   | `code` | string | ✓ | 3–5 characters, must not already exist | body |
   | `name` | string | ✓ | non-empty, ≤ 200 characters | body |
-  | `description` | string | — | ≤ 1000 characters | body |
+  | `description` | string | — | ≤ 1000 characters — a **column limit only**, not validated (see below) | body |
   | `type` | enum | ✓ | one of `Customer`, `Merchant`, `Internal`, `Suspense`, `Settlement` | body |
   | `ownerId` | string | ✓ | non-empty, ≤ 100 characters | body |
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
 - **Response:** `201 Created` — `AccountGroupDto`, `status: "Active"`
 - **Errors:** `422 DUPLICATE_GROUP_CODE` · `400` malformed body
-- **Enforcement:** FluentValidation, enforced
+- **Enforcement:** FluentValidation enforces `code`, `name`, `ownerId` and `type`. `description` has
+  no validator rule at all — its 1000-character bound is the database column length
+  (`AccountGroupConfigs.cs`), so an over-long value is not refused with `400`; it fails when the row
+  is saved instead
 
 ```bash
 curl -X POST "https://accounts.example.com/v1/account-groups" \
@@ -82,11 +85,13 @@ Updates `name`, `description` and/or `metadata`. A member left out (or `null`) i
 `type` and `ownerId` have no update path at all.
 
 - **Auth:** `accounts.write`
-- **Request:** `name` (string, ≤ 200, when supplied), `description` (string, ≤ 1000, optional),
-  `metadata` (map, optional) — at least one of the three must be supplied
+- **Request:** `name` (string, ≤ 200, when supplied, validated), `description` (string, ≤ 1000 — a
+  column limit only, not validated), `metadata` (map, optional) — at least one of the three must be
+  supplied
 - **Response:** `200 OK` — `AccountGroupDto`
 - **Errors:** `400` no member supplied, or malformed id · `404` unknown id
-- **Enforcement:** FluentValidation, enforced
+- **Enforcement:** FluentValidation enforces the at-least-one-member rule and `name`'s length;
+  `description` has no validator rule — see the note above
 
 ```bash
 curl -X PUT "https://accounts.example.com/v1/account-groups/{id}" \
@@ -146,7 +151,8 @@ sums `Balance` and `HeldAmount` per currency (`GetAccountGroupBalancesQueryHandl
   this service has no hold mechanism yet, so the two are always equal. A group holding no account
   answers `200` with an empty list — and so does an unknown id, since this read sums accounts *by*
   group id and never looks the group up itself
-- **Errors:** `400` malformed id
+- **Errors:** `404` malformed id — this route is mapped `{id:guid}`, so a non-GUID segment never
+  matches the route at all rather than reaching the handler for a `400`
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-groups/{id}/balances"
@@ -159,7 +165,10 @@ group currently holds (backfilled with zero).
 
 - **Auth:** `accounts.read`
 - **Request:** `from`/`to` (RFC 3339, optional) — narrows by the group's `CreatedOn`
-- **Response:** `200 OK` — `[{ status, count }]`
+- **Response:** `200 OK` — `[{ type, status, count }]`. `type` is the enum's type name
+  (`"AccountGroupStatus"`); `status` is **upper-cased** (`"ACTIVE"`, not `"active"` — unlike every
+  other enum this API returns) via `StatusCountsResult`
+  (`AppServices/Share/Generics/ModelSpecGenericStatusCounts.cs:37,116`)
 - **Errors:** `400` a narrowing other than the date window
 
 ```bash

@@ -91,8 +91,8 @@ sequenceDiagram
     HDL->>NUM: NextValueAsync() (if caller omitted a suffix)
     HDL->>HDL: accountNumber = "{group.Code}-{suffix}"
     HDL->>HDL: new Account(...)
-    HDL->>REPO: AddAsync(entity) + SaveChangesAsync()
-    REPO-->>HDL: OK
+    HDL->>REPO: AddAsync(entity)
+    Note over REPO: SaveChanges runs after the handler returns —<br/>DKNet's SlimBus EF Core interceptor auto-saves.<br/>Lazy mapping resolves AFTER that save, so generated/audit fields are populated.
     HDL-->>EP: AccountDto
     EP-->>C: 201 Created + AccountDto
 ```
@@ -159,5 +159,5 @@ stateDiagram-v2
 |-------|-------------------------------|
 | `DKNet.Accounts.Api` | One hand-mapped Open route, one generated composite (list/read/rename), five further hand-mapped reads/writes; no business logic |
 | `DKNet.Accounts.AppServices` | `OpenAccountCommandHandler` (account-number allocation, currency/floor checks), `UpdateAccountCommandHandler` (status/floor recheck), balance/statement queries |
-| `DKNet.Accounts.Domains` | `Account` entity, `AccountFloorPolicy`, `AccountPostingPolicy` — the floor and status-gate rules every posting and every `PATCH` goes through |
+| `DKNet.Accounts.Domains` | `Account` entity (also holds the `AccountPostingPolicy` static class), `AccountFloorPolicy` — the floor and status-gate rules every posting and every `PATCH` goes through |
 | `DKNet.Accounts.Infra` | `AccountConfigs` EF mapping, including the two `Ignore`d computed properties |

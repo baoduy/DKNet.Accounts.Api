@@ -64,8 +64,8 @@ sequenceDiagram
     VAL-->>BUS: Valid
     BUS->>HDL: Handle(request)
     HDL->>HDL: new AccountGroup(code, name, description, type, ownerId, metadata)
-    HDL->>REPO: AddAsync(entity) + SaveChangesAsync()
-    REPO-->>HDL: OK
+    HDL->>REPO: AddAsync(entity)
+    Note over REPO: SaveChanges runs after the handler returns —<br/>DKNet's SlimBus EF Core interceptor auto-saves.
     HDL-->>EP: AccountGroupDto
     EP-->>C: 201 Created + AccountGroupDto
 ```
@@ -97,7 +97,7 @@ sequenceDiagram
     else group is clean
         REPO-->>HDL: false
         HDL->>HDL: group.Close()
-        HDL->>REPO: SaveChangesAsync()
+        Note over REPO: SaveChanges runs after the handler returns —<br/>the handler itself never calls SaveChangesAsync.
         HDL-->>EP: 200 + AccountGroupDto
     end
 ```

@@ -48,7 +48,7 @@ Authorization: Bearer {token}
 ```
 
 ```json
-{ "currency": "SGD", "balance": 0.00, "availableBalance": 0.00, "heldAmount": 0.00 }
+{ "currency": "SGD", "balance": 0.00, "availableBalance": 0.00, "heldAmount": 0.00, "floor": 0.00 }
 ```
 
 ## Key Concepts
@@ -65,7 +65,7 @@ Authorization: Bearer {token}
 
 | Layer | Path |
 |-------|------|
-| Domain entity | `ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs`, `AccountFloorPolicy.cs`, `AccountPostingPolicy.cs` |
+| Domain entity | `ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs` (also holds the `AccountPostingPolicy` static class, `Account.cs:263`), `AccountFloorPolicy.cs` |
 | EF Core mapping | `ApiEndpoints/DKNet.Accounts.Infra/Features/Accounts/Mappers/AccountConfigs.cs` |
 | Open (create) | `ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/Actions/Open.cs` |
 | Change details (`PUT`) | `ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/Actions/ChangeDetails.cs` |

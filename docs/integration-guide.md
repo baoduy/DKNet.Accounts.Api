@@ -664,5 +664,6 @@ to add `DELETE` to that list. See [`configuration-reference.md`](configuration-r
 - [Readme](../README.md) — every field of every record type, every invariant, the full route and error
   tables, and what the service deliberately does not own.
 - `GET /openapi/v1.json` on a running instance — the machine-readable contract.
-- [docs/index.md](index.md) — the solution-template reference docs, for when you are changing this
-  service rather than calling it.
+- [docs/index.md](index.md) — this service's own docs index: the feature docs, request pipeline,
+  configuration reference and generic list contract, for when you are changing this service rather
+  than calling it.

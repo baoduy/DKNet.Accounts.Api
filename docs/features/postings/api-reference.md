@@ -57,10 +57,11 @@ Records one credit or debit. Full flow: [architecture.md](architecture.md#record
 
 - **Auth:** `postings.write`
 - **Idempotency:** `Idempotency-Key` declared `[FromRequestHeader]` — published as a header parameter
-  on the operation itself, not read by hand from `HttpRequest.Headers`. Same key, same content →
-  `200` with the original posting, nothing new recorded. Same key, different content →
-  `409 IDEMPOTENCY_KEY_CONFLICT`. A key placed in the request body instead is discarded — the header
-  source overwrites it before validation
+  on the operation itself, not read by hand from `HttpRequest.Headers`. **Optional** — omitting it
+  skips the replay/conflict check entirely, so a retry with no key records a second posting. When
+  supplied: same key, same content → `200` with the original posting, nothing new recorded; same key,
+  different content → `409 IDEMPOTENCY_KEY_CONFLICT`. A key placed in the request body instead is
+  discarded — the header source overwrites it before validation
 - **Request:**
 
   | Field | Type | Required | Rules | From |
@@ -73,13 +74,14 @@ Records one credit or debit. Full flow: [architecture.md](architecture.md#record
   | `effectiveDate` | date | — | never later than the recording date; unset defaults to the recording date | body |
   | `transactionGroupId` | uuid | — | ties several movements together | body |
   | `counterpartyAccountId` / `counterpartyReference` / `externalReference` / `description` / `metadata` | — | — | optional, no cross-field rule | body |
-  | `Idempotency-Key` | string | ✓ | required header, not a body field | header |
+  | `Idempotency-Key` | string | — | optional header, not a body field; no key means no deduplication | header |
 
 - **Response:** `201 Created` — `PostingDto`
 - **Errors:** `422 UNSUPPORTED_CURRENCY` · `422 INVALID_POSTING_AMOUNT` · `422 EFFECTIVE_DATE_IN_FUTURE`
   · `422 CURRENCY_MISMATCH` · `422 ACCOUNT_CLOSED` · `422 ACCOUNT_FROZEN` ·
   `422 ACCOUNT_DORMANT_DEBIT_REFUSED` · `422 INSUFFICIENT_FUNDS` · `422 AMOUNT_OUT_OF_RANGE` ·
-  `422 LOCK_TIMEOUT` (10-second per-account lock) · `409 IDEMPOTENCY_KEY_CONFLICT`
+  `422 LOCK_TIMEOUT` (10-second per-account lock) · `409 IDEMPOTENCY_KEY_CONFLICT` (only reachable
+  when a key was supplied)
 - **Enforcement:** FluentValidation, enforced
 
 ```bash
@@ -95,13 +97,14 @@ Records several movements as one all-or-nothing batch — nothing is persisted u
 succeeds.
 
 - **Auth:** `postings.write`
-- **Idempotency:** `Idempotency-Key` declared `[FromRequestHeader]`, same replay/conflict rule as
-  `POST /v1/postings`, but the content signature is computed over the whole batch — a key already
-  used on a single posting is refused `409`, not replayed, if reused on a batch (and vice versa). The
-  key is recorded on the batch's first leg only; the other legs come back with no `idempotencyKey`
-  of their own
-- **Request:** `movements` — an array of the same fields as `POST /v1/postings` (minus the header),
-  non-empty
+- **Idempotency:** `Idempotency-Key` declared `[FromRequestHeader]`, **optional** — same rule as
+  `POST /v1/postings`: omit it and no replay/conflict check runs. When supplied, the content
+  signature is computed over the whole batch — a key already used on a single posting is refused
+  `409`, not replayed, if reused on a batch (and vice versa). The key is recorded on the batch's
+  first leg only; the other legs come back with no `idempotencyKey` of their own
+- **Request:** `movements` — a non-empty array of the same fields as `POST /v1/postings` (minus the
+  header) — plus a top-level, optional `transactionGroupId`: when unset, one is generated so every
+  movement in the batch still shares one
 - **Locking:** every distinct `accountId` in the batch is locked in ascending id order, to avoid a
   cross-batch deadlock; a timeout on any lock releases every lock already acquired
 - **Response:** `201 Created` — `PostingDto[]`, one per movement, sharing one `transactionGroupId`
@@ -149,7 +152,9 @@ flow: [architecture.md](architecture.md#reverse-a-posting--sequence-diagram).
 - **Errors:** `400` missing `reason` or `Idempotency-Key` · `422 POSTING_ALREADY_REVERSED` — already
   reversed under a new key (a retry under the *same* key replays the earlier reversal with `200`
   instead) · `409 IDEMPOTENCY_KEY_CONFLICT` — same key, different reason · every status-gate refusal
-  from `POST /v1/postings` still applies to the reversal's own direction · `422 LOCK_TIMEOUT`
+  from `POST /v1/postings` still applies to the reversal's own direction · `422 AMOUNT_OUT_OF_RANGE` —
+  the ceiling check is a storage limit, not a policy a reversal is exempt from, unlike the floor check
+  · `422 LOCK_TIMEOUT`
 - **Enforcement:** FluentValidation, enforced
 
 ```bash
@@ -180,7 +185,8 @@ that route's URL, but its data and handler (`GetAccountStatementQueryHandler`) b
 
 - **Response:** `200 OK` — `PagedResponse<PostingDto>` in stream order. Reading past the end returns
   an empty page with `200`, never an error
-- **Errors:** none beyond auth and malformed id
+- **Errors:** `404` — this route is mapped `{id:guid}`, so a non-GUID `{id}` never matches the route
+  at all, the same as an unknown-but-valid id
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \

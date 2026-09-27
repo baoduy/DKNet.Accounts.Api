@@ -21,6 +21,7 @@ erDiagram
         timestamptz LastPostedOn "Nullable"
         varchar_200 ExternalReference "Nullable"
         varchar_4000 Metadata "JSON-string converted map"
+        timestamptz ClosedOn "Nullable; set when Status becomes Closed"
         varchar CreatedBy
         timestamptz CreatedOn
         varchar UpdatedBy "Nullable"
@@ -59,6 +60,7 @@ properties (`AvailableBalance => Balance`, `OpenedOn => CreatedOn`) and are `bui
 | `LastPostedOn` | `LastPostedOn` | timestamptz | — | — | — | — | Absent until the first posting |
 | `ExternalReference` | `ExternalReference` | varchar | 200 | — | — | — | Caller's own reference for this account |
 | `Metadata` | `Metadata` | varchar (JSON string) | 4000 | — | — | — | Free-form key/value pairs |
+| `ClosedOn` | `ClosedOn` | timestamptz | — | — | — | — | Set by `ChangeStatus` when `Status` becomes `Closed`; cleared back to `null` on any other status change |
 | `CreatedBy`/`UpdatedBy` | same | varchar | — | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook, never by a request field |
 | `CreatedOn`/`UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created/last touched |
 

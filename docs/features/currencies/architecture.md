@@ -18,7 +18,7 @@ graph TD
     end
 
     subgraph AppServices["DKNet.Accounts.AppServices"]
-        VAL["Create/RenameCurrencyRequestValidator\n(FluentValidation)"]
+        VAL["CreateCurrencyCommandValidator /\nRenameCurrencyRequestValidator\n(FluentValidation)"]
         HDL["Generated handlers\n(Create, Rename, Activate)"]
         DEACT["DeactivateCurrencyHandler\n(hand-written, replaces generated)"]
         SPEC["SpecGetCurrency"]
@@ -65,8 +65,8 @@ sequenceDiagram
     VAL-->>BUS: Valid
     BUS->>HDL: Handle(request)
     HDL->>HDL: new Currency(code, name, decimalPlaces)
-    HDL->>REPO: AddAsync(entity) + SaveChangesAsync()
-    REPO-->>HDL: OK
+    HDL->>REPO: AddAsync(entity)
+    Note over REPO: SaveChanges runs after the handler returns —<br/>DKNet's SlimBus EF Core interceptor auto-saves.<br/>The handler itself never calls SaveChangesAsync.
     HDL-->>EP: CurrencyDto
     EP-->>C: 201 Created + CurrencyDto
 ```

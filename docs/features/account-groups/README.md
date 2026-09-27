@@ -51,7 +51,7 @@ Authorization: Bearer {token}
 
 | Concept | Description |
 |---------|-------------|
-| **`code`** | Your own unique code (≤ 5 characters), upper-cased on write. Unique across the service; a duplicate is refused. |
+| **`code`** | Your own unique code (3–5 characters), upper-cased on write. Unique across the service; a duplicate is refused. |
 | **`type`** | Fixed at creation — there is no method that changes it. |
 | **`status`** | `Active`/`Closed`. Closing is refused while any account the group holds carries a balance or held amount. |
 | **Delete** | The service's *only* delete route — refused while the group holds any account, even a closed, zero-balance one. |

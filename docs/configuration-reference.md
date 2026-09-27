@@ -10,9 +10,8 @@ The API is a stock `WebApplication.CreateBuilder(args)` host, so the standard AS
 applies — later sources win:
 
 1. `DKNet.Accounts.Api/appsettings.json` — the base file. **This is what a deployed service runs with**,
-   because the template ships no `appsettings.Production.json`.
-2. `DKNet.Accounts.Api/appsettings.{Environment}.json` — `Development` and `Testing` overlays ship; both
-   are copied into the scaffolded solution.
+   because this service ships no `appsettings.Production.json`.
+2. `DKNet.Accounts.Api/appsettings.{Environment}.json` — `Development` and `Testing` overlays both ship.
 3. User secrets, in `Development` only.
 4. Environment variables — `Section__Key` with a double underscore, e.g.
    `FeatureManagement__RequireAuthorization=false`. These outrank every JSON file.
@@ -83,7 +82,7 @@ The scope side is not a sample: `AuthConfig` registers one authorization policy 
 |---|---|---|---|---|
 | `Cors:AllowedOrigins` | string array | `[]` | `[ "http://localhost:3000", "http://localhost:5173" ]` | Deny-by-default allow-list. Empty or all-blank → neither `AddCors` nor `UseCors` is registered at all, so no `Access-Control-Allow-*` header is emitted. Non-empty → a default policy allowing exactly those origins, the methods and headers below, and nothing else. Credentials are never allowed on any path. |
 | `Cors:AllowedMethods` | string array | `[ "GET", "POST", "PUT", "PATCH" ]` | — | The methods reflected in `Access-Control-Allow-Methods`. `DELETE` is absent by default, and the service does have one delete route — `DELETE /v1/account-groups/{id}`, on an empty group — so a browser front-end that deletes a group has to add `DELETE` here. See [Closing up](integration-guide.md#10-closing-up). Widen or narrow the list freely — an entry not listed is never reflected, so a preflight for it fails. |
-| `Cors:AllowedHeaders` | string array | `[ "Authorization", "Content-Type", "Accept", "X-Idempotency-Key" ]` | — | The request headers reflected in `Access-Control-Allow-Headers`. `X-Idempotency-Key` is there because the template's own create route requires it (`IdempotencyOptions.IdempotencyHeaderKey`'s default). No tracing header (`traceparent`, `X-Request-Id`, …) is enumerated — add yours if your front-end sends one. |
+| `Cors:AllowedHeaders` | string array | `[ "Authorization", "Content-Type", "Accept", "Idempotency-Key" ]` | — | The request headers reflected in `Access-Control-Allow-Headers`. `Idempotency-Key` is there because that's the header the posting routes actually read (`Record.cs`/`RecordBatch.cs`/`Reverse.cs`'s `[FromRequestHeader("Idempotency-Key")]`) — not `DKNet.AspCore.Idempotency`'s `X-Idempotency-Key` default, which this service doesn't use (`CrosConfig.cs:11-12`). No tracing header (`traceparent`, `X-Request-Id`, …) is enumerated — add yours if your front-end sends one. |
 
 Entries in `AllowedOrigins` are absolute origins — scheme included, no trailing slash, no path. This
 is a plain configuration array, not a `FeatureManagement` flag; the empty array is its off switch,
@@ -117,9 +116,10 @@ a CIDR range such as `10.0.0.0/8` is **not** accepted and fails at startup with 
 `KnownProxies` and `KnownIPNetworks` are cleared before the list is applied, so ASP.NET Core's
 seeded loopback entry is gone too: `127.0.0.1` is trusted only if you list it.
 
-The whole module is gated on `FeatureManagement:EnableForwardedHeaders` (default `true`, `false` in
-the `Development` overlay). Turning the flag off and leaving the list empty are equivalent in effect;
-the flag exists so the middleware can be taken out of the pipeline entirely for local work.
+The whole module is gated on `FeatureManagement:EnableForwardedHeaders` (default `true`, and it stays
+`true` in the `Development` overlay too — only `Security:TrustedProxies` is empty locally). Turning
+the flag off and leaving the list empty are equivalent in effect; the flag exists so the middleware
+can be taken out of the pipeline entirely, for local work or otherwise.
 
 ## `Https`
 
@@ -136,8 +136,8 @@ middleware deliberately does not emit `Strict-Transport-Security`, so it is neve
 ## `RequestBounds`
 
 Bound to `RequestBoundsOptions` and applied only when `FeatureManagement:EnableRequestBounds` is
-`true` (default `true`; `false` in the `Development` overlay). The template states all three bounds
-rather than inheriting Kestrel's, so a generated service is bounded with no configuration supplied.
+`true` (default `true`, and it stays `true` in the `Development` overlay too). This service states
+all three bounds rather than inheriting Kestrel's, so it is bounded with no configuration supplied.
 
 | Key | Type | Class default | Base `appsettings.json` | Effect when relaxed | Framework default it replaces |
 |---|---|---|---|---|---|
@@ -216,7 +216,7 @@ tracing and metrics instrumentation, with a console exporter in `DEBUG` builds o
 
 | Key | Type | Shipped default | Effect | Read by |
 |---|---|---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | string (URL) | `http://localhost:4317` in the base file | Non-blank → `UseOtlpExporter()` is added. The template reads the key only as a presence check; the exporter resolves its own endpoint through the OpenTelemetry SDK's standard configuration for this key. | `LogConfigs.AddLogConfig` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | string (URL) | `http://localhost:4317` in the base file | Non-blank → `UseOtlpExporter()` is added. This service reads the key only as a presence check; the exporter resolves its own endpoint through the OpenTelemetry SDK's standard configuration for this key. | `LogConfigs.AddLogConfig` |
 | `AzureMonitor:ConnectionString` | string | `""` in the base file | Non-blank → `UseAzureMonitor()` is added, shipping traces, metrics and logs to Application Insights. Blank, as shipped, means no Azure Monitor exporter. | `LogConfigs.AddLogConfig` |
 | `Logging:LogLevel:*` | string | `Default: Information`, `Microsoft: Warning`, `Microsoft.Hosting.Lifetime: Warning`; the `Development` overlay drops to `Debug`/`None`/`None` | Standard ASP.NET Core log filtering. Note that `EnableOpenTelemetry` clears the providers, so these filters then apply to the OpenTelemetry logger. | ASP.NET Core logging |
 
@@ -241,13 +241,13 @@ falls through to the column on its left.
 |---|---|---|---|---|
 | `EnableAntiforgery` | `false` | `false` | `false` | — |
 | `EnableAzureAppConfig` | `false` | `false` | `false` | — |
-| `EnableForwardedHeaders` | `true` | `true` | **`false`** | — |
+| `EnableForwardedHeaders` | `true` | `true` | `true` | — |
 | `EnableHealthCheck` | `true` | — | — | — |
-| `EnableHttps` | `false` | **`true`** | `false` | `false` |
+| `EnableHttps` | `false` | **`true`** | **`false`** | `false` |
 | `EnableOpenTelemetry` | `false` | `false` | — | — |
-| `EnableRateLimit` | `true` | `true` | `false` | `false` |
-| `EnableRequestBounds` | `true` | `true` | **`false`** | — |
-| `EnableSecurityHeaders` | `true` | `true` | **`false`** | — |
+| `EnableRateLimit` | `true` | `true` | **`false`** | `false` |
+| `EnableRequestBounds` | `true` | `true` | `true` | — |
+| `EnableSecurityHeaders` | `true` | `true` | `true` | — |
 | `EnableServiceBus` | `false` | `true` | `false` | — |
 | `EnableSwagger` | `false` | `false` | `true` | — |
 | `EnableVersioning` | `true` | `true` | — | — |
@@ -270,15 +270,22 @@ publishes to (`mcr.microsoft.com/dotnet/aspnet:10.0-alpine`, set as `ContainerBa
 TLS-terminating ingress logs `Failed to determine the https port for redirect` and passes the request
 through unredirected. Set `ASPNETCORE_HTTPS_PORT` if you need the redirect itself; HSTS is unaffected.
 
-`dotnet run` locally picks up `appsettings.Development.json`, and both test suites boot under the
-`Testing` environment (`DKNet.Accounts.App.TestSupport/TestApiFactoryBase.cs` calls
-`UseEnvironment("Testing")`), so neither is affected. That `appsettings.Testing.json` overlay sets
-`RequireAuthorization`, `EnableHttps` and `EnableRateLimit` all to `false`. Never run a deployed
-instance with `ASPNETCORE_ENVIRONMENT=Testing`: it drops all three protections at once. It does
-**not** name `EnableSecurityHeaders`, `EnableForwardedHeaders` or `EnableRequestBounds`, so those
-three fall through to the base file and stay on under `Testing` — the `Development` overlay is the
-only shipped file that relaxes them. To relax a flag for an environment, add it to that environment's
-overlay — or set the `FeatureManagement__<Flag>` environment variable, which outranks every JSON file.
+`dotnet run` locally picks up `appsettings.Development.json`, which relaxes exactly three of the
+secure-by-default set: `EnableHttps`, `RequireAuthorization` and `EnableRateLimit`. It leaves
+`EnableSecurityHeaders`, `EnableForwardedHeaders` and `EnableRequestBounds` all `true` — a local
+`dotnet run` still gets security headers, forwarded-header handling and the request bounds; only the
+HTTPS redirect, authentication and rate limiting step aside. Development additionally turns
+`EnableSwagger` and `RunDbMigrationWhenAppStart` on and `EnableServiceBus` off, none of which are
+security flags.
+
+Both test suites boot under the `Testing` environment
+(`DKNet.Accounts.App.TestSupport/TestApiFactoryBase.cs` calls `UseEnvironment("Testing")`).
+`appsettings.Testing.json` names only the same three flags — `RequireAuthorization`, `EnableHttps` and
+`EnableRateLimit` — all `false`; it names nothing else, so every other flag falls through to the base
+file and stays on under `Testing` too. Never run a deployed instance with
+`ASPNETCORE_ENVIRONMENT=Testing`: it drops all three protections at once. To relax a flag for an
+environment, add it to that environment's overlay — or set the `FeatureManagement__<Flag>`
+environment variable, which outranks every JSON file.
 
 Because `EnableRateLimit` is on in the base file, the base file also carries an explicit `RateLimit`
 section so the limiter never falls back to `RateLimitOptions`'s 2-requests-per-second class defaults —
@@ -311,7 +318,7 @@ setting them changes no behaviour.
 | `ConnectionStrings:AppConfig` | base `appsettings.json` | `AzureAppConfigOptions.ConnectionStringName` defaults to `AzureAppConfig`, not `AppConfig`. |
 | `ConnectionStrings:AzureAppConfiguration` | base `appsettings.json` | Same reason — the looked-up name is `AzureAppConfig`. |
 | The whole `AzureAppConfiguration` section (`KeyPrefix`, `Label`, `CacheExpirationInSeconds`, `LoadFeatureFlags`, `FeatureFlagPrefix`) | base `appsettings.json` | `AzureAppConfigOptions.Name` is `AzureAppConfig`. Nothing binds a section called `AzureAppConfiguration`, and `KeyPrefix`/`CacheExpirationInSeconds` are not properties on the options class at all. |
-| `OTEL_SERVICE_NAME` | base `appsettings.json` | No template code reads it. The OpenTelemetry SDK resolves the service name from the environment variable of the same name, not from this configuration entry. |
+| `OTEL_SERVICE_NAME` | base `appsettings.json` | No code in this service reads it. The OpenTelemetry SDK resolves the service name from the environment variable of the same name, not from this configuration entry. |
 | `ApplicationInsights:InstrumentationKey` | `appsettings.Development.json` | Azure Monitor is wired from `AzureMonitor:ConnectionString`; instrumentation keys are not read anywhere. |
 
 Removing them is a source change to the shipped `appsettings*.json` files, out of scope for this
