@@ -1,3 +1,4 @@
+using DKNet.EfCore.Abstractions.Events;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.Postings.Entities;
@@ -32,6 +33,28 @@ public enum PostingStatus
 /// only: the sole state transition after creation is the one-way <see cref="MarkReversedBy"/>, applied at most
 /// once (DRK-1242 §"Correcting and reading the ledger").
 /// </summary>
+// Outbound events (DRK-1773 §3a): postings.created, and postings.updated only when a posting is marked reversed.
+// The payload never carries IdempotencySignature.
+[RaisesEvent(EventOperations.Created,
+    Include =
+    [
+        nameof(Id), nameof(AccountId), nameof(PostingNumber), nameof(StreamPosition), nameof(Direction),
+        nameof(Amount), nameof(Currency), nameof(SignedValue), nameof(BalanceAfter), nameof(EffectiveDate),
+        nameof(RecordedAt), nameof(Category), nameof(Status), nameof(ReversedByPostingId), nameof(ReversesPostingId),
+        nameof(TransactionGroupId), nameof(CounterpartyAccountId), nameof(CounterpartyReference),
+        nameof(CallingSystem), nameof(IdempotencyKey), nameof(ExternalReference), nameof(Description),
+        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
+[RaisesEvent(EventOperations.Updated, nameof(Status),
+    Include =
+    [
+        nameof(Id), nameof(AccountId), nameof(PostingNumber), nameof(StreamPosition), nameof(Direction),
+        nameof(Amount), nameof(Currency), nameof(SignedValue), nameof(BalanceAfter), nameof(EffectiveDate),
+        nameof(RecordedAt), nameof(Category), nameof(Status), nameof(ReversedByPostingId), nameof(ReversesPostingId),
+        nameof(TransactionGroupId), nameof(CounterpartyAccountId), nameof(CounterpartyReference),
+        nameof(CallingSystem), nameof(IdempotencyKey), nameof(ExternalReference), nameof(Description),
+        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
 public sealed class Posting : AggregateRoot
 {
     #region Constructors

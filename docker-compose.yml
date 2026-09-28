@@ -14,6 +14,22 @@ services:
       timeout: 3s
       retries: 10
 
+  rabbitmq:
+    profiles: [api]
+    # The official multi-arch image (linux/amd64 and linux/arm64). RabbitMQ's guest user may only connect over
+    # loopback, so the api gets a user of its own.
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: accounts
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-accounts}
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   redis:
     # No profile: Redis serves both the API side and the console.
     image: redis:8-alpine
@@ -58,6 +74,7 @@ services:
     user: "1654:1654"
     depends_on:
       postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
       redis: { condition: service_healthy }
     # Feature flags and auth live in .env — see .env.sample.
     env_file:
@@ -67,6 +84,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__AppDb: Host=postgres;Database=accounts;Username=accounts;Password=${POSTGRES_PASSWORD:-accounts}
       ConnectionStrings__Redis: redis:6379
+      # Outbound ledger events (DRK-1773) go to the in-stack RabbitMQ; the service creates the queue.
+      FeatureManagement__EnableServiceBus: "true"
+      MessageBus__Transport: RabbitMq
+      ConnectionStrings__RabbitMq: amqp://accounts:${RABBITMQ_PASSWORD:-accounts}@rabbitmq:5672/
     ports:
       - "${API_PORT:-8080}:8080"
     healthcheck:
@@ -108,4 +129,5 @@ services:
 
 volumes:
   pgdata:
+  rabbitmqdata:
   redisdata:

@@ -96,6 +96,7 @@ public sealed class ApiHooks(IObjectContainer objectContainer)
     {
         await _factory.DisposeAsync();
         await _factory.StopDatabaseAsync();
+        await OutboundBroker.DisposeAsync();
     }
 
     /// <summary>

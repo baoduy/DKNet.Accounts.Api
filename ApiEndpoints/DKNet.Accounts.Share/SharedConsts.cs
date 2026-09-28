@@ -21,6 +21,11 @@ public static class SharedConsts
     public static string DbConnectionString => "AppDb";
 
     /// <summary>
+    ///     Gets the connection string name for RabbitMQ.
+    /// </summary>
+    public static string RabbitMqConnectionString => "RabbitMq";
+
+    /// <summary>
     ///     Gets the connection string name for Redis cache.
     /// </summary>
     public static string RedisConnectionString => "Redis";

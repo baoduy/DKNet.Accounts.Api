@@ -129,9 +129,9 @@ test('R3 — the console image is pulled when named and built from ui/Dockerfile
   });
 });
 
-test('R4 — with the console switched off, the stack runs the API, its database and Redis for a console on the host', async () => {
+test('R4 — with the console switched off, the stack runs the API, its database, RabbitMQ and Redis for a console on the host', async () => {
   const services = resolveCompose(['COMPOSE_PROFILES=api', 'API_PORT=18080', ''].join('\n'));
-  expect(Object.keys(services).sort()).toEqual(['api', 'postgres', 'redis']);
+  expect(Object.keys(services).sort()).toEqual(['api', 'postgres', 'rabbitmq', 'redis']);
   expect(services.api.ports).toEqual([expect.objectContaining({ target: 8080, published: '18080' })]);
 });
 
@@ -145,7 +145,7 @@ test('R5 — with the API side switched off, the stack runs the console and Redi
 
 test('R6 — the unmodified sample environment starts both services, built from source', async () => {
   const services = resolveCompose(fs.readFileSync(path.join(REPO_ROOT, '.env.sample'), 'utf-8'));
-  expect(Object.keys(services).sort()).toEqual(['api', 'console', 'postgres', 'redis']);
+  expect(Object.keys(services).sort()).toEqual(['api', 'console', 'postgres', 'rabbitmq', 'redis']);
   expectBuiltNeverPulled(services.api, API_DOCKERFILE);
   expectBuiltNeverPulled(services.console, CONSOLE_DOCKERFILE);
   // The in-stack default, not .env.sample's host-side CONSOLE_API_BASE_URL (localhost:8080).
