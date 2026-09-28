@@ -1,4 +1,5 @@
 using DKNet.EfCore.Abstractions.Attributes;
+using DKNet.EfCore.Abstractions.Events;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.Accounts.Entities;
@@ -25,6 +26,28 @@ public enum AccountStatus
 /// <see cref="TryApplyPosting"/> is the only way <see cref="Balance"/>/<see cref="StreamPosition"/> move — the
 /// invariants below (floor, status, close-with-balance) guard that real, postings-driven balance.
 /// </summary>
+// Outbound events (DRK-1773 §3a): accounts.created, and accounts.updated only when the account's own details,
+// status or controls change — never on a posting's balance movement alone (R4).
+[RaisesEvent(EventOperations.Created,
+    Include =
+    [
+        nameof(Id), nameof(AccountNumber), nameof(GroupId), nameof(Name), nameof(CurrencyCode),
+        nameof(Classification), nameof(Status), nameof(Balance), nameof(HeldAmount), nameof(OverdraftLimit),
+        nameof(MinimumBalance), nameof(PermittedToGoNegative), nameof(StreamPosition), nameof(LastPostedOn),
+        nameof(ExternalReference), nameof(Metadata), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
+        nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
+[RaisesEvent(EventOperations.Updated,
+    nameof(Name), nameof(Metadata), nameof(ExternalReference), nameof(Status), nameof(ClosedOn), nameof(OverdraftLimit),
+    nameof(MinimumBalance), nameof(PermittedToGoNegative),
+    Include =
+    [
+        nameof(Id), nameof(AccountNumber), nameof(GroupId), nameof(Name), nameof(CurrencyCode),
+        nameof(Classification), nameof(Status), nameof(Balance), nameof(HeldAmount), nameof(OverdraftLimit),
+        nameof(MinimumBalance), nameof(PermittedToGoNegative), nameof(StreamPosition), nameof(LastPostedOn),
+        nameof(ExternalReference), nameof(Metadata), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
+        nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
 public sealed class Account : AggregateRoot
 {
     #region Constructors

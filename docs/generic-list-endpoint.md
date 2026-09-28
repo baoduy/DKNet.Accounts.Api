@@ -1,47 +1,33 @@
 # Generic List Endpoint (filter · search · order · page)
 
-> **The `Product` and `PurchaseOrder` samples on this page are fictional.** They come from the
-> `DKNet.Templates` solution template this service was scaffolded from; **no such entity, slice or
-> `/v1/products` route exists in this repository** and none ever will. Read them as illustrations of
-> the package contract, never as calls you can make here.
->
-> The two routes in this service that actually use this contract are `GET /v1/account-groups` and
-> `GET /v1/accounts`, mapped in
-> `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs:40` and
-> `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs:34`. For their concrete
-> query surface — the fields you may filter and order by, the defaults this service sets, and the one
-> field that is *not* queryable — read
-> [the README's API contract](../README.md#listing-groups-and-accounts) instead. Everything below is
-> the underlying package contract both of them inherit.
-
-Every generator-driven CRUD slice gets a `GET /` list route for free. It is a single, uniform query
-surface — pagination, multi-field filtering, free-text search, and ordering — driven entirely by the
-query string, with **no per-feature code to write**. This page is the full contract for that route.
-
-> This is the *automated* path. Hand-written slices (`ManualSample/PurchaseOrder`) instead expose a
-> bespoke `ListPurchaseOrdersQuery` with its own hand-picked parameters — see
-> [Querying and Specifications](querying-and-specifications.md). The two do not share a contract;
-> everything below applies only to routes mapped through the generator.
+The two routes in this service that use this contract are `GET /v1/account-groups` and
+`GET /v1/accounts`, mapped in
+`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs` and
+`ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs`. For their concrete
+query surface — the fields you may filter and order by, the defaults this service sets, and the one
+field that is *not* queryable — read
+[the README's API contract](../README.md#listing-groups-and-accounts) instead. Everything below is
+the underlying package contract both of them inherit.
 
 ## Where it comes from
 
 The route is `MapGetList<TEntity, TKey, TModel>()`, part of the **`DKNet.AspCore.Extensions`** NuGet
-package (version pinned in `src/Directory.Packages.props`). You never call it directly in this
-template. The `DKNet.SlimBus.Generators` source generator emits the call for you inside the generated
-`Map<Entity>Crud()` extension whenever an entity carries `[CrudCreate]`/`[CrudUpdate]`.
+package. You never call it directly in this service. The `DKNet.SlimBus.Generators` source generator
+emits the call for you inside the generated `Map<Entity>Crud()` extension whenever an entity carries
+`[CrudCreate]`/`[CrudUpdate]`.
 
-Worked instance — the automated `Product` sample:
+Worked instance — account groups:
 
 ```csharp
-// src/ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AutomatedSample/ProductV1Endpoint.cs
+// ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs
 public void Map(RouteGroupBuilder group)
 {
-    group.MapProductCrud();   // generated → group.MapGetList<Product, Guid, ProductDto>()
+    group.MapAccountGroupCrud(...);   // generated → group.MapGetList<AccountGroup, Guid, AccountGroupDto>()
 }
 ```
 
-So `GET /v1/products` is a fully capable list endpoint even though no list handler, validator, or
-query object was hand-written anywhere in the slice.
+So `GET /v1/account-groups` is a fully capable list endpoint even though no list handler, validator,
+or query object was hand-written for it.
 
 Signature (from the package):
 
@@ -57,9 +43,9 @@ public RouteHandlerBuilder MapGetList<TEntity, TModel>(string endpoint = "/")
     where TModel  : class;
 ```
 
-`TModel` is the projected DTO (`ProductDto` for the sample). It is central to the whole contract:
-**you can only filter, search, and order by fields that exist on the DTO**, never on the raw entity.
-See [The DTO is the boundary](#the-dto-is-the-boundary) below.
+`TModel` is the projected DTO (`AccountGroupDto`/`AccountDto` in this service). It is central to the
+whole contract: **you can only filter, search, and order by fields that exist on the DTO**, never on
+the raw entity. See [The DTO is the boundary](#the-dto-is-the-boundary) below.
 
 ## Query parameters
 
@@ -72,7 +58,7 @@ See [The DTO is the boundary](#the-dto-is-the-boundary) below.
 | `orderBy`    | `string`      | none    | A single DTO field name to sort by.                                |
 | `desc`       | `bool`        | `false` | Reverses the `orderBy` direction.                                  |
 | `fromDate`   | ISO-8601      | none    | Inclusive lower bound on when a record was last active — see [Recent-activity window](#recent-activity-window-fromdate--todate). |
-| `toDate`     | ISO-8601      | none    | Inclusive upper bound on when a record was last active. Omitting both bounds does **not** mean "all history" — see the same section. |
+| `toDate`     | ISO-8601      | none    | Inclusive upper bound on when a record was last active. Omitting both bounds does **not** mean "all history" by default — see the same section, and this service's own override below. |
 
 Paging is always applied. Filter, search, and order are each optional and independent; when present
 they are ANDed together (search is one OR-group, then ANDed with the filter predicate). Over records
@@ -85,7 +71,7 @@ Each `filter` value is a colon-delimited triple parsed into a `ListFilter(Field,
 Repeat the parameter to combine conditions with **AND**:
 
 ```
-GET /v1/products?filter=Price:GreaterThan:100&filter=IsDiscontinued:Equal:false
+GET /v1/accounts?filter=Classification:Equal:Asset&filter=Status:Equal:Active
 ```
 
 ### Operations
@@ -108,14 +94,14 @@ GET /v1/products?filter=Price:GreaterThan:100&filter=IsDiscontinued:Equal:false
 | `IsNotNull`          | *(omit value)*      | `field != null` — two-part form `field:IsNotNull`|
 
 - **`In` / `NotIn`** take a comma-separated list; each element is coerced to the property's CLR type.
-  Example: `filter=Status:In:Active,Pending`.
-- **`IsNull` / `IsNotNull`** use the two-segment form with no value: `filter=UpdatedOn:IsNull`.
+  Example: `filter=Status:In:Active,Dormant`.
+- **`IsNull` / `IsNotNull`** use the two-segment form with no value: `filter=ClosedOn:IsNull`.
 - The scalar `Value` is coerced to the DTO property's CLR type (int, decimal, bool, Guid, DateTime, …).
   A value that cannot be coerced is a `400`, not a silent no-op.
 
 ### Field naming
 
-`Field` is normalised to PascalCase, so `unit_price`, `unit-price`, and `UnitPrice` all resolve to
+`Field` is normalised to PascalCase, so `group_id`, `group-id`, and `GroupId` all resolve to
 the same DTO property, matched case-insensitively. The resolved name **must** be a public property
 on `TModel`. If it is not, the request fails with `400 Bad Request` — unknown fields are never
 silently dropped, because dropping a condition would answer a filtered query with unfiltered data.
@@ -134,14 +120,14 @@ ISO-8601 timestamp being the case that matters:
 and the entity). `desc=true` sorts descending; omitted or `false` sorts ascending.
 
 ```
-GET /v1/products?orderBy=Price&desc=true
+GET /v1/accounts?orderBy=Balance&desc=true
 ```
 
 - The unique `Id` is appended as a **descending tie-breaker** so paging is deterministic — unless you
   already ordered by `Id`.
 - **Default order (no `orderBy` given):**
-  - Audited entities (`IAuditedEntity<TKey>`, which every `AggregateRoot` here is) → `CreatedOn`
-    descending, then `Id` descending. Newest first.
+  - Audited entities (`IAuditedEntity<TKey>`, which every `AggregateRoot` in this service is) →
+    `CreatedOn` descending, then `Id` descending. Newest first.
   - Non-audited entities → `Id` descending only.
 - An unknown `orderBy` field is a `400`, not a silent fallback to the default.
 
@@ -151,14 +137,15 @@ GET /v1/products?orderBy=Price&desc=true
 DTO**, OR'd together, then ANDed with any `filter`/default predicate:
 
 ```
-GET /v1/products?search=widget
+GET /v1/account-groups?search=acme
 ```
 
 - **Which fields:** the text properties of `TModel`. As with `filter` and `orderBy`, the DTO is the
   boundary — a column it does not expose is never searched.
-- **How deep:** up to 2 levels of properties (`MaxDepth = 2` in `ModelSearch`), so `Name` and
-  `Merchant.Name` are searched but `Merchant.Address.City` is not. A collection member is wrapped in
-  `Any(...)`; dictionaries and `byte[]` are never descended into or searched.
+- **How deep:** up to 2 levels of properties (`MaxDepth = 2` in `ModelSearch`), so a top-level string
+  field and one level of a nested object's string field are searched, but no deeper. A collection
+  member is wrapped in `Any(...)`; dictionaries and `byte[]` are never descended into or searched —
+  which is why an account group's `metadata` map is never matched by `search`.
 - **Operator:** substring (`LIKE '%…%'`), not prefix match. Each clause is emitted as
   `Field != null && Field.Contains(term)` — the null guard matters for a provider that evaluates in
   memory.
@@ -167,8 +154,8 @@ GET /v1/products?search=widget
 - **Case sensitivity** follows the database collation — no lowercasing is applied in the predicate.
 - If the DTO has no text field, `search` matches nothing (an empty page, not an error).
 
-For `ProductDto` the string fields are `Name` plus the mapped audit columns `CreatedBy` / `UpdatedBy`,
-so a search hits any of those. (Every searched field must map to a real column — see
+For `AccountGroupDto` the string fields include `Code`, `Name`, `Description` and `OwnerId`, so a
+search hits any of those. (Every searched field must map to a real column — see
 [the trap below](#trap-a-dto-field-must-map-to-a-real-column).)
 
 ## Recent-activity window (`fromDate` / `toDate`)
@@ -179,14 +166,14 @@ bounds — so a record never updated since creation is matched on its creation m
 dropped for lacking an update.
 
 ```
-GET /v1/products?fromDate=2026-06-01T00:00:00Z&toDate=2026-06-30T23:59:59Z
+GET /v1/accounts?fromDate=2026-06-01T00:00:00Z&toDate=2026-06-30T23:59:59Z
 ```
 
 - **Records with no audit timestamps:** the bounds have no meaning and are **ignored, not refused** — a
   listing over a non-audited entity answers the same with or without them.
-- **Neither bound given, over audited records:** the listing covers the **last three months of
-  activity**, not all history — *unless the host switches the default window off, which this service
-  does*; see [Configuring the defaults](#configuring-the-defaults).
+- **Neither bound given, over audited records:** the package's own default is the **last three months
+  of activity**, not all history — *unless the host switches the default window off, which this
+  service does*; see [Configuring the defaults](#configuring-the-defaults).
 - **Either bound given:** exactly the bounds you named, open-ended on the side you left out. Your bounds
   **replace** the default window rather than being narrowed by it — which makes
   `?fromDate=0001-01-01T00:00:00Z` the documented way to ask for **all history**.
@@ -194,11 +181,6 @@ GET /v1/products?fromDate=2026-06-01T00:00:00Z&toDate=2026-06-30T23:59:59Z
   page; it is the one date-bound error.
 - The window narrows which records are in the result **and the reported `TotalItemCount` to match**, it
   combines with `filter`/`search` by **AND**, and it does **not** affect ordering.
-
-The automated sample's `Product` is an `AggregateRoot` and therefore audited
-(`src/ApiEndpoints/DKNet.Accounts.Domains/Features/AutomatedSample/Entities/Product.cs`), so a bare
-`GET /v1/products` is subject to the default window: the last three months of product activity, not
-every product ever created.
 
 ## Configuring the defaults
 
@@ -215,7 +197,7 @@ A service that configures its own values keeps them — the figures above are on
 used when a service configures nothing.
 
 **This service configures one of them.**
-`ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:64` sets `DefaultActivityWindowMonths = 0`, so the
+`ApiEndpoints/DKNet.Accounts.AppServices/AppSetup.cs:62` sets `DefaultActivityWindowMonths = 0`, so the
 default activity window described above is **off** on `GET /v1/account-groups` and `GET /v1/accounts`: a
 bare listing here returns the caller's full history, not the last three months. A ledger that quietly
 withheld older records would answer a question it was not asked. `DefaultPageSize` and `MaxPageSize` are
@@ -265,48 +247,55 @@ entity**. This is a deliberate security boundary: a column the DTO doesn't expos
 filtered on, or searched — no hidden column leaks through the query surface. Widen or narrow the query
 surface by changing what the DTO exposes (`[GenerateDto(... Exclude/Include ...)]`), not the endpoint.
 
-The `Product` sample DTO is generated as:
+`AccountDto` is generated as:
 
 ```csharp
-[GenerateDto(typeof(Product),
-    Exclude = [nameof(Product.OwnedBy), nameof(AuditedEntity<Guid>.LastModifiedBy), nameof(AuditedEntity<Guid>.LastModifiedOn)])]
-public sealed partial record ProductDto;
+[GenerateDto(typeof(Account), Exclude =
+    [nameof(Account.CurrencyCode), nameof(Account.AvailableBalance), nameof(Account.OpenedOn),
+     nameof(AuditedEntity<Guid>.CreatedBy), nameof(AuditedEntity<Guid>.CreatedOn),
+     nameof(AuditedEntity<Guid>.UpdatedBy), nameof(AuditedEntity<Guid>.UpdatedOn)])]
+public sealed partial record AccountDto;
 ```
 
-`OwnedBy` is excluded, so it is unqueryable through this route by construction — you cannot filter or
-sort products by their ownership key over HTTP, even though the column exists on the entity.
+`CurrencyCode`, `AvailableBalance` and `OpenedOn` are excluded from the generated shape and then
+re-declared by hand on the DTO for exactly the reasons in
+[the trap below](#trap-a-dto-field-must-map-to-a-real-column) — see
+[the README's note on `CurrencyCode` vs `Currency`](../README.md#listing-groups-and-accounts) for the
+full story of why one of the three is queryable and the other two are not.
 
 ### Trap: a DTO field must map to a real column
 
 Because filter/search/order build EF predicates against the entity **by property name**, every
 queryable DTO field has to resolve to a *mapped* entity column. A DTO property whose entity counterpart
-is computed or `[NotMapped]` makes the whole query fail to translate — a **500**, not a `400`, and it
-fires the moment such a field is touched (search touches *every* string field, so it breaks on the
-first search).
+is computed or unmapped (`builder.Ignore(...)`) makes the whole query fail to translate — a **500**,
+not a `400`, and it fires the moment such a field is touched (search touches *every* string field, so
+it breaks on the first search).
 
-This is exactly why `LastModifiedBy` / `LastModifiedOn` are excluded above. On `AuditedEntity<TKey>`
-they are computed conveniences ("the updated value, or the created one if never modified"), not columns
-— `[GenerateDto]` would otherwise surface them and every `?search=` would `500`. The mapped
-`UpdatedBy` / `UpdatedOn` stay and cover the same intent. **When you point `[GenerateDto]` at an entity
-with computed or unmapped members, `Exclude` them** or the free list route inherits a latent 500.
+This is exactly why `Account.AvailableBalance` and `Account.OpenedOn` are excluded above: on `Account`
+they are expression-bodied computed properties (`AvailableBalance => Balance`, `OpenedOn => CreatedOn`)
+and are `builder.Ignore(...)`-ed in `AccountConfigs.cs` — not columns. `[GenerateDto]` would otherwise
+surface them and every `?search=` on accounts would `500`. **When you point `[GenerateDto]` at an
+entity with computed or unmapped members, `Exclude` them** or the free list route inherits a latent
+500.
 
 ## Worked example
 
 ```
-GET /v1/products
-  ?search=widget
-  &filter=Price:GreaterThanOrEqual:100
-  &filter=IsDiscontinued:Equal:false
-  &orderBy=Price
+GET /v1/accounts
+  ?search=acme
+  &filter=Classification:Equal:Asset
+  &filter=Status:Equal:Active
+  &orderBy=Balance
   &desc=true
   &fromDate=2026-06-01T00:00:00Z
   &pageNumber=2
   &pageSize=50
 ```
 
-Reads as: products whose `Name`/`CreatedBy`/`UpdatedBy` contains "widget", priced at 100 or more, not
-discontinued, last active on or after 1 June 2026 (with no upper bound, because `toDate` was omitted),
-sorted by price descending (with `Id` as tie-break), returning the second page of 50.
+Reads as: accounts whose searchable text fields contain "acme", classified as `Asset`, currently
+`Active`, last active on or after 1 June 2026 (with no upper bound, because `toDate` was omitted),
+sorted by balance descending (with `Id` as tie-break), returning the second page of 50.
 
-Drop the `fromDate` line and the listing falls back to the default three-month window rather than to all
-history; to get all history, name `fromDate=0001-01-01T00:00:00Z` instead.
+Because this service turns the default activity window off, dropping the `fromDate` line here still
+returns every account regardless of age — unlike a service running the package's own three-month
+default.

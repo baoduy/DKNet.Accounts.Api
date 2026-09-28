@@ -15,7 +15,7 @@ public class ServiceBusSetupTests
     [InlineData(true, "", false)]
     [InlineData(false, "Endpoint=sb://fake.servicebus.windows.net/;SharedAccessKeyName=k;SharedAccessKey=v", false)]
     [InlineData(false, "", false)]
-    public void AddServiceBus_ShouldGateAzureChildBus_OnEnableServiceBusAndConnectionString(
+    public async Task AddServiceBus_ShouldGateAzureChildBus_OnEnableServiceBusAndConnectionString(
         bool enableServiceBus,
         string azureBusConnectionString,
         bool expectAzureBus)
@@ -33,7 +33,9 @@ public class ServiceBusSetupTests
         services.AddServiceBus(configuration, typeof(AppSetup).Assembly,
             new FeatureOptions { EnableServiceBus = enableServiceBus });
 
-        using var provider = services.BuildServiceProvider();
+        // Disposed asynchronously, as a host does: with the bus on, SlimMessageBus's outbox tasks are
+        // IAsyncDisposable only.
+        await using var provider = services.BuildServiceProvider();
         var masterBus = provider.GetRequiredService<IMasterMessageBus>();
         var childBusNames = masterBus.Settings.Children.Select(c => c.Name).ToArray();
 

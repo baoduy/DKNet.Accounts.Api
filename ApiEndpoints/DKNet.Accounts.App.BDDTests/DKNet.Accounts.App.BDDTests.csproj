@@ -36,6 +36,7 @@
         <PackageReference Include="Reqnroll.NUnit" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="Testcontainers.RabbitMq" />
     </ItemGroup>
 
     <ItemGroup>
