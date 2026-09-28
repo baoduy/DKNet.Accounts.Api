@@ -54,7 +54,7 @@ result is serialized — see
 **API versioning** is absent from the table because it is not a middleware. It shapes the route
 template when the group is registered — see [API versioning](#api-versioning) below.
 
-![A request runs through Kestrel limits, forwarded and security headers, HSTS, routing, timeouts, rate limiting, authentication, the exception handler and OpenAPI mapping, claim population, validation and idempotency before reaching the handler, with 429, 401/403, 400 and 500 as short-circuit exits.](diagrams/api-pipeline.svg)
+![A request runs through Kestrel limits, forwarded and security headers, HSTS, routing, timeouts, rate limiting, authentication, the exception handler and OpenAPI mapping, claim population, validation and idempotency before reaching the handler, with 413, 504, 429, 401/403, 400 and 500 as short-circuit exits.](diagrams/api-pipeline.svg)
 
 Every short-circuit response above still passes back through the security-headers `OnStarting` hook
 and, once registered, the global exception handler's shape — see

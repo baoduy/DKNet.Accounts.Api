@@ -27,18 +27,25 @@ Currencies is reference data that [Accounts](accounts.md) and [Postings](posting
 
 ## 🚀 Quick Start
 
+Get a JWT bearer token from your issuer, carrying `scp` (or `scope`) `accounts.read` (listing) and `accounts.write` (registering) — see [Getting a token](../integration-guide.md#before-you-start) or, for a local instance, [Local setup with Microsoft Entra ID](../local-setup-entra.md).
+
 ```http
-GET /v1/currencies
+GET /v1/currencies?pageSize=2
 Authorization: Bearer {token}
 ```
 
 ```json
 {
   "items": [
-    { "id": "3fa85f64-...-46e6", "code": "SGD", "name": "Singapore Dollar", "decimalPlaces": 2, "isActive": true },
-    { "id": "c0de0002-0000-4000-8000-000000000001", "code": "USDT", "name": "Tether USD", "decimalPlaces": 6, "isActive": true }
+    { "id": "c0de0001-0000-4000-8000-000000000702", "code": "SGD", "name": "Singapore Dollar", "decimalPlaces": 2, "isActive": true },
+    { "id": "c0de0001-0000-4000-8000-000000000840", "code": "USD", "name": "US Dollar", "decimalPlaces": 2, "isActive": true }
   ],
-  "pageNumber": 1, "pageSize": 1000, "totalItemCount": 26, "hasNextPage": false, "hasPreviousPage": false
+  "pageCount": 13,
+  "pageNumber": 1,
+  "pageSize": 2,
+  "totalItemCount": 26,
+  "hasNextPage": true,
+  "hasPreviousPage": false
 }
 ```
 
@@ -80,7 +87,12 @@ Lists currencies. Generated `MapGetList<Currency, Guid, CurrencyDto>()` route �
 - **Auth:** `accounts.read`
 - **Request:** none of its own — shares the generic list query surface ([Listing groups and accounts](../../README.md#listing-groups-and-accounts))
 - **Response:** `200 OK` — `PagedResponse<CurrencyDto>`
-- **Errors:** `400` unknown filter/order field, or a malformed filter triple
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Unknown filter/order field, or a malformed filter triple |
+
 - **Example:**
 
 ```bash
@@ -94,7 +106,13 @@ Reads one currency.
 - **Auth:** `accounts.read`
 - **Request:** `id` (uuid, route)
 - **Response:** `200 OK` — `CurrencyDto`
-- **Errors:** `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -116,7 +134,13 @@ Registers a currency. Generated route; validation is a hand-written FluentValida
   | `decimalPlaces` | int | ✓ | 0–6 inclusive — every money column in this service stores 6 decimal places, so a currency can never be finer | body |
 
 - **Response:** `201 Created` — `CurrencyDto`, `isActive: true`
-- **Errors:** `422 DUPLICATE_CURRENCY_CODE` · `400` malformed body
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed body |
+  | `422` | `DUPLICATE_CURRENCY_CODE` | `code` already used |
+
 - **Example:**
 
 ```bash
@@ -133,7 +157,13 @@ Renames a currency. `code`, `decimalPlaces` and `isActive` are untouched — the
 - **Idempotency:** not idempotent, but repeatable — resending the same name is a no-op that returns the same `200`
 - **Request:** `name` (string, required, ≤ 100 characters, `RenameCurrencyRequestValidator`)
 - **Response:** `200 OK` — `CurrencyDto`
-- **Errors:** `400` malformed id or body · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id or body |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -150,7 +180,13 @@ Reactivates a currency. No request body, no validator, no guard on the entity me
 - **Idempotency:** naturally idempotent — activating an already-active currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: true`
-- **Errors:** `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -167,7 +203,14 @@ Deactivates a currency — the one hand-written handler in this slice (`Deactiva
 - **Idempotency:** naturally idempotent — deactivating an already-inactive currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: false`
-- **Errors:** `422 CURRENCY_HOLDS_BALANCE` — an account denominated in this currency still holds a non-zero balance or held amount (checked via `SpecListAccounts(currency: code)`) · `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+  | `422` | `CURRENCY_HOLDS_BALANCE` | An account denominated in this currency still holds a non-zero balance or held amount (checked via `SpecListAccounts(currency: code)`) |
+
 - **Example:**
 
 ```bash
@@ -187,7 +230,7 @@ One row is one currency this service can denominate an account or a posting in.
 | `Name` | `Name` | varchar | 100 | ✓ | — | — | Human-readable display name |
 | `DecimalPlaces` | `DecimalPlaces` | int | — | ✓ | — | — | The precision every posting amount in this currency is validated against; immutable after registration |
 | `IsActive` | `IsActive` | bool | — | ✓ | — | `true` | Whether new accounts may open in this currency |
-| `CreatedBy` / `UpdatedBy` | same | varchar | — | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook from the caller's credential on save, never by a request field |
+| `CreatedBy` / `UpdatedBy` | same | varchar | 255 | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook from the caller's credential on save, never by a request field |
 | `CreatedOn` / `UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created / last touched |
 
 `Currency` carries no foreign key of its own — `Account.CurrencyCode` (see [Accounts' data model](accounts.md#account--proaccounts)) references `Currency.Code` by value, not by a mapped EF Core relationship, so there is no navigation property either direction.

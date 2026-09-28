@@ -29,6 +29,8 @@ Account Groups is the ownership layer above [Accounts](accounts.md): every accou
 
 ## 🚀 Quick Start
 
+Get a JWT bearer token from your issuer, carrying `scp` (or `scope`) `accounts.write` (creating) and `accounts.read` (reading balances back) — see [Getting a token](../integration-guide.md#before-you-start) or, for a local instance, [Local setup with Microsoft Entra ID](../local-setup-entra.md).
+
 ```http
 POST /v1/account-groups
 Content-Type: application/json
@@ -95,7 +97,13 @@ Creates a group. Generated route; validation is `CreateAccountGroupCommandValida
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
 - **Response:** `201 Created` — `AccountGroupDto`, `status: "active"`
-- **Errors:** `422 DUPLICATE_GROUP_CODE` · `400` malformed body
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed body |
+  | `422` | `DUPLICATE_GROUP_CODE` | `code` already used |
+
 - **Example:**
 
 ```bash
@@ -110,7 +118,12 @@ Lists groups. Generated `MapGetList<AccountGroup, Guid, AccountGroupDto>()` rout
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `PagedResponse<AccountGroupDto>`
-- **Errors:** `400` unknown filter/order field
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Unknown filter/order field |
+
 - **Example:**
 
 ```bash
@@ -121,7 +134,13 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `AccountGroupDto`
-- **Errors:** `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -133,9 +152,16 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 Updates `name`, `description` and/or `metadata`. A member left out (or `null`) is unchanged; `code`, `type` and `ownerId` have no update path at all.
 
 - **Auth:** `accounts.write`
+- **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`
 - **Request:** `name` (string, ≤ 200, when supplied), `description` (string, ≤ 1000 — a column limit only, not validated), `metadata` (map, optional) — at least one of the three must be supplied
 - **Response:** `200 OK` — `AccountGroupDto`
-- **Errors:** `400` no member supplied, or malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | No member supplied, or malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -151,7 +177,14 @@ The service's only delete route. Generated route; validation is `DeleteAccountGr
 - **Auth:** `accounts.write`
 - **Idempotency:** not idempotent in the retry sense — a second delete of an already-deleted id returns `404`
 - **Response:** `204 No Content`
-- **Errors:** `422 GROUP_NOT_EMPTY` — the group still holds any account, closed and zero-balance included · `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+  | `422` | `GROUP_NOT_EMPTY` | The group still holds any account, closed and zero-balance included |
+
 - **Example:**
 
 ```bash
@@ -168,7 +201,14 @@ Closes a group — the one hand-written handler in this slice (`CloseAccountGrou
 - **Idempotency:** naturally idempotent — closing an already-closed group is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "closed"`
-- **Errors:** `422 GROUP_HOLDS_BALANCE` — any account it holds carries a non-zero balance or held amount · `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+  | `422` | `GROUP_HOLDS_BALANCE` | Any account it holds carries a non-zero balance or held amount |
+
 - **Example:**
 
 ```bash
@@ -182,7 +222,13 @@ Reactivates a closed group. No request body, no guard on the entity method.
 - **Auth:** `accounts.write`
 - **Idempotency:** naturally idempotent — activating an already-active group is a no-op `200`
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "active"`
-- **Errors:** `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -195,7 +241,12 @@ Hand-written aggregation, not a stored field: groups the group's own accounts by
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `[{ currency, balance, available, held }]`. `available` mirrors `balance` — this service has no hold mechanism yet, so the two are always equal. A group holding no account answers `200` with an empty list — and so does an unknown id, since this read sums accounts *by* group id and never looks the group up itself
-- **Errors:** `404` malformed id — this route is mapped `{id:guid}`, so a non-GUID segment never matches the route at all
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | Malformed id — this route is mapped `{id:guid}`, so a non-GUID segment never matches the route at all |
+
 - **Example:**
 
 ```bash
@@ -209,7 +260,12 @@ Generic `MapGetStatusCounts<AccountGroup>` helper — counts groups by `Status`,
 - **Auth:** `accounts.read`
 - **Request:** `from`/`to` (RFC 3339, optional) — narrows by the group's `CreatedOn`
 - **Response:** `200 OK` — `[{ type, status, count }]`. `type` is the enum's type name (`"AccountGroupStatus"`); `status` is **upper-cased** (`"ACTIVE"`, not `"active"` — unlike every other enum this API returns)
-- **Errors:** `400` a narrowing other than the date window
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | A narrowing other than the date window |
+
 - **Example:**
 
 ```bash
@@ -228,11 +284,11 @@ One row is one named, ownable bucket of accounts in one classification.
 | `Code` | `Code` | varchar | 5 | ✓ | unique | — | Caller's own code, upper-cased; the create-time uniqueness check target |
 | `Name` | `Name` | varchar | 200 | ✓ | — | — | Human-readable name |
 | `Description` | `Description` | varchar | 1000 | — | — | — | Free-text description |
-| `Type` | `Type` | varchar (`HasConversion<string>`) | — | ✓ | — | — | What the group represents; fixed at creation |
-| `Status` | `Status` | varchar (`HasConversion<string>`) | — | ✓ | — | `Active` | Gates whether the group can hold new activity |
+| `Type` | `Type` | text (`HasConversion<string>`) | — | ✓ | — | — | What the group represents; fixed at creation |
+| `Status` | `Status` | text (`HasConversion<string>`) | — | ✓ | — | `Active` | Gates whether the group can hold new activity |
 | `OwnerId` | `OwnerId` | varchar | 100 | ✓ | — | — | Caller's own identifier for who owns this group |
 | `Metadata` | `Metadata` | varchar (JSON string) | 4000 | — | — | — | Free-form key/value pairs, round-tripped verbatim |
-| `CreatedBy` / `UpdatedBy` | same | varchar | — | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook, never by a request field |
+| `CreatedBy` / `UpdatedBy` | same | varchar | 255 | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook, never by a request field |
 | `CreatedOn` / `UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created / last touched |
 
 `AccountGroupDto` excludes `CreatedBy`/`CreatedOn`/`UpdatedBy`/`UpdatedOn` from the response — they exist as columns but are never returned over HTTP.

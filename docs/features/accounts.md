@@ -30,6 +30,8 @@ Accounts sits between [Account Groups](account-groups.md) (the ownership bucket)
 
 ## 🚀 Quick Start
 
+Get a JWT bearer token from your issuer, carrying `scp` (or `scope`) `accounts.write` (opening) and `accounts.read` (reading it back) — see [Getting a token](../integration-guide.md#before-you-start) or, for a local instance, [Local setup with Microsoft Entra ID](../local-setup-entra.md).
+
 ```http
 POST /v1/accounts
 Content-Type: application/json
@@ -61,9 +63,9 @@ Unlike Currencies and Account Groups, **Open is entirely hand-written** — `Acc
 
 The entity and its outbox row commit in the one `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. This diagram can't show a posting being recorded against the account afterward — that flow, including the status gate and floor check `TryApplyPosting` runs, lives in [Postings' end-to-end flow](postings.md#-end-to-end-flow), since the rules are the account's own but the write is a posting.
 
-![Account status starts Active on open; PATCH can move it to Frozen, Dormant or Closed and back to Active; Frozen and Dormant can also move directly to Closed, all refused with ACCOUNT_HOLDS_BALANCE unless the balance and held amount are both zero.](../diagrams/accounts-status.svg)
+![Account status starts Active on open; PATCH can set any of Active, Frozen, Dormant or Closed directly from any other value — including Frozen to or from Dormant, and Closed to or from Frozen or Dormant without passing through Active — refused only when the target is Closed and the balance or held amount is non-zero.](../diagrams/accounts-status.svg)
 
-`Frozen` accepts no posting in either direction; `Dormant` accepts credits only — enforced by `AccountPostingPolicy.StatusGate` on every posting and reversal, not by the `PATCH` route itself.
+`ChangeStatus` assigns the requested value unconditionally; there is no ordering between the four states, so every one of the twelve directed moves among them is reachable in a single `PATCH`. The one guard `UpdateAccountCommandHandler` applies is on the *target*: entering `Closed` is refused (`ACCOUNT_HOLDS_BALANCE`) while the balance or held amount is non-zero, whatever the current status was. `Frozen` accepts no posting in either direction; `Dormant` accepts credits only — enforced by `AccountPostingPolicy.StatusGate` on every posting and reversal, not by the `PATCH` route itself.
 
 ## 🔌 Endpoints
 
@@ -103,7 +105,18 @@ Opens an account. Entirely hand-written — `Account` carries no `[CrudCreate]` 
   | `metadata` | map\<string,string\> | — | round-trips verbatim | body |
 
 - **Response:** `201 Created` — `AccountDto`, `status: "active"`, `balance: 0`
-- **Errors:** `422 UNSUPPORTED_CURRENCY` (unknown or inactive currency) · `422 OVERDRAFT_LIMIT_REQUIRED` · `404` unknown group · `400` malformed body · `409` a caller-chosen suffix already used with this group's code
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed body |
+  | `404` | — | Unknown group |
+  | `409` | — | A caller-chosen suffix already used with this group's code |
+  | `422` | `UNSUPPORTED_CURRENCY` | Unknown or inactive currency |
+  | `422` | `OVERDRAFT_LIMIT_REQUIRED` | `permittedToGoNegative: true` with no `overdraftLimit` |
+  | `422` | `AMOUNT_OUT_OF_RANGE` | `overdraftLimit`/`minimumBalance` beyond 999,999,999,999.999999 |
+  | `422` | `INVALID_LIMIT_AMOUNT` | `overdraftLimit`/`minimumBalance` finer than the currency's decimal places |
+
 - **Example:**
 
 ```bash
@@ -118,7 +131,12 @@ Generated `MapGetList<Account, Guid, AccountDto>()` route. Full contract: [Gener
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `PagedResponse<AccountDto>`
-- **Errors:** `400` unknown filter/order field
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Unknown filter/order field, or a malformed filter triple |
+
 - **Example:**
 
 ```bash
@@ -132,7 +150,12 @@ Generic `MapGetStatusCounts<Account>` helper.
 - **Auth:** `accounts.read`
 - **Request:** `from`/`to` (RFC 3339, optional) — narrows by `CreatedOn`
 - **Response:** `200 OK` — `[{ type, status, count }]`. `type` is `"AccountStatus"`; `status` is **upper-cased** (`"ACTIVE"`), unlike every other enum this API returns. Every `AccountStatus` value is included even at zero
-- **Errors:** `400` a narrowing other than the date window
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | A narrowing other than the date window |
+
 - **Example:**
 
 ```bash
@@ -156,7 +179,13 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/accounts
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `AccountDto`
-- **Errors:** `400` malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -168,9 +197,16 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/accounts
 Changes `name` and/or `metadata` only — generated route (`ChangeDetails`, `[CrudUpdate]`), hand-written validator.
 
 - **Auth:** `accounts.write`
+- **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`
 - **Request:** `name` (string, ≤ 200, when supplied), `metadata` (map, optional) — at least one required
 - **Response:** `200 OK` — `AccountDto`
-- **Errors:** `400` no member supplied, or malformed id · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | No member supplied, or malformed id |
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -185,7 +221,12 @@ Narrow read: the three money fields plus currency and the account's live floor.
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `{ currency, balance, availableBalance, heldAmount, floor }`. `heldAmount` is always `0` and `availableBalance` always equals `balance` in this delivery. `floor` is computed live from `AccountFloorPolicy.Floor(...)`, never stored
-- **Errors:** `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -199,6 +240,7 @@ Changes `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative`
 ![Handler merges the supplied controls with the stored ones and rechecks the floor is still determinate, then applies the change in one save and publishes an accounts.updated event.](../diagrams/accounts-patch.svg)
 
 - **Auth:** `accounts.write`
+- **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`, since `ChangeStatus` and the floor setters simply reassign the same values
 - **Request:**
 
   | Field | Type | Required | Rules | From |
@@ -209,7 +251,16 @@ Changes `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative`
   | `permittedToGoNegative` | bool | — | re-checked against the merged floor state | body |
 
 - **Response:** `200 OK` — `AccountDto`
-- **Errors:** `422 ACCOUNT_HOLDS_BALANCE` — closing while balance or held amount is non-zero · `422 OVERDRAFT_LIMIT_REQUIRED` — the merged permission/limit leaves no determinate floor · `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | Unknown id |
+  | `422` | `ACCOUNT_HOLDS_BALANCE` | `status: "Closed"` requested while balance or held amount is non-zero |
+  | `422` | `OVERDRAFT_LIMIT_REQUIRED` | The merged permission/limit leaves no determinate floor |
+  | `422` | `AMOUNT_OUT_OF_RANGE` | `overdraftLimit`/`minimumBalance` beyond 999,999,999,999.999999 |
+  | `422` | `INVALID_LIMIT_AMOUNT` | `overdraftLimit`/`minimumBalance` finer than the currency's decimal places |
+
 - **Example:**
 
 ```bash
@@ -231,8 +282,8 @@ One row is one single-currency account, its floor controls and its live posting-
 | `GroupId` | `GroupId` | uuid | — | ✓ | indexed | — | Cross-aggregate reference to `AccountGroup.Id`, read via `SpecListAccounts`, never navigated |
 | `Name` | `Name` | varchar | 200 | ✓ | — | — | Human-readable name |
 | `CurrencyCode` | `CurrencyCode` | varchar | 10 | ✓ | — | — | Fixed at open, immutable once set — no method changes it |
-| `Classification` | `Classification` | varchar (`HasConversion<string>`) | — | ✓ | — | — | Fixes which side of the ledger a credit increases (see [Postings' signed amount resolution](postings.md#signed-amount-resolution)) |
-| `Status` | `Status` | varchar (`HasConversion<string>`) | — | ✓ | — | `Active` | Governs which postings the account accepts |
+| `Classification` | `Classification` | text (`HasConversion<string>`) | — | ✓ | — | — | Fixes which side of the ledger a credit increases (see [Postings' signed amount resolution](postings.md#signed-amount-resolution)) |
+| `Status` | `Status` | text (`HasConversion<string>`) | — | ✓ | — | `Active` | Governs which postings the account accepts |
 | `Balance` | `Balance` | decimal | 18,6 | ✓ | — | `0` | The signed sum of the account's own postings |
 | `HeldAmount` | `HeldAmount` | decimal | 18,6 | ✓ | — | `0` | Reserved but unsettled funds — always `0`, held-funds behaviour is deferred |
 | `OverdraftLimit` | `OverdraftLimit` | decimal | 18,6 | — | — | — | How far below zero the account may go, when `PermittedToGoNegative` |
@@ -243,7 +294,7 @@ One row is one single-currency account, its floor controls and its live posting-
 | `ExternalReference` | `ExternalReference` | varchar | 200 | — | — | — | Caller's own reference for this account |
 | `Metadata` | `Metadata` | varchar (JSON string) | 4000 | — | — | — | Free-form key/value pairs |
 | `ClosedOn` | `ClosedOn` | timestamptz | — | — | — | — | Set when `Status` becomes `Closed`; cleared back to `null` on any other status change |
-| `CreatedBy` / `UpdatedBy` | same | varchar | — | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook, never by a request field |
+| `CreatedBy` / `UpdatedBy` | same | varchar | 255 | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook, never by a request field |
 | `CreatedOn` / `UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created / last touched |
 
 `AvailableBalance` and `OpenedOn` are **not** stored columns — both are expression-bodied computed properties (`AvailableBalance => Balance`, `OpenedOn => CreatedOn`), `Ignore`d in `AccountConfigs.cs`, and not queryable through the generic list route. `Account 1 — n Posting` via `Posting.AccountId`, a plain indexed column, not a mapped EF Core relationship.
@@ -251,9 +302,9 @@ One row is one single-currency account, its floor controls and its live posting-
 | Status | Meaning | Reached by | Next |
 |---|---|---|---|
 | `Active` | Accepts every posting direction | Open (always), or `PATCH {status: "Active"}` from any other value | `Frozen`, `Dormant`, `Closed` |
-| `Frozen` | Accepts no posting in either direction, including a reversal | `PATCH {status: "Frozen"}` | `Active`, `Closed` |
-| `Dormant` | Accepts credits only; a debit (including a debiting reversal) is refused | `PATCH {status: "Dormant"}` | `Active`, `Closed` |
-| `Closed` | Accepts no posting; refused while balance or held amount is non-zero | `PATCH {status: "Closed"}` | `Active` (reopening) |
+| `Frozen` | Accepts no posting in either direction, including a reversal | `PATCH {status: "Frozen"}` from any other value | `Active`, `Dormant`, `Closed` |
+| `Dormant` | Accepts credits only; a debit (including a debiting reversal) is refused | `PATCH {status: "Dormant"}` from any other value | `Active`, `Frozen`, `Closed` |
+| `Closed` | Accepts no posting; refused while balance or held amount is non-zero | `PATCH {status: "Closed"}` from any other value, refused if balance or held amount ≠ 0 | `Active`, `Frozen`, `Dormant` |
 
 ## 📣 Events
 

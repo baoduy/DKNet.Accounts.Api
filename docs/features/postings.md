@@ -31,6 +31,8 @@ Postings is the movement layer under [Accounts](accounts.md): every posting is r
 
 ## 🚀 Quick Start
 
+Get a JWT bearer token from your issuer, carrying `scp` (or `scope`) `postings.write` (recording), `postings.read` (reading back) and `postings.reverse` (correcting) — see [Getting a token](../integration-guide.md#before-you-start) or, for a local instance, [Local setup with Microsoft Entra ID](../local-setup-entra.md).
+
 ```http
 POST /v1/postings
 Content-Type: application/json
@@ -59,7 +61,7 @@ Idempotency-Key: 9c1b7e6f-4d3c-4a7c-8f1d-1a2b5c6d7e02
 
 Only `GET /v1/postings/{id}` is generated; every other route in this slice — list, record, batch, reverse, and the statement route mapped on the accounts group — is hand-written, because each carries orchestration a generator cannot express: a lock, an idempotency replay, or a cross-aggregate refusal.
 
-![Client posts to /v1/postings; the handler checks idempotency, acquires the per-account lock, applies the posting against the account's status and floor, inserts the posting and its outbox row in one save, then publishes a postings.created event.](../diagrams/postings-record.svg)
+![Client posts to /v1/postings; the handler validates the currency, amount and effective date, checks idempotency, acquires the per-account lock, re-fetches the account and checks the currency matches, applies the posting against the account's status and floor, inserts the posting and its outbox row in one save, then publishes a postings.created event.](../diagrams/postings-record.svg)
 
 The idempotency pre-check runs *before* the lock is acquired — a deliberate, documented trade-off: two first-uses of the same key can both miss that read, and the second is then refused `409` by the database's own unique index on `(CallingSystem, IdempotencyKey)` rather than replayed — a narrow, accepted race, not a silent double-post. This diagram can't show the transaction boundary in full: the entity and its outbox row commit in the one `SaveChanges` call that runs after the handler returns, and a bus outage never fails the write — the event waits in the outbox and is retried every 10 seconds, indefinitely (see [📣 Events](#-events)).
 
@@ -103,7 +105,13 @@ Hand-mapped: explicit query parameters, not `[AsParameters]` — a deliberate mi
   | `pageNumber` / `pageSize` | int | — | same paging contract as [the generic list endpoint](../generic-list-endpoint.md) | query |
 
 - **Response:** `200 OK` — `PagedResponse<PostingDto>`
-- **Errors:** `422 INVALID_DATE_RANGE` — no window, or one wider than 90 days · `400` an unrecognised `orderBy`/`direction`/`category`/`status` value, or a `search` under 2 characters
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | An unrecognised `orderBy`/`direction`/`category`/`status` value, or a `search` under 2 characters |
+  | `422` | `INVALID_DATE_RANGE` | No window, or one wider than 90 days |
+
 - **Example:**
 
 ```bash
@@ -132,7 +140,23 @@ Records one credit or debit.
   | `Idempotency-Key` | string | — | optional header, not a body field; no key means no deduplication | header |
 
 - **Response:** `201 Created` — `PostingDto`
-- **Errors:** `422 UNSUPPORTED_CURRENCY` · `422 INVALID_POSTING_AMOUNT` · `422 EFFECTIVE_DATE_IN_FUTURE` · `422 CURRENCY_MISMATCH` · `422 ACCOUNT_CLOSED` · `422 ACCOUNT_FROZEN` · `422 ACCOUNT_DORMANT_DEBIT_REFUSED` · `422 INSUFFICIENT_FUNDS` · `422 AMOUNT_OUT_OF_RANGE` · `422 LOCK_TIMEOUT` (10-second per-account lock) · `409 IDEMPOTENCY_KEY_CONFLICT` (only reachable when a key was supplied)
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | `accountId` does not resolve to an existing account |
+  | `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same key, different content — only reachable when a key was supplied |
+  | `422` | `UNSUPPORTED_CURRENCY` | `currency` unknown or inactive |
+  | `422` | `INVALID_POSTING_AMOUNT` | `amount` ≤ 0, or finer than the currency's decimal places |
+  | `422` | `EFFECTIVE_DATE_IN_FUTURE` | `effectiveDate` later than the recording date |
+  | `422` | `CURRENCY_MISMATCH` | `currency` does not equal the account's own currency |
+  | `422` | `ACCOUNT_CLOSED` | The account is closed |
+  | `422` | `ACCOUNT_FROZEN` | The account is frozen |
+  | `422` | `ACCOUNT_DORMANT_DEBIT_REFUSED` | A debit against a dormant account |
+  | `422` | `INSUFFICIENT_FUNDS` | A debit would take the account past its floor |
+  | `422` | `AMOUNT_OUT_OF_RANGE` | The amount or the resulting balance exceeds 999,999,999,999.999999 |
+  | `422` | `LOCK_TIMEOUT` | The 10-second per-account lock timed out |
+
 - **Example:**
 
 ```bash
@@ -151,7 +175,7 @@ Records several movements as one all-or-nothing batch — nothing is persisted u
 - **Request:** `movements` — a non-empty array of the same fields as `POST /v1/postings` (minus the header) — plus a top-level, optional `transactionGroupId`: when unset, one is generated so every movement in the batch still shares one
 - **Locking:** every distinct `accountId` in the batch is locked in ascending id order, to avoid a cross-batch deadlock; a timeout on any lock releases every lock already acquired
 - **Response:** `201 Created` — `PostingDto[]`, one per movement, sharing one `transactionGroupId` when the request set one
-- **Errors:** any one movement's refusal (from the list above) refuses the whole batch and records nothing
+- **Errors:** any one movement's refusal (from the table above, `404` included when a movement's `accountId` does not resolve) refuses the whole batch and records nothing
 - **Example:**
 
 ```bash
@@ -167,7 +191,12 @@ The one generated route in this slice (`MapGetById<Posting, Guid, PostingDto>`).
 
 - **Auth:** `postings.read`
 - **Response:** `200 OK` — `PostingDto`
-- **Errors:** `404` unknown id
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | Unknown id |
+
 - **Example:**
 
 ```bash
@@ -190,7 +219,18 @@ Reverses a posting — mapped through the generic `MapActionById<ReversePostingR
   | `Idempotency-Key` | string | ✓ | required header | header |
 
 - **Response:** `200 OK` — `PostingDto` (the new opposing posting)
-- **Errors:** `400` missing `reason` or `Idempotency-Key` · `422 POSTING_ALREADY_REVERSED` — already reversed under a new key (a retry under the *same* key replays the earlier reversal with `200` instead) · `409 IDEMPOTENCY_KEY_CONFLICT` — same key, different reason · every status-gate refusal from `POST /v1/postings` still applies to the reversal's own direction · `422 AMOUNT_OUT_OF_RANGE` — the ceiling check is a storage limit, not a policy a reversal is exempt from, unlike the floor check · `422 LOCK_TIMEOUT`
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `400` | — | Missing `reason` or `Idempotency-Key` |
+  | `404` | — | Unknown posting id |
+  | `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same key, different reason |
+  | `422` | `POSTING_ALREADY_REVERSED` | Already reversed under a new key (a retry under the *same* key replays the earlier reversal with `200` instead) |
+  | `422` | `ACCOUNT_CLOSED` / `ACCOUNT_FROZEN` / `ACCOUNT_DORMANT_DEBIT_REFUSED` | Every status-gate refusal from `POST /v1/postings` still applies, to the reversal's own direction |
+  | `422` | `AMOUNT_OUT_OF_RANGE` | The ceiling check is a storage limit, not a policy a reversal is exempt from, unlike the floor check |
+  | `422` | `LOCK_TIMEOUT` | The 10-second per-account lock timed out |
+
 - **Example:**
 
 ```bash
@@ -214,7 +254,12 @@ Date-bounded, paged statement for one account, in stream order — never effecti
   | `pageSize` | int | — | default `20` — its own default, not the generic list contract's `1000` | query |
 
 - **Response:** `200 OK` — `PagedResponse<PostingDto>` in stream order. Reading past the end returns an empty page with `200`, never an error
-- **Errors:** `404` for a non-GUID `{id}` — this route is mapped `{id:guid}`, so a malformed segment never matches the route at all. An **unknown but valid** id is not an error: the handler never looks the account up, so it answers `200` with an empty page, the same as a real account with no postings in the requested window
+- **Errors:**
+
+  | Status | Code | When |
+  |---|---|---|
+  | `404` | — | A non-GUID `{id}` — this route is mapped `{id:guid}`, so a malformed segment never matches the route at all. An **unknown but valid** id is not an error: the handler never looks the account up, so it answers `200` with an empty page, the same as a real account with no postings in the requested window |
+
 - **Example:**
 
 ```bash
@@ -234,17 +279,17 @@ One row is one credit or debit recorded against exactly one account, at its gapl
 | `PostingNumber` | `PostingNumber` | varchar | 32 | ✓ | unique | — | Service-generated, unique across the service |
 | `AccountId` | `AccountId` | uuid | — | ✓ | indexed | — | The account this posting moves |
 | `StreamPosition` | `StreamPosition` | bigint | — | ✓ | unique per `(AccountId, StreamPosition)` | — | This posting's position in the account's stream — gapless, so a missing entry is detectable |
-| `Direction` | `Direction` | varchar (`HasConversion<string>`) | — | ✓ | — | — | `Credit`/`Debit` — the direction, not the amount's sign, says which way money moved |
+| `Direction` | `Direction` | text (`HasConversion<string>`) | — | ✓ | — | — | `Credit`/`Debit` — the direction, not the amount's sign, says which way money moved |
 | `Amount` | `Amount` | decimal | 18,6 | ✓ | — | — | Always strictly positive, never finer than the currency permits |
 | `Currency` | `Currency` | varchar | 10 | ✓ | — | — | Always equal to the account's currency |
 | `SignedValue` | `SignedValue` | decimal | 18,6 | ✓ | — | — | The amount resolved against the account's ledger side — what sums to the balance (see [Signed amount resolution](#signed-amount-resolution)) |
 | `BalanceAfter` | `BalanceAfter` | decimal | 18,6 | ✓ | — | — | The account's balance immediately after this posting |
 | `EffectiveDate` | `EffectiveDate` | date | — | ✓ | indexed with `AccountId`+`StreamPosition` | — | May be backdated; never later than `RecordedAt` |
 | `RecordedAt` | `RecordedAt` | timestamptz | — | ✓ | — | — | The moment the service recorded it |
-| `Category` | `Category` | varchar (`HasConversion<string>`) | — | ✓ | — | — | One of eight business categories |
-| `Status` | `Status` | varchar (`HasConversion<string>`) | — | ✓ | — | `Posted` | `Posted` or `Reversed` once a reversal has been written against it |
-| `ReversesPostingId` | `ReversesPostingId` | uuid | — | — | FK → `Postings.Id` | — | Set only on a reversal |
-| `ReversedByPostingId` | `ReversedByPostingId` | uuid | — | — | FK → `Postings.Id` | — | Set once by `MarkReversedBy`, never cleared |
+| `Category` | `Category` | text (`HasConversion<string>`) | — | ✓ | — | — | One of eight business categories |
+| `Status` | `Status` | text (`HasConversion<string>`) | — | ✓ | — | `Posted` | `Posted` or `Reversed` once a reversal has been written against it |
+| `ReversesPostingId` | `ReversesPostingId` | uuid | — | — | — | — | Set only on a reversal — a plain column, no FK constraint (cross-aggregate references are by id only, DKNET-AGG-004) |
+| `ReversedByPostingId` | `ReversedByPostingId` | uuid | — | — | — | — | Set once by `MarkReversedBy`, never cleared — a plain column, no FK constraint |
 | `TransactionGroupId` | `TransactionGroupId` | uuid | — | — | — | — | Ties every leg of one batch together |
 | `CounterpartyAccountId` | `CounterpartyAccountId` | uuid | — | — | — | — | The other side, when it is an account inside this service |
 | `CounterpartyReference` | `CounterpartyReference` | varchar | 200 | — | — | — | The other side, when it is outside this service |
@@ -254,10 +299,12 @@ One row is one credit or debit recorded against exactly one account, at its gapl
 | `ExternalReference` | `ExternalReference` | varchar | 200 | — | — | — | Caller's own reference for this posting |
 | `Description` | `Description` | varchar | 500 | — | — | — | Narrative description; a reversal's `reason` is stored here |
 | `Metadata` | `Metadata` | varchar (JSON string) | 4000 | — | — | — | Free-form key/value pairs |
-| `CreatedBy` | `CreatedBy` | varchar | — | ✓ | — | — | Stamped by the audit hook, never by a request field |
+| `CreatedBy` | `CreatedBy` | varchar | 255 | ✓ | — | — | Stamped by the audit hook, never by a request field |
 | `CreatedOn` | `CreatedOn` | timestamptz | — | ✓ | — | — | When the row was created |
+| `UpdatedBy` | `UpdatedBy` | varchar | 255 | — | — | — | Stamped by the audit hook on the one write after insert — `MarkReversedBy` |
+| `UpdatedOn` | `UpdatedOn` | timestamptz | — | — | — | — | When that one write happened |
 
-`PostingDto` excludes `SignedValue` and `IdempotencySignature` from the generated shape, then re-declares `SignedValue` by hand as the response field `signedAmount` — `IdempotencySignature` never reaches the response at all, and is never included in the `postings.created`/`postings.updated` event payload either. `Posting` has no `UpdatedBy`/`UpdatedOn` of its own — in practice a row is never updated after insert except the one-way `Status`/`ReversedByPostingId` pair `MarkReversedBy` sets. `Posting n — 1 Account` via `AccountId`, a plain indexed column, not a mapped EF Core relationship; `Posting 0..1 — 0..1 Posting` via `ReversesPostingId`/`ReversedByPostingId`.
+`PostingDto` excludes `SignedValue` and `IdempotencySignature` from the generated shape, then re-declares `SignedValue` by hand as the response field `signedAmount` — `IdempotencySignature` never reaches the response at all, and is never included in the `postings.created`/`postings.updated` event payload either. `Posting` does carry `UpdatedBy`/`UpdatedOn`, from the same audited-entity base every aggregate in this service derives from — in practice they are set only once, on the one write after insert: the one-way `Status`/`ReversedByPostingId` pair `MarkReversedBy` sets. `Posting n — 1 Account` via `AccountId`, a plain indexed column, not a mapped EF Core relationship; `Posting 0..1 — 0..1 Posting` via `ReversesPostingId`/`ReversedByPostingId`, also plain columns with no FK constraint.
 
 #### Signed amount resolution
 
