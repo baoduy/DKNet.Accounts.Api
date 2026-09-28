@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Currency Status",
+    "quality_profile": "showcase",
+    "viewBox": [720, 580]
+  },
+  "lanes": [
+    { "id": "main", "label": "Currency.IsActive" }
+  ],
+  "states": [
+    { "id": "start", "type": "start", "label": "Registered", "sublabel": "POST /v1/currencies", "lane": "main", "col": 0, "step": "01" },
+    { "id": "active", "type": "success", "label": "Active", "sublabel": "IsActive = true", "lane": "main", "col": 1, "step": "02", "tag": "default" },
+    { "id": "inactive", "type": "neutral", "label": "Inactive", "sublabel": "IsActive = false", "lane": "main", "col": 2, "step": "03", "tag": "retired" }
+  ],
+  "transitions": [
+    { "from": "start", "to": "active", "label": "Create — always active", "labelDy": -25 },
+    { "from": "active", "to": "inactive", "label": "POST /{id}/deactivate", "route": "top-channel", "channelY": 60, "note": "Refused 422 CURRENCY_HOLDS_BALANCE if any account in this currency still holds a balance or held amount" },
+    { "from": "inactive", "to": "active", "label": "POST /{id}/activate — unconditional", "route": "bottom-channel", "channelY": 240 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Two writers only", "items": ["Activate() and Deactivate() are the only methods that change IsActive", "Both are [CrudAction] routes on the same generated composite"] },
+    { "dot": "amber", "title": "Deactivation is not deletion", "items": ["Existing accounts and postings in this currency are unaffected", "Only opening a NEW account in this currency is refused (UNSUPPORTED_CURRENCY)"] }
+  ]
+}

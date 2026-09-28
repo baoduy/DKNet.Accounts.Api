@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Close an Account Group",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [960, 560]
+  },
+  "participants": [
+    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
+    { "id": "handler", "type": "backend", "label": "Close", "sublabel": "hand-written handler" },
+    { "id": "accounts", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts" },
+    { "id": "group", "type": "database", "label": "PostgreSQL", "sublabel": "pro.AccountGroups" }
+  ],
+  "segments": [
+    { "from": 170, "to": 300, "label": "Cross-aggregate check" },
+    { "from": 316, "to": 430, "label": "Apply + save" }
+  ],
+  "messages": [
+    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/account-groups/{id}/close", "variant": "emphasis" },
+    { "from": "handler", "to": "accounts", "y": 260, "label": "any account with Balance != 0 or HeldAmount != 0?", "variant": "default", "note": "SpecListAccounts(groupId) — a different aggregate than the one being closed" },
+    { "from": "accounts", "to": "handler", "y": 290, "label": "none found", "variant": "return", "note": "Otherwise refused: 422 GROUP_HOLDS_BALANCE, and the group is left active" },
+    { "from": "handler", "to": "group", "y": 400, "label": "Close() — Status = Closed, one save", "variant": "emphasis" },
+    { "from": "handler", "to": "client", "y": 460, "label": "200 OK + AccountGroupDto", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "handler", "from": 190, "to": 480, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Why this route stays hand-written", "items": ["The refusal reads Account, not AccountGroup — a generated [CrudAction] handler can only see the aggregate it mutates"] },
+    { "dot": "amber", "title": "What this can't show", "items": ["A closed, zero-balance group can still be deleted separately — Delete has its own, stricter check (GROUP_NOT_EMPTY)"] }
+  ]
+}
