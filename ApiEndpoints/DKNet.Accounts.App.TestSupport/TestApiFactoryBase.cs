@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using DKNet.Accounts.Domains.Features.Currencies.Entities;
@@ -13,6 +14,7 @@ using DKNet.Accounts.Domains.Share;
 using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Features.Currencies;
 using DKNet.Accounts.AppServices.Share;
+using SlimMessageBus.Host;
 
 namespace DKNet.Accounts.App.TestSupport;
 
@@ -25,9 +27,31 @@ namespace DKNet.Accounts.App.TestSupport;
 public abstract class TestApiFactoryBase(string? dbName = null) : WebApplicationFactory<DKNet.Accounts.Api.Program>
 {
     private readonly string _dbName = dbName ?? $"tests-{Guid.NewGuid():N}";
+    private IHost? _host;
 
     /// <summary>Captures log lines written by the app during a scenario/test, for asserting on log output.</summary>
     public TestLogCapture LogCapture { get; } = new();
+
+    protected override IHost CreateHost(IHostBuilder builder) => _host = base.CreateHost(builder);
+
+    /// <summary>
+    /// Stops the message bus before the host is disposed, the way a real host stops its hosted services before it
+    /// disposes them. WebApplicationFactory's dispose runs alongside the app's own shutdown, and with the outbound
+    /// bus on (DRK-1773) both would stop the outbox's sending task at the same time — SlimMessageBus 3.5's
+    /// unsynchronised <c>Stop</c> then throws <see cref="ObjectDisposedException"/>.
+    /// </summary>
+    public override async ValueTask DisposeAsync()
+    {
+        var host = _host;
+        _host = null;
+        if (host?.Services.GetService<IMasterMessageBus>() is { } bus)
+        {
+            await bus.Stop();
+        }
+
+        await base.DisposeAsync();
+        GC.SuppressFinalize(this);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

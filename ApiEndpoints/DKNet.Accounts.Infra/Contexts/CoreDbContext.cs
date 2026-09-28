@@ -1,9 +1,16 @@
 using DKNet.EfCore.Abstractions.Entities;
 using DKNet.EfCore.AuditLogs;
+using DKNet.Accounts.Share.Options;
 
 namespace DKNet.Accounts.Infra.Contexts;
 
-internal class CoreDbContext(DbContextOptions options, IEnumerable<ICurrentUserProvider>? currentUserProviders = null)
+/// <param name="options"></param>
+/// <param name="currentUserProviders"></param>
+/// <param name="outbound">The outbound bus settings; registered only when the bus is on.</param>
+internal class CoreDbContext(
+    DbContextOptions options,
+    IEnumerable<ICurrentUserProvider>? currentUserProviders = null,
+    MessageBusOptions? outbound = null)
     : DbContext(options)
 {
     private readonly ICurrentUserProvider? _currentUserProvider = currentUserProviders?.FirstOrDefault();
@@ -21,13 +28,62 @@ internal class CoreDbContext(DbContextOptions options, IEnumerable<ICurrentUserP
         CancellationToken cancellationToken = default)
     {
         EnsureOwnershipResolvable();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (outbound is null)
+        {
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        return Database.CurrentTransaction is not null
+            ? SaveWithEventsAsync(acceptAllChangesOnSuccess, cancellationToken)
+            : SaveInOneTransactionAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         EnsureOwnershipResolvable();
         return base.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Set by <c>EventPublisher</c> when an outbound event of the running save could not be stored in the outbox.
+    /// </summary>
+    internal Exception? OutboundEventFailure { get; set; }
+
+    /// <summary>
+    /// With the outbound bus on, the save and the outbox rows its events write (the DKNet event hook publishes them
+    /// while the save is still open) commit in ONE transaction (DRK-1773 R1): a failed or rolled-back save leaves no
+    /// event behind. Runs inside the execution strategy, which refuses a user-opened transaction otherwise; changes
+    /// are accepted only after the commit, so a retried attempt saves them again. A save joining a caller's own
+    /// transaction takes no transaction of its own — its outbox rows commit or roll back with the caller's.
+    /// </summary>
+    private Task<int> SaveInOneTransactionAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken) =>
+        Database.CreateExecutionStrategy().ExecuteAsync(async token =>
+        {
+            await using var transaction = await Database.BeginTransactionAsync(token);
+            var saved = await SaveWithEventsAsync(false, token);
+            await transaction.CommitAsync(token);
+
+            if (acceptAllChangesOnSuccess)
+            {
+                ChangeTracker.AcceptAllChanges();
+            }
+
+            return saved;
+        }, cancellationToken);
+
+    /// <summary>
+    /// Saves, then refuses to let the transaction commit when an event of this save could not be stored: the DKNet
+    /// hook only logs a publisher failure, and a failed outbox insert leaves the PostgreSQL transaction aborted, so
+    /// its commit would silently roll the change back behind a successful save. Neither is kept instead.
+    /// </summary>
+    private async Task<int> SaveWithEventsAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+    {
+        OutboundEventFailure = null;
+        var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        return OutboundEventFailure is null
+            ? saved
+            : throw new InvalidOperationException(
+                "An outbound event of this save could not be stored, so the save is not kept.", OutboundEventFailure);
     }
 
     /// <summary>

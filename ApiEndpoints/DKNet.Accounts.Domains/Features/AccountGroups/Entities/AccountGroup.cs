@@ -1,4 +1,5 @@
 using DKNet.EfCore.Abstractions.Attributes;
+using DKNet.EfCore.Abstractions.Events;
 using DKNet.Accounts.Domains.Share;
 
 namespace DKNet.Accounts.Domains.Features.AccountGroups.Entities;
@@ -26,6 +27,25 @@ public enum AccountGroupStatus
 /// whose accounts still hold a balance is refused — a cross-aggregate check the handler performs before
 /// calling <see cref="Close"/>.
 /// </summary>
+// Outbound events (DRK-1773 §3a): account-groups.created / .updated / .deleted, raised by the DKNet save hook.
+[RaisesEvent(EventOperations.Created,
+    Include =
+    [
+        nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
+        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
+[RaisesEvent(EventOperations.Updated,
+    Include =
+    [
+        nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
+        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
+[RaisesEvent(EventOperations.Deleted,
+    Include =
+    [
+        nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
+        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+    ])]
 public sealed class AccountGroup : AggregateRoot
 {
     #region Constructors

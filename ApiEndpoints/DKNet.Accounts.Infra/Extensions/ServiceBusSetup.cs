@@ -1,7 +1,11 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Azure.Messaging.ServiceBus;
 using DKNet.Accounts.Infra.Contexts;
+using DKNet.Accounts.Infra.Services;
 using DKNet.Accounts.Share.Options;
+using SlimMessageBus.Host.Outbox;
+using SlimMessageBus.Host.Outbox.PostgreSql.DbContext;
+using SlimMessageBus.Host.RabbitMQ;
 
 namespace DKNet.Accounts.Infra.Extensions;
 
@@ -10,7 +14,12 @@ public static class ServiceBusSetup
 {
     #region Methods
 
-    private static MessageBusBuilder AddAzureBus(this MessageBusBuilder builder, string connectionString)
+    /// <summary>
+    ///     The outbound transport when it is Azure Service Bus (production): the outbound queue is provisioned
+    ///     outside the service, so topology provisioning stays off and the queue is never created here.
+    /// </summary>
+    private static MessageBusBuilder AddAzureBus(this MessageBusBuilder builder, string connectionString,
+        string outboundQueue)
     {
         builder.AddChildBus(
             "AzureBus",
@@ -45,8 +54,45 @@ public static class ServiceBusSetup
                                 op.DefaultMessageTimeToLive = TimeSpan.FromDays(7);
                             }
                         };
-                    });
+                    })
+                    .Produce<OutboundEnvelope>(x => x
+                        .DefaultQueue(outboundQueue)
+                        .WithModifier((_, message) => OutboundMessageId.ApplyTo(message))
+                        .UseOutbox());
             });
+        return builder;
+    }
+
+    /// <summary>
+    ///     The outbound transport when it is RabbitMQ (local runs and integration tests): events are published to a
+    ///     fanout exchange named after the outbound queue, and the queue is declared (created when missing) and bound
+    ///     to it whenever the bus connects, so a local setup needs no manual step.
+    /// </summary>
+    private static MessageBusBuilder AddRabbitMqBus(this MessageBusBuilder builder, string connectionString,
+        string outboundQueue)
+    {
+        builder.AddChildBus(
+            "RabbitMq",
+            rmq => rmq
+                .WithProviderRabbitMQ(st =>
+                {
+                    st.ConnectionString = connectionString;
+                    st.UseTopologyInitializer(async (channel, applyDefaultTopology) =>
+                    {
+                        await channel.QueueDeclareAsync(outboundQueue, durable: true, exclusive: false,
+                            autoDelete: false);
+                        await applyDefaultTopology();
+                        await channel.QueueBindAsync(outboundQueue, outboundQueue, routingKey: string.Empty);
+                    });
+                })
+                .Produce<OutboundEnvelope>(x => x
+                    .Exchange(outboundQueue, ExchangeType.Fanout, durable: true)
+                    .MessagePropertiesModifier((_, properties) =>
+                    {
+                        properties.Persistent = true;
+                        OutboundMessageId.ApplyTo(properties);
+                    })
+                    .UseOutbox()));
         return builder;
     }
 
@@ -76,7 +122,18 @@ public static class ServiceBusSetup
         Assembly serviceAssembly,
         FeatureOptions features)
     {
-        var busConnectionString = configuration.GetConnectionString(SharedConsts.AzureBusConnectionString)!;
+        var options = configuration.GetSection(MessageBusOptions.Name).Get<MessageBusOptions>()
+                      ?? new MessageBusOptions();
+        var isRabbitMq = options.Transport == MessageBusTransport.RabbitMq;
+        var busConnectionString = configuration.GetConnectionString(
+            isRabbitMq ? SharedConsts.RabbitMqConnectionString : SharedConsts.AzureBusConnectionString);
+        var isBusOn = features.EnableServiceBus && !string.IsNullOrWhiteSpace(busConnectionString);
+
+        // Its presence is what tells EventPublisher and CoreDbContext the outbound bus is on (R3).
+        if (isBusOn)
+        {
+            service.AddSingleton(options);
+        }
 
         service.AddSlimBusEfCoreInterceptor<CoreDbContext>()
             .AddSlimMessageBus(mbb =>
@@ -86,10 +143,27 @@ public static class ServiceBusSetup
 
             mbb.AddMemoryBus(serviceAssembly);
 
-            if (features.EnableServiceBus && !string.IsNullOrWhiteSpace(busConnectionString))
+            if (!isBusOn)
             {
-                mbb.AddAzureBus(busConnectionString);
+                return;
             }
+
+            if (isRabbitMq)
+            {
+                mbb.AddRabbitMqBus(busConnectionString!, options.OutboundQueue);
+            }
+            else
+            {
+                mbb.AddAzureBus(busConnectionString!, options.OutboundQueue);
+            }
+
+            mbb.AddOutboxUsingDbContext<CoreDbContext>(outbox =>
+            {
+                // A stored event is kept until the bus accepts it (R2): never give up on it, and retry a failed
+                // send soon after the bus is back.
+                outbox.MaxDeliveryAttempts = int.MaxValue;
+                outbox.PollIdleSleep = TimeSpan.FromSeconds(10);
+            });
         });
 
         return service;
