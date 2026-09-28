@@ -429,7 +429,7 @@ public sealed class OutboundEventsSteps(ScenarioState state)
     public async Task WhenTreasuryOpsRenamesAccount(string name, string newName)
     {
         var id = await AccountAsync(name);
-        await SucceedsAsync(await SendAsync(HttpMethod.Patch, $"{AccountsPath}/{id}", new { name = newName }),
+        await SucceedsAsync(await SendAsync(HttpMethod.Put, $"{AccountsPath}/{id}", new { name = newName }),
             $"renaming {name}");
         state.Values["record"] = id.ToString();
     }

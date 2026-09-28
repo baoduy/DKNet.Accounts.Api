@@ -32,11 +32,11 @@ public sealed class OutboundTransportConfigurationTests
     #region Methods
 
     [Fact]
-    public void ConfigurationPicksTheTransportAndQueue_AzureServiceBus_NeverCreatesTheQueue()
+    public async Task ConfigurationPicksTheTransportAndQueue_AzureServiceBus_NeverCreatesTheQueue()
     {
         // Given the service is configured for Azure Service Bus with outbound queue "ledger-events"
         // When the service starts
-        using var provider = StartService("AzureServiceBus");
+        await using var provider = StartService("AzureServiceBus");
         var bus = (HybridMessageBus)provider.GetRequiredService<IMasterMessageBus>();
 
         // Then events go to queue "ledger-events" on Azure Service Bus
@@ -58,7 +58,7 @@ public sealed class OutboundTransportConfigurationTests
     {
         // Given the service is configured for RabbitMQ with outbound queue "ledger-events"
         // When the service starts
-        using var provider = StartService("RabbitMq");
+        await using var provider = StartService("RabbitMq");
         var bus = (HybridMessageBus)provider.GetRequiredService<IMasterMessageBus>();
 
         var childNames = bus.Settings.Children.Select(c => c.Name).ToArray();
