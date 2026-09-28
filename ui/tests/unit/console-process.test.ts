@@ -94,6 +94,11 @@ function closeServer(server: net.Server): Promise<void> {
   return new Promise((resolve) => server.close(() => resolve()));
 }
 
+/** What a failed sign-in redirect check reports: where the fetch ended up, and what the console logged. */
+function redirectReport(response: Response, handle: ConsoleHandle): string {
+  return `GET /signin ended at ${response.status} ${response.url} — console stderr:\n${handle.stderr}`;
+}
+
 let activeHandles: ConsoleHandle[] = [];
 let activeServers: net.Server[] = [];
 
@@ -189,7 +194,7 @@ process.exit(0);
     activeHandles.push(handle);
 
     let response = await fetch(`${BASE}/signin`);
-    expect(response.url).toContain(TENANT_DRUNK_CODING);
+    expect(response.url, redirectReport(response, handle)).toContain(TENANT_DRUNK_CODING);
 
     await stopConsole(handle);
     activeHandles = activeHandles.filter((h) => h !== handle);
@@ -198,7 +203,7 @@ process.exit(0);
     activeHandles.push(handle);
 
     response = await fetch(`${BASE}/signin`);
-    expect(response.url).toContain(TENANT_OTHER_DIRECTORY);
-    expect(response.url).not.toContain(TENANT_DRUNK_CODING);
+    expect(response.url, redirectReport(response, handle)).toContain(TENANT_OTHER_DIRECTORY);
+    expect(response.url, redirectReport(response, handle)).not.toContain(TENANT_DRUNK_CODING);
   }, 150_000);
 });

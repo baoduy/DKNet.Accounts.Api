@@ -13,7 +13,8 @@ export default defineConfig({
     baseURL: DEFAULT_CONSOLE_BASE,
     trace: 'retain-on-failure',
     actionTimeout: 8_000,
-    navigationTimeout: 8_000,
+    // A route's first visit includes its `next dev` compile (DRK-1780 R3).
+    navigationTimeout: 20_000,
   },
   // Every port and name is this run's own (`tests/support/run.ts`), and no stand-in is ever
   // adopted from another run: each is started, owned and stopped by this one (DRK-1726 R1, R2).
