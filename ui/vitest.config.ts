@@ -27,13 +27,15 @@ export default defineConfig({
     globals: true,
     css: true,
     setupFiles: ['tests/unit/setup.ts'],
-    // Vitest 3.0 sizes each pool type once, from this root config, for every project in it: the
-    // `forks` pool runs one file at a time, and only the console-starting files use it. The rest
-    // run in parallel in the `threads` pool. No root `include` — each project's is added to it.
-    poolOptions: { forks: { minForks: 1, maxForks: 1 } },
-    workspace: [
-      { extends: true, test: { name: 'console', pool: 'forks', include: CONSOLE_STARTING_FILES } },
-      { extends: true, test: { name: 'unit', pool: 'threads', include: UNIT_FILES, exclude: [...configDefaults.exclude, ...CONSOLE_STARTING_FILES] } },
+    // Vitest 5 sizes workers per project: the `console` project runs one file at a time, and only
+    // the console-starting files are in it. The rest run in parallel in `unit`. Projects with
+    // different `maxWorkers` need their own `sequence.groupOrder`. No root `include`.
+    projects: [
+      { extends: true, test: { name: 'console', pool: 'forks', maxWorkers: 1, sequence: { groupOrder: 0 }, include: CONSOLE_STARTING_FILES } },
+      {
+        extends: true,
+        test: { name: 'unit', pool: 'threads', sequence: { groupOrder: 1 }, include: UNIT_FILES, exclude: [...configDefaults.exclude, ...CONSOLE_STARTING_FILES] },
+      },
     ],
     coverage: {
       provider: 'v8',

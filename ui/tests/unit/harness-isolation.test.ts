@@ -7,10 +7,9 @@
  *   SC3 — A route's first visit has room for its compile (R3).
  *
  * SC1 reads the unit suite's config the way `vitest run` resolves it — Vitest's own
- * `createVitest`, no test run — and asks which pool each unit file lands in. Vitest 3.0 keeps one
- * worker pool per pool type (`forks`, `threads`, …) shared by every project, sized from the root
- * config, so "one at a time" means: the 4 files share a pool that runs a single worker and no
- * other unit file lands in it. Nothing here starts `next dev`.
+ * `createVitest`, no test run — and asks which project each unit file lands in. Vitest 5 sizes
+ * workers per project, so "one at a time" means: the 4 files share a project that runs a single
+ * worker and no other unit file lands in it. Nothing here starts `next dev`.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -35,22 +34,12 @@ describe('SC1 — The unit checks that start a console never run beside each oth
   test('the 4 console-starting files share one single-worker pool that no other unit file runs in', async () => {
     const vitest = await createVitest('test', { config: path.join(UI_ROOT, 'vitest.config.ts'), root: UI_ROOT, watch: false });
     try {
-      const resolved = vitest.config;
       const specifications = await vitest.globTestSpecifications();
       // One entry per file per project that collects it: a file two projects collect runs twice.
-      const runs = specifications.map((spec) => [path.relative(UI_ROOT, spec.moduleId), spec.pool] as const);
-      // Every pool type's worker count comes from the root config (Vitest 3.0 `createPool`).
-      const singleWorker = (pool: string): boolean => {
-        const options = (resolved.poolOptions as Record<string, Record<string, unknown> | undefined> | undefined)?.[pool] ?? {};
-        return (
-          resolved.fileParallelism === false ||
-          resolved.maxWorkers === 1 ||
-          options.singleFork === true ||
-          options.singleThread === true ||
-          options.maxForks === 1 ||
-          options.maxThreads === 1
-        );
-      };
+      const runs = specifications.map((spec) => [path.relative(UI_ROOT, spec.moduleId), spec.project.name] as const);
+      // Vitest 5 sizes workers per project, falling back to the root config (`resolveMaxWorkers`).
+      const singleWorker = (name: string): boolean =>
+        (vitest.getProjectByName(name).config.maxWorkers ?? vitest.config.maxWorkers) === 1;
 
       expect(
         CONSOLE_STARTING_FILES.map((file) => runs.filter(([run]) => run === file).length),
