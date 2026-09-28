@@ -5,16 +5,7 @@
  * standalone bundle actually calls, so it is where R8 has to be enforced for that runtime.
  */
 export async function register(): Promise<void> {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  const { loadConfig } = await import('@/lib/config');
-  try {
-    loadConfig();
-  } catch (error) {
-    // A thrown/rejected register() is only logged, never fatal, even for the standalone
-    // production server (`node server.js` keeps listening after printing the error) — a
-    // real process exit is the only thing that actually stops it here.
-    // eslint-disable-next-line no-console
-    console.error((error as Error).message);
-    process.exit(1);
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation-node');
   }
 }

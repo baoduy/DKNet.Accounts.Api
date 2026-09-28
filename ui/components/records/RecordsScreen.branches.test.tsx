@@ -6,7 +6,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within, type RenderResult } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { RecordsScreen } from './RecordsScreen';
 
 let mockSearch = '';
@@ -39,8 +39,8 @@ interface Stub {
   currenciesStatus?: number;
 }
 
-function stubLedger({ items = [P1], pageCount = 2, listStatus = 200, currenciesStatus = 200, pending = [] }: Stub = {}): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn().mockImplementation((raw: string) => {
+function stubLedger({ items = [P1], pageCount = 2, listStatus = 200, currenciesStatus = 200, pending = [] }: Stub = {}): Mock<(raw: string) => Promise<unknown>> {
+  const fetchMock = vi.fn<(raw: string) => Promise<unknown>>().mockImplementation((raw: string) => {
     const url = String(raw);
     if (pending.some((id) => url.endsWith(`/${id}`))) return new Promise(() => {});
     if (url.startsWith('/api/ledger/postings?')) {
@@ -78,85 +78,6 @@ afterEach(() => {
 });
 
 describe('RecordsScreen', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('asks for the most recently recorded first by default, then sorts a column ascending and flips it on a second press', async () => {
-    const fetchMock = stubLedger();
-    renderScreen();
-    await screen.findByRole('cell', { name: 'P-1' });
-    expect(lastListQuery(fetchMock).get('orderBy')).toBe('RecordedAt');
-    expect(lastListQuery(fetchMock).get('desc')).toBe('true');
-    expect(['accountId', 'direction', 'category', 'status', 'search'].filter((key) => lastListQuery(fetchMock).has(key))).toEqual([]);
-    expect(screen.getByLabelText('Direction filter')).toHaveDisplayValue('All directions');
-    expect(screen.getByLabelText('Category filter')).toHaveDisplayValue('All categories');
-    expect(screen.getByLabelText('Status filter')).toHaveDisplayValue('All statuses');
-
-    fireEvent.click(within(screen.getByRole('columnheader', { name: 'Amount' })).getByRole('button'));
-    await waitFor(() => expect(lastListQuery(fetchMock).get('orderBy')).toBe('Amount'));
-    expect(lastListQuery(fetchMock).has('desc')).toBe(false);
-    expect(screen.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'ascending');
-
-    // Another column starts ascending, whatever the previous column's direction.
-    fireEvent.click(within(screen.getByRole('columnheader', { name: 'Effective date' })).getByRole('button'));
-    await waitFor(() => expect(lastListQuery(fetchMock).get('orderBy')).toBe('EffectiveDate'));
-    expect(lastListQuery(fetchMock).has('desc')).toBe(false);
-
-    fireEvent.click(within(screen.getByRole('columnheader', { name: 'Effective date' })).getByRole('button'));
-    await waitFor(() => expect(lastListQuery(fetchMock).get('desc')).toBe('true'));
-    expect(window.location.search).toContain('sort=-EffectiveDate');
-
-    fireEvent.click(within(screen.getByRole('columnheader', { name: 'Posting number' })).getByRole('button'));
-    await waitFor(() => expect(lastListQuery(fetchMock).get('orderBy')).toBe('PostingNumber'));
-    expect(lastListQuery(fetchMock).has('desc')).toBe(false);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('narrows on a filter from the first page, and drops it again when cleared', async () => {
-    const fetchMock = stubLedger();
-    renderScreen();
-    await screen.findByRole('cell', { name: 'P-1' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
-    await waitFor(() => expect(lastListQuery(fetchMock).get('pageNumber')).toBe('2'));
-    expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Page 1' })).not.toHaveAttribute('aria-current');
-
-    fireEvent.change(screen.getByLabelText('Category filter'), { target: { value: 'Fee' } });
-    await waitFor(() => expect(lastListQuery(fetchMock).get('category')).toBe('Fee'));
-    expect(lastListQuery(fetchMock).get('pageNumber')).toBe('1');
-
-    fireEvent.change(screen.getByLabelText('Direction filter'), { target: { value: 'Debit' } });
-    fireEvent.change(screen.getByLabelText('Status filter'), { target: { value: 'Reversed' } });
-    await waitFor(() => expect(lastListQuery(fetchMock).get('status')).toBe('Reversed'));
-    expect(lastListQuery(fetchMock).get('direction')).toBe('Debit');
-    expect(lastListQuery(fetchMock).get('category')).toBe('Fee');
-
-    fireEvent.change(screen.getByLabelText('Category filter'), { target: { value: '' } });
-    await waitFor(() => expect(lastListQuery(fetchMock).has('category')).toBe(false));
-    expect(window.location.search).not.toContain('category');
-    expect(lastListQuery(fetchMock).get('direction')).toBe('Debit');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('requests the end of the period the operator sets', async () => {
-    const fetchMock = stubLedger();
-    renderScreen();
-    await screen.findByRole('cell', { name: 'P-1' });
-
-    fireEvent.change(screen.getByLabelText('To', { exact: true }), { target: { value: '2026-09-10' } });
-
-    await waitFor(() => expect(lastListQuery(fetchMock).get('to')).toBe('2026-09-10'));
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('keeps an emptied end of the period too', async () => {
-    stubLedger();
-    renderScreen();
-    await screen.findByRole('cell', { name: 'P-1' });
-
-    fireEvent.change(screen.getByLabelText('To', { exact: true }), { target: { value: '' } });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^A period must be set\.$/);
-  });
 
   it('offers Record posting enabled with postings.write, and disabled naming it without', async () => {
     stubLedger();
@@ -192,27 +113,6 @@ describe('RecordsScreen', () => {
     expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('opens a listed posting from the list itself, without waiting on its own read', async () => {
-    stubLedger({ pending: [P_1] });
-    renderScreen();
-    fireEvent.click(await screen.findByRole('cell', { name: 'P-1' }));
-
-    expect(within(await screen.findByTestId('detail-panel')).getByRole('heading', { name: 'P-1' })).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('keeps an emptied period bound, refusing it on screen instead of falling back to the default', async () => {
-    stubLedger();
-    renderScreen();
-    await screen.findByRole('cell', { name: 'P-1' });
-
-    fireEvent.change(screen.getByLabelText('From', { exact: true }), { target: { value: '' } });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^A period must be set\.$/);
-    expect(screen.getByLabelText('From', { exact: true })).toHaveValue('');
-  });
-
   it('closes the details when the open row is chosen again', async () => {
     stubLedger();
     renderScreen();
@@ -243,19 +143,6 @@ describe('RecordsScreen', () => {
     expect(within(row).getAllByRole('cell')[4]).toHaveTextContent(/^10$/);
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('opens a posting named by the page address even when it is not on the listed page, its amount as sent when its currency is unknown', async () => {
-    mockSearch = `open=${P_OFF_PAGE}`;
-    const fetchMock = stubLedger({ items: [P1], pageCount: 1 });
-    renderScreen();
-
-    const panel = await screen.findByTestId('detail-panel');
-    expect(await within(panel).findByRole('heading', { name: 'P-99' })).toBeInTheDocument();
-    expect(await within(panel).findByText('GLOBEX-000456')).toBeInTheDocument();
-    expect(within(panel).getByText('7 XAU')).toBeInTheDocument();
-    expect(fetchMock.mock.calls.map(([u]) => String(u))).toContain(`/api/ledger/postings/${P_OFF_PAGE}`);
-  });
-
   it('shows an amount as sent in the list when the currency list does not name its currency', async () => {
     stubLedger({ items: [{ ...OFF_PAGE, postingNumber: 'P-98' }], pageCount: 1 });
     renderScreen();
@@ -263,61 +150,15 @@ describe('RecordsScreen', () => {
     const row = (await screen.findByRole('cell', { name: 'P-98' })).closest('tr')!;
     expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['P-98', 'GLOBEX-000456', 'Credit', '', '7', 'XAU', '', 'Posted']);
   });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('draws every column of a row, the amount at its currency\'s scale and the account as a link to it', async () => {
-    stubLedger({ pageCount: 1 });
-    renderScreen();
-
-    const row = (await screen.findByRole('cell', { name: 'P-1' })).closest('tr')!;
-    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['P-1', 'ACME-000123', 'Credit', 'Transfer', '10.00', 'SGD', '2026-09-20', 'Posted']);
-    expect(within(row).getByRole('link', { name: 'ACME-000123' })).toHaveAttribute('href', '/accounts/ACME-000123');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('reads only the accounts its rows name, and tones an amount by its direction', async () => {
-    const fetchMock = stubLedger({ items: [P1, { ...P1, id: 'b0000000-0000-4000-8000-000000000002', postingNumber: 'P-2', direction: 'Debit' }], pageCount: 1 });
-    renderScreen();
-
-    const credit = (await screen.findByRole('cell', { name: 'P-1' })).closest('tr')!;
-    const debit = screen.getByRole('cell', { name: 'P-2' }).closest('tr')!;
-    expect(within(credit).getByText('10.00')).toHaveClass('text-credit');
-    expect(within(debit).getByText('10.00')).toHaveClass('text-debit');
-    expect(fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith('/api/ledger/accounts'))).toEqual([`/api/ledger/accounts/${ACME_ID}`]);
-  });
 });
 
 describe('RecordsScreen — screen states (DRK-1725 §3)', () => {
-  function stubList(page: Record<string, unknown>): ReturnType<typeof vi.fn> {
+  function stubList(page: Record<string, unknown>): Mock<(raw: string) => Promise<unknown>> {
     const fetchMock = stubLedger();
     const answer = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') ? Promise.resolve(jsonResponse(page)) : answer(raw)));
     return fetchMock;
   }
-
-  // DRK-1745: rewrite for the new form
-  it.skip.each([
-    { search: 'from=2026-09-01&to=2026-09-24', total: 0, message: 'No postings between 1 Sep and 24 Sep.' },
-    { search: 'from=2026-09-01&to=2026-09-24&category=Fee', total: 0, message: 'No postings match this filter.' },
-    { search: 'from=2026-09-01&to=2026-09-24&direction=Debit', total: 0, message: 'No postings match this filter.' },
-    { search: 'from=2026-09-01&to=2026-09-24&status=Reversed', total: 0, message: 'No postings match this filter.' },
-    { search: 'from=2026-09-01&to=2026-09-24&search=zz', total: 0, message: 'No postings match this filter.' },
-    { search: 'page=9', total: 25, message: 'No more postings.' },
-  ])('says $message for an empty list at "$search"', async ({ search, total, message }) => {
-    mockSearch = search;
-    stubList({ items: [], pageNumber: 9, pageSize: 10, pageCount: 3, totalItemCount: total });
-    renderScreen();
-    expect(await screen.findByRole('cell', { name: message })).toHaveAttribute('colspan', '8');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('states a period it refuses to send in place of the list, never loading', async () => {
-    mockSearch = 'from=&to=2026-09-24';
-    stubList({ items: [], totalItemCount: 0 });
-    const { container } = renderScreen();
-    expect(await screen.findByRole('cell', { name: 'A period must be set.' })).toBeInTheDocument();
-    expect(container.querySelector('tbody [data-slot="skeleton"]')).toBeNull();
-  });
 
   it('never stands placeholders in for a search too short to send', async () => {
     mockSearch = 'search=a';

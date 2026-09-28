@@ -32,19 +32,19 @@ public enum AccountGroupStatus
     Include =
     [
         nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
-        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+        nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 [RaisesEvent(EventOperations.Updated,
     Include =
     [
         nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
-        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+        nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 [RaisesEvent(EventOperations.Deleted,
     Include =
     [
         nameof(Id), nameof(Code), nameof(Name), nameof(Description), nameof(Type), nameof(Status), nameof(OwnerId),
-        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+        nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 public sealed class AccountGroup : AggregateRoot
 {

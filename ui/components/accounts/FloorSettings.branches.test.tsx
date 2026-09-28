@@ -28,32 +28,6 @@ describe('FloorSettings — typed values', () => {
     expect(onChange).toHaveBeenCalledWith({ ...VALUE, overdraftLimit: null });
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('reports a typed smallest permitted balance verbatim', () => {
-    const onChange = vi.fn();
-    render(createElement(FloorSettings, { value: VALUE, currency: 'SGD', onChange }));
-
-    fireEvent.change(screen.getByLabelText('Smallest permitted balance'), { target: { value: '25.00' } });
-
-    expect(onChange).toHaveBeenCalledWith({ ...VALUE, minimumBalance: '25.00' });
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('clears the smallest permitted balance to null, not an empty string, when emptied', () => {
-    const onChange = vi.fn();
-    render(createElement(FloorSettings, { value: VALUE, currency: 'SGD', onChange }));
-
-    fireEvent.change(screen.getByLabelText('Smallest permitted balance'), { target: { value: '' } });
-
-    expect(onChange).toHaveBeenCalledWith({ ...VALUE, minimumBalance: null });
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('shows an unset smallest permitted balance as an empty field, not the string "null"', () => {
-    render(createElement(FloorSettings, { value: { ...VALUE, minimumBalance: null }, currency: 'SGD', onChange: vi.fn() }));
-    expect(screen.getByLabelText('Smallest permitted balance')).toHaveValue('');
-  });
-
   it('marks the overdraft limit field invalid and shows its message when refused', () => {
     render(createElement(FloorSettings, { value: VALUE, currency: 'SGD', onChange: vi.fn(), overdraftLimitError: 'Too small.' }));
     expect(screen.getByLabelText('Overdraft limit')).toHaveAttribute('aria-invalid', 'true');

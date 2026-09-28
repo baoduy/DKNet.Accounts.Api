@@ -65,3 +65,14 @@ export function pushRecent(directoryObjectId: string, kind: RecentKind, id: stri
     // Storage full or blocked: the list is a convenience, never worth failing the screen for.
   }
 }
+
+/** Takes `gone` out of the operator's list — records the service no longer has (Overview). */
+export function dropRecent(directoryObjectId: string, gone: Pick<RecentEntry, 'kind' | 'id'>[]): void {
+  if (gone.length === 0) return;
+  const next = readRecent(directoryObjectId).filter((entry) => !gone.some((g) => g.kind === entry.kind && g.id === entry.id));
+  try {
+    storage()?.setItem(storageKey(directoryObjectId), JSON.stringify(next));
+  } catch {
+    // Storage full or blocked: the list is a convenience, never worth failing the screen for.
+  }
+}

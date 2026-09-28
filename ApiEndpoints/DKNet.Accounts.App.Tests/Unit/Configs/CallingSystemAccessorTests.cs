@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using DKNet.Accounts.Api.Configs.Handlers;
 using DKNet.Accounts.AppServices.Share;
+using DKNet.Accounts.Share.Options;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace DKNet.Accounts.App.Tests.Unit.Configs;
@@ -50,14 +52,26 @@ public sealed class CallingSystemAccessorTests
         personA.ShouldNotBe(personB);
     }
 
+    [Theory]
+    [InlineData(false, "System")]
+    [InlineData(true, null)]
+    public void CallingSystem_ForAnAnonymousCaller_ShouldFallBackToSystem_OnlyWhenAuthorizationIsOff(
+        bool requireAuthorization, string? expected)
+    {
+        var accessor = CreateAccessorFor(new DefaultHttpContext(), requireAuthorization);
+
+        accessor.CallingSystem.ShouldBe(expected);
+    }
+
     private static ICallingSystemAccessor CreateAccessor(params Claim[] claims) =>
         CreateAccessorFor(AuthenticatedContext(claims));
 
-    private static ICallingSystemAccessor CreateAccessorFor(HttpContext context)
+    private static ICallingSystemAccessor CreateAccessorFor(HttpContext context, bool requireAuthorization = true)
     {
         var accessor = new Mock<IHttpContextAccessor>();
         accessor.Setup(a => a.HttpContext).Returns(context);
-        return new CallingSystemAccessor(accessor.Object);
+        return new CallingSystemAccessor(
+            accessor.Object, Options.Create(new FeatureOptions { RequireAuthorization = requireAuthorization }));
     }
 
     private static IPrincipalProvider CreatePrincipalProviderFor(HttpContext context)

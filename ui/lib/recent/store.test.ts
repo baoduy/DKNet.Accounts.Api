@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_RECENT, parseRecent, pushRecent, readRecent, readRecentText, subscribeRecent } from './store';
+import { dropRecent, MAX_RECENT, parseRecent, pushRecent, readRecent, readRecentText, subscribeRecent } from './store';
 
 const MAI = '11111111-1111-4111-8111-111111111111';
 const NAM = '22222222-2222-4222-8222-222222222222';
@@ -67,6 +67,14 @@ describe('with storage', () => {
       { kind: 'Account', id: id(1), openedAt: '2026-09-24T11:00:00.000Z' },
       expect.objectContaining({ kind: 'Account', id: id(2) }),
     ]);
+  });
+
+  it('drops only the records named, by kind and id, and keeps the rest in order', () => {
+    pushRecent(MAI, 'Account', id(1));
+    pushRecent(MAI, 'Posting', id(1));
+    pushRecent(MAI, 'AccountGroup', id(2));
+    dropRecent(MAI, [{ kind: 'Account', id: id(1) }]);
+    expect(readRecent(MAI).map((entry) => `${entry.kind}:${entry.id}`)).toEqual([`AccountGroup:${id(2)}`, `Posting:${id(1)}`]);
   });
 
   it('keeps an account and a posting that share an id as two records', () => {

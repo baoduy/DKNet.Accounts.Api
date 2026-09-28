@@ -45,7 +45,9 @@ export function AppShell({
             {breadcrumb}
             <div className="ml-auto flex items-center gap-2">{topbarRight}</div>
           </header>
-          <main className="flex flex-col gap-5 overflow-x-auto p-(--page-padding)">{children}</main>
+          {/* `overflow-x-clip`, not `-auto`: `auto` on one axis turns the other into a scroll box too,
+              which cut off a filter panel hanging below the last card. Tables scroll themselves. */}
+          <main className="flex flex-col gap-5 overflow-x-clip p-(--page-padding)">{children}</main>
         </div>
         {panelBehavior === 'shift' && panel ? (
           <div className="fixed inset-y-0 right-0 w-(--drawer-width) border-l border-border bg-card p-5">{panel}</div>

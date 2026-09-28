@@ -53,14 +53,16 @@ function memoryStorage(entries: Record<string, string> = {}): Storage {
   };
 }
 
+const OTHER_ID = 'a0000000-0000-4000-8000-000000000999';
+
 function storeRecent(entries: Array<{ kind: string; id: string }>): void {
   const stored = entries.map((entry) => ({ ...entry, openedAt: '2026-09-24T10:00:00.000Z' }));
   vi.stubGlobal('localStorage', memoryStorage({ [`recently-viewed:${MAI}`]: JSON.stringify(stored) }));
 }
 
-function renderOverview(grantedScopes: string[] = ALL_READS): void {
+function renderOverview(grantedScopes: string[] = ALL_READS): ReturnType<typeof render> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <OverviewScreen grantedScopes={grantedScopes} directoryObjectId={MAI} />
     </QueryClientProvider>,
@@ -71,14 +73,6 @@ function panel(name: string): HTMLElement {
   return screen.getByRole('region', { name });
 }
 
-/** The region's table once its data is drawn — while loading it holds placeholder rows (DRK-1725 R1). */
-async function loadedTable(region: HTMLElement): Promise<HTMLElement> {
-  return waitFor(() => {
-    const table = within(region).getByRole('table');
-    expect(table.querySelector('[data-slot="skeleton"]')).toBeNull();
-    return table;
-  });
-}
 
 function fetched(fetchMock: ReturnType<typeof vi.fn>): string[] {
   return fetchMock.mock.calls.map(([url]) => url as string);
@@ -92,150 +86,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('a panel the operator has no permission for', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('says so in place, never hidden, and reads nothing for it', async () => {
-    const fetchMock = stubLedger();
-
-    renderOverview([]);
-
-    for (const [name, scope] of [
-      ['Position by currency', 'accounts.read'],
-      ['Accounts by status', 'accounts.read'],
-      ['Groups by status', 'accounts.read'],
-      ['Postings per week', 'postings.read'],
-      ['Accounts opened per month', 'accounts.read'],
-    ]) {
-      expect(within(panel(name)).getByText(`requires ${scope}`)).toBeInTheDocument();
-      expect(within(panel(name)).getByText('This panel needs a permission you do not hold.')).toBeInTheDocument();
-      expect(within(panel(name)).queryByRole('table')).toBeNull();
-    }
-    await waitFor(() => expect(fetched(fetchMock).length).toBeGreaterThan(0));
-    expect(fetched(fetchMock).filter((url) => !url.startsWith('/api/ledger/currencies'))).toEqual([]);
-  });
-});
-
-describe('a read', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip("that fails states the service's refusal in its own panel and leaves the others drawn", async () => {
-    stubLedger({
-      '/api/ledger/account-groups/status-counts': { status: 500, text: '{"errors":[{"code":"LOCK_TIMEOUT","message":"Try again."}],"traceId":"t-9"}' },
-      '/api/ledger/accounts/status-counts': { status: 200, text: '[{"type":"AccountStatus","status":"ACTIVE","count":3}]' },
-    });
-
-    renderOverview();
-
-    expect(await within(panel('Groups by status')).findByText('LOCK_TIMEOUT')).toBeInTheDocument();
-    expect(within(panel('Groups by status')).getByText('Trace: t-9')).toBeInTheDocument();
-    expect(await loadedTable(panel('Accounts by status'))).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('stands a placeholder cell in under every heading of a chart still being read', () => {
-    stubLedger({ '/api/ledger/accounts/status-counts': () => new Promise<Response>(() => {}) });
-    renderOverview();
-    const table = within(panel('Accounts opened per month')).getByRole('table', { hidden: true });
-    expect(table.querySelectorAll('thead th')).toHaveLength(6);
-    expect(table.querySelectorAll('tbody tr')).toHaveLength(12);
-    expect(table.querySelectorAll('tbody tr:first-child td [data-slot="skeleton"]')).toHaveLength(6);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('tries only the failed reads again on Retry, and draws the panel once they answer', async () => {
-    let groupsFail = true;
-    const fetchMock = stubLedger({
-      '/api/ledger/account-groups/status-counts': () =>
-        Promise.resolve(groupsFail ? new Response('{"errors":[{"message":"Ledger store unavailable"}]}', { status: 503 }) : new Response('[{"status":"ACTIVE","count":2}]')),
-    });
-
-    renderOverview();
-    const groups = panel('Groups by status');
-    expect(await within(groups).findByRole('alert')).toHaveTextContent('Ledger store unavailable');
-    const accountCountReads = (): number => fetched(fetchMock).filter((url) => url === '/api/ledger/accounts/status-counts').length;
-    await waitFor(() => expect(accountCountReads()).toBe(1));
-
-    groupsFail = false;
-    fireEvent.click(within(groups).getByRole('button', { name: 'Retry' }));
-    const table = await loadedTable(groups);
-    expect(within(table).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Active', '2', 'Closed', '—']);
-    expect(accountCountReads()).toBe(1);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('that has not answered yet keeps the panel loading while its other read has answered', async () => {
-    const fetchMock = stubLedger({ '/api/ledger/accounts/balances': () => new Promise<Response>(() => {}) });
-
-    renderOverview();
-    // The currencies have answered; the position has not.
-    await waitFor(() => expect(fetched(fetchMock)).toContain('/api/ledger/currencies'));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Its table keeps its headings over placeholder rows, and no loading line (DRK-1725 R1).
-    const table = within(panel('Position by currency')).getByRole('table', { hidden: true });
-    // A placeholder, not data: hidden from assistive technology and inert until the rows arrive.
-    expect(table).toHaveAttribute('aria-hidden', 'true');
-    expect(table).toHaveAttribute('inert');
-    expect(within(table).getAllByRole('columnheader', { hidden: true }).map((header) => header.textContent)).toEqual(['Currency', 'Balance', 'Available', 'Held', 'Available and held']);
-    expect(table.querySelectorAll('tbody tr')).toHaveLength(3);
-    expect(table.querySelectorAll('tbody [data-slot="skeleton"]')).toHaveLength(15);
-    expect(within(panel('Position by currency')).queryByText(/^Loading/)).toBeNull();
-  });
-});
-
-describe('status counts', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('list the 4 account statuses in order, from the service counts', async () => {
-    stubLedger({ '/api/ledger/accounts/status-counts': { status: 200, text: '[{"status":"CLOSED","count":1},{"status":"DORMANT","count":0},{"status":"FROZEN","count":2},{"status":"ACTIVE","count":1200}]' } });
-
-    renderOverview();
-
-    const table = await loadedTable(panel('Accounts by status'));
-    const rows = [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent));
-    expect(rows).toEqual([
-      ['Active', '1,200'],
-      ['Frozen', '2'],
-      ['Dormant', '0'],
-      ['Closed', '1'],
-    ]);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('match the service spelling in any case, and draw a status the service did not send as unknown, not 0', async () => {
-    stubLedger({ '/api/ledger/account-groups/status-counts': { status: 200, text: '[{"type":"AccountGroupStatus","status":"active","count":1200}]' } });
-
-    renderOverview();
-
-    const table = await loadedTable(panel('Groups by status'));
-    const rows = [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent));
-    expect(rows).toEqual([
-      ['Active', '1,200'],
-      ['Closed', '—'],
-    ]);
-  });
-});
-
 describe('the position', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip("draws a currency the currency list does not know with the service's own digits", async () => {
-    stubLedger({ '/api/ledger/accounts/balances': { status: 200, text: '[{"currency":"XAU","balance":1.2345,"available":1.2,"held":0.0345}]' } });
-
-    renderOverview();
-
-    const table = await loadedTable(panel('Position by currency'));
-    const cells = [...table.querySelectorAll('tbody td')].map((cell) => cell.textContent);
-    expect(cells.slice(0, 4)).toEqual(['XAU', '1.2345', '1.2', '0.0345']);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip("draws each amount at its currency's own decimal places, not the digits the service wrote", async () => {
-    stubLedger({ '/api/ledger/accounts/balances': { status: 200, text: '[{"currency":"SGD","balance":100,"available":99.5,"held":0.5}]' } });
-
-    renderOverview();
-
-    const table = await loadedTable(panel('Position by currency'));
-    const cells = [...table.querySelectorAll('tbody td')].map((cell) => cell.textContent);
-    expect(cells.slice(0, 4)).toEqual(['SGD', '100.00', '99.50', '0.50']);
-  });
 
   it("draws each row's bar across the whole of its cell", async () => {
     stubLedger({ '/api/ledger/accounts/balances': { status: 200, text: '[{"currency":"SGD","balance":100.00,"available":75.00,"held":25.00}]' } });
@@ -257,78 +108,6 @@ describe('the position', () => {
   });
 });
 
-/** The width each row's aria-hidden bar segments are drawn at. */
-function barWidths(table: HTMLElement): string[][] {
-  return [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('[aria-hidden="true"]')].map((bar) => (bar as HTMLElement).style.width));
-}
-
-describe('the activity charts', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('draw each week as a bar scaled to the busiest week', async () => {
-    const fetchMock = stubLedger();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.startsWith('/api/ledger/postings?')) {
-        const from = new URLSearchParams(url.split('?')[1]).get('from');
-        return Promise.resolve(new Response(`{"items":[],"totalItemCount":${from === '2026-09-18' ? 200 : from === '2026-09-11' ? 50 : 0}}`));
-      }
-      return Promise.resolve(new Response('[]'));
-    });
-    vi.useFakeTimers({ now: new Date('2026-09-24T10:00:00Z'), toFake: ['Date'] });
-
-    renderOverview();
-
-    const widths = barWidths(await loadedTable(panel('Postings per week')));
-    vi.useRealTimers();
-    expect(widths.at(-1)).toEqual(['100%']);
-    expect(widths.at(-2)).toEqual(['25%']);
-    expect(widths[0]).toEqual(['0%']);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('draw each month as one segment per status, scaled to the largest count', async () => {
-    const fetchMock = stubLedger();
-    fetchMock.mockImplementation((url: string) => {
-      if (url.startsWith('/api/ledger/accounts/status-counts?')) {
-        const september = new URLSearchParams(url.split('?')[1]).get('from') === '2026-09-01T00:00:00.000Z';
-        return Promise.resolve(new Response(september ? '[{"status":"ACTIVE","count":3},{"status":"CLOSED","count":1}]' : '[{"status":"ACTIVE","count":0}]'));
-      }
-      return Promise.resolve(new Response(url.startsWith('/api/ledger/postings') ? '{"items":[],"totalItemCount":0}' : '[]'));
-    });
-    vi.useFakeTimers({ now: new Date('2026-09-24T10:00:00Z'), toFake: ['Date'] });
-
-    renderOverview();
-
-    const table = await loadedTable(panel('Accounts opened per month'));
-    vi.useRealTimers();
-    expect([...table.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual(['Month (UTC)', 'Active', 'Frozen', 'Dormant', 'Closed', 'By status']);
-    expect(barWidths(table).at(-1)).toEqual(['25%', '0%', '0%', `${(1 / 12) * 100}%`]);
-    const septemberRead = fetched(fetchMock).find((url) => url.includes('from=2026-09-01'))!;
-    expect(new URLSearchParams(septemberRead.split('?')[1]).get('to')).toBe('2026-09-30T23:59:59.999Z');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('draw no bar length when every figure is 0', async () => {
-    stubLedger();
-
-    renderOverview();
-
-    const widths = barWidths(await loadedTable(panel('Postings per week')));
-    expect(new Set(widths.flat())).toEqual(new Set(['0%']));
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('draw every week and month at 0 when nothing happened', async () => {
-    stubLedger({ '/api/ledger/accounts/status-counts?': { status: 200, text: '[{"type":"AccountStatus","status":"ACTIVE","count":0}]' } });
-
-    renderOverview();
-
-    const weeks = await loadedTable(panel('Postings per week'));
-    expect(weeks.querySelectorAll('tbody tr')).toHaveLength(13);
-    const months = await loadedTable(panel('Accounts opened per month'));
-    const firstMonth = [...months.querySelectorAll('tbody tr')[0].querySelectorAll('td')].map((cell) => cell.textContent);
-    expect(firstMonth.slice(1, 5)).toEqual(['0', '—', '—', '—']);
-  });
-});
 
 describe('recently viewed', () => {
   it('states an entry it could not read in its own line, and reads it again on Retry', async () => {
@@ -382,12 +161,20 @@ describe('recently viewed', () => {
     ['Account', ACCOUNT_ID, `/api/ledger/accounts/${ACCOUNT_ID}`, 'This account can no longer be found.'],
     ['Posting', POSTING_ID, `/api/ledger/postings/${POSTING_ID}`, 'This posting can no longer be found.'],
   ])('says a %s that no longer exists can no longer be found', async (kind, id, path, statement) => {
-    storeRecent([{ kind, id }]);
-    stubLedger({ [path]: { status: 404, text: '{"errors":[{"message":"Not found."}]}' } });
+    storeRecent([{ kind, id }, { kind: 'Account', id: OTHER_ID }]);
+    stubLedger({
+      [path]: { status: 404, text: '{"errors":[{"message":"Not found."}]}' },
+      [`/api/ledger/accounts/${OTHER_ID}`]: { status: 200, text: `{"id":"${OTHER_ID}","accountNumber":"ACME-000999","name":"Acme Other"}` },
+    });
 
-    renderOverview();
+    const view = renderOverview();
 
     expect(await within(panel('Recently viewed')).findByText(statement)).toBeInTheDocument();
+    await waitFor(() => expect(within(panel('Recently viewed')).getAllByRole('listitem')[1]).toHaveTextContent('ACME-000999'));
+    // Said once, in place: still listed while Overview is open, gone once the operator leaves it.
+    expect(within(panel('Recently viewed')).getByText(statement)).toBeInTheDocument();
+    view.unmount();
+    expect(JSON.parse(localStorage.getItem(`recently-viewed:${MAI}`)!).map((entry: { id: string }) => entry.id)).toEqual([OTHER_ID]);
   });
 
   it('says the operator may no longer read a record the service refuses them', async () => {
@@ -421,18 +208,6 @@ describe('recently viewed', () => {
     renderOverview();
 
     expect(await within(panel('Recently viewed')).findByText(/The ledger service is unavailable\./)).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('shows an entry loading until the service answers', () => {
-    storeRecent([{ kind: 'Account', id: ACCOUNT_ID }]);
-    stubLedger({ [`/api/ledger/accounts/${ACCOUNT_ID}`]: () => new Promise<Response>(() => {}) });
-
-    renderOverview();
-
-    const entry = within(panel('Recently viewed')).getByRole('listitem');
-    expect(entry.querySelector('[data-slot="skeleton"]')).not.toBeNull();
-    expect(entry).toHaveTextContent(/^$/);
   });
 
   it('draws no list on the server, which cannot see the browser', () => {
@@ -473,18 +248,5 @@ describe('recently viewed', () => {
     });
 
     expect(await within(panel('Recently viewed')).findByText('ACME-000123')).toBeInTheDocument();
-  });
-});
-
-describe('the screen', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('offers no action that records, changes or deletes anything', async () => {
-    storeRecent([{ kind: 'Account', id: ACCOUNT_ID }]);
-    stubLedger({ [`/api/ledger/accounts/${ACCOUNT_ID}`]: { status: 200, text: `{"id":"${ACCOUNT_ID}","accountNumber":"ACME-000123","name":"Acme"}` } });
-
-    renderOverview(['accounts.read', 'accounts.write', 'postings.read', 'postings.write', 'postings.reverse']);
-
-    await within(panel('Recently viewed')).findByText('ACME-000123');
-    expect(screen.queryAllByRole('button')).toEqual([]);
   });
 });

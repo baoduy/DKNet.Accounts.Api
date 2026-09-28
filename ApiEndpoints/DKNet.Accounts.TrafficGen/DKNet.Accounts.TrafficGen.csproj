@@ -1,0 +1,25 @@
+<!-- Dev-only traffic generator, launched (explicit start) from DKNet.Accounts.AppHost to exercise the outbound
+     ledger events. Web SDK only for the shared framework's generic host — it serves nothing over HTTP. -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <EnableNETAnalyzers>false</EnableNETAnalyzers>
+        <AnalysisMode>None</AnalysisMode>
+        <RunAnalyzers>false</RunAnalyzers>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DKNet.Accounts.Client\DKNet.Accounts.Client.csproj" />
+    </ItemGroup>
+
+</Project>

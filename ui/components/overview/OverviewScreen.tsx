@@ -1,11 +1,12 @@
 'use client';
 
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useId, useMemo, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type JSX, type ReactNode } from 'react';
 import { ArrowRight, Plus, Wallet, type LucideIcon } from 'lucide-react';
 import { FailedRead } from '@/components/feedback/RefusalAlert';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { AccountNumber } from '@/components/ledger/AccountNumber';
+import { Currency } from '@/components/ledger/Currency';
 import { Money } from '@/components/ledger/Money';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { TopBarSearch } from '@/components/shell/TopBarSearch';
@@ -30,7 +31,7 @@ import {
   type LedgerRecordLookup,
   type PostingDto,
 } from '@/lib/query/overview';
-import { parseRecent, readRecentText, subscribeRecent, type RecentEntry, type RecentKind } from '@/lib/recent/store';
+import { dropRecent, parseRecent, readRecentText, subscribeRecent, type RecentEntry, type RecentKind } from '@/lib/recent/store';
 import { GroupTypeBars } from './GroupTypeBars';
 import { HeadlineTiles } from './HeadlineTiles';
 import { countOf, formatCount, heightOf, MissingScope, Panel, Ready } from './parts';
@@ -228,7 +229,9 @@ function PositionPanel({ granted, balances }: { granted: boolean; balances: UseQ
                 );
                 return balances.data!.map((line) => (
                   <TableRow key={line.currency}>
-                    <TableCell className="font-semibold">{line.currency}</TableCell>
+                    <TableCell className="font-semibold">
+                      <Currency code={line.currency} />
+                    </TableCell>
                     <TableCell>
                       <PositionBar line={line} />
                     </TableCell>
@@ -375,6 +378,22 @@ function RecentlyViewedPanel({ grantedScopes, directoryObjectId }: { grantedScop
     (entries ?? []).map((entry) => ({ kind: entry.kind, id: entry.id, path: RECENT_KINDS[entry.kind].path(entry.id), enabled: grantedScopes.includes(RECENT_KINDS[entry.kind].scope) })),
   );
 
+  // A record the service no longer has says so once, in place (DRK-1725 §5 "says so in place"),
+  // and leaves the list when the operator leaves Overview — not before, or the panel would
+  // re-read the list and drop the entry while it is still on screen.
+  const gone = useRef<RecentEntry[]>([]);
+  useEffect(() => {
+    gone.current = (entries ?? []).filter((_, index) => lookups[index]?.data?.state === 'notFound');
+  });
+  useEffect(() => {
+    const flush = (): void => dropRecent(directoryObjectId, gone.current);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, [directoryObjectId]);
+
   return (
     <Card role="region" aria-labelledby={headingId} padded={false}>
       <CardBar position="top">
@@ -424,7 +443,7 @@ function RecentEntryLine({ entry, lookup, granted }: { entry: RecentEntry; looku
         <AccountNumber value={account.accountNumber} href={`/accounts/${encodeURIComponent(account.accountNumber)}`} />
         <span className="min-w-0 truncate">{account.name}</span>
         <Caption>
-          <Mono>{account.currency}</Mono>
+          <Currency code={account.currency} />
         </Caption>
       </>
     );

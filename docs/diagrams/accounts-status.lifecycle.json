@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Account Status",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      900
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Active rail"
+    },
+    {
+      "id": "waiting",
+      "label": "Frozen / Dormant \u2014 restricted"
+    },
+    {
+      "id": "terminal",
+      "label": "Closed"
+    }
+  ],
+  "states": [
+    {
+      "id": "start",
+      "type": "start",
+      "label": "Opened",
+      "sublabel": "POST /v1/accounts",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "active",
+      "type": "success",
+      "label": "Active",
+      "sublabel": "accepts every direction",
+      "lane": "main",
+      "col": 2,
+      "step": "02"
+    },
+    {
+      "id": "frozen",
+      "type": "waiting",
+      "label": "Frozen",
+      "sublabel": "accepts nothing",
+      "lane": "waiting",
+      "col": 0
+    },
+    {
+      "id": "dormant",
+      "type": "waiting",
+      "label": "Dormant",
+      "sublabel": "credits only",
+      "lane": "waiting",
+      "col": 1
+    },
+    {
+      "id": "closed",
+      "type": "neutral",
+      "label": "Closed",
+      "sublabel": "balance must be 0",
+      "lane": "terminal",
+      "col": 2
+    }
+  ],
+  "transitions": [
+    {
+      "from": "start",
+      "to": "active",
+      "label": "Open \u2014 always Active",
+      "labelDy": -25
+    },
+    {
+      "from": "active",
+      "to": "frozen",
+      "label": "status: Frozen",
+      "route": "top-channel",
+      "channelY": 110,
+      "labelAt": [
+        90,
+        20
+      ]
+    },
+    {
+      "from": "frozen",
+      "to": "active",
+      "label": "status: Active",
+      "route": "top-channel",
+      "channelY": 96,
+      "labelAt": [
+        230,
+        20
+      ]
+    },
+    {
+      "from": "active",
+      "to": "dormant",
+      "label": "status: Dormant",
+      "route": "top-channel",
+      "channelY": 82,
+      "labelAt": [
+        370,
+        20
+      ]
+    },
+    {
+      "from": "dormant",
+      "to": "active",
+      "label": "status: Active",
+      "route": "top-channel",
+      "channelY": 68,
+      "labelAt": [
+        510,
+        20
+      ]
+    },
+    {
+      "from": "frozen",
+      "to": "dormant",
+      "label": "status: Dormant",
+      "labelAt": [
+        650,
+        20
+      ],
+      "fromSide": "top",
+      "toSide": "top",
+      "route": "top-channel",
+      "channelY": 250
+    },
+    {
+      "from": "dormant",
+      "to": "frozen",
+      "label": "status: Frozen",
+      "labelAt": [
+        790,
+        20
+      ],
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "route": "bottom-channel",
+      "channelY": 360
+    },
+    {
+      "from": "frozen",
+      "to": "closed",
+      "label": "status: Closed",
+      "route": "bottom-channel",
+      "channelY": 460,
+      "labelAt": [
+        270,
+        780
+      ],
+      "note": "Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero"
+    },
+    {
+      "from": "active",
+      "to": "closed",
+      "label": "status: Closed",
+      "route": "right-channel",
+      "channelX": 800,
+      "labelAt": [
+        810,
+        780
+      ],
+      "note": "Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero"
+    },
+    {
+      "from": "dormant",
+      "to": "closed",
+      "label": "status: Closed",
+      "route": "bottom-channel",
+      "channelY": 490,
+      "labelAt": [
+        100,
+        830
+      ]
+    },
+    {
+      "from": "closed",
+      "to": "active",
+      "label": "status: Active \u2014 reopen",
+      "route": "right-channel",
+      "channelX": 920,
+      "labelAt": [
+        300,
+        830
+      ]
+    },
+    {
+      "from": "closed",
+      "to": "frozen",
+      "label": "status: Frozen \u2014 direct",
+      "route": "bottom-channel",
+      "channelY": 520,
+      "labelAt": [
+        500,
+        830
+      ]
+    },
+    {
+      "from": "closed",
+      "to": "dormant",
+      "label": "status: Dormant \u2014 direct",
+      "route": "bottom-channel",
+      "channelY": 550,
+      "labelAt": [
+        700,
+        830
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One route, every direction",
+      "items": [
+        "Every move is PATCH {id} with {\"status\": \"<value>\"} \u2014 ChangeStatus assigns any of the four values unconditionally",
+        "There is no dedicated freeze/close endpoint, and no ordering between the four states \u2014 any status may be set from any other"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Only one guard, on the target",
+      "items": [
+        "The single check is on entering Closed: refused (ACCOUNT_HOLDS_BALANCE) whenever Balance or HeldAmount is non-zero, whatever the current status",
+        "Status gates postings too: Frozen refuses every direction including a reversal; Dormant refuses a debit (including a debiting reversal) \u2014 see Postings' Record/Reverse flow for AccountPostingPolicy.StatusGate"
+      ]
+    }
+  ]
+}
