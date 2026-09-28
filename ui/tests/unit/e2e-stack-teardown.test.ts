@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { isRunning } from '../support/processes';
 import { UI_ROOT } from '../support/run';
 
 const GLOBAL_SETUP = path.join(UI_ROOT, 'tests', 'e2e', 'support', 'global-setup.ts');
@@ -103,15 +104,6 @@ function runSetup(env: Record<string, string>, signal?: NodeJS.Signals): Promise
   });
 }
 
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function tlsDir(): string {
   return fs.readFileSync(`${log}.tls`, 'utf8').trim();
 }
@@ -163,7 +155,7 @@ describe('the end-to-end runner removes the stack it started (DRK-1732 R2)', () 
     expect(run.code, run.output).toBe(exitCode);
     expect(run.calls.slice(1)).toEqual([DOWN, IMAGES]);
     expect(fs.existsSync(tlsDir())).toBe(false);
-    expect(alive(Number(fs.readFileSync(`${log}.up-pid`, 'utf8'))), 'compose up still running').toBe(false);
+    expect(isRunning(Number(fs.readFileSync(`${log}.up-pid`, 'utf8'))), 'compose up still running').toBe(false);
   });
 
   it('removes the stack on a signal someone else also handles, and leaves ending the run to them', async () => {
