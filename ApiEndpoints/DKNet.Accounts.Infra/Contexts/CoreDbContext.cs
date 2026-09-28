@@ -4,8 +4,8 @@ using DKNet.Accounts.Share.Options;
 
 namespace DKNet.Accounts.Infra.Contexts;
 
-/// <param name="options"></param>
-/// <param name="currentUserProviders"></param>
+/// <param name="options">The EF Core options of this context.</param>
+/// <param name="currentUserProviders">The signed-in user source the ownership check reads.</param>
 /// <param name="outbound">The outbound bus settings; registered only when the bus is on.</param>
 internal class CoreDbContext(
     DbContextOptions options,

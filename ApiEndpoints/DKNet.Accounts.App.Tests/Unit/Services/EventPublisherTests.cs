@@ -69,5 +69,18 @@ public sealed class EventPublisherTests
         db.OutboundEventFailure.ShouldBeSameAs(failure);
     }
 
+    [Fact]
+    public async Task AnOutboundEventThatCannotBeStored_WithNoSavingContext_IsRethrownAsItIs()
+    {
+        var failure = new InvalidOperationException("outbox down");
+        _bus.Setup(b => b.Publish(It.IsAny<OutboundEnvelope>(), null, It.IsAny<IDictionary<string, object>>(),
+            It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(
+            () => new EventPublisher(_bus.Object, new MessageBusOptions()).PublishAsync(CurrencyCreated));
+
+        thrown.ShouldBeSameAs(failure);
+    }
+
     #endregion
 }

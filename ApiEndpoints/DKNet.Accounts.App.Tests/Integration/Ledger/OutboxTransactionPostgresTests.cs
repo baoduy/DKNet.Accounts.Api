@@ -200,12 +200,12 @@ public sealed class OutboxTransactionPostgresTests : IAsyncLifetime
     }
 
     private Task<long> OutboxRowsForAsync(Guid id) =>
-        ScalarAsync<long>("SELECT COUNT(*) FROM public.smb_outbox WHERE convert_from(message_payload, 'UTF8') LIKE @id",
+        ScalarAsync<long>("SELECT COUNT(*) FROM public.smb_outbox WHERE convert_from(message_payload, 'UTF8')::jsonb -> 'payload' ->> 'id' = @id",
             id);
 
     private Task<string?> MessageIdOfAsync(Guid id) =>
         ScalarAsync<string?>(
-            "SELECT headers ->> 'OutboundMessageId' FROM public.smb_outbox WHERE convert_from(message_payload, 'UTF8') LIKE @id",
+            "SELECT headers ->> 'OutboundMessageId' FROM public.smb_outbox WHERE convert_from(message_payload, 'UTF8')::jsonb -> 'payload' ->> 'id' = @id",
             id);
 
     private async Task<T> ScalarAsync<T>(string sql, Guid id)
@@ -213,7 +213,7 @@ public sealed class OutboxTransactionPostgresTests : IAsyncLifetime
         await using var connection = new NpgsqlConnection(_container.GetConnectionString());
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("id", $"%{id}%");
+        command.Parameters.AddWithValue("id", id.ToString());
         return (T)(await command.ExecuteScalarAsync())!;
     }
 }

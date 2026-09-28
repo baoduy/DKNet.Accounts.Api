@@ -21,6 +21,17 @@ public sealed class OutboundMessageIdHeaderTests
     }
 
     [Fact]
+    public void AnAzureServiceBusMessageWhoseHeaderIsNotText_KeepsItsOwnMessageId()
+    {
+        var message = new ServiceBusMessage { MessageId = "transport-id" };
+        message.ApplicationProperties.Add(OutboundMessageId.Header, 42);
+
+        OutboundMessageId.ApplyTo(message);
+
+        message.MessageId.ShouldBe("transport-id");
+    }
+
+    [Fact]
     public void ARabbitMqMessage_CarriesTheStoredIdAsItsText()
     {
         var properties = new BasicProperties
