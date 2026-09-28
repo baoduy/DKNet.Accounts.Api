@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KNOWN_SCOPES } from './scopes';
 
 const TEST_CONFIG = {
   entraTenantId: 'drunk-coding-tenant',
@@ -79,6 +80,43 @@ describe('scopesFromAccessToken', () => {
 
   it('is empty (never throws) for an opaque, non-JWT access token', () => {
     expect(scopesFromAccessToken('MAI-CANARY-ACCESS-TOKEN-NOT-A-JWT')).toEqual([]);
+  });
+});
+
+/**
+ * DRK-1796 §5:
+ *   @unit
+ *   Scenario Outline: The console reads a user's scopes from scp, else from scope
+ *     Given a token whose `scp` is "<scp>" and whose `scope` is "<scope>"
+ *     When the console reads the user's permissions
+ *     Then the user holds <granted>
+ *
+ *     Examples:
+ *       | scp           | scope                                     | granted                            |
+ *       | accounts.read |                                           | "accounts.read" only               |
+ *       |               | profile email accounts.read postings.read | "accounts.read" and "postings.read" |
+ *       | accounts.read | accounts.read accounts.write              | "accounts.read" only               |
+ *       |               |                                           | no permission                      |
+ *
+ * "Holds" is which of the 5 known ledger scopes the token carries (brief DRK-1798 §7): `profile` and
+ * `email` grant nothing. A blank cell is a claim holding an empty string; brief §3 row 8 also names an
+ * absent `scp`, pinned by the last case.
+ */
+describe("The console reads a user's scopes from scp, else from scope", () => {
+  const held = (claims: Record<string, unknown>): string[] =>
+    scopesFromAccessToken(fakeJwt(claims)).filter((scope) => (KNOWN_SCOPES as readonly string[]).includes(scope));
+
+  it.each([
+    { scp: 'accounts.read', scope: '', granted: ['accounts.read'] },
+    { scp: '', scope: 'profile email accounts.read postings.read', granted: ['accounts.read', 'postings.read'] },
+    { scp: 'accounts.read', scope: 'accounts.read accounts.write', granted: ['accounts.read'] },
+    { scp: '', scope: '', granted: [] },
+  ])('scp "$scp" and scope "$scope" hold $granted', ({ scp, scope, granted }) => {
+    expect(held({ scp, scope })).toEqual(granted);
+  });
+
+  it('reads scope when the token carries no scp claim at all', () => {
+    expect(held({ scope: 'profile email accounts.read postings.read' })).toEqual(['accounts.read', 'postings.read']);
   });
 });
 

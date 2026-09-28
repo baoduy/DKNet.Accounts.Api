@@ -19,6 +19,21 @@
  * - `.env.sample`, and `docker-compose.yml` as written and as resolved on its own.
  *
  * RED today: `docker-compose.e2e.yml` does not exist.
+ *
+ * DRK-1796 §5:
+ *   @integration
+ *   Scenario: Published artefacts never name the demo sign-in server
+ *     Given the service and console images built for the registry, the sample environment file and the repository's container stack
+ *     When their sign-in settings are read
+ *     Then none of them names Keycloak, the demo realm or its secrets
+ *     And none of them relaxes how tokens are trusted
+ *
+ * What names the AppHost's demo sign-in server is read from the one place allowed to (DRK-1796 R5): the AppHost's
+ * own Keycloak wiring (`AppHost.cs`, its Keycloak resource) and the realm file it imports (`Realms/`) — the realm's
+ * name and its own clients' ids and secrets, Keycloak's built-in clients left out. Those markers are matched as
+ * whole names (`dknet-accounts-api:local`, a compose image name, does not name a realm `dknet-accounts`); the
+ * stand-in's markers keep matching anywhere in the text. RELAXED_TRUST already covers "relaxes how tokens are
+ * trusted". RED for DRK-1796: the AppHost has no Keycloak resource and no realm file.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -34,6 +49,38 @@ const CONSOLE_IMAGE = `ghcr.io/baoduy/dknet.accounts-console:acceptance-trust-${
 
 /** Settings that loosen how the service or the console checks who signed a token. */
 const RELAXED_TRUST = ['RequireHttpsMetadata', 'MapInboundClaims', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE'];
+
+const APPHOST_DIR = path.join(REPO_ROOT, 'ApiEndpoints', 'DKNet.Accounts.AppHost');
+
+/** The clients every Keycloak realm is created with — they name nothing of the demo realm's own. */
+const KEYCLOAK_BUILT_IN_CLIENTS = new Set(['account', 'account-console', 'admin-cli', 'broker', 'realm-management', 'security-admin-console']);
+
+type RealmFile = { realm?: string; clients?: Array<{ clientId?: string; secret?: string }> };
+
+/** DRK-1796: what names the demo sign-in server — Keycloak, the AppHost's Keycloak resource, the realm and its secrets. */
+function demoSignInMarkers(): string[] {
+  const keycloakResource = /\.AddKeycloak\(\s*"([^"]+)"/.exec(read(APPHOST_DIR, 'AppHost.cs'))?.[1];
+  expect(keycloakResource, "the AppHost's Keycloak resource").toBeTruthy();
+
+  const realmsDir = path.join(APPHOST_DIR, 'Realms');
+  const realmFiles = fs.existsSync(realmsDir) ? fs.readdirSync(realmsDir).filter((name) => name.endsWith('.json')) : [];
+  expect(realmFiles.length, 'realm files the AppHost imports').toBeGreaterThan(0);
+  const realms = realmFiles.map((name) => JSON.parse(read(realmsDir, name)) as RealmFile);
+
+  const own = realms.flatMap((realm) => (realm.clients ?? []).filter((client) => !KEYCLOAK_BUILT_IN_CLIENTS.has(client.clientId ?? '')));
+  expect(own.length, "the demo realm's own clients").toBeGreaterThan(0);
+  return [
+    ...new Set(
+      ['keycloak', keycloakResource!, ...realms.map((realm) => realm.realm ?? ''), ...own.flatMap((client) => [client.clientId ?? '', client.secret ?? ''])].filter(Boolean),
+    ),
+  ];
+}
+
+/** `marker` as a whole name: not inside a longer name of letters, digits and dashes. */
+function namesWhole(text: string, marker: string): boolean {
+  const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, 'i').test(text);
+}
 
 type ComposeFile = { services?: Record<string, { environment?: Record<string, unknown> | string[] }> };
 
@@ -79,6 +126,7 @@ test('Published images and the sample settings trust only Microsoft Entra ID', a
   const standInHosts = hosts([...Object.values(serviceTrust), ...Object.values(consoleTrust)]).filter((host) => !baseHosts.has(host));
   expect(standInHosts.length, 'hosts the check points sign-in at').toBeGreaterThan(0);
   const markers = [...new Set([...standIns, ...standInHosts, ...RELAXED_TRUST])];
+  const demoMarkers = demoSignInMarkers();
 
   execFileSync('docker', ['build', '-f', path.join(REPO_ROOT, 'ui', 'Dockerfile'), '-t', CONSOLE_IMAGE, REPO_ROOT], { stdio: 'pipe' });
   const consoleImage = JSON.parse(execFileSync('docker', ['inspect', CONSOLE_IMAGE], { encoding: 'utf8' }))[0].Config as Record<string, unknown>;
@@ -103,8 +151,9 @@ test('Published images and the sample settings trust only Microsoft Entra ID', a
     ),
   };
 
-  const named = Object.entries(published).flatMap(([where, text]) =>
-    markers.filter((marker) => text.toLowerCase().includes(marker.toLowerCase())).map((marker) => `${where} names ${marker}`),
-  );
+  const named = Object.entries(published).flatMap(([where, text]) => [
+    ...markers.filter((marker) => text.toLowerCase().includes(marker.toLowerCase())).map((marker) => `${where} names ${marker}`),
+    ...demoMarkers.filter((marker) => namesWhole(text, marker)).map((marker) => `${where} names ${marker}`),
+  ]);
   expect(named).toEqual([]);
 });
