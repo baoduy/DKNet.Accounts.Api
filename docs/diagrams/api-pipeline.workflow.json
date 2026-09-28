@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "API Request Pipeline",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "edge", "label": "Edge" },
+    { "id": "resilience", "label": "Routing + Resilience" },
+    { "id": "auth", "label": "Auth + Validation" },
+    { "id": "app", "label": "Application" }
+  ],
+  "nodes": [
+    { "id": "kestrel", "lane": "edge", "col": 0, "width": 140, "type": "backend", "label": "Kestrel limits", "sublabel": "body size, timeout" },
+    { "id": "headers", "lane": "edge", "col": 1, "width": 210, "type": "security", "label": "Forwarded + security headers", "sublabel": "antiforgery, CORS" },
+    { "id": "hsts", "lane": "edge", "col": 2, "width": 150, "type": "security", "label": "HSTS / HTTPS redirect", "sublabel": "health checks" },
+    { "id": "e413", "lane": "edge", "col": 3, "width": 160, "type": "external", "label": "413 Payload Too Large", "tag": "over body size" },
+
+    { "id": "routing", "lane": "resilience", "col": 0, "width": 110, "type": "backend", "label": "Routing", "sublabel": "endpoint registration" },
+    { "id": "timeouts", "lane": "resilience", "col": 1, "width": 130, "type": "backend", "label": "Request timeouts", "sublabel": "30s, then 504" },
+    { "id": "ratelimit", "lane": "resilience", "col": 2, "width": 160, "type": "backend", "label": "Rate limiting", "sublabel": "fixed window + concurrency" },
+    { "id": "e429", "lane": "resilience", "col": 3, "width": 170, "type": "external", "label": "429 Too Many Requests", "tag": "no token read" },
+    { "id": "e504", "lane": "resilience", "col": 4, "width": 150, "type": "external", "label": "504 Gateway Timeout", "tag": "over 30s" },
+
+    { "id": "authn", "lane": "auth", "col": 0, "width": 130, "type": "security", "label": "Authentication", "sublabel": "/ authorization" },
+    { "id": "exhandler", "lane": "auth", "col": 1, "width": 160, "type": "backend", "label": "Exception handler", "sublabel": "registered; OpenAPI mapped" },
+    { "id": "claim", "lane": "auth", "col": 2, "width": 170, "type": "backend", "label": "[FromClaim] population", "sublabel": "endpoint filter" },
+    { "id": "validation", "lane": "auth", "col": 3, "width": 150, "type": "backend", "label": "FluentValidation", "sublabel": "auto-validation filter" },
+    { "id": "e401", "lane": "auth", "col": 4, "width": 110, "type": "external", "label": "401 / 403", "tag": "no credential / scope" },
+    { "id": "e400", "lane": "auth", "col": 5, "width": 140, "type": "external", "label": "400 Bad Request", "tag": "validator failure" },
+
+    { "id": "idempotency", "lane": "app", "col": 0, "width": 190, "type": "backend", "label": "Idempotency", "sublabel": "Record/RecordBatch/Reverse only" },
+    { "id": "handler", "lane": "app", "col": 1, "width": 130, "type": "backend", "label": "Handler", "sublabel": "the feature's own logic" },
+    { "id": "e500", "lane": "app", "col": 2, "width": 150, "type": "external", "label": "500 problem+json", "tag": "unhandled exception" }
+  ],
+  "edges": [
+    { "from": "kestrel", "to": "headers" },
+    { "from": "headers", "to": "hsts" },
+    { "from": "hsts", "to": "routing" },
+    { "from": "routing", "to": "timeouts" },
+    { "from": "timeouts", "to": "ratelimit" },
+    { "from": "ratelimit", "to": "authn" },
+    { "from": "authn", "to": "exhandler" },
+    { "from": "exhandler", "to": "claim" },
+    { "from": "claim", "to": "validation" },
+    { "from": "validation", "to": "idempotency" },
+    { "from": "idempotency", "to": "handler" },
+    { "from": "kestrel", "to": "e413", "variant": "security", "role": "error" },
+    { "from": "timeouts", "to": "e504", "variant": "security", "role": "error" },
+    { "from": "ratelimit", "to": "e429", "variant": "security", "role": "error" },
+    { "from": "authn", "to": "e401", "variant": "security", "role": "error" },
+    { "from": "validation", "to": "e400", "variant": "security", "role": "error" },
+    { "from": "handler", "to": "e500", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Order is the authority", "items": ["Rate limiting runs before authentication, validation and idempotency — a throttled caller never reaches a handler, a validator, or the idempotency store", "The exception handler is registered after the endpoints, yet still wraps them: WebApplication appends endpoint execution at the very end"] },
+    { "dot": "amber", "title": "What this can't show", "items": ["Role-aware sensitive-property filtering runs after the handler, on serialization — a JsonSerializerOptions modifier, not a middleware", "API versioning shapes the route template at registration, not a pipeline stage"] }
+  ]
+}

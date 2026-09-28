@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Deactivate a Currency",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [960, 560]
+  },
+  "participants": [
+    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
+    { "id": "handler", "type": "backend", "label": "Deactivate", "sublabel": "hand-written handler" },
+    { "id": "accounts", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts" },
+    { "id": "currency", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Currencies" }
+  ],
+  "segments": [
+    { "from": 170, "to": 300, "label": "Cross-aggregate check" },
+    { "from": 316, "to": 430, "label": "Apply + save" }
+  ],
+  "messages": [
+    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/currencies/{id}/deactivate", "variant": "emphasis" },
+    { "from": "handler", "to": "accounts", "y": 260, "label": "any account in this currency with Balance != 0 or HeldAmount != 0?", "variant": "default", "note": "SpecListAccounts(currency: code) — a different aggregate than the one being deactivated" },
+    { "from": "accounts", "to": "handler", "y": 340, "label": "none found", "variant": "return", "note": "Otherwise refused: 422 CURRENCY_HOLDS_BALANCE, and the currency is left active" },
+    { "from": "handler", "to": "currency", "y": 400, "label": "Deactivate() — IsActive = false, one save", "variant": "emphasis" },
+    { "from": "handler", "to": "client", "y": 460, "label": "200 OK + CurrencyDto", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "handler", "from": 190, "to": 480, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Why this route stays hand-written", "items": ["The refusal reads Account, not Currency — a generated [CrudAction] handler can only see the aggregate it mutates", "The entity method Deactivate() itself carries no guard at all"] },
+    { "dot": "amber", "title": "What this can't show", "items": ["Existing accounts and postings already in this currency keep working unchanged", "Only a NEW account open (UNSUPPORTED_CURRENCY) is refused going forward"] }
+  ]
+}
