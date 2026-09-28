@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Change Account Status or Floor",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [960, 600]
+  },
+  "participants": [
+    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
+    { "id": "handler", "type": "backend", "label": "Update", "sublabel": "PATCH handler" },
+    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts" },
+    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
+  ],
+  "segments": [
+    { "from": 170, "to": 285, "label": "Recheck the floor" },
+    { "from": 300, "to": 410, "label": "Apply + save" },
+    { "from": 426, "to": 540, "label": "Respond" }
+  ],
+  "messages": [
+    { "from": "client", "to": "handler", "y": 200, "label": "PATCH /v1/accounts/{id} { status?, overdraftLimit?, minimumBalance?, permittedToGoNegative? }", "variant": "emphasis" },
+    { "from": "handler", "to": "account", "y": 240, "label": "merge supplied controls with the stored ones — still determinate?", "variant": "default", "note": "AccountFloorPolicy.RequiresOverdraftLimit on the merged state" },
+    { "from": "account", "to": "handler", "y": 270, "label": "determinate", "variant": "return", "note": "Otherwise refused: 422 OVERDRAFT_LIMIT_REQUIRED. Closing while Balance != 0 or HeldAmount != 0 is refused: 422 ACCOUNT_HOLDS_BALANCE" },
+    { "from": "handler", "to": "account", "y": 350, "label": "ChangeStatus / update controls, one save", "variant": "emphasis", "note": "ClosedOn is set when Status becomes Closed, cleared on any other status change" },
+    { "from": "handler", "to": "queue", "y": 390, "label": "accounts.updated event", "variant": "dashed" },
+    { "from": "handler", "to": "client", "y": 480, "label": "200 OK + AccountDto", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "handler", "from": 190, "to": 495, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Two separate update routes", "items": ["PUT changes name/metadata only — a different route entirely", "PATCH changes status and the three floor controls only; neither route overlaps the other's fields"] },
+    { "dot": "amber", "title": "What this can't show", "items": ["accounts.updated is raised only when this route actually changes a tracked field — never on a posting's balance movement alone"] }
+  ]
+}

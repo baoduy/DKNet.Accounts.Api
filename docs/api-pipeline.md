@@ -54,31 +54,7 @@ result is serialized — see
 **API versioning** is absent from the table because it is not a middleware. It shapes the route
 template when the group is registered — see [API versioning](#api-versioning) below.
 
-```mermaid
-graph TD
-    Req["Request"] --> K["0. Kestrel limits\nmax body size, header timeout, no Server header"]
-    K -->|"413 over body size"| K413["413 Payload Too Large"]
-    K --> FH["1. Forwarded headers"]
-    FH --> SH["2. Security response headers"]
-    SH --> AF["3. Antiforgery (not wired)"]
-    AF --> CORS["4. CORS"]
-    CORS --> HSTS["5. HSTS / HTTPS redirect"]
-    HSTS --> HC["6. Health-check endpoints"]
-    HC --> Route["7. Routing + endpoint registration"]
-    Route --> RT["8. Request timeouts"]
-    RT -->|"504 over timeout"| RT504["504 Gateway Timeout"]
-    RT --> RL["9. Rate limiting"]
-    RL -->|"429 over limit"| RL429["429 Too Many Requests"]
-    RL --> Auth["10. Authentication / authorization"]
-    Auth -->|"401 / 403"| Auth4xx["401 Unauthenticated / 403 Forbidden"]
-    Auth --> Swagger["11. Global exception handling registered here;\nOpenAPI/Scalar mapped here"]
-    Swagger --> Claim["12. [FromClaim]/[FromRequestHeader] population"]
-    Claim --> Val["13. FluentValidation auto-validation"]
-    Val -->|"400 on failure"| Val400["400 Bad Request"]
-    Val --> Idem["14. Idempotency filter (opt-in per route)"]
-    Idem --> H["15. Handler"]
-    H -->|"unhandled exception"| H500["500 problem+json\n(global exception handler)"]
-```
+![A request runs through Kestrel limits, forwarded and security headers, HSTS, routing, timeouts, rate limiting, authentication, the exception handler and OpenAPI mapping, claim population, validation and idempotency before reaching the handler, with 429, 401/403, 400 and 500 as short-circuit exits.](diagrams/api-pipeline.svg)
 
 Every short-circuit response above still passes back through the security-headers `OnStarting` hook
 and, once registered, the global exception handler's shape — see
@@ -380,7 +356,7 @@ The real idempotency mechanism is hand-written, on the three postings write rout
 up itself (`SpecGetPosting(byCallingSystem, byIdempotencyKey)`), compares a content signature
 (`PostingSignature`) against any existing row, and answers accordingly — the same key with the same
 content returns the original posting, the same key with different content is refused
-`409 IDEMPOTENCY_KEY_CONFLICT`. Full mechanics: [Postings' architecture](features/postings/architecture.md#the-per-account-lock).
+`409 IDEMPOTENCY_KEY_CONFLICT`. Full mechanics: [Postings — the per-account lock](features/postings.md#the-per-account-lock).
 
 The key is **required** on `Reverse` (`RuleFor(r => r.IdempotencyKey).NotEmpty()`) and **optional** on
 `Record`/`RecordBatch` — omitting it on either of those two simply skips the replay/conflict check

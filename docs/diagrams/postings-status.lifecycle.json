@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Posting Status",
+    "quality_profile": "showcase",
+    "viewBox": [720, 580]
+  },
+  "lanes": [
+    { "id": "main", "label": "Posting.Status" }
+  ],
+  "states": [
+    { "id": "start", "type": "start", "label": "Recorded", "sublabel": "POST /v1/postings or /batch", "lane": "main", "col": 0, "step": "01" },
+    { "id": "posted", "type": "success", "label": "Posted", "sublabel": "the normal, correctable state", "lane": "main", "col": 1, "step": "02" },
+    { "id": "reversed", "type": "neutral", "label": "Reversed", "sublabel": "terminal", "lane": "main", "col": 2, "step": "03", "tag": "terminal" }
+  ],
+  "transitions": [
+    { "from": "start", "to": "posted", "label": "Record / RecordBatch — always", "labelDy": -25 },
+    { "from": "posted", "to": "reversed", "label": "POST {id}/reverse", "labelDy": 55, "note": "Refused 422 POSTING_ALREADY_REVERSED if already reversed under a new key; refused per the account's own status gate in the reversal's direction" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "One-way and once only", "items": ["MarkReversedBy throws if called twice — a posting can be reversed at most once", "There is no path back to Posted: a mistake is corrected by a new posting, never by editing this one"] },
+    { "dot": "amber", "title": "A reversal is itself a Posting", "items": ["The reversing entry starts at Posted like any other — see Reverse a Posting for how the two rows link"] }
+  ]
+}

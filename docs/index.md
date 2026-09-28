@@ -22,14 +22,14 @@ invariants it guarantees, the full API contract and the decisions on record.
 
 ## Features
 
-Each feature owns its own README, architecture, API reference and data model:
+Each feature is one page — overview, business domain, quick start, end-to-end flow, endpoints, data model, events and downstream systems:
 
 | Feature | What it covers |
 |---|---|
-| [Currencies](features/currencies/README.md) | The reference currencies the service can denominate accounts and postings in. |
-| [Account Groups](features/account-groups/README.md) | The bucket accounts belong to, classified by what it represents. |
-| [Accounts](features/accounts/README.md) | Where a balance lives — currency, classification, floor, status. |
-| [Postings](features/postings/README.md) | The append-only ledger — postings, batches, reversals and the account statement route. |
+| [Currencies](features/currencies.md) | The reference currencies the service can denominate accounts and postings in. |
+| [Account Groups](features/account-groups.md) | The bucket accounts belong to, classified by what it represents. |
+| [Accounts](features/accounts.md) | Where a balance lives — currency, classification, floor, status. |
+| [Postings](features/postings.md) | The append-only ledger — postings, batches, reversals and the account statement route. |
 
 ## How the plumbing works
 

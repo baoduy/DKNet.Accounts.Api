@@ -75,4 +75,3 @@ The template carries two side-by-side vertical slices demonstrating opposite end
 
 ## Reference docs (link-first)
 - Comparison + worked samples: `docs/samples/manual-vs-automated.md`, `docs/samples/manual-purchase-orders/README.md`, `docs/samples/automated-products/README.md`
-- Skill catalog for guided implementation: `.github/skills/README.md`

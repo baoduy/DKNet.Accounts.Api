@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Open an Account",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [960, 620]
+  },
+  "participants": [
+    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
+    { "id": "endpoint", "type": "backend", "label": "Accounts API", "sublabel": "Open handler" },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts" },
+    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
+  ],
+  "segments": [
+    { "from": 170, "to": 280, "label": "Checks" },
+    { "from": 316, "to": 430, "label": "Allocate + save" },
+    { "from": 446, "to": 560, "label": "Respond" }
+  ],
+  "messages": [
+    { "from": "client", "to": "endpoint", "y": 200, "label": "POST /v1/accounts", "variant": "emphasis" },
+    { "from": "endpoint", "to": "db", "y": 240, "label": "currency active? group exists? floor determinate?", "variant": "default" },
+    { "from": "db", "to": "endpoint", "y": 270, "label": "all pass", "variant": "return", "note": "Otherwise refused: 422 UNSUPPORTED_CURRENCY, 404 unknown group, or 422 OVERDRAFT_LIMIT_REQUIRED" },
+    { "from": "endpoint", "to": "db", "y": 380, "label": "insert Account + outbox row, one save", "variant": "emphasis", "note": "accountNumber = \"{group.Code}-{suffix}\" (caller's suffix or a generated one); new Account(...), Status = Active, Balance = 0" },
+    { "from": "endpoint", "to": "queue", "y": 460, "label": "accounts.created event", "variant": "dashed", "note": "Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable." },
+    { "from": "endpoint", "to": "client", "y": 530, "label": "201 Created + AccountDto", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "endpoint", "from": 190, "to": 545, "type": "backend" },
+    { "participant": "db", "from": 240, "to": 400, "type": "database" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entirely hand-written", "items": ["Account carries no [CrudCreate] constructor — account-number allocation and the floor/currency checks are all handler logic"] },
+    { "dot": "amber", "title": "What this can't show", "items": ["The transaction boundary is the one SaveChanges call: entity and outbox row commit together or not at all", "A posting against this account is a separate flow — see Postings"] }
+  ]
+}

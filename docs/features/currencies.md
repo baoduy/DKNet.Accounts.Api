@@ -1,0 +1,240 @@
+# Currencies
+
+The reference list of currencies a caller can denominate accounts and postings in, and the precision each one is validated against.
+
+## 📖 Overview
+
+- **A currency is a stored, editable row, not a hard-coded table.** Registering `USDT` at 6 decimal places is a `POST`, not a deploy — the same way a fiat currency like `SGD` is registered.
+- **Every posting amount is checked against its currency's precision.** `10.555 USD` is refused because USD is denominated to 2 decimal places; a currency's `decimalPlaces` is fixed for life once registered, so every amount ever posted in it stays comparable.
+- **A currency is retired, never deleted.** Deactivating removes it from the set new accounts may open in; every account and posting already in it is untouched, and there is no delete route at all — the same append-only philosophy the ledger itself follows.
+- Called by any system integrating with the ledger — most often at onboarding time, to look up or register the currencies it will open accounts in.
+
+## 🏢 Business domain
+
+Currencies is reference data that [Accounts](accounts.md) and [Postings](postings.md) both depend on: an account is opened in exactly one currency, and every posting amount is validated against that currency's precision. It does not overlap the accounting side of the ledger — it never holds a balance itself.
+
+| Term | Meaning | In the code |
+|---|---|---|
+| `code` | The currency's identity, upper-cased on write so lookups are case-insensitive | `Currency.Code`, unique index `IX_Currencies_Code` |
+| `decimalPlaces` | How many decimal places this currency is legally denominated to; fixed at registration | `Currency.DecimalPlaces` |
+| `isActive` | Whether new accounts may open in this currency — an account-opening gate, not a visibility flag | `Currency.IsActive` |
+
+| Rule | Enforced by | A caller who breaks it gets |
+|---|---|---|
+| `code` must be unique (case-insensitive) | `CreateCurrencyCommandValidator` | `422 DUPLICATE_CURRENCY_CODE` |
+| `decimalPlaces` is immutable after registration | No `ChangeDecimalPlaces` method exists on `Currency` — enforced by omission | Not applicable — there is no route that could attempt it |
+| A currency can't be deactivated while an account in it holds a balance | `DeactivateCurrencyHandler`, a cross-aggregate check against `Account` | `422 CURRENCY_HOLDS_BALANCE` |
+
+## 🚀 Quick Start
+
+```http
+GET /v1/currencies
+Authorization: Bearer {token}
+```
+
+```json
+{
+  "items": [
+    { "id": "3fa85f64-...-46e6", "code": "SGD", "name": "Singapore Dollar", "decimalPlaces": 2, "isActive": true },
+    { "id": "c0de0002-0000-4000-8000-000000000001", "code": "USDT", "name": "Tether USD", "decimalPlaces": 6, "isActive": true }
+  ],
+  "pageNumber": 1, "pageSize": 1000, "totalItemCount": 26, "hasNextPage": false, "hasPreviousPage": false
+}
+```
+
+```http
+POST /v1/currencies
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{ "code": "XAU", "name": "Gold (troy ounce)", "decimalPlaces": 4 }
+```
+
+## 🔄 End-to-end flow
+
+The whole slice — Create, List, Get, Rename, Activate, Deactivate — rides one generated composite route (`group.MapCurrencyCrud(o => o.Exclude(CrudOp.Delete))`), except Deactivate, whose generated handler is replaced by a hand-written one.
+
+![Client posts to /v1/currencies; the handler checks the code is free, inserts the currency and its outbox row in one save, then publishes a currencies.created event to the ledger-events queue.](../diagrams/currencies-register.svg)
+
+The entity and its outbox row commit in the one `SaveChanges` call that DKNet's SlimBus EF Core interceptor runs after the handler returns — the handler itself never calls `SaveChangesAsync`. This diagram can't show what happens when the bus is unreachable: the event stays in the outbox and is retried every 10 seconds, indefinitely, without ever failing the write that created the currency (see [📣 Events](#-events)).
+
+`IsActive` is a plain boolean, but it does gate behaviour — new accounts may only open in an active currency:
+
+![Currency status starts Active on create; POST /{id}/deactivate moves it to Inactive unless an account in that currency still holds a balance; POST /{id}/activate moves it back to Active unconditionally.](../diagrams/currencies-status.svg)
+
+## 🔌 Endpoints
+
+| Verb | Path | Purpose | Auth |
+|---|---|---|---|
+| `GET` | `/v1/currencies` | List currencies (filter/search/order/page) | `accounts.read` |
+| `GET` | `/v1/currencies/{id}` | Read one currency | `accounts.read` |
+| `POST` | `/v1/currencies` | Register a currency | `accounts.write` |
+| `PUT` | `/v1/currencies/{id}` | Rename a currency | `accounts.write` |
+| `POST` | `/v1/currencies/{id}/activate` | Reactivate a currency | `accounts.write` |
+| `POST` | `/v1/currencies/{id}/deactivate` | Deactivate a currency | `accounts.write` |
+
+### `GET /v1/currencies`
+
+Lists currencies. Generated `MapGetList<Currency, Guid, CurrencyDto>()` route — full filter/search/order/page contract: [Generic List Endpoint](../generic-list-endpoint.md).
+
+- **Auth:** `accounts.read`
+- **Request:** none of its own — shares the generic list query surface ([Listing groups and accounts](../../README.md#listing-groups-and-accounts))
+- **Response:** `200 OK` — `PagedResponse<CurrencyDto>`
+- **Errors:** `400` unknown filter/order field, or a malformed filter triple
+- **Example:**
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/currencies?pageSize=50"
+```
+
+### `GET /v1/currencies/{id}`
+
+Reads one currency.
+
+- **Auth:** `accounts.read`
+- **Request:** `id` (uuid, route)
+- **Response:** `200 OK` — `CurrencyDto`
+- **Errors:** `400` malformed id · `404` unknown id
+- **Example:**
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/currencies/{id}"
+```
+
+### `POST /v1/currencies`
+
+Registers a currency. Generated route; validation is a hand-written FluentValidation validator (`CreateCurrencyCommandValidator`, `AppServices/Currencies/V1/Actions/Create.cs`).
+
+- **Auth:** `accounts.write`
+- **Idempotency:** not idempotent — a retry registers a second currency if `code` differs, or is refused `DUPLICATE_CURRENCY_CODE` if it repeats one
+- **Request:**
+
+  | Field | Type | Required | Rules | From |
+  |---|---|---|---|---|
+  | `code` | string | ✓ | 3–10 letters (`^[A-Za-z]{3,10}$`), must not already exist (case-insensitive, stored upper-cased) | body |
+  | `name` | string | ✓ | non-empty, ≤ 100 characters | body |
+  | `decimalPlaces` | int | ✓ | 0–6 inclusive — every money column in this service stores 6 decimal places, so a currency can never be finer | body |
+
+- **Response:** `201 Created` — `CurrencyDto`, `isActive: true`
+- **Errors:** `422 DUPLICATE_CURRENCY_CODE` · `400` malformed body
+- **Example:**
+
+```bash
+curl -X POST "https://accounts.example.com/v1/currencies" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"code":"XAU","name":"Gold (troy ounce)","decimalPlaces":4}'
+```
+
+### `PUT /v1/currencies/{id}`
+
+Renames a currency. `code`, `decimalPlaces` and `isActive` are untouched — there is no method that changes them after registration.
+
+- **Auth:** `accounts.write`
+- **Idempotency:** not idempotent, but repeatable — resending the same name is a no-op that returns the same `200`
+- **Request:** `name` (string, required, ≤ 100 characters, `RenameCurrencyRequestValidator`)
+- **Response:** `200 OK` — `CurrencyDto`
+- **Errors:** `400` malformed id or body · `404` unknown id
+- **Example:**
+
+```bash
+curl -X PUT "https://accounts.example.com/v1/currencies/{id}" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Gold (troy ounce, refined)"}'
+```
+
+### `POST /v1/currencies/{id}/activate`
+
+Reactivates a currency. No request body, no validator, no guard on the entity method — always succeeds for a known id.
+
+- **Auth:** `accounts.write`
+- **Idempotency:** naturally idempotent — activating an already-active currency is a no-op `200`
+- **Request:** none
+- **Response:** `200 OK` — `CurrencyDto`, `isActive: true`
+- **Errors:** `400` malformed id · `404` unknown id
+- **Example:**
+
+```bash
+curl -X POST "https://accounts.example.com/v1/currencies/{id}/activate" -H "Authorization: Bearer $TOKEN"
+```
+
+### `POST /v1/currencies/{id}/deactivate`
+
+Deactivates a currency — the one hand-written handler in this slice (`DeactivateCurrencyHandler`, replacing the generated one on the same route), because its refusal reads a different aggregate (`Account`) than the one being mutated.
+
+![Handler checks whether any account in this currency still holds a non-zero balance or held amount; if none do, it deactivates the currency in one save.](../diagrams/currencies-deactivate.svg)
+
+- **Auth:** `accounts.write`
+- **Idempotency:** naturally idempotent — deactivating an already-inactive currency is a no-op `200`
+- **Request:** none
+- **Response:** `200 OK` — `CurrencyDto`, `isActive: false`
+- **Errors:** `422 CURRENCY_HOLDS_BALANCE` — an account denominated in this currency still holds a non-zero balance or held amount (checked via `SpecListAccounts(currency: code)`) · `400` malformed id · `404` unknown id
+- **Example:**
+
+```bash
+curl -X POST "https://accounts.example.com/v1/currencies/{id}/deactivate" -H "Authorization: Bearer $TOKEN"
+```
+
+## 🗃️ Data model
+
+### Currency — `pro.Currencies`
+
+One row is one currency this service can denominate an account or a posting in.
+
+| Field | Column | DB type | Length / precision | Required | Key / index | Default | Purpose |
+|---|---|---|---|---|---|---|---|
+| `Id` | `Id` | uuid | — | ✓ | PK | new Guid | Service-generated identifier |
+| `Code` | `Code` | varchar | 10 | ✓ | unique (`IX_Currencies_Code`) | — | The currency's identity; upper-cased on write so lookups are case-insensitive |
+| `Name` | `Name` | varchar | 100 | ✓ | — | — | Human-readable display name |
+| `DecimalPlaces` | `DecimalPlaces` | int | — | ✓ | — | — | The precision every posting amount in this currency is validated against; immutable after registration |
+| `IsActive` | `IsActive` | bool | — | ✓ | — | `true` | Whether new accounts may open in this currency |
+| `CreatedBy` / `UpdatedBy` | same | varchar | — | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook from the caller's credential on save, never by a request field |
+| `CreatedOn` / `UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created / last touched |
+
+`Currency` carries no foreign key of its own — `Account.CurrencyCode` (see [Accounts' data model](accounts.md#account--proaccounts)) references `Currency.Code` by value, not by a mapped EF Core relationship, so there is no navigation property either direction.
+
+| Status | Meaning | Reached by | Next |
+|---|---|---|---|
+| `IsActive = true` | New accounts may open in this currency | Create (always), or `POST /{id}/activate` | `IsActive = false` |
+| `IsActive = false` | Existing accounts and postings in this currency are unaffected; new accounts may not open in it | `POST /{id}/deactivate`, refused with `CURRENCY_HOLDS_BALANCE` while any account in this currency holds a non-zero balance or held amount | `IsActive = true` |
+
+## 📣 Events
+
+Declared on `Currency` with `[RaisesEvent]` (DRK-1773 §3a) and raised by the DKNet EF Core save hook — no application code calls a publish method directly.
+
+| Event | Raised when | Payload | Transport | Consumers |
+|---|---|---|---|---|
+| `currencies.created` | A currency is registered | `id`, `code`, `name`, `decimalPlaces`, `isActive`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue |
+| `currencies.updated` | A currency is renamed, activated or deactivated | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue |
+
+Every event is wrapped as `{ "type": "currencies.created", "payload": { ... } }` (`OutboundEnvelope`), stored in the same database save as the change (a PostgreSQL outbox), and sent over Azure Service Bus or RabbitMQ depending on `MessageBus:Transport`. With the message bus off (`FeatureManagement:EnableServiceBus` false, or no connection string configured), an event is dropped: nothing is stored and nothing is sent, but the currency change itself still succeeds. With the bus on but the broker unreachable, the event waits in the outbox and is retried every 10 seconds, without limit, until it is delivered — see [🌐 Downstream systems](#-downstream-systems).
+
+## 🌐 Downstream systems
+
+| System | Direction | How | What for | When it is down |
+|---|---|---|---|---|
+| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (production) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a currency was registered, renamed, activated or deactivated | Event is retried from the PostgreSQL outbox every 10 seconds, indefinitely — nothing is lost, but delivery is delayed until the broker is reachable again |
+
+Configuration keys: `FeatureManagement:EnableServiceBus`, `MessageBus:Transport` (`AzureServiceBus` or `RabbitMq`), `MessageBus:OutboundQueue`, `ConnectionStrings:AzureBus` / `ConnectionStrings:RabbitMq`.
+
+## ⚙️ Configuration reference
+
+| Key | Type | Default | Effect |
+|---|---|---|---|
+| `MessageBus:Transport` | enum | `AzureServiceBus` | Which broker `currencies.created`/`currencies.updated` are sent on |
+| `MessageBus:OutboundQueue` | string | `ledger-events` | The queue/exchange every outbound event, this feature's included, is sent to |
+| `FeatureManagement:EnableServiceBus` | bool | `true` | External bus wiring. Off means every event is dropped, not queued |
+
+## ⚠️ Errors & limits
+
+Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the root README](../../README.md#refusals-and-error-codes).
+
+- **No delete route exists.** A currency is retired by deactivating it, never removed — the same append-only philosophy as the ledger itself.
+- **`decimalPlaces` can never be changed after registration.** There is deliberately no rename-precision method, because every posting amount and every stored money value elsewhere rounds against the value fixed at registration.
+- **Deactivating is not retroactive.** Every existing account and posting in a deactivated currency keeps working; only opening a *new* account in it is refused.
+- The service ships 26 seeded currencies; registering more has no fixed cap.
+
+## 🔗 Related features
+
+- [Accounts](accounts.md) — every account opens in exactly one currency, and `CurrencyCode` is immutable once set.
+- [Postings](postings.md) — every posting amount is validated against its currency's `decimalPlaces`, and its own currency must always equal its account's.
+- [Accounts client (.NET)](../accounts-client.md) — reach for the `DKNet.Accounts.Client` NuGet package when calling this and the other three features from a .NET caller instead of raw HTTP.

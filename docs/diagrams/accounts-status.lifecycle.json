@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Account Status",
+    "quality_profile": "showcase",
+    "viewBox": [980, 760]
+  },
+  "lanes": [
+    { "id": "main", "label": "Active rail" },
+    { "id": "waiting", "label": "Frozen / Dormant — restricted" },
+    { "id": "terminal", "label": "Closed" }
+  ],
+  "states": [
+    { "id": "start", "type": "start", "label": "Opened", "sublabel": "POST /v1/accounts", "lane": "main", "col": 0, "step": "01" },
+    { "id": "active", "type": "success", "label": "Active", "sublabel": "accepts every direction", "lane": "main", "col": 2, "step": "02" },
+    { "id": "frozen", "type": "waiting", "label": "Frozen", "sublabel": "accepts nothing", "lane": "waiting", "col": 0 },
+    { "id": "dormant", "type": "waiting", "label": "Dormant", "sublabel": "credits only", "lane": "waiting", "col": 1 },
+    { "id": "closed", "type": "neutral", "label": "Closed", "sublabel": "balance must be 0", "lane": "terminal", "col": 2 }
+  ],
+  "transitions": [
+    { "from": "start", "to": "active", "label": "Open — always Active", "labelDy": -25 },
+    { "from": "active", "to": "frozen", "label": "PATCH {status: Frozen}", "route": "top-channel", "channelY": 100, "labelAt": [120, 20] },
+    { "from": "frozen", "to": "active", "label": "PATCH {status: Active}", "route": "top-channel", "channelY": 78, "labelAt": [280, 20] },
+    { "from": "active", "to": "dormant", "label": "PATCH {status: Dormant}", "route": "top-channel", "channelY": 56, "labelAt": [440, 20] },
+    { "from": "dormant", "to": "active", "label": "PATCH {status: Active}", "route": "top-channel", "channelY": 34, "labelAt": [600, 20] },
+    { "from": "frozen", "to": "closed", "label": "PATCH {status: Closed}", "route": "bottom-channel", "channelY": 460, "labelAt": [90, 690] },
+    { "from": "dormant", "to": "closed", "label": "PATCH {status: Closed}", "route": "bottom-channel", "channelY": 490, "labelAt": [250, 690] },
+    { "from": "active", "to": "closed", "label": "PATCH {status: Closed}", "route": "right-channel", "channelX": 800, "labelAt": [90, 730], "note": "Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero" },
+    { "from": "closed", "to": "active", "label": "PATCH {status: Active} — reopen", "route": "right-channel", "channelX": 920, "labelAt": [700, 690] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "One route, every transition", "items": ["Every move is PATCH {id} with {\"status\": \"<value>\"} — there is no dedicated freeze/close endpoint"] },
+    { "dot": "amber", "title": "Status gates postings too", "items": ["Frozen refuses every posting direction, including a reversal", "Dormant refuses a debit (including a debiting reversal), accepts a credit — see Postings' Record/Reverse flow for AccountPostingPolicy.StatusGate"] }
+  ]
+}
