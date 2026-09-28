@@ -34,18 +34,18 @@ public enum AccountStatus
         nameof(Id), nameof(AccountNumber), nameof(GroupId), nameof(Name), nameof(CurrencyCode),
         nameof(Classification), nameof(Status), nameof(Balance), nameof(HeldAmount), nameof(OverdraftLimit),
         nameof(MinimumBalance), nameof(PermittedToGoNegative), nameof(StreamPosition), nameof(LastPostedOn),
-        nameof(ExternalReference), nameof(Metadata), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
+        nameof(ExternalReference), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
         nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 [RaisesEvent(EventOperations.Updated,
-    nameof(Name), nameof(Metadata), nameof(ExternalReference), nameof(Status), nameof(ClosedOn), nameof(OverdraftLimit),
+    nameof(Name), nameof(ExternalReference), nameof(Status), nameof(ClosedOn), nameof(OverdraftLimit),
     nameof(MinimumBalance), nameof(PermittedToGoNegative),
     Include =
     [
         nameof(Id), nameof(AccountNumber), nameof(GroupId), nameof(Name), nameof(CurrencyCode),
         nameof(Classification), nameof(Status), nameof(Balance), nameof(HeldAmount), nameof(OverdraftLimit),
         nameof(MinimumBalance), nameof(PermittedToGoNegative), nameof(StreamPosition), nameof(LastPostedOn),
-        nameof(ExternalReference), nameof(Metadata), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
+        nameof(ExternalReference), nameof(ClosedOn), nameof(CreatedBy), nameof(CreatedOn),
         nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 public sealed class Account : AggregateRoot

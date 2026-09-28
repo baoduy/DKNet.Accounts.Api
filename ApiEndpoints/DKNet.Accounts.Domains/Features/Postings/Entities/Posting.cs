@@ -43,7 +43,7 @@ public enum PostingStatus
         nameof(RecordedAt), nameof(Category), nameof(Status), nameof(ReversedByPostingId), nameof(ReversesPostingId),
         nameof(TransactionGroupId), nameof(CounterpartyAccountId), nameof(CounterpartyReference),
         nameof(CallingSystem), nameof(IdempotencyKey), nameof(ExternalReference), nameof(Description),
-        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+        nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 [RaisesEvent(EventOperations.Updated, nameof(Status),
     Include =
@@ -53,7 +53,7 @@ public enum PostingStatus
         nameof(RecordedAt), nameof(Category), nameof(Status), nameof(ReversedByPostingId), nameof(ReversesPostingId),
         nameof(TransactionGroupId), nameof(CounterpartyAccountId), nameof(CounterpartyReference),
         nameof(CallingSystem), nameof(IdempotencyKey), nameof(ExternalReference), nameof(Description),
-        nameof(Metadata), nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
+        nameof(CreatedBy), nameof(CreatedOn), nameof(UpdatedBy), nameof(UpdatedOn)
     ])]
 public sealed class Posting : AggregateRoot
 {

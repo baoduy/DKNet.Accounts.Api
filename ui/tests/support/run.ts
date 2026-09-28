@@ -73,7 +73,7 @@ function allocate(): AcceptanceRun {
  */
 function tsconfigBeforeAnyConsole(): string {
   const current = fs.readFileSync(TSCONFIG_PATH, 'utf8');
-  if (!/\.next-[^/"]+\/types/.test(current)) return current;
+  if (!/\.next-[^/"]+\/(dev\/)?types/.test(current)) return current;
   try {
     return execFileSync('git', ['show', 'HEAD:./tsconfig.json'], { cwd: UI_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {

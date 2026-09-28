@@ -12,6 +12,7 @@ import { usePanelFocus } from '@/components/feedback/use-panel-focus';
 import { usePanelState } from '@/components/feedback/use-panel-state';
 import { ScopeGate } from '@/components/feedback/ScopeGate';
 import { FilterField, FilterMenu } from '@/components/forms/FilterMenu';
+import { Currency as CurrencyCode } from '@/components/ledger/Currency';
 import { formatAmount } from '@/components/ledger/Money';
 import { LedgerTable, type LedgerColumn } from '@/components/ledger/LedgerTable';
 import { StatusBadge } from '@/components/ledger/StatusBadge';
@@ -226,7 +227,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
   }
 
   const columns: LedgerColumn<Currency>[] = [
-    { key: 'code', header: 'Code', sortable: true, render: (row) => <Mono className="font-semibold">{row.code}</Mono> },
+    { key: 'code', header: 'Code', sortable: true, render: (row) => <Mono className="font-semibold"><CurrencyCode code={row.code} /></Mono> },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'decimalPlaces', header: 'Decimals', sortable: true, align: 'right', render: (row) => <Mono>{row.decimalPlaces}</Mono> },
     {
@@ -328,7 +329,7 @@ export function CurrenciesScreen({ grantedScopes }: CurrenciesScreenProps): JSX.
               </DetailSection>
               <DetailList
                 items={[
-                  { label: 'Code', value: <Mono>{selected.code}</Mono> },
+                  { label: 'Code', value: <Mono><CurrencyCode code={selected.code} /></Mono> },
                   { label: 'Name', value: selected.name },
                   { label: 'Decimal places', value: <Mono>{selected.decimalPlaces}</Mono> },
                   {

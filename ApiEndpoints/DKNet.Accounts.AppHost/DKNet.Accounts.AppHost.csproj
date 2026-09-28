@@ -32,6 +32,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DKNet.Accounts.Api\DKNet.Accounts.Api.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.TrafficGen\DKNet.Accounts.TrafficGen.csproj" />
     </ItemGroup>
 
     <ItemGroup>

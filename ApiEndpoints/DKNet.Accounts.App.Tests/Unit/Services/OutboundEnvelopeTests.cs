@@ -18,13 +18,13 @@ public sealed class OutboundEnvelopeTests
     private static readonly string[] CurrencyFields = ["id", "code", "name", "decimalPlaces", "isActive"];
 
     private static readonly string[] AccountGroupFields =
-        ["id", "code", "name", "description", "type", "status", "ownerId", "metadata"];
+        ["id", "code", "name", "description", "type", "status", "ownerId"];
 
     private static readonly string[] AccountFields =
     [
         "id", "accountNumber", "groupId", "name", "currencyCode", "classification", "status", "balance",
         "heldAmount", "overdraftLimit", "minimumBalance", "permittedToGoNegative", "streamPosition", "lastPostedOn",
-        "externalReference", "metadata", "closedOn"
+        "externalReference", "closedOn"
     ];
 
     private static readonly string[] PostingFields =
@@ -32,7 +32,7 @@ public sealed class OutboundEnvelopeTests
         "id", "accountId", "postingNumber", "streamPosition", "direction", "amount", "currency", "signedValue",
         "balanceAfter", "effectiveDate", "recordedAt", "category", "status", "reversedByPostingId",
         "reversesPostingId", "transactionGroupId", "counterpartyAccountId", "counterpartyReference", "callingSystem",
-        "idempotencyKey", "externalReference", "description", "metadata"
+        "idempotencyKey", "externalReference", "description"
     ];
 
     private static readonly IMapper Mapper =
@@ -49,7 +49,7 @@ public sealed class OutboundEnvelopeTests
         { typeof(AccountGroupDeletedEvent), "account-groups.deleted" },
         { typeof(AccountCreatedEvent), "accounts.created" },
         {
-            typeof(AccountClosedOnExternalReferenceMetadataMinimumBalanceNameOverdraftLimitPermittedToGoNegativeStatusUpdatedEvent),
+            typeof(AccountClosedOnExternalReferenceMinimumBalanceNameOverdraftLimitPermittedToGoNegativeStatusUpdatedEvent),
             "accounts.updated"
         },
         { typeof(PostingCreatedEvent), "postings.created" },
@@ -86,7 +86,7 @@ public sealed class OutboundEnvelopeTests
         envelope!.Payload.GetProperty("classification").GetString().ShouldBe("liability");
         envelope.Payload.GetProperty("status").GetString().ShouldBe("active");
         envelope.Payload.GetProperty("currencyCode").GetString().ShouldBe("SGD");
-        envelope.Payload.GetProperty("metadata").GetProperty("Team").GetString().ShouldBe("Treasury");
+        envelope.Payload.TryGetProperty("metadata", out _).ShouldBeFalse();
     }
 
     [Fact]

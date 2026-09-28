@@ -2,3 +2,10 @@
 # host paths and breaks the in-container restore of ApiEndpoints/DKNet.Accounts.Api/Dockerfile.
 **/bin/
 **/obj/
+
+# Local secrets (the root .env and its ui/.env symlink) must never reach an image.
+**/.env
+
+# Docs never reach an image — and ui/README.md is a symlink to ../README.md, which the console
+# build context (Design/ + ui/ only) does not carry: left in, Next's build stats it and fails.
+ui/*.md

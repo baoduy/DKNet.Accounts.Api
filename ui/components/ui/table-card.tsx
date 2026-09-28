@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
 import type { PaginationProps } from '@/components/ui/pagination';
 import { Caption } from '@/components/ui/text';
+import { cn } from '@/components/ui/utils';
 
 export interface TableCardProps {
   /** The search field's placeholder — also its accessible name. Omit for a card with no search. */
@@ -46,7 +47,9 @@ export function TableCard({
   const hasTopBar = searchPlaceholder !== undefined || (rows !== undefined && total !== undefined) || filter !== undefined;
   return (
     <div style={style} className={className}>
-      <Card padded={false}>
+      {/* The card must not clip: the filter panel hangs below the top bar, over the rows. Only
+          the table and pager are clipped to the card's radius, by the wrapper below. */}
+      <Card padded={false} className="overflow-visible">
         {hasTopBar ? (
           <CardBar position="top">
             {searchPlaceholder !== undefined ? (
@@ -75,8 +78,10 @@ export function TableCard({
             {filter ? <div className={rows !== undefined && total !== undefined ? undefined : 'ml-auto'}>{filter}</div> : null}
           </CardBar>
         ) : null}
-        {children}
-        {pagination ? <Pagination {...pagination} /> : null}
+        <div className={cn('overflow-hidden rounded-b-[inherit]', !hasTopBar && 'rounded-t-[inherit]')}>
+          {children}
+          {pagination ? <Pagination {...pagination} /> : null}
+        </div>
       </Card>
       {panel ? (
         // A grid, so the one child it holds — the panel, or a screen's focus wrapper around it —

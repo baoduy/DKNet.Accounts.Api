@@ -12,6 +12,7 @@ import { useState, type CSSProperties, type JSX } from 'react';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { Button } from '@/components/ui/button';
+import { Currency } from '@/components/ledger/Currency';
 import { Input, ReadOnlyField } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Caption, Mono } from '@/components/ui/text';
@@ -216,7 +217,7 @@ export function AccountForm({
               {fieldErrors.currency ? <span role="alert">{fieldErrors.currency.message}</span> : null}
             </>
           ) : (
-            <Locked value={account.currency} />
+            <ReadOnlyField locked>{account.currency ? <Currency code={account.currency} /> : <span>Not set.</span>}</ReadOnlyField>
           )}
         </FormRow>
 

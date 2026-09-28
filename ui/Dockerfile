@@ -20,8 +20,9 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /repo/ui/.next/standalone ./
-COPY --from=build /repo/ui/.next/static ./.next/static
+# Tracing root is the repo root (next.config.ts `turbopack.root`), so the server sits under ui/.
+COPY --from=build /repo/ui/.next/static ./ui/.next/static
 USER node
 EXPOSE 3000
 ENV PORT=3000
-CMD ["node", "server.js"]
+CMD ["node", "ui/server.js"]

@@ -6,7 +6,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within, type RenderResult } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { RecordsScreen } from './RecordsScreen';
 
 let mockSearch = '';
@@ -39,8 +39,8 @@ interface Stub {
   currenciesStatus?: number;
 }
 
-function stubLedger({ items = [P1], pageCount = 2, listStatus = 200, currenciesStatus = 200, pending = [] }: Stub = {}): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn().mockImplementation((raw: string) => {
+function stubLedger({ items = [P1], pageCount = 2, listStatus = 200, currenciesStatus = 200, pending = [] }: Stub = {}): Mock<(raw: string) => Promise<unknown>> {
+  const fetchMock = vi.fn<(raw: string) => Promise<unknown>>().mockImplementation((raw: string) => {
     const url = String(raw);
     if (pending.some((id) => url.endsWith(`/${id}`))) return new Promise(() => {});
     if (url.startsWith('/api/ledger/postings?')) {
@@ -288,7 +288,7 @@ describe('RecordsScreen', () => {
 });
 
 describe('RecordsScreen — screen states (DRK-1725 §3)', () => {
-  function stubList(page: Record<string, unknown>): ReturnType<typeof vi.fn> {
+  function stubList(page: Record<string, unknown>): Mock<(raw: string) => Promise<unknown>> {
     const fetchMock = stubLedger();
     const answer = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') ? Promise.resolve(jsonResponse(page)) : answer(raw)));

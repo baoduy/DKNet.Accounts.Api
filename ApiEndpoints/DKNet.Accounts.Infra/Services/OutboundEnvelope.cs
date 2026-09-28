@@ -36,7 +36,7 @@ internal sealed record OutboundEnvelope(
         [typeof(AccountGroupUpdatedEvent)] = "account-groups.updated",
         [typeof(AccountGroupDeletedEvent)] = "account-groups.deleted",
         [typeof(AccountCreatedEvent)] = "accounts.created",
-        [typeof(AccountClosedOnExternalReferenceMetadataMinimumBalanceNameOverdraftLimitPermittedToGoNegativeStatusUpdatedEvent)] =
+        [typeof(AccountClosedOnExternalReferenceMinimumBalanceNameOverdraftLimitPermittedToGoNegativeStatusUpdatedEvent)] =
             "accounts.updated",
         [typeof(PostingCreatedEvent)] = "postings.created",
         [typeof(PostingStatusUpdatedEvent)] = "postings.updated"

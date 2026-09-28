@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const RedisConstructor = vi.fn().mockImplementation(() => ({ id: Math.random() }));
+const RedisConstructor = vi.fn(function () {
+  return { id: Math.random() };
+});
 vi.mock('ioredis', () => ({ default: RedisConstructor }));
 vi.mock('./config', () => ({ loadConfig: () => ({ redisUrl: 'redis://127.0.0.1:6379' }) }));
 

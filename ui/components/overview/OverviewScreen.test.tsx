@@ -53,14 +53,16 @@ function memoryStorage(entries: Record<string, string> = {}): Storage {
   };
 }
 
+const OTHER_ID = 'a0000000-0000-4000-8000-000000000999';
+
 function storeRecent(entries: Array<{ kind: string; id: string }>): void {
   const stored = entries.map((entry) => ({ ...entry, openedAt: '2026-09-24T10:00:00.000Z' }));
   vi.stubGlobal('localStorage', memoryStorage({ [`recently-viewed:${MAI}`]: JSON.stringify(stored) }));
 }
 
-function renderOverview(grantedScopes: string[] = ALL_READS): void {
+function renderOverview(grantedScopes: string[] = ALL_READS): ReturnType<typeof render> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <OverviewScreen grantedScopes={grantedScopes} directoryObjectId={MAI} />
     </QueryClientProvider>,
@@ -382,12 +384,20 @@ describe('recently viewed', () => {
     ['Account', ACCOUNT_ID, `/api/ledger/accounts/${ACCOUNT_ID}`, 'This account can no longer be found.'],
     ['Posting', POSTING_ID, `/api/ledger/postings/${POSTING_ID}`, 'This posting can no longer be found.'],
   ])('says a %s that no longer exists can no longer be found', async (kind, id, path, statement) => {
-    storeRecent([{ kind, id }]);
-    stubLedger({ [path]: { status: 404, text: '{"errors":[{"message":"Not found."}]}' } });
+    storeRecent([{ kind, id }, { kind: 'Account', id: OTHER_ID }]);
+    stubLedger({
+      [path]: { status: 404, text: '{"errors":[{"message":"Not found."}]}' },
+      [`/api/ledger/accounts/${OTHER_ID}`]: { status: 200, text: `{"id":"${OTHER_ID}","accountNumber":"ACME-000999","name":"Acme Other"}` },
+    });
 
-    renderOverview();
+    const view = renderOverview();
 
     expect(await within(panel('Recently viewed')).findByText(statement)).toBeInTheDocument();
+    await waitFor(() => expect(within(panel('Recently viewed')).getAllByRole('listitem')[1]).toHaveTextContent('ACME-000999'));
+    // Said once, in place: still listed while Overview is open, gone once the operator leaves it.
+    expect(within(panel('Recently viewed')).getByText(statement)).toBeInTheDocument();
+    view.unmount();
+    expect(JSON.parse(localStorage.getItem(`recently-viewed:${MAI}`)!).map((entry: { id: string }) => entry.id)).toEqual([OTHER_ID]);
   });
 
   it('says the operator may no longer read a record the service refuses them', async () => {

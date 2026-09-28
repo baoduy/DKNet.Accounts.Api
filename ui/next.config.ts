@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from 'next/constants';
 import type { NextConfig } from 'next';
 import { loadConfig } from './lib/config';
@@ -14,11 +15,20 @@ export default function config(phase: string): NextConfig {
 
   return {
     output: 'standalone',
+    // `app/globals.css` imports `../../Design/tokens/*` from outside `ui/`, and Turbopack (the
+    // Next 16 default for `dev` and `build`) refuses any file above its root — which defaults to
+    // the folder holding the nearest lockfile, `ui/`. Next forces `outputFileTracingRoot` to the
+    // same value, so the standalone server lands at `.next/standalone/ui/server.js` (Dockerfile).
+    turbopack: { root: path.join(__dirname, '..') },
     // The floating dev-tools badge renders a button labelled "Open Next.js Dev Tools", which
     // collides with any on-screen button whose own name contains "Open" (e.g. the accounts
     // form's `Open` submit) under the acceptance suite's substring-matching role queries.
     // Dev-only UI; never present in a production build.
     devIndicators: false,
+    // Next 16 blocks `next dev`'s own resources (`/_next/hmr`, …) for any origin but `localhost`,
+    // and a page that cannot open that socket never hydrates. The acceptance suite browses the
+    // console at `127.0.0.1` (`tests/support/fixtures.ts`). Dev-only; ignored by `next start`.
+    allowedDevOrigins: ['127.0.0.1'],
     // The acceptance suite runs several `next dev` instances against this same checkout,
     // one at a time, on different ports (the shared `webServer` plus per-scenario restarts).
     // Without this they'd all write into the same `.next/`, corrupting each other's dev
