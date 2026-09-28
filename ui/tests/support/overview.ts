@@ -75,7 +75,8 @@ export async function rowLabels(region: Locator): Promise<string[]> {
 /** Opens an account's detail screen and waits until it has drawn the account. */
 export async function openAccount(page: Page, baseURL: string, accountNumber: string): Promise<void> {
   await page.goto(`${baseURL}/accounts/${accountNumber}`);
-  await expect(page.getByTestId('account-balance')).toBeVisible();
+  // Not `account-balance`: its label is drawn (even server-side) before the account is read.
+  await expect(page.getByTestId('account-status')).toBeVisible();
 }
 
 /** Opens a posting's details on the Records screen. */

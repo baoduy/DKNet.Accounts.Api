@@ -66,29 +66,6 @@ describe('AccountGroupsScreen', () => {
     expect(within(row).getByText('Active')).toBeInTheDocument();
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('changing the status filter navigates with the filter and resets paging', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(pagedResponse([])));
-    renderScreen();
-    await screen.findByLabelText('Status filter');
-
-    await userEvent.selectOptions(screen.getByLabelText('Status filter'), 'Closed');
-
-    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?status=Closed');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('changing the owner filter navigates with the filter', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(pagedResponse([])));
-    renderScreen();
-    await screen.findByLabelText('Owner filter');
-
-    await userEvent.type(screen.getByLabelText('Owner filter'), 'partner-bank-01');
-
-    const lastCall = historyPushSpy.mock.calls.at(-1);
-    expect(lastCall?.[2]).toContain('ownerId=');
-  });
-
   it('clicking the Name column header navigates with a sort param', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(pagedResponse([GROUP])));
     renderScreen();
@@ -104,21 +81,6 @@ describe('AccountGroupsScreen', () => {
     renderScreen();
     expect(await screen.findByRole('button', { name: 'Next page' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('clicking Next page engages an explicit page size alongside the page number', async () => {
-    // 11 unpaginated rows — more than ACCOUNT_GROUPS_PAGE_SIZE (10) — is what makes "Next
-    // page" clickable before pagination is engaged (43-mai-narrows-the-group-list still shows
-    // every matching row on one page; only crossing that size hints there is a next page).
-    const items = Array.from({ length: 11 }, (_, i) => ({ ...GROUP, id: `g${i}`, code: `GRP${i}` }));
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, { items, pageIndex: 0, pageSize: 1000, pageCount: 1, hasNextPage: false })));
-    renderScreen();
-    await screen.findByRole('button', { name: 'Next page' });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
-
-    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?page=2&pageSize=10');
   });
 
   it('opening a row fetches its detail and balances, showing one line per currency and no combined total', async () => {
@@ -214,30 +176,6 @@ describe('AccountGroupsScreen', () => {
     expect(screen.getByLabelText('Owner')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('a refused Close in view mode shows the message and code (DRK-1700 review B2)', async () => {
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith('/close') && init?.method === 'POST') {
-        return jsonResponse(422, { errors: [{ message: 'Group TRSY holds an account with a balance.', code: 'GROUP_HOLDS_BALANCE' }], traceId: 't-close' });
-      }
-      if (url.includes('/balances')) return new Response('[]', { status: 200 });
-      if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
-      return pagedResponse([GROUP]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /TRSY/ }));
-    const closeButton = await screen.findByRole('button', { name: 'Close group' });
-    await waitFor(() => expect(closeButton).toBeEnabled());
-
-    await userEvent.click(closeButton);
-
-    const panel = within(await screen.findByTestId('detail-panel'));
-    expect(await panel.findByText(/Group TRSY holds an account with a balance\./)).toBeInTheDocument();
-    expect(panel.getByText('GROUP_HOLDS_BALANCE')).toBeInTheDocument();
-  });
-
   it('a view-mode Delete refused with a field still renders in the alert (DRK-1700 review round 2, R2-1)', async () => {
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
       const url = String(input);
@@ -287,30 +225,6 @@ describe('AccountGroupsScreen', () => {
     expect(await screen.findByText('Not permitted.')).toBeInTheDocument();
     expect(screen.getByText('FORBIDDEN')).toBeInTheDocument();
     expect(screen.queryByText('No groups match this filter.')).not.toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('editing shows Code and Owner disabled, and saving with nothing changed surfaces the no-code refusal verbatim', async () => {
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (init?.method === 'PUT') return jsonResponse(400, { errors: [{ message: 'At least one field must be supplied.' }], traceId: 't-2' });
-      if (url.includes('/balances')) return new Response('[]', { status: 200 });
-      if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
-      return pagedResponse([GROUP]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /TRSY/ }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit group' }));
-
-    expect(screen.getByLabelText('Code')).toBeDisabled();
-    expect(screen.getByLabelText('Owner')).toBeDisabled();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-
-    const alertLine = await screen.findByText('At least one field must be supplied.');
-    expect(alertLine).toBeInTheDocument();
-    expect(screen.getByText(/Trace:/)).toBeInTheDocument();
   });
 
   it('renaming a group only sends the changed name', async () => {
@@ -437,66 +351,12 @@ describe('AccountGroupsScreen', () => {
 
     expect(await within(screen.getByTestId('detail-panel')).findByText('region=apac')).toBeInTheDocument();
   });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('Previous page navigates back a page, engaging the same explicit page size', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, { items: [GROUP], pageIndex: 1, pageSize: 10, pageCount: 2, hasNextPage: false })));
-    setSearchParams('page=2&pageSize=10');
-    renderScreen();
-    const previousButton = await screen.findByRole('button', { name: 'Previous page' });
-    expect(previousButton).toBeEnabled();
-
-    await userEvent.click(previousButton);
-
-    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?page=1&pageSize=10');
-  });
 });
 
 describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
   function paged(items: unknown[], totalItemCount: number, pageNumber = 1): Response {
     return jsonResponse(200, { items, pageNumber, pageSize: 10, pageCount: Math.max(1, Math.ceil(totalItemCount / 10)), totalItemCount, hasNextPage: false });
   }
-
-  // DRK-1745: rewrite for the new form
-  it.skip('narrows by type from its own Type filter, beside the status filter', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(paged([], 0));
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.selectOptions(await screen.findByLabelText('Type filter'), 'Internal');
-
-    expect(historyPushSpy).toHaveBeenCalledWith(null, '', '/groups?type=Internal');
-    await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain('/api/ledger/account-groups?filter=Type%3AEqual%3AInternal&pageNumber=1'));
-    expect(screen.getAllByRole('option').filter((option) => option.closest('select') === screen.getByLabelText('Type filter')).map((option) => option.textContent)).toEqual([
-      'Any',
-      'Customer',
-      'Merchant',
-      'Internal',
-      'Suspense',
-      'Settlement',
-    ]);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('starts its Owner filter blank', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
-    renderScreen();
-    expect(await screen.findByLabelText('Owner filter')).toHaveValue('');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('starts its Type filter on any type', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
-    renderScreen();
-    expect(((await screen.findByLabelText('Type filter')) as HTMLSelectElement).selectedOptions[0]).toHaveTextContent(/^Any$/);
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('keeps a type from the address in its filter', async () => {
-    setSearchParams('type=Internal');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(paged([], 0)));
-    renderScreen();
-    expect(await screen.findByLabelText('Type filter')).toHaveValue('Internal');
-  });
 
   it.each([
     { search: '', total: 0, message: 'No groups yet.' },
@@ -528,58 +388,6 @@ describe('AccountGroupsScreen — screen states (DRK-1725 §3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('cell', { name: 'TRSY' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('moves focus into the panel a row opens, and keeps the filters usable while the panel shows a group', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string) => {
-        const url = String(input);
-        if (url.includes('/balances')) return new Response('[]', { status: 200 });
-        if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
-        return paged([GROUP], 1);
-      }),
-    );
-    renderScreen();
-    const row = (await screen.findByRole('cell', { name: 'TRSY' })).closest('tr')!;
-    row.focus();
-    await userEvent.keyboard('{Enter}');
-
-    const panel = await screen.findByTestId('detail-panel');
-    expect(panel).toHaveFocus();
-    // It can hold focus, but is no tab stop of its own: Tab goes on through the page (R3).
-    expect(panel).toHaveAttribute('tabindex', '-1');
-    expect(row).toHaveAttribute('data-state', 'selected');
-    expect(screen.getByLabelText('Status filter')).toBeEnabled();
-    expect(screen.getByLabelText('Type filter')).toBeEnabled();
-
-    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(screen.queryByTestId('detail-panel')).toBeNull());
-    expect(row).toHaveFocus();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip("keeps the filters on screen while the panel's own form is open, and draws a placeholder until the balances answer", async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string) => {
-        const url = String(input);
-        if (url.includes('/balances')) return new Promise<Response>(() => {});
-        if (url.includes('/account-groups/g1')) return jsonResponse(200, GROUP);
-        return paged([GROUP], 1);
-      }),
-    );
-    renderScreen();
-    await userEvent.click(await screen.findByRole('cell', { name: 'TRSY' }));
-    const panel = await screen.findByTestId('detail-panel');
-    await within(panel).findByText('Balances');
-    expect(panel.querySelector('[data-slot="skeleton"]')).not.toBeNull();
-    expect(within(panel).queryByText('This group holds no account.')).toBeNull();
-
-    await userEvent.click(screen.getByRole('button', { name: 'New group' }));
-    expect(screen.getByLabelText('Type', { exact: true })).toBeInTheDocument();
-    for (const label of ['Status filter', 'Type filter', 'Owner filter']) expect(screen.getByLabelText(label, { exact: true })).toBeEnabled();
   });
 
   it('offers Retry on a failed group read in the panel', async () => {

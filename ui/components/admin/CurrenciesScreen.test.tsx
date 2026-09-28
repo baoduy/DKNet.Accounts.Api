@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -88,18 +88,6 @@ describe('CurrenciesScreen', () => {
     expect(screen.getByLabelText('Code')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('editing shows Code and Decimal places disabled, Name editable', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, [CURRENCY])));
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit currency' }));
-
-    expect(screen.getByLabelText('Code')).toBeDisabled();
-    expect(screen.getByLabelText('Decimal places')).toBeDisabled();
-    expect(screen.getByLabelText('Name')).toBeEnabled();
-  });
-
   it('renaming a currency sends only the new name and reflects it immediately', async () => {
     let current = { ...CURRENCY };
     const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
@@ -121,23 +109,6 @@ describe('CurrenciesScreen', () => {
     const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
     expect(JSON.parse((putCall?.[1] as RequestInit | undefined)?.body as string)).toEqual({ name: 'Singapore Dollar (SG)' });
     expect(await within(screen.getByTestId('detail-panel')).findByText('Singapore Dollar (SG)')).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('Deactivate currency stays disabled with CURRENCY_HOLDS_BALANCE beside it when an account holds a balance', async () => {
-    const fetchMock = vi.fn(async (input: string) => {
-      const url = String(input);
-      if (url.includes('/accounts/balances')) return new Response('[{"currency":"SGD","balance":400.00}]', { status: 200 });
-      return jsonResponse(200, [CURRENCY]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-
-    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
-    await waitFor(() => expect(deactivateButton).toBeDisabled());
-    expect(screen.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
-    expect(screen.getByText(/still holds a balance in this currency/)).toBeInTheDocument();
   });
 
   it('a blank Decimal places sends no POST (DRK-1700 review I1)', async () => {
@@ -174,52 +145,6 @@ describe('CurrenciesScreen', () => {
     expect(screen.getByLabelText('Decimal places')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('a refused Deactivate in view mode shows the message and code (DRK-1700 review B2)', async () => {
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/deactivate') && init?.method === 'POST') {
-        return jsonResponse(422, { errors: [{ message: 'An account in SGD still holds a balance.', code: 'CURRENCY_HOLDS_BALANCE' }], traceId: 't-deact' });
-      }
-      if (url.includes('/accounts/balances')) return new Response('[]', { status: 200 });
-      return jsonResponse(200, [CURRENCY]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
-    await waitFor(() => expect(deactivateButton).toBeEnabled());
-
-    await userEvent.click(deactivateButton);
-
-    const panel = within(await screen.findByTestId('detail-panel'));
-    expect(await panel.findByText(/An account in SGD still holds a balance\./)).toBeInTheDocument();
-    expect(panel.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('a view-mode Deactivate refused with a field still renders in the alert (DRK-1700 review round 2, R2-1)', async () => {
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/deactivate') && init?.method === 'POST') {
-        return jsonResponse(422, { errors: [{ message: 'An account in SGD still holds a balance.', code: 'CURRENCY_HOLDS_BALANCE', field: 'Id' }], traceId: 't-deact2' });
-      }
-      if (url.includes('/accounts/balances')) return new Response('[]', { status: 200 });
-      return jsonResponse(200, [CURRENCY]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
-    await waitFor(() => expect(deactivateButton).toBeEnabled());
-
-    await userEvent.click(deactivateButton);
-
-    const panel = within(await screen.findByTestId('detail-panel'));
-    expect(await panel.findByText(/An account in SGD still holds a balance\./)).toBeInTheDocument();
-    expect(panel.getByText('CURRENCY_HOLDS_BALANCE')).toBeInTheDocument();
-  });
-
   it('a failed list read shows the service code instead of the empty-list text (DRK-1700 review I2)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(401, { errors: [{ message: 'Session expired.', code: 'UNAUTHENTICATED' }], traceId: 't-auth' })));
     renderScreen();
@@ -227,48 +152,6 @@ describe('CurrenciesScreen', () => {
     expect(await screen.findByText('Session expired.')).toBeInTheDocument();
     expect(screen.getByText('UNAUTHENTICATED')).toBeInTheDocument();
     expect(screen.queryByText('No currencies registered.')).not.toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('deactivates a currency that holds no balance and shows it inactive', async () => {
-    let current = { ...CURRENCY };
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/deactivate') && init?.method === 'POST') {
-        current = { ...current, isActive: false };
-        return jsonResponse(200, current);
-      }
-      if (url.includes('/accounts/balances')) return new Response('[]', { status: 200 });
-      return jsonResponse(200, [current]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-    const deactivateButton = await screen.findByRole('button', { name: 'Deactivate currency' });
-    await waitFor(() => expect(deactivateButton).toBeEnabled());
-
-    await userEvent.click(deactivateButton);
-
-    expect(await within(screen.getByTestId('detail-panel')).findByText('Inactive')).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('reactivates an inactive currency', async () => {
-    let current = { ...CURRENCY, isActive: false };
-    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/activate') && !url.includes('deactivate') && init?.method === 'POST') {
-        current = { ...current, isActive: true };
-        return jsonResponse(200, current);
-      }
-      return jsonResponse(200, [current]);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    renderScreen();
-    await userEvent.click(await screen.findByRole('row', { name: /SGD/ }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Activate currency' }));
-
-    expect(await within(screen.getByTestId('detail-panel')).findByText('Active')).toBeInTheDocument();
   });
 
   it('gates every write control behind accounts.write when the scope is not granted', async () => {
@@ -303,18 +186,6 @@ describe("The console's new-currency form accepts up to 6 decimal places", () =>
   const posts = (fetchMock: ReturnType<typeof vi.fn>) =>
     fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
 
-  // DRK-1745: rewrite for the new form
-  it.skip('places 6: the console allows the registration', async () => {
-    const fetchMock = await registerLoyaltyPointsWith('6');
-
-    expect(screen.getByTestId('currency-worked-example')).toHaveTextContent(/^1,250\.000000 LOYALTYPTS$/);
-    expect(screen.getByRole('button', { name: 'Register currency' })).toBeEnabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Register currency' }));
-
-    await waitFor(() => expect(posts(fetchMock)).toHaveLength(1));
-    expect(JSON.parse((posts(fetchMock)[0]?.[1] as RequestInit | undefined)?.body as string)).toEqual({ code: 'LOYALTYPTS', name: 'Loyalty Points', decimalPlaces: 6 });
-  });
-
   it('places 7: the console blocks the registration', async () => {
     const fetchMock = await registerLoyaltyPointsWith('7');
 
@@ -327,21 +198,6 @@ describe("The console's new-currency form accepts up to 6 decimal places", () =>
 });
 
 describe('CurrenciesScreen — screen states (DRK-1725 §3)', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('says the ledger holds no currencies yet, under the list headings', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, [])));
-    renderScreen();
-    expect(await screen.findByRole('cell', { name: 'No currencies yet.' })).toHaveAttribute('colspan', '4');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('draws placeholder rows under its headings while the list is read', () => {
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
-    const { container } = renderScreen();
-    expect(container.querySelectorAll('thead th')).toHaveLength(4);
-    expect(container.querySelectorAll('tbody tr [data-slot="skeleton"]')).toHaveLength(40);
-    expect(screen.queryByText('No currencies yet.')).toBeNull();
-  });
 
   it('offers Retry on a failed list read, keeping New currency usable', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));

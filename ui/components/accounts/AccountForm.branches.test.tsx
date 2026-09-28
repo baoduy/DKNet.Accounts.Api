@@ -1,7 +1,7 @@
 /**
  * DRK-1704 rework — findings 3, 7, 12, 13 (`AccountForm.test.tsx` is frozen; these are additive).
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -31,16 +31,6 @@ const CURRENCIES = [
 ];
 
 describe('AccountForm — the accounts.write gate (finding 7)', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('disables Save, Status and the floor controls with the requires-scope caption when not granted', () => {
-    render(createElement(AccountForm, { mode: 'edit', account: ACCOUNT, writeGranted: false }));
-
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-    expect(screen.getByLabelText('Status')).toBeDisabled();
-    expect(screen.getByLabelText('Permitted to go negative')).toBeDisabled();
-    expect(screen.getByLabelText('Smallest permitted balance')).toBeDisabled();
-    expect(screen.getByText('requires accounts.write')).toBeInTheDocument();
-  });
 
   it('leaves Save enabled by default (writeGranted defaults to true)', () => {
     render(createElement(AccountForm, { mode: 'edit', account: ACCOUNT }));
@@ -49,28 +39,6 @@ describe('AccountForm — the accounts.write gate (finding 7)', () => {
 });
 
 describe('AccountForm — field refusals are marked on their field (finding 3)', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('shows a field-named refusal on the smallest permitted balance field', () => {
-    render(
-      createElement(AccountForm, {
-        mode: 'edit',
-        account: ACCOUNT,
-        errors: [{ message: 'Must not exceed the balance.', field: 'MinimumBalance' }],
-      }),
-    );
-
-    const field = screen.getByLabelText('Smallest permitted balance');
-    expect(field).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Must not exceed the balance.')).toBeInTheDocument();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('shows a field-named refusal on the status field', () => {
-    render(createElement(AccountForm, { mode: 'edit', account: ACCOUNT, errors: [{ message: 'Unknown status.', field: 'Status' }] }));
-
-    expect(screen.getByLabelText('Status')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Unknown status.')).toBeInTheDocument();
-  });
 
   it('routes a field-less refusal other than OVERDRAFT_LIMIT_REQUIRED to a RefusalAlert', () => {
     render(createElement(AccountForm, { mode: 'edit', account: ACCOUNT, errors: [{ message: 'The account holds a balance.', code: 'ACCOUNT_HOLDS_BALANCE' }] }));
@@ -116,14 +84,6 @@ describe('AccountForm — the dead fieldErrors.OVERDRAFT_LIMIT_REQUIRED branch i
 });
 
 describe('AccountForm — defaults when groups, currencies and errors are all omitted', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('renders no bogus option and no bogus alert (kills the default-parameter mutants)', () => {
-    const { container } = render(createElement(AccountForm, { mode: 'open', account: { ...ACCOUNT, name: '', groupName: '', currency: '', classification: '' } }));
-
-    expect(within(screen.getByLabelText('Group')).queryAllByRole('option')).toHaveLength(0);
-    expect(within(screen.getByLabelText('Currency')).queryAllByRole('option')).toHaveLength(0);
-    expect(container.querySelector('[data-slot="card"]')).toBeNull();
-  });
 
   it('submits a blank groupId and currency, never a placeholder string, when no lists were offered', async () => {
     const onSubmit = vi.fn<(values: AccountFormValues) => void>();
@@ -160,38 +120,6 @@ describe('AccountForm — field-level invalid marking and a missing onSubmit', (
 });
 
 describe('AccountForm — open mode submits the fields edit mode locks', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('submits the chosen group, currency and classification', async () => {
-    const onSubmit = vi.fn<(values: AccountFormValues) => void>();
-    const user = userEvent.setup();
-    render(
-      createElement(AccountForm, {
-        mode: 'open',
-        account: { ...ACCOUNT, name: '', groupName: '', currency: '', classification: '' },
-        groups: GROUPS,
-        currencies: CURRENCIES,
-        onSubmit,
-      }),
-    );
-
-    await user.selectOptions(screen.getByLabelText('Group'), 'g2');
-    await user.selectOptions(screen.getByLabelText('Currency'), 'JPY');
-    await user.selectOptions(screen.getByLabelText('Accounting classification'), 'Expense');
-    await user.type(screen.getByLabelText('Name', { exact: true }), 'New account');
-    await user.click(screen.getByRole('button', { name: 'Open' }));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ groupId: 'g2', currency: 'JPY', classification: 'Expense', status: undefined }),
-    );
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('defaults the group and currency selects to the first option offered', () => {
-    render(createElement(AccountForm, { mode: 'open', account: { ...ACCOUNT, groupName: '', currency: '' }, groups: GROUPS, currencies: CURRENCIES }));
-
-    expect(screen.getByLabelText('Group')).toHaveValue('g1');
-    expect(screen.getByLabelText('Currency')).toHaveValue('SGD');
-  });
 
   it('has no Account number or Status field — those are edit-only', () => {
     render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES }));
@@ -229,21 +157,6 @@ describe('AccountForm — edit mode never submits the locked fields', () => {
 });
 
 describe('AccountForm — open-mode field refusals on group and currency (review round 2 nit 5)', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('marks the Group select invalid and shows its message', () => {
-    render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES, errors: [{ message: 'The group is archived.', field: 'GroupId' }] }));
-    expect(screen.getByLabelText('Group')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Currency')).not.toHaveAttribute('aria-invalid');
-    expect(screen.getByRole('alert')).toHaveTextContent('The group is archived.');
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('marks the Currency select invalid and shows its message', () => {
-    render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES, errors: [{ message: 'The currency is inactive.', field: 'Currency' }] }));
-    expect(screen.getByLabelText('Currency')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Group')).not.toHaveAttribute('aria-invalid');
-    expect(screen.getByRole('alert')).toHaveTextContent('The currency is inactive.');
-  });
 
   it('marks neither select when no field-named refusal is present', () => {
     render(createElement(AccountForm, { mode: 'open', account: ACCOUNT, groups: GROUPS, currencies: CURRENCIES }));

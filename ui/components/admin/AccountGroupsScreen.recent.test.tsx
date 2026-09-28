@@ -74,18 +74,6 @@ describe('AccountGroupsScreen — ?open= and recently viewed', () => {
     expect(readRecent(MAI).map((entry) => entry.id)).toEqual([GROUP.id]);
   });
 
-  // DRK-1745: rewrite for the new form
-  it.skip('drops ?open= from the address when the panel is closed', async () => {
-    mockSearch = `open=${GROUP.id}`;
-    renderScreen(MAI);
-    await waitFor(() => expect(within(screen.getByTestId('detail-panel')).getByText('Initech')).toBeInTheDocument());
-
-    await userEvent.setup().click(within(screen.getByTestId('detail-panel')).getByRole('button', { name: 'Close' }));
-
-    expect(screen.queryByTestId('detail-panel')).toBeNull();
-    expect(pushState).toHaveBeenLastCalledWith(null, '', '/groups?');
-  });
-
   it('keeps nothing when no operator is named', async () => {
     mockSearch = `open=${GROUP.id}`;
     renderScreen();

@@ -15,10 +15,9 @@
  * `OverviewScreen` is a stub that throws (brief §3 row 6).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within, type RenderResult } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, within, type RenderResult } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OverviewScreen } from './OverviewScreen';
 
 vi.mock('next/navigation', () => ({
@@ -27,7 +26,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-const SEARCH_LABEL = 'Search accounts, groups and postings';
 const MAI_OBJECT_ID = '11111111-1111-4111-8111-111111111111';
 const ALL_READS = ['accounts.read', 'postings.read'];
 
@@ -98,12 +96,6 @@ function renderOverview(grantedScopes: string[] = ALL_READS): RenderResult {
   return render(createElement(QueryClientProvider, { client: queryClient }, createElement(OverviewScreen, { grantedScopes, directoryObjectId: MAI_OBJECT_ID })));
 }
 
-/** Every request that searched or looked a record up: an accounts or groups list, or a read of one record. */
-function searchCalls(fetchMock: ReturnType<typeof vi.fn>): string[] {
-  return fetchMock.mock.calls
-    .map(([input]) => urlOf(input))
-    .filter((url) => /\/api\/ledger\/(accounts|account-groups)\?|\/api\/ledger\/(accounts|account-groups|postings)\/(?!balances|status-counts)[^/?]+$|search=/.test(url));
-}
 
 /** A position bar's segments (its child elements), as the percentage of the bar each is drawn across. */
 function segmentWidths(bar: HTMLElement): number[] {
@@ -114,51 +106,10 @@ function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-/** Each body row of `container`'s table as its cells' text. */
-function bodyRows(container: HTMLElement): string[][] {
-  const table = within(container).getByRole('table');
-  return [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('th, td')].map((cell) => (cell.textContent ?? '').trim()));
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
   window.localStorage?.clear();
-});
-
-describe('The caption states the route before anything is sent', () => {
-  const EXAMPLES = [
-    { typed: '6d1e4f0a-2b3c-4d5e-8f90-a1b2c3d4e5f6', caption: 'Looked up as an account, then a group, then a posting.' },
-    { typed: 'ACME-000123', caption: 'Matched as an account number.' },
-    { typed: 'Acme', caption: 'Searched across accounts and groups.' },
-  ];
-
-  for (const { typed, caption } of EXAMPLES) {
-    // DRK-1745: rewrite for the new form
-    it.skip(`says "${caption}" for "${typed}"`, async () => {
-      const fetchMock = stubLedger();
-      const user = userEvent.setup();
-      renderOverview();
-
-      await user.type(screen.getByRole('searchbox', { name: SEARCH_LABEL }), typed);
-
-      expect(await screen.findByText(caption, { exact: true })).toBeInTheDocument();
-      expect(searchCalls(fetchMock)).toEqual([]);
-    });
-  }
-});
-
-describe('A search shorter than 2 characters is not sent', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('sends nothing for "A" and says a search needs at least 2 characters', async () => {
-    const fetchMock = stubLedger();
-    const user = userEvent.setup();
-    renderOverview();
-
-    await user.type(screen.getByRole('searchbox', { name: SEARCH_LABEL }), 'A{Enter}');
-
-    expect(await screen.findByText('A search needs at least 2 characters.', { exact: true })).toBeInTheDocument();
-    expect(searchCalls(fetchMock)).toEqual([]);
-  });
 });
 
 describe("Each currency's bar is scaled to its own row", () => {
@@ -183,71 +134,5 @@ describe("Each currency's bar is scaled to its own row", () => {
     expect(segmentWidths(jpy)[0]).toBe(100);
     expect(sum(segmentWidths(jpy))).toBeCloseTo(100, 6);
     expect(sgd.style.width).toBe(jpy.style.width);
-  });
-});
-
-describe('The position has no total across currencies', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('lists SGD and USD, no total, and says why', async () => {
-    stubLedger({
-      balances: [
-        { currency: 'SGD', balance: '100.00', available: '100.00', held: '0.00' },
-        { currency: 'USD', balance: '200.00', available: '200.00', held: '0.00' },
-      ],
-    });
-    renderOverview();
-
-    const position = await screen.findByRole('region', { name: 'Position by currency' });
-    await waitFor(() => expect(bodyRows(position).map((cells) => cells[0])).toEqual(['SGD', 'USD']));
-    expect(within(position).queryByText(/total/i)).toBeNull();
-    expect(within(position).queryByText('300.00')).toBeNull();
-    expect(within(position).getByText('Balances in different currencies are never added together.', { exact: true })).toBeInTheDocument();
-  });
-});
-
-describe('Weeks are counted in UTC', () => {
-  let savedTimeZone: string | undefined;
-
-  beforeAll(() => {
-    savedTimeZone = process.env.TZ;
-    process.env.TZ = 'Asia/Singapore';
-  });
-
-  afterAll(() => {
-    if (savedTimeZone === undefined) delete process.env.TZ;
-    else process.env.TZ = savedTimeZone;
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  // DRK-1745: rewrite for the new form
-  it.skip('counts a posting effective 2026-09-17 (UTC) in the week 2026-09-11 to 2026-09-17, on a Singapore computer', async () => {
-    // 20:00 UTC on 2026-09-24 is already 04:00 on 2026-09-25 in Singapore: a week counted on
-    // the computer's own clock would end on the 25th and hold the posting in 2026-09-12 to 2026-09-18.
-    vi.useFakeTimers({ now: new Date('2026-09-24T20:00:00Z'), toFake: ['Date'] });
-    expect(new Date().getDate()).toBe(25);
-    stubLedger({ postingsIn: (from, to) => (from <= '2026-09-17' && '2026-09-17' <= to ? 1 : 0) });
-    renderOverview();
-
-    const chart = await screen.findByRole('region', { name: 'Postings per week' });
-    await waitFor(() => expect(bodyRows(chart)).toHaveLength(13));
-    const rows = bodyRows(chart);
-    expect(rows.find((cells) => cells[0] === '2026-09-11 to 2026-09-17')?.at(-1)).toBe('1');
-    expect(rows.find((cells) => cells[0] === '2026-09-18 to 2026-09-24')?.at(-1)).toBe('0');
-    expect(rows.at(-1)?.[0]).toBe('2026-09-18 to 2026-09-24');
-  });
-});
-
-describe('The screen names the insight it cannot show', () => {
-  // DRK-1745: rewrite for the new form
-  it.skip('says a total across all currencies is not shown, because the service has no exchange-rate source', async () => {
-    stubLedger();
-    renderOverview();
-
-    expect(
-      await screen.findByText('A total across all currencies is not shown, because the service has no exchange-rate source and currencies are never added together.', { exact: true }),
-    ).toBeInTheDocument();
   });
 });

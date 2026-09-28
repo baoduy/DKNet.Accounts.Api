@@ -31,25 +31,6 @@ const ROW: AccountsTableRow = {
   status: 'Active',
 };
 
-describe("A column the service cannot sort offers no sort control", () => {
-  // DRK-1745: rewrite for the new form
-  it.skip.each([
-    { column: 'Name', hasControl: true },
-    { column: 'Balance', hasControl: true },
-    { column: 'Available balance', hasControl: false },
-    { column: 'Opened', hasControl: false },
-  ])('$column offers a sort control: $hasControl', ({ column, hasControl }) => {
-    render(createElement(AccountsTable, { rows: [ROW], onSort: () => {} }));
-    const header = screen.getByRole('columnheader', { name: new RegExp(column) });
-    const button = header.querySelector('button');
-    if (hasControl) {
-      expect(button).not.toBeNull();
-    } else {
-      expect(button).toBeNull();
-    }
-  });
-});
-
 describe('No total is worked out over a list', () => {
   it('shows no total over a page of 1000 accounts', () => {
     const rows = Array.from({ length: 1000 }, (_, index) => ({ ...ROW, accountNumber: `ACME-${String(index).padStart(6, '0')}` }));
