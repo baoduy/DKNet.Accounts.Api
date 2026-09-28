@@ -34,11 +34,13 @@ GET /v1/currencies?pageSize=2
 Authorization: Bearer {token}
 ```
 
+With no `orderBy`, the default is `CreatedOn` descending then `Id` descending ([the generic list contract](../generic-list-endpoint.md#ordering)); every seeded currency shares one `CreatedOn`, so the tie-break alone decides the order — `USDT` (`c0de0002-…`) sorts above every `c0de0001-…` fiat code, and `EUR` (`…000978`) is the highest-numbered of those:
+
 ```json
 {
   "items": [
-    { "id": "c0de0001-0000-4000-8000-000000000702", "code": "SGD", "name": "Singapore Dollar", "decimalPlaces": 2, "isActive": true },
-    { "id": "c0de0001-0000-4000-8000-000000000840", "code": "USD", "name": "US Dollar", "decimalPlaces": 2, "isActive": true }
+    { "id": "c0de0002-0000-4000-8000-000000000001", "code": "USDT", "name": "Tether USD", "decimalPlaces": 6, "isActive": true },
+    { "id": "c0de0001-0000-4000-8000-000000000978", "code": "EUR", "name": "Euro", "decimalPlaces": 2, "isActive": true }
   ],
   "pageCount": 13,
   "pageNumber": 1,

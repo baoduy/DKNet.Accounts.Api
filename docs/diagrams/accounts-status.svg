@@ -4949,30 +4949,30 @@
           <text x="790" y="20" class="t-muted" font-size="8" text-anchor="middle">status: Frozen</text>
         </g>
         <g data-detail="context" data-edge-from="frozen" data-edge-to="closed" data-edge-label="status: Closed" data-edge-key="7">
-          <rect x="-157.10000000000002" y="769" width="394.20000000000005" height="27" rx="4" class="c-mask"/>
-          <text x="40" y="780" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
-        <text data-detail="fine" x="40" y="791" class="t-dim" font-size="7" text-anchor="middle">Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero</text>
+          <rect x="72.89999999999998" y="769" width="394.20000000000005" height="27" rx="4" class="c-mask"/>
+          <text x="270" y="780" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
+        <text data-detail="fine" x="270" y="791" class="t-dim" font-size="7" text-anchor="middle">Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero</text>
         </g>
         <g data-detail="context" data-edge-from="active" data-edge-to="closed" data-edge-label="status: Closed" data-edge-key="8">
-          <rect x="322.9" y="769" width="394.20000000000005" height="27" rx="4" class="c-mask"/>
-          <text x="520" y="780" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
-        <text data-detail="fine" x="520" y="791" class="t-dim" font-size="7" text-anchor="middle">Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero</text>
+          <rect x="612.9" y="769" width="394.20000000000005" height="27" rx="4" class="c-mask"/>
+          <text x="810" y="780" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
+        <text data-detail="fine" x="810" y="791" class="t-dim" font-size="7" text-anchor="middle">Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero</text>
         </g>
         <g data-detail="context" data-edge-from="dormant" data-edge-to="closed" data-edge-label="status: Closed" data-edge-key="9">
-          <rect x="-0.30000000000000426" y="819" width="80.60000000000001" height="16" rx="4" class="c-mask"/>
-          <text x="40" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
+          <rect x="59.699999999999996" y="819" width="80.60000000000001" height="16" rx="4" class="c-mask"/>
+          <text x="100" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Closed</text>
         </g>
         <g data-detail="context" data-edge-from="closed" data-edge-to="active" data-edge-label="status: Active — reopen" data-edge-key="10">
-          <rect x="157.65" y="819" width="124.7" height="16" rx="4" class="c-mask"/>
-          <text x="220" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Active — reopen</text>
+          <rect x="237.65" y="819" width="124.7" height="16" rx="4" class="c-mask"/>
+          <text x="300" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Active — reopen</text>
         </g>
         <g data-detail="context" data-edge-from="closed" data-edge-to="frozen" data-edge-label="status: Frozen — direct" data-edge-key="11">
-          <rect x="357.65" y="819" width="124.7" height="16" rx="4" class="c-mask"/>
-          <text x="420" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Frozen — direct</text>
+          <rect x="437.65" y="819" width="124.7" height="16" rx="4" class="c-mask"/>
+          <text x="500" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Frozen — direct</text>
         </g>
         <g data-detail="context" data-edge-from="closed" data-edge-to="dormant" data-edge-label="status: Dormant — direct" data-edge-key="12">
-          <rect x="575.2" y="819" width="129.60000000000002" height="16" rx="4" class="c-mask"/>
-          <text x="640" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Dormant — direct</text>
+          <rect x="635.2" y="819" width="129.60000000000002" height="16" rx="4" class="c-mask"/>
+          <text x="700" y="830" class="t-muted" font-size="8" text-anchor="middle">status: Dormant — direct</text>
         </g>
 
         <!-- Legend -->

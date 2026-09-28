@@ -151,7 +151,7 @@
       "route": "bottom-channel",
       "channelY": 460,
       "labelAt": [
-        40,
+        270,
         780
       ],
       "note": "Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero"
@@ -163,7 +163,7 @@
       "route": "right-channel",
       "channelX": 800,
       "labelAt": [
-        520,
+        810,
         780
       ],
       "note": "Refused 422 ACCOUNT_HOLDS_BALANCE unless balance and held amount are both zero"
@@ -175,7 +175,7 @@
       "route": "bottom-channel",
       "channelY": 490,
       "labelAt": [
-        40,
+        100,
         830
       ]
     },
@@ -186,7 +186,7 @@
       "route": "right-channel",
       "channelX": 920,
       "labelAt": [
-        220,
+        300,
         830
       ]
     },
@@ -197,7 +197,7 @@
       "route": "bottom-channel",
       "channelY": 520,
       "labelAt": [
-        420,
+        500,
         830
       ]
     },
@@ -208,7 +208,7 @@
       "route": "bottom-channel",
       "channelY": 550,
       "labelAt": [
-        640,
+        700,
         830
       ]
     }
