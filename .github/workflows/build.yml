@@ -153,3 +153,28 @@ jobs:
           name: console-e2e-traces
           path: ui/test-results/
           retention-days: 7
+
+  helm-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Build chart dependencies
+        working-directory: helm/dknet-accounts
+        run: helm dependency build .
+
+      - name: Lint
+        working-directory: helm/dknet-accounts
+        run: helm lint .
+
+      - name: Template (default values)
+        working-directory: helm/dknet-accounts
+        run: helm template dknet-accounts .
+
+      - name: Template (API HTTPRoute switch on)
+        working-directory: helm/dknet-accounts
+        run: helm template dknet-accounts . --set api.httpRoute.enabled=true

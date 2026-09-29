@@ -1,0 +1,21 @@
+apiVersion: v2
+name: dknet-accounts
+description: Umbrella chart deploying the DKNet.Accounts API and its console (ui/) to AKS, both built on drunk-app.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+# drunk-app (https://github.com/baoduy/drunk.charts) supplies the Deployment/Service/
+# SecretProviderClass/HTTPRoute templates for both sides via two aliased instances, pulled
+# from its OCI registry (ghcr.io/baoduy is public — no `helm registry login` needed).
+dependencies:
+  - name: drunk-app
+    version: 2.*.*
+    repository: oci://ghcr.io/baoduy
+    alias: api
+    condition: api.enabled
+  - name: drunk-app
+    version: 2.*.*
+    repository: oci://ghcr.io/baoduy
+    alias: console
+    condition: console.enabled

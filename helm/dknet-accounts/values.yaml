@@ -1,0 +1,310 @@
+# ==============================================================================================
+# OPERATOR VALUES — the ONLY block an operator edits. Every Azure/gateway/image value the chart
+# needs is anchored (&name) here once; the api:/console: sections below reuse it through aliases
+# (*name). Nothing Azure-specific repeats outside this block. Every value below is a placeholder —
+# replace before any real deploy.
+# ==============================================================================================
+operator:
+  # --- Azure identity ---
+  azureTenantId: &azureTenantId "00000000-0000-0000-0000-000000000000"
+  keyVaultName: &keyVaultName "REPLACE-ME-keyvault-name"
+  # Client id of the AKS workload-identity user-assigned managed identity granted "get" on the
+  # vault's secrets (both sides read from the same vault, so one identity covers both).
+  identityClientId: &identityClientId "00000000-0000-0000-0000-000000000000"
+
+  # Shared secretProvider.provider block for both sides — same vault, same identity.
+  #
+  # KNOWN GAP in drunk-app 2.0.2's SecretProviderClass template (drunk-lib
+  # charts/drunk-lib/templates/_secretprovider.tpl:38-44 — vendored, not ours to edit): it emits
+  # `useWorkloadIdentity`/`userAssignedIdentityID` but never a `clientID` field. The Azure Key
+  # Vault CSI provider's workload-identity path reads `clientID`, not `userAssignedIdentityID`
+  # (that one is the VM/pod-managed-identity field) — see
+  # https://azure.github.io/secrets-store-csi-driver-provider-azure/docs/configurations/identity-access-modes/workload-identity-mode/
+  # This chart has no field to emit a correctly-named `clientID`, so the rendered
+  # SecretProviderClass alone will NOT authenticate via workload identity against a real vault.
+  # `userAssignedIdentityID` below still carries the identity's client id — the closest field
+  # this chart exposes — but until drunk-lib adds `clientID`, the operator must add it by hand
+  # after every install/upgrade, e.g.:
+  #   kubectl patch secretproviderclass accounts-api-spc-cls --type=json \
+  #     -p='[{"op":"add","path":"/spec/parameters/clientID","value":"<identityClientId>"}]'
+  #   kubectl patch secretproviderclass accounts-console-spc-cls --type=json \
+  #     -p='[{"op":"add","path":"/spec/parameters/clientID","value":"<identityClientId>"}]'
+  # (`serviceAccountName` plus the identity's federated credential, both already wired below via
+  # serviceAccount.annotations, are the rest of what workload identity mode needs — no pod label.)
+  # ponytail: known chart gap, not fixable from this repo — upgrade path is a drunk-lib fix
+  # (add `clientID`) or a post-render patch; flagged for the human owner via the kubectl patch above.
+  # useVMManagedIdentity MUST be the quoted string "false", not the YAML boolean false: the
+  # template does `$provider.useVMManagedIdentity | default true`, and sprig's `default` treats
+  # a bare `false` as "empty" and silently substitutes `true` back in (verified by rendering).
+  secretProviderBase: &secretProviderBase
+    name: azure
+    tenantId: *azureTenantId
+    vaultName: *keyVaultName
+    userAssignedIdentityID: *identityClientId
+    useWorkloadIdentity: true
+    useVMManagedIdentity: "false"
+
+  # --- Gateway API (existing gateway; this chart creates no Gateway resource) ---
+  gatewayName: &gatewayName "REPLACE-ME-gateway-name"
+  gatewayNamespace: &gatewayNamespace "REPLACE-ME-gateway-namespace"
+  gatewaySectionName: &gatewaySectionName "https"
+  consoleHostname: &consoleHostname "accounts.example.com"
+  apiHostname: &apiHostname "accounts-api.example.com"
+
+  # --- Image tags ---
+  apiImageTag: &apiImageTag "latest"
+  consoleImageTag: &consoleImageTag "latest"
+
+  # --- Key Vault secret names ---
+  # Key Vault secret names allow only letters, digits and "-" (no "_"), so an env var name can't
+  # be used as-is. Convention used below: "__" -> "--", "_" -> "-", lowercased. Every name here is
+  # the exact Key Vault secret the operator must create; the comment on each names the env var it
+  # becomes (see api.secretProvider.secretObjects / console.secretProvider.secretObjects).
+  secretNames:
+    appDb: &vaultAppDb "connectionstrings--appdb"                                     # -> ConnectionStrings__AppDb
+    redis: &vaultRedis "connectionstrings--redis"                                     # -> ConnectionStrings__Redis
+    azureBus: &vaultAzureBus "connectionstrings--azurebus"                            # -> ConnectionStrings__AzureBus
+    bearerMetadataAddress: &vaultBearerMetadata "authentication--schemes--bearer--metadataaddress" # -> Authentication__Schemes__Bearer__MetadataAddress
+    bearerAudience: &vaultBearerAudience "authentication--schemes--bearer--validaudiences-0"        # -> Authentication__Schemes__Bearer__ValidAudiences__0
+    bearerIssuer: &vaultBearerIssuer "authentication--schemes--bearer--validissuer"    # -> Authentication__Schemes__Bearer__ValidIssuer
+    consoleEntraTenantId: &vaultConsoleTenant "console-entra-tenant-id"                # -> CONSOLE_ENTRA_TENANT_ID
+    consoleEntraClientId: &vaultConsoleClientId "console-entra-client-id"              # -> CONSOLE_ENTRA_CLIENT_ID
+    consoleEntraClientSecret: &vaultConsoleClientSecret "console-entra-client-secret"  # -> CONSOLE_ENTRA_CLIENT_SECRET
+    consoleBaseUrl: &vaultConsoleBaseUrl "console-base-url"                            # -> CONSOLE_BASE_URL
+    consoleRedisUrl: &vaultConsoleRedisUrl "console-redis-url"                         # -> CONSOLE_REDIS_URL
+    consoleSessionSecret: &vaultConsoleSession "console-session-secret"                # -> CONSOLE_SESSION_SECRET
+    consoleTokenKey: &vaultConsoleTokenKey "console-token-encryption-key"              # -> CONSOLE_TOKEN_ENCRYPTION_KEY (must be exactly 32 bytes)
+
+  # Optional: the ingress/gateway peer address, only needed if you enable
+  # Security__TrustedProxies__0 in api.configMap below (commented out by default — an empty
+  # value there makes the API fail to parse it as an IP address at startup).
+  trustedProxy: &trustedProxy "REPLACE-ME-ingress-peer-ip"
+
+  # drunk-app 2.0.2's OWN values.yaml is invalid YAML (its `global:` key is indented one space
+  # while the sibling keys below it start at column 0 — a mixed-indentation parse error), so
+  # none of its shipped pod/container-security or resources defaults ever load for either
+  # subchart instance. Set both explicitly here rather than relying on chart defaults.
+  containerSecurityContext: &containerSecurityContext
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  podSecurityContextBase: &podSecurityContextBase
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  # ponytail: one requests/limits pair shared by both sides — split them if profiling ever shows
+  # the API and console need different budgets.
+  resources: &sharedResources
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# ==============================================================================================
+# API — DKNet.Accounts.Api, built on drunk-app (alias "api"). Internal-only (ClusterIP); the
+# console reaches it in-cluster. No Postgres/Redis/message-bus manifest ships here — those are
+# existing third-party services the API reaches via ConnectionStrings__* (requester decision 2).
+# ==============================================================================================
+api:
+  enabled: true
+  # Fixed, release-independent names: values.yaml is plain YAML (Helm does not template it), so
+  # the console's CONSOLE_API_BASE_URL below can't reference `.Release.Name` — fullnameOverride
+  # sidesteps that by giving the Service a literal, known-ahead-of-time DNS name.
+  # ponytail: fixed name assumes one dknet-accounts release per namespace; add a release-scoped
+  # override if that stops holding.
+  nameOverride: "accounts-api"
+  fullnameOverride: "accounts-api"
+
+  global:
+    image: "ghcr.io/baoduy/dknet.accounts-api"
+    tag: *apiImageTag
+    imagePullPolicy: "IfNotPresent"
+
+  deployment:
+    enabled: true
+    replicaCount: 1
+    ports:
+      http: 8080
+    liveness: "/healthz"
+    readiness: "/healthz"
+
+  service:
+    type: ClusterIP
+
+  # drunk-app's own defaults don't load (see the containerSecurityContext note above) — set
+  # explicitly. uid/gid 1654 matches the API image's runtime user (docker-compose.yml).
+  podSecurityContext:
+    <<: *podSecurityContextBase
+    runAsUser: 1654
+    runAsGroup: 1654
+    fsGroup: 1654
+  securityContext: *containerSecurityContext
+  resources: *sharedResources
+
+  # Plain values (Option A) — fixed switches, safe production defaults (requester decision 4).
+  configMap:
+    ASPNETCORE_ENVIRONMENT: "Production"
+    # Secure-by-default: must never be "false" in a real deployment.
+    FeatureManagement__RequireAuthorization: "true"
+    # TLS ends at the gateway in front of this Service, not in the container.
+    FeatureManagement__EnableHttps: "false"
+    FeatureManagement__EnableServiceBus: "true"
+    # The API runs DB migrations at startup on this flag — keep replicaCount at 1 while it's on.
+    FeatureManagement__RunDbMigrationWhenAppStart: "true"
+    # Uncomment both this and `operator.trustedProxy` above once the gateway's peer address is
+    # known — an empty value here fails IPAddress.Parse at API startup.
+    # Security__TrustedProxies__0: *trustedProxy
+
+  # From Key Vault (Option A) — secrets and per-environment values (requester decision 4).
+  secretProvider:
+    enabled: true
+    provider: *secretProviderBase
+    objects:
+      - *vaultAppDb
+      - *vaultRedis
+      - *vaultAzureBus
+      - *vaultBearerMetadata
+      - *vaultBearerAudience
+      - *vaultBearerIssuer
+    secretObjects:
+      - key: "ConnectionStrings__AppDb"
+        objectName: *vaultAppDb
+      - key: "ConnectionStrings__Redis"
+        objectName: *vaultRedis
+      - key: "ConnectionStrings__AzureBus"
+        objectName: *vaultAzureBus
+      - key: "Authentication__Schemes__Bearer__MetadataAddress"
+        objectName: *vaultBearerMetadata
+      - key: "Authentication__Schemes__Bearer__ValidAudiences__0"
+        objectName: *vaultBearerAudience
+      - key: "Authentication__Schemes__Bearer__ValidIssuer"
+        objectName: *vaultBearerIssuer
+
+  # Half of Azure workload identity (see the KNOWN GAPS note above for the other half).
+  serviceAccount:
+    enabled: true
+    annotations:
+      azure.workload.identity/client-id: *identityClientId
+
+  volumes:
+    tmp:
+      mountPath: "/tmp"
+      emptyDir: true
+      readOnly: false
+
+  # Off by default (requester decision 6 / acceptance #4) — the API stays internal (ClusterIP)
+  # unless this is switched on, e.g. `--set api.httpRoute.enabled=true`.
+  httpRoute:
+    enabled: false
+    parentRefs:
+      - name: *gatewayName
+        namespace: *gatewayNamespace
+        sectionName: *gatewaySectionName
+    hostnames:
+      - *apiHostname
+
+# ==============================================================================================
+# CONSOLE — the Next.js UI (ui/), built on drunk-app (alias "console"). Publicly exposed through
+# an HTTPRoute (requester decision 6); calls the API in-cluster.
+# ==============================================================================================
+console:
+  enabled: true
+  nameOverride: "accounts-console"
+  fullnameOverride: "accounts-console"
+
+  global:
+    image: "ghcr.io/baoduy/dknet.accounts-console"
+    tag: *consoleImageTag
+    imagePullPolicy: "IfNotPresent"
+
+  deployment:
+    enabled: true
+    replicaCount: 1
+    ports:
+      http: 3000
+    liveness: "/healthz"
+    readiness: "/healthz"
+
+  service:
+    type: ClusterIP
+
+  # drunk-app's own defaults don't load (see the containerSecurityContext note above) — set
+  # explicitly. uid/gid 1000 matches node:22-alpine's built-in "node" user (ui/Dockerfile).
+  podSecurityContext:
+    <<: *podSecurityContextBase
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  securityContext: *containerSecurityContext
+  resources: *sharedResources
+
+  configMap:
+    # api.fullnameOverride above ("accounts-api") is the literal in-cluster Service DNS name;
+    # its Service exposes port 80 (drunk-app's single-port default) mapped to container port 8080.
+    CONSOLE_API_BASE_URL: "http://accounts-api"
+    CONSOLE_ENTRA_SCOPES: "accounts.read accounts.write postings.read postings.write postings.reverse"
+    CONSOLE_REDIS_KEY_PREFIX: "console:"
+    # Next's standalone server otherwise binds the container id, refusing the in-cluster probe.
+    HOSTNAME: "0.0.0.0"
+
+  secretProvider:
+    enabled: true
+    provider: *secretProviderBase
+    objects:
+      - *vaultConsoleTenant
+      - *vaultConsoleClientId
+      - *vaultConsoleClientSecret
+      - *vaultConsoleBaseUrl
+      - *vaultConsoleRedisUrl
+      - *vaultConsoleSession
+      - *vaultConsoleTokenKey
+    secretObjects:
+      - key: "CONSOLE_ENTRA_TENANT_ID"
+        objectName: *vaultConsoleTenant
+      - key: "CONSOLE_ENTRA_CLIENT_ID"
+        objectName: *vaultConsoleClientId
+      - key: "CONSOLE_ENTRA_CLIENT_SECRET"
+        objectName: *vaultConsoleClientSecret
+      - key: "CONSOLE_BASE_URL"
+        objectName: *vaultConsoleBaseUrl
+      - key: "CONSOLE_REDIS_URL"
+        objectName: *vaultConsoleRedisUrl
+      - key: "CONSOLE_SESSION_SECRET"
+        objectName: *vaultConsoleSession
+      - key: "CONSOLE_TOKEN_ENCRYPTION_KEY"
+        objectName: *vaultConsoleTokenKey
+
+  serviceAccount:
+    enabled: true
+    annotations:
+      azure.workload.identity/client-id: *identityClientId
+
+  volumes:
+    tmp:
+      mountPath: "/tmp"
+      emptyDir: true
+      readOnly: false
+    next-cache:
+      mountPath: "/app/ui/.next/cache"
+      emptyDir: true
+      readOnly: false
+
+  httpRoute:
+    enabled: true
+    parentRefs:
+      - name: *gatewayName
+        namespace: *gatewayNamespace
+        sectionName: *gatewaySectionName
+    hostnames:
+      - *consoleHostname
+
+# ------------------------------------------------------------------------------------------------
+# Manual setup (requester decision 5) — this chart creates no Entra ID objects. Two app
+# registrations, created by hand, feed the placeholders above:
+#   - API: scopes accounts.read accounts.write postings.read postings.write postings.reverse
+#   - Console: confidential client with a secret, redirect URI
+#     <console base url>/signin/callback (ui/app/signin/callback/route.ts)
+# ------------------------------------------------------------------------------------------------
