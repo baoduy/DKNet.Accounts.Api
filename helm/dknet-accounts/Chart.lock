@@ -1,9 +1,9 @@
 dependencies:
 - name: drunk-app
-  repository: https://baoduy.github.io/drunk.charts/drunk-app
-  version: 1.3.9
+  repository: oci://ghcr.io/baoduy
+  version: 2.0.2
 - name: drunk-app
-  repository: https://baoduy.github.io/drunk.charts/drunk-app
-  version: 1.3.9
-digest: sha256:8a40019f20d63e44a418be471d01a59ca6c26414fc5207c6f77f65e8dcb26ee4
-generated: "2026-09-29T12:08:42.401764806+08:00"
+  repository: oci://ghcr.io/baoduy
+  version: 2.0.2
+digest: sha256:279b5901d8dd3a0e29e3104a983c29533bd1b397ee61f1ff67ce1d961d4888be
+generated: "2026-09-29T12:25:01.934860323+08:00"

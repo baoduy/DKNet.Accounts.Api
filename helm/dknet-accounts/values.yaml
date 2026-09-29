@@ -14,23 +14,25 @@ operator:
 
   # Shared secretProvider.provider block for both sides — same vault, same identity.
   #
-  # KNOWN GAPS in drunk-app 1.3.x/2.0.0's SecretProviderClass template (drunk-lib
-  # charts/drunk-lib/templates/_secretprovider.tpl:36-41 — vendored, not ours to edit):
-  #  1. It emits `useWorkloadIdentity`/`userAssignedIdentityID` but never a `clientID` field.
-  #     The Azure Key Vault CSI provider's workload-identity path reads `clientID`, not
-  #     `userAssignedIdentityID` (that one is the VM/pod-managed-identity field) — see
-  #     https://azure.github.io/secrets-store-csi-driver-provider-azure/docs/configurations/identity-access-modes/workload-identity-mode/
-  #     This chart has no field to emit a correctly-named `clientID`, so the rendered
-  #     SecretProviderClass alone will NOT authenticate via workload identity against a real
-  #     vault. Below, `userAssignedIdentityID` still carries the identity's client id — it's
-  #     the closest field this chart exposes — but treat vault access as unverified until
-  #     either drunk-lib adds `clientID` or this is patched with a post-render/kustomize step.
-  #  2. `_deployment.tpl`'s pod template only sets selector labels — there is no values field to
-  #     add the `azure.workload.identity/use: "true"` pod label the workload-identity webhook
-  #     requires. `serviceAccount.annotations` below carries the client-id annotation, which is
-  #     the other half, but the pod label is still missing.
+  # KNOWN GAP in drunk-app 2.0.2's SecretProviderClass template (drunk-lib
+  # charts/drunk-lib/templates/_secretprovider.tpl:38-44 — vendored, not ours to edit): it emits
+  # `useWorkloadIdentity`/`userAssignedIdentityID` but never a `clientID` field. The Azure Key
+  # Vault CSI provider's workload-identity path reads `clientID`, not `userAssignedIdentityID`
+  # (that one is the VM/pod-managed-identity field) — see
+  # https://azure.github.io/secrets-store-csi-driver-provider-azure/docs/configurations/identity-access-modes/workload-identity-mode/
+  # This chart has no field to emit a correctly-named `clientID`, so the rendered
+  # SecretProviderClass alone will NOT authenticate via workload identity against a real vault.
+  # `userAssignedIdentityID` below still carries the identity's client id — the closest field
+  # this chart exposes — but until drunk-lib adds `clientID`, the operator must add it by hand
+  # after every install/upgrade, e.g.:
+  #   kubectl patch secretproviderclass accounts-api-spc-cls --type=json \
+  #     -p='[{"op":"add","path":"/spec/parameters/clientID","value":"<identityClientId>"}]'
+  #   kubectl patch secretproviderclass accounts-console-spc-cls --type=json \
+  #     -p='[{"op":"add","path":"/spec/parameters/clientID","value":"<identityClientId>"}]'
+  # (`serviceAccountName` plus the identity's federated credential, both already wired below via
+  # serviceAccount.annotations, are the rest of what workload identity mode needs — no pod label.)
   # ponytail: known chart gap, not fixable from this repo — upgrade path is a drunk-lib fix
-  # (add `clientID` + a pod-labels value) or a post-render patch; flagged for the human owner.
+  # (add `clientID`) or a post-render patch; flagged for the human owner via the kubectl patch above.
   # useVMManagedIdentity MUST be the quoted string "false", not the YAML boolean false: the
   # template does `$provider.useVMManagedIdentity | default true`, and sprig's `default` treats
   # a bare `false` as "empty" and silently substitutes `true` back in (verified by rendering).
