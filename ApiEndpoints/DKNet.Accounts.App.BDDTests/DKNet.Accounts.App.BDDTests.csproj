@@ -2,10 +2,9 @@
 
     <PropertyGroup>
         <IsPackable>false</IsPackable>
-        <!-- The @redis scenario needs Docker, and the @apphost scenarios (DRK-1796) run the real AppHost; keep both
-             out of a bare "dotnet test" run (still runnable via an explicit filter targeting TestCategory=redis or
-             TestCategory=apphost). -->
-        <VSTestTestCaseFilter>TestCategory!=redis&amp;TestCategory!=apphost</VSTestTestCaseFilter>
+        <!-- The @redis scenario needs Docker; keep it out of a bare "dotnet test" run (still runnable via an
+             explicit filter targeting TestCategory=redis). -->
+        <VSTestTestCaseFilter>TestCategory!=redis</VSTestTestCaseFilter>
     </PropertyGroup>
 
     <PropertyGroup>
