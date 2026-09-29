@@ -108,18 +108,24 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
-/** The scopes an access token carries — read from its own `scp` claim, never cached elsewhere. */
+/**
+ * The scopes an access token carries — read from its own claims, never cached elsewhere. Entra ID
+ * lists them under `scp`; other OIDC sign-in servers list them under `scope` instead, so
+ * `scope` is read only when `scp` is missing or empty (`scp` wins when both are present).
+ */
 export function scopesFromAccessToken(accessToken: string): string[] {
-  return String(decodeJwtPayload(accessToken).scp ?? '')
+  const payload = decodeJwtPayload(accessToken);
+  return String(payload.scp || payload.scope || '')
     .split(' ')
     .filter(Boolean);
 }
 
 /**
- * Completes a sign-in from the callback's `code`/`state`. Refuses (throws) when `state`
- * has no server-side record, or has already been consumed (R4).
+ * Completes a sign-in from the callback's `code`/`state`, plus the `iss` the sign-in server sent
+ * with them (RFC 9207) — passed on exactly as sent, so openid-client can check it.
+ * Refuses (throws) when `state` has no server-side record, or has already been consumed (R4).
  */
-export async function completeSignIn(params: { code: string; state: string }): Promise<SignInResult> {
+export async function completeSignIn(params: { code: string; state: string; iss?: string }): Promise<SignInResult> {
   const config = loadConfig();
   const redis = getRedisClient();
   const key = signInStateKey(config, params.state);
@@ -135,6 +141,9 @@ export async function completeSignIn(params: { code: string; state: string }): P
   callbackUrl.pathname = '/signin/callback';
   callbackUrl.searchParams.set('code', params.code);
   callbackUrl.searchParams.set('state', params.state);
+  if (params.iss !== undefined) {
+    callbackUrl.searchParams.set('iss', params.iss);
+  }
 
   const tokens = await client.authorizationCodeGrant(oidcConfig, callbackUrl, {
     expectedState: params.state,

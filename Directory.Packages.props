@@ -35,6 +35,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Asp.Versioning.Http" Version="10.2.3" />
+    <PackageVersion Include="Aspire.Hosting.Keycloak" Version="13.5.4-preview.1.26464.4" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.4" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.5.4" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.4" />
