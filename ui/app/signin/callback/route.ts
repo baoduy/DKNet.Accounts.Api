@@ -12,13 +12,15 @@ import { storeAccessToken } from '@/lib/token-store';
 export async function GET(request: NextRequest): Promise<Response> {
   const code = request.nextUrl.searchParams.get('code');
   const state = request.nextUrl.searchParams.get('state');
+  // RFC 9207: a sign-in server that names itself in the answer expects it checked; Entra ID sends none.
+  const iss = request.nextUrl.searchParams.get('iss') ?? undefined;
   if (!code || !state) {
     return new NextResponse('Sign-in answer refused: missing code or state', { status: 400 });
   }
 
   let result;
   try {
-    result = await completeSignIn({ code, state });
+    result = await completeSignIn({ code, state, iss });
   } catch (error) {
     return new NextResponse(`Sign-in answer refused: ${(error as Error).message}`, { status: 400 });
   }

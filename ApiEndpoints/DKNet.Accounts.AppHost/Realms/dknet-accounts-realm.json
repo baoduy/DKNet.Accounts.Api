@@ -1,0 +1,327 @@
+{
+  "realm": "dknet-accounts",
+  "displayName": "DKNet Accounts demo (AppHost only)",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "accounts.read"
+      },
+      {
+        "name": "accounts.write"
+      },
+      {
+        "name": "postings.read"
+      },
+      {
+        "name": "postings.write"
+      },
+      {
+        "name": "postings.reverse"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "basic",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "accounts.read",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "accounts.write",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "postings.read",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "postings.write",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "postings.reverse",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    }
+  ],
+  "scopeMappings": [
+    {
+      "clientScope": "accounts.read",
+      "roles": [
+        "accounts.read"
+      ]
+    },
+    {
+      "clientScope": "accounts.write",
+      "roles": [
+        "accounts.write"
+      ]
+    },
+    {
+      "clientScope": "postings.read",
+      "roles": [
+        "postings.read"
+      ]
+    },
+    {
+      "clientScope": "postings.write",
+      "roles": [
+        "postings.write"
+      ]
+    },
+    {
+      "clientScope": "postings.reverse",
+      "roles": [
+        "postings.reverse"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "dknet-accounts-console",
+      "name": "DKNet Accounts console",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dknet-accounts-console-demo-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/signin/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "ledger-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "dknet-accounts-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "accounts.read",
+        "accounts.write",
+        "postings.read",
+        "postings.write",
+        "postings.reverse"
+      ]
+    },
+    {
+      "clientId": "dknet-accounts-trafficgen",
+      "name": "DKNet Accounts TrafficGen",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dknet-accounts-trafficgen-demo-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "ledger-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "dknet-accounts-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "accounts.read",
+        "accounts.write",
+        "postings.read",
+        "postings.write",
+        "postings.reverse"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "firstName": "Demo",
+      "lastName": "Admin",
+      "email": "admin@dknet-accounts.local",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "accounts.read",
+        "accounts.write",
+        "postings.read",
+        "postings.write",
+        "postings.reverse"
+      ]
+    },
+    {
+      "username": "operator",
+      "firstName": "Demo",
+      "lastName": "Operator",
+      "email": "operator@dknet-accounts.local",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "operator",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "accounts.read",
+        "accounts.write",
+        "postings.read",
+        "postings.write"
+      ]
+    },
+    {
+      "username": "viewer",
+      "firstName": "Demo",
+      "lastName": "Viewer",
+      "email": "viewer@dknet-accounts.local",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "accounts.read",
+        "postings.read"
+      ]
+    },
+    {
+      "username": "service-account-dknet-accounts-trafficgen",
+      "enabled": true,
+      "serviceAccountClientId": "dknet-accounts-trafficgen",
+      "realmRoles": [
+        "accounts.read",
+        "accounts.write",
+        "postings.read",
+        "postings.write",
+        "postings.reverse"
+      ]
+    }
+  ]
+}
