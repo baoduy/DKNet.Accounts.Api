@@ -80,6 +80,29 @@ operator:
   # value there makes the API fail to parse it as an IP address at startup).
   trustedProxy: &trustedProxy "REPLACE-ME-ingress-peer-ip"
 
+  # drunk-app 2.0.2's OWN values.yaml is invalid YAML (its `global:` key is indented one space
+  # while the sibling keys below it start at column 0 — a mixed-indentation parse error), so
+  # none of its shipped pod/container-security or resources defaults ever load for either
+  # subchart instance. Set both explicitly here rather than relying on chart defaults.
+  containerSecurityContext: &containerSecurityContext
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  podSecurityContextBase: &podSecurityContextBase
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  # ponytail: one requests/limits pair shared by both sides — split them if profiling ever shows
+  # the API and console need different budgets.
+  resources: &sharedResources
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
 # ==============================================================================================
 # API — DKNet.Accounts.Api, built on drunk-app (alias "api"). Internal-only (ClusterIP); the
 # console reaches it in-cluster. No Postgres/Redis/message-bus manifest ships here — those are
@@ -106,9 +129,20 @@ api:
     ports:
       http: 8080
     liveness: "/healthz"
+    readiness: "/healthz"
 
   service:
     type: ClusterIP
+
+  # drunk-app's own defaults don't load (see the containerSecurityContext note above) — set
+  # explicitly. uid/gid 1654 matches the API image's runtime user (docker-compose.yml).
+  podSecurityContext:
+    <<: *podSecurityContextBase
+    runAsUser: 1654
+    runAsGroup: 1654
+    fsGroup: 1654
+  securityContext: *containerSecurityContext
+  resources: *sharedResources
 
   # Plain values (Option A) — fixed switches, safe production defaults (requester decision 4).
   configMap:
@@ -192,9 +226,20 @@ console:
     ports:
       http: 3000
     liveness: "/healthz"
+    readiness: "/healthz"
 
   service:
     type: ClusterIP
+
+  # drunk-app's own defaults don't load (see the containerSecurityContext note above) — set
+  # explicitly. uid/gid 1000 matches node:22-alpine's built-in "node" user (ui/Dockerfile).
+  podSecurityContext:
+    <<: *podSecurityContextBase
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  securityContext: *containerSecurityContext
+  resources: *sharedResources
 
   configMap:
     # api.fullnameOverride above ("accounts-api") is the literal in-cluster Service DNS name;
