@@ -30,6 +30,7 @@ public static class LedgerErrors
     public const string AccountFrozen = "ACCOUNT_FROZEN";
     public const string AccountDormantDebitRefused = "ACCOUNT_DORMANT_DEBIT_REFUSED";
     public const string PostingAlreadyReversed = "POSTING_ALREADY_REVERSED";
+    public const string PostingIsReversal = "POSTING_IS_REVERSAL";
     public const string IdempotencyKeyConflict = "IDEMPOTENCY_KEY_CONFLICT";
     public const string LockTimeout = "LOCK_TIMEOUT";
     public const string InvalidDateRange = "INVALID_DATE_RANGE";

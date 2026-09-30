@@ -13,7 +13,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 /// comes back as an unexpected status — that is the nameable reason R2 asks for.
 /// </summary>
 [Binding]
-public sealed class LedgerSteps(HttpClient client, ScenarioState state)
+public sealed class LedgerSteps(HttpClient client, ScenarioState state, BddApiFactory factory)
 {
     private const string GroupsPath = "/v1/account-groups";
     private const string AccountsPath = "/v1/accounts";
@@ -455,10 +455,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Given(@"today is (.+)$")]
     public void GivenTodayIs(string date)
     {
-        // No fake clock is wired at this stub stage (§5 bodies all throw NotImplementedException before
-        // any clock read would happen) — the pinned date is documented here for the Build stage, which
-        // owns wiring a controllable clock per §2/R6.
-        state.Values["today"] = ParseLedgerDate(date).ToString("yyyy-MM-dd");
+        var today = ParseLedgerDate(date);
+        factory.Clock.PinToday(today);
+        state.Values["today"] = today.ToString("yyyy-MM-dd");
     }
 
     #endregion
@@ -1038,6 +1037,71 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
         var text = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<JsonElement>(text);
     }
+
+    #region Reversing a reversal (DRK-1813 fix brief #1)
+
+    [Given(@"PayHub holds an account not permitted to go negative that was credited ([\d.]+) (\w+) and then debited ([\d.]+) \w+")]
+    public async Task GivenPayHubHoldsAnAccountThatWasCreditedAndThenDebited(decimal credit, string currency, decimal debit)
+    {
+        var accountId = await OpenAccountAsync(currency, permittedToGoNegative: false);
+        state.Values["account"] = accountId.ToString();
+        (await RecordPostingAsync(accountId, "Credit", credit, currency)).ShouldNotBeNull();
+        var debitId = await RecordPostingAsync(accountId, "Debit", debit, currency);
+        debitId.ShouldNotBeNull();
+        state.Values["posting"] = debitId.Value.ToString();
+    }
+
+    [Given(@"PayHub has reversed that debit, bringing the balance back to ([\d.]+) (\w+)")]
+    public async Task GivenPayHubHasReversedThatDebit(decimal balance, string currency)
+    {
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting()}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
+        var reversal = await ReadResponseJsonAsync();
+        state.Response.StatusCode.ShouldBe(HttpStatusCode.OK, reversal.ToString());
+        reversal.GetProperty("balanceAfter").GetDecimal().ShouldBe(balance);
+        reversal.GetProperty("currency").GetString().ShouldBe(currency);
+        state.Values["reversal"] = reversal.GetProperty("id").GetGuid().ToString();
+    }
+
+    [Given(@"PayHub has since recorded another debit of ([\d.]+) (\w+), bringing the balance to ([\d.]+) \w+")]
+    public async Task GivenPayHubHasSinceRecordedAnotherDebit(decimal amount, string currency, decimal balance)
+    {
+        (await RecordPostingAsync(Account(), "Debit", amount, currency)).ShouldNotBeNull();
+        var account = await ReadJsonAsync(
+            await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}"));
+        account.GetProperty("balance").GetDecimal().ShouldBe(balance);
+        state.Values["streamPosition"] = account.GetProperty("streamPosition").GetInt64().ToString(CultureInfo.InvariantCulture);
+    }
+
+    [When(@"PayHub asks to reverse that reversal")]
+    public async Task WhenPayHubAsksToReverseThatReversal() =>
+        state.Response = await client.SendAsCallerAsync(
+            state, HttpMethod.Post, $"{PostingsPath}/{Posting("reversal")}/reverse",
+            new { reason = "Recorded in error" }, $"rev-{Guid.NewGuid():N}");
+
+    [Then(@"the account balance still reads ([\d.]+) (\w+) and its stream holds no new posting")]
+    public async Task ThenTheAccountBalanceStillReadsAndItsStreamHoldsNoNewPosting(decimal balance, string currency)
+    {
+        var account = await ReadJsonAsync(
+            await client.SendAsCallerAsync(state, HttpMethod.Get, $"{AccountsPath}/{Account()}"));
+        account.GetProperty("balance").GetDecimal().ShouldBe(balance);
+        account.GetProperty("currency").GetString().ShouldBe(currency);
+        account.GetProperty("streamPosition").GetInt64().ToString(CultureInfo.InvariantCulture)
+            .ShouldBe(state.Values["streamPosition"]);
+    }
+
+    [Then(@"that reversal is not itself marked reversed")]
+    public async Task ThenThatReversalIsNotItselfMarkedReversed()
+    {
+        var reversal = await ReadJsonAsync(
+            await client.SendAsCallerAsync(state, HttpMethod.Get, $"{PostingsPath}/{Posting("reversal")}"));
+        reversal.GetProperty("status").GetString().ShouldBe("posted");
+        (reversal.TryGetProperty("reversedByPostingId", out var reversedBy) && reversedBy.ValueKind != JsonValueKind.Null)
+            .ShouldBeFalse($"expected no reversedByPostingId, got: {reversal}");
+    }
+
+    #endregion
 
     [Then(@"one request records the posting")]
     public void ThenOneRequestRecordsThePosting() =>

@@ -228,7 +228,7 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
-| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
+| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); the posting is itself a reversal (`POSTING_IS_REVERSAL`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
 
 #### Listing groups and accounts
 
@@ -385,6 +385,7 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
 | `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
 | `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting under a key not used before. A retry under the *same* key replays the earlier reversal with `200` instead |
+| `422` | `POSTING_IS_REVERSAL` | Reverse requested on a posting that is itself a reversal. Nothing is recorded |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |

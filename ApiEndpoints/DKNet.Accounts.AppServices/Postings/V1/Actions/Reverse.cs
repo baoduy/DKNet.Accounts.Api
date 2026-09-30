@@ -9,7 +9,8 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 
 /// <summary>
 /// Reverses a posting. Exempt from the account's floor but not from its status (§ invariants) — a
-/// posting can be reversed at most once. Both <see cref="Reason"/> and <see cref="IdempotencyKey"/> are
+/// posting can be reversed at most once, and a posting that is itself a reversal can never be reversed
+/// (refused POSTING_IS_REVERSAL, nothing recorded). Both <see cref="Reason"/> and <see cref="IdempotencyKey"/> are
 /// required: the reason is the audit record of WHY the correction was made (there is no other place to put
 /// it — a posting is never edited), and the key makes a retried reversal replay its first outcome instead of
 /// being refused POSTING_ALREADY_REVERSED. <see cref="IdempotencyKey"/> is populated from the
@@ -44,7 +45,10 @@ internal sealed class ReversePostingCommandValidator : AbstractValidator<Reverse
 /// back-link — one-way, applied at most once. The request's idempotency key is checked before anything else
 /// is read, so a retried reversal replays the reversal it already wrote rather than hitting the
 /// already-reversed refusal; a genuinely new request (its own key) against an already-reversed posting is
-/// still refused POSTING_ALREADY_REVERSED. Exempt
+/// still refused POSTING_ALREADY_REVERSED. A posting that is itself a reversal (it carries a
+/// <see cref="Domains.Features.Postings.Entities.Posting.ReversesPostingId"/> back-link) is refused
+/// POSTING_IS_REVERSAL with nothing recorded — checked after the already-reversed refusal, so a posting that
+/// is both answers POSTING_ALREADY_REVERSED. Exempt
 /// from the account's floor only; never from its status gate (frozen/closed refuse either direction; a
 /// dormant account refuses only a reversal that would debit it). Concurrency-safe: two concurrent reversal
 /// requests for the same posting share that posting's account lock, so the second one always re-reads the
@@ -132,6 +136,13 @@ internal sealed class ReversePostingCommandHandler(
             {
                 return Result.Fail<PostingDto>(LedgerErrors.Error(
                     LedgerErrors.PostingAlreadyReversed, "This posting has already been reversed."));
+            }
+
+            // Lineage, never Category: a hand-labelled Reversal posting has no back-link and stays reversible.
+            if (original.ReversesPostingId is not null)
+            {
+                return Result.Fail<PostingDto>(LedgerErrors.Error(
+                    LedgerErrors.PostingIsReversal, "This posting is itself a reversal and cannot be reversed."));
             }
 
             var account = await repository.FirstOrDefaultAsync(new SpecGetAccount(original.AccountId), cancellationToken);

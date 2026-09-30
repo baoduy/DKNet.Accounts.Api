@@ -43,6 +43,7 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.AccountFrozen,
         LedgerErrors.AccountDormantDebitRefused,
         LedgerErrors.PostingAlreadyReversed,
+        LedgerErrors.PostingIsReversal,
         LedgerErrors.LockTimeout,
         LedgerErrors.IdempotencyKeyConflict,
         LedgerErrors.InvalidDateRange,
