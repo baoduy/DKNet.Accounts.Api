@@ -107,7 +107,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/CorrectingAndReadingTheLedger.feature.ndjson", 15);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/CorrectingAndReadingTheLedger.feature.ndjson", 16);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -188,15 +188,15 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A reversal lands even when the account can no longer cover it")]
+        [global::NUnit.Framework.DescriptionAttribute("Reversing a reversal is refused")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task AReversalLandsEvenWhenTheAccountCanNoLongerCoverIt()
+        public async global::System.Threading.Tasks.Task ReversingAReversalIsRefused()
         {
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "2";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A reversal lands even when the account can no longer cover it", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Reversing a reversal is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 19
@@ -210,16 +210,65 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 20
+    await testRunner.GivenAsync("PayHub holds an account not permitted to go negative that was credited 100.00 SGD" +
+                        " and then debited 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 21
+    await testRunner.AndAsync("PayHub has reversed that debit, bringing the balance back to 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 22
+    await testRunner.AndAsync("PayHub has since recorded another debit of 100.00 SGD, bringing the balance to 0." +
+                        "00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 23
+    await testRunner.WhenAsync("PayHub asks to reverse that reversal", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 24
+    await testRunner.ThenAsync("the request is refused with status 422 and the code \"POSTING_IS_REVERSAL\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 25
+    await testRunner.AndAsync("the account balance still reads 0.00 SGD and its stream holds no new posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 26
+    await testRunner.AndAsync("that reversal is not itself marked reversed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::NUnit.Framework.TestAttribute()]
+        [global::NUnit.Framework.DescriptionAttribute("A reversal lands even when the account can no longer cover it")]
+        [global::NUnit.Framework.CategoryAttribute("integration")]
+        public async global::System.Threading.Tasks.Task AReversalLandsEvenWhenTheAccountCanNoLongerCoverIt()
+        {
+            string[] tagsOfScenario = new string[] {
+                    "integration"};
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "3";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A reversal lands even when the account can no longer cover it", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 29
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 30
     await testRunner.GivenAsync("PayHub recorded a credit of 100.00 SGD against an account not permitted to go neg" +
                         "ative", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 21
+#line 31
     await testRunner.AndAsync("the account has since been debited down to 20.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 22
+#line 32
     await testRunner.WhenAsync("PayHub reverses that credit of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 23
+#line 33
     await testRunner.ThenAsync("the reversal is recorded and the account balance is -80.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -234,11 +283,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "3";
+            string pickleIndex = "4";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A reversal against a closed account is refused until the account is reopened", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 26
+#line 36
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -248,16 +297,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 27
+#line 37
     await testRunner.GivenAsync("PayHub holds a closed account carrying a posting of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 28
+#line 38
     await testRunner.WhenAsync("PayHub asks to reverse that posting", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 29
+#line 39
     await testRunner.ThenAsync("the request is refused", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 30
+#line 40
     await testRunner.AndAsync("after PayHub returns the account to active the same reversal is recorded", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -272,11 +321,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
+            string pickleIndex = "5";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A reversal that debits a dormant account is refused until the account is active", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 33
+#line 43
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -286,16 +335,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 34
+#line 44
     await testRunner.GivenAsync("PayHub holds a dormant account carrying a credit of 100.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 35
+#line 45
     await testRunner.WhenAsync("PayHub asks to reverse that credit", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 36
+#line 46
     await testRunner.ThenAsync("the request is refused and the balance is unchanged", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 37
+#line 47
     await testRunner.AndAsync("after PayHub returns the account to active the same reversal is recorded", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -310,11 +359,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
+            string pickleIndex = "6";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A batch where one movement fails records none of them", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 40
+#line 50
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -324,15 +373,15 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 41
+#line 51
     await testRunner.GivenAsync("PayHub holds an account with a balance of 10.00 SGD that is not permitted to go n" +
                         "egative, and an account with a balance of 500.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 42
+#line 52
     await testRunner.WhenAsync("PayHub submits one batch debiting 400.00 SGD from the first and crediting 400.00 " +
                         "SGD to the second", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 43
+#line 53
     await testRunner.ThenAsync("the request is refused, both balances are unchanged, and neither movement appears" +
                         " in either stream", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
@@ -348,11 +397,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "6";
+            string pickleIndex = "7";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A transfer batch records both legs under one transaction group", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 46
+#line 56
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -362,18 +411,18 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 47
+#line 57
     await testRunner.GivenAsync("PayHub holds an account with a balance of 500.00 SGD and an account with a balanc" +
                         "e of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 48
+#line 58
     await testRunner.WhenAsync("PayHub submits one batch debiting 400.00 SGD from the first and crediting 400.00 " +
                         "SGD to the second", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 49
+#line 59
     await testRunner.ThenAsync("the debited account reads 100.00 SGD and the credited account reads 400.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 50
+#line 60
     await testRunner.AndAsync("both postings share one transaction group identifier", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -388,11 +437,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "7";
+            string pickleIndex = "8";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A statement returns an account\'s postings in stream order within a date range", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 53
+#line 63
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -402,16 +451,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 54
+#line 64
     await testRunner.GivenAsync("PayHub\'s account has postings dated 1 June 2026, 15 June 2026 and 30 June 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 55
+#line 65
     await testRunner.WhenAsync("PayHub reads the statement from 10 June 2026 to 30 June 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 56
+#line 66
     await testRunner.ThenAsync("the postings dated 15 June 2026 and 30 June 2026 are returned in that order", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 57
+#line 67
     await testRunner.AndAsync("the posting dated 1 June 2026 is not returned", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -426,11 +475,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
+            string pickleIndex = "9";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A backdated posting is read at the position it was recorded at", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 60
+#line 70
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -440,14 +489,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 61
+#line 71
     await testRunner.GivenAsync("PayHub\'s account has a posting dated 30 June 2026 recorded before a posting backd" +
                         "ated to 15 June 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 62
+#line 72
     await testRunner.WhenAsync("PayHub reads the statement covering all of June 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 63
+#line 73
     await testRunner.ThenAsync("the posting dated 30 June 2026 is returned before the posting dated 15 June 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -462,11 +511,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "9";
+            string pickleIndex = "10";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting dated in the future is refused", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 66
+#line 76
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -476,13 +525,13 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 67
+#line 77
     await testRunner.GivenAsync("today is 14 September 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 68
+#line 78
     await testRunner.WhenAsync("PayHub records a credit of 10.00 SGD taking effect on 30 September 2026", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 69
+#line 79
     await testRunner.ThenAsync("the request is refused and no posting is recorded", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -497,11 +546,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "10";
+            string pickleIndex = "11";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Reading a statement page by page returns every posting exactly once", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 72
+#line 82
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -511,16 +560,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 73
+#line 83
     await testRunner.GivenAsync("PayHub\'s account holds twenty-five postings within one date range", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 74
+#line 84
     await testRunner.WhenAsync("PayHub reads that statement in pages of ten until a page comes back empty", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 75
+#line 85
     await testRunner.ThenAsync("twenty-five postings are returned across the pages in stream order", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 76
+#line 86
     await testRunner.AndAsync("no posting appears on two pages and none is missing", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -535,11 +584,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "11";
+            string pickleIndex = "12";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An account balance always equals the sum of its postings", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 79
+#line 89
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -549,14 +598,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 80
+#line 90
     await testRunner.GivenAsync("PayHub has recorded credits of 100.00, 250.00 and 5.50 SGD and debits of 30.00 an" +
                         "d 12.25 SGD against an account opened at 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 81
+#line 91
     await testRunner.WhenAsync("PayHub reads that account\'s balance", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 82
+#line 92
     await testRunner.ThenAsync("the balance is 313.25 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
@@ -571,11 +620,11 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             string[] tagsOfScenario = new string[] {
                     "integration"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "12";
+            string pickleIndex = "13";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Concurrent postings to one account all land and none is lost", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 85
+#line 95
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -585,16 +634,16 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 86
+#line 96
     await testRunner.GivenAsync("PayHub holds an account with a balance of 0.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 87
+#line 97
     await testRunner.WhenAsync("PayHub records twenty credits of 10.00 SGD at the same time", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 88
+#line 98
     await testRunner.ThenAsync("the account balance is 200.00 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 89
+#line 99
     await testRunner.AndAsync("the account\'s stream holds twenty postings at consecutive positions", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

@@ -66,7 +66,9 @@ internal sealed class RecordPostingBatchCommandValidator : AbstractValidator<Rec
             movement.RuleFor(m => m.AccountId).NotEmpty();
             movement.RuleFor(m => m.Direction).IsInEnum();
             movement.RuleFor(m => m.Currency).NotEmpty().Length(3, 10);
-            movement.RuleFor(m => m.Category).IsInEnum();
+            movement.RuleFor(m => m.Category).IsInEnum()
+                .NotEqual(PostingCategory.Reversal)
+                .WithMessage("A Reversal posting is written only by reversing a posting, never recorded directly.");
         });
     }
 }
