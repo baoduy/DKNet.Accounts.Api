@@ -1,0 +1,426 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Accounts API Runtime",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api",
+      "revision": "ccc05ace5aa95c5fe36e82e7eac4cdecb3ee7851"
+    },
+    "viewBox": [
+      1320,
+      680
+    ],
+    "views": [
+      {
+        "id": "write-path",
+        "label": "Primary write path",
+        "focus": [
+          "browser",
+          "console",
+          "api",
+          "bus",
+          "handler",
+          "db"
+        ],
+        "note": "An operator action travels from the browser through the BFF and the API pipeline to one PostgreSQL transaction."
+      },
+      {
+        "id": "identity",
+        "label": "Identity and trust",
+        "focus": [
+          "browser",
+          "console",
+          "idp",
+          "api",
+          "redis"
+        ],
+        "note": "The BFF holds tokens server-side; the API trusts only a validated JWT carrying the right scp scope."
+      },
+      {
+        "id": "events",
+        "label": "Outbound ledger events",
+        "focus": [
+          "handler",
+          "db",
+          "outbox",
+          "broker"
+        ],
+        "note": "Events are written to a Postgres outbox in the same transaction, then relayed to the broker."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Operator browser",
+      "sublabel": "session cookie only",
+      "pos": [
+        30,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ]
+    },
+    {
+      "id": "console",
+      "type": "frontend",
+      "label": "Accounts Console",
+      "sublabel": "Next.js BFF :3000",
+      "tag": "route allowlist",
+      "pos": [
+        220,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ui/app/api/ledger/[...route]/route.ts",
+          "label": "BFF proxy"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "API pipeline",
+      "sublabel": "rate limit · JWT · scp",
+      "tag": "default-deny",
+      "pos": [
+        410,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/AppConfig.cs",
+          "line": 82,
+          "end_line": 100,
+          "label": "middleware order"
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/Auth/AuthConfig.cs",
+          "line": 30,
+          "end_line": 47,
+          "label": "scope policies"
+        }
+      ]
+    },
+    {
+      "id": "bus",
+      "type": "messagebus",
+      "label": "SlimMessageBus",
+      "sublabel": "in-memory child bus",
+      "pos": [
+        600,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Extensions/ServiceBusSetup.cs",
+          "line": 99,
+          "end_line": 114,
+          "label": "in-memory bus"
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "AppServices handlers",
+      "sublabel": "idempotency · lock",
+      "pos": [
+        790,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs",
+          "label": "Record posting"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "AppDb + outbox",
+      "pos": [
+        980,
+        230
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Extensions/InfraSetup.cs",
+          "line": 36,
+          "end_line": 41,
+          "label": "Npgsql context"
+        }
+      ]
+    },
+    {
+      "id": "idp",
+      "type": "security",
+      "label": "Identity provider",
+      "sublabel": "Keycloak dev · Entra ID prod",
+      "pos": [
+        252,
+        30
+      ],
+      "size": [
+        250,
+        64
+      ]
+    },
+    {
+      "id": "appconfig",
+      "type": "cloud",
+      "label": "Azure App Configuration",
+      "sublabel": "optional flags",
+      "pos": [
+        397,
+        570
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/AzureAppConfig/AzureAppConfigSetup.cs",
+          "line": 35,
+          "end_line": 41
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "sessions · HybridCache",
+      "pos": [
+        220,
+        430
+      ],
+      "size": [
+        124,
+        64
+      ]
+    },
+    {
+      "id": "outbox",
+      "type": "backend",
+      "label": "Outbox relay",
+      "sublabel": "in API process",
+      "pos": [
+        790,
+        430
+      ],
+      "size": [
+        124,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Extensions/ServiceBusSetup.cs",
+          "line": 160,
+          "end_line": 166,
+          "label": "outbox"
+        }
+      ]
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "Event broker",
+      "sublabel": "RabbitMQ / ASB",
+      "pos": [
+        1160,
+        430
+      ],
+      "size": [
+        130,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Deployment: AppHost / docker-compose / AKS",
+      "wraps": [
+        "console",
+        "api",
+        "bus",
+        "handler",
+        "db",
+        "redis",
+        "outbox"
+      ],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "API process · JWT + scp required",
+      "wraps": [
+        "api",
+        "bus",
+        "handler",
+        "outbox"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-console",
+      "from": "browser",
+      "to": "console",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "console-api",
+      "from": "console",
+      "to": "api",
+      "label": "Bearer JWT",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-bus",
+      "from": "api",
+      "to": "bus",
+      "label": "bus.Send",
+      "variant": "emphasis"
+    },
+    {
+      "id": "bus-handler",
+      "from": "bus",
+      "to": "handler",
+      "label": "command",
+      "variant": "emphasis"
+    },
+    {
+      "id": "handler-db",
+      "from": "handler",
+      "to": "db",
+      "label": "EF Core tx",
+      "variant": "emphasis"
+    },
+    {
+      "id": "console-idp",
+      "from": "console",
+      "to": "idp",
+      "label": "OIDC + PKCE",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        282,
+        142
+      ]
+    },
+    {
+      "id": "api-idp",
+      "from": "api",
+      "to": "idp",
+      "label": "JWKS",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        472,
+        142
+      ]
+    },
+    {
+      "id": "api-appconfig",
+      "from": "api",
+      "to": "appconfig",
+      "label": "flags",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        472,
+        370
+      ]
+    },
+    {
+      "id": "console-redis",
+      "from": "console",
+      "to": "redis",
+      "label": "encrypted tokens",
+      "labelAt": [
+        282,
+        362
+      ]
+    },
+    {
+      "id": "db-outbox",
+      "from": "db",
+      "to": "outbox",
+      "label": "outbox rows",
+      "variant": "dashed"
+    },
+    {
+      "id": "outbox-broker",
+      "from": "outbox",
+      "to": "broker",
+      "label": "ledger events",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Trust boundaries",
+      "items": [
+        "Browser holds only a session cookie; BFF keeps tokens in Redis",
+        "API: issuer, audience, signature, lifetime + scp scope; default-deny",
+        "Helm: console HTTPRoute public, API ClusterIP only"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Write path",
+      "items": [
+        "Rate limit, timeouts, auth, then FluentValidation",
+        "Postings: Idempotency-Key replay via unique DB index",
+        "Per-account SemaphoreSlim lock: single replica only"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Platform",
+      "items": [
+        "MessageBus__Transport: RabbitMQ local, ASB on AKS",
+        "Machine callers: TrafficGen, DKNet.Accounts.Client",
+        "Key Vault via CSI; OTLP / Azure Monitor telemetry"
+      ]
+    }
+  ]
+}
