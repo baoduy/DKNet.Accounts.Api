@@ -13,7 +13,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 /// comes back as an unexpected status — that is the nameable reason R2 asks for.
 /// </summary>
 [Binding]
-public sealed class LedgerSteps(HttpClient client, ScenarioState state)
+public sealed class LedgerSteps(HttpClient client, ScenarioState state, BddApiFactory factory)
 {
     private const string GroupsPath = "/v1/account-groups";
     private const string AccountsPath = "/v1/accounts";
@@ -455,10 +455,9 @@ public sealed class LedgerSteps(HttpClient client, ScenarioState state)
     [Given(@"today is (.+)$")]
     public void GivenTodayIs(string date)
     {
-        // No fake clock is wired at this stub stage (§5 bodies all throw NotImplementedException before
-        // any clock read would happen) — the pinned date is documented here for the Build stage, which
-        // owns wiring a controllable clock per §2/R6.
-        state.Values["today"] = ParseLedgerDate(date).ToString("yyyy-MM-dd");
+        var today = ParseLedgerDate(date);
+        factory.Clock.PinToday(today);
+        state.Values["today"] = today.ToString("yyyy-MM-dd");
     }
 
     #endregion

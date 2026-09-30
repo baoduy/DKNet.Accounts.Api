@@ -19,6 +19,10 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
 
     protected override string DbConnectionString => _container.GetConnectionString();
 
+    /// <summary>The host's clock. Real time unless a scenario pins "today" (<c>Given today is</c>); reset before
+    /// every scenario by <see cref="ApiHooks"/>.</summary>
+    public ScenarioClock Clock { get; } = new();
+
     /// <summary>The run-shared container's connection string, for a scenario that needs a database of its own
     /// on the same server (<see cref="ScratchDatabaseApiFactory"/>).</summary>
     public string ContainerConnectionString => _container.GetConnectionString();
@@ -82,6 +86,10 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
 
         LedgerCallerAuthHandler.Register(services);
 
+        // InfraSetup registers TimeProvider.System; the host reads the clock through this one instead.
+        services.RemoveAll<TimeProvider>();
+        services.AddSingleton<TimeProvider>(Clock);
+
         if (!string.IsNullOrWhiteSpace(redisConnectionString))
         {
             // Program.cs's own AddAppConfig already chose the in-memory idempotency fallback (it ran before
@@ -93,4 +101,24 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
                 o => o.ConflictHandling = IdempotentConflictHandling.CachedResult);
         }
     }
+}
+
+/// <summary>
+/// Real time shifted by a fixed offset, so a scenario can pin "today" while the clock keeps moving (lock
+/// timeouts and other elapsed-time waits still elapse). Offset zero is plain system time.
+/// </summary>
+public sealed class ScenarioClock : TimeProvider
+{
+    private TimeSpan _offset;
+
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + _offset;
+
+    /// <summary>Makes the current UTC date <paramref name="today"/>, at the current time of day.</summary>
+    public void PinToday(DateOnly today)
+    {
+        var now = base.GetUtcNow();
+        _offset = today.ToDateTime(TimeOnly.FromTimeSpan(now.TimeOfDay), DateTimeKind.Utc) - now.UtcDateTime;
+    }
+
+    public void Reset() => _offset = TimeSpan.Zero;
 }
