@@ -1,5 +1,5 @@
 /**
- * DRK-1886 §7:
+ * DRK-1886 — Scenarios to cover:
  *   R1: the Record posting form's Category select lists `Transfer, Payment, Fee, Interest,
  *   Adjustment, Refund, OpeningBalance`, in that order, with `Transfer` selected. `Reversal` is
  *   absent. Cover it on both mounts: the account detail screen and the Records screen.

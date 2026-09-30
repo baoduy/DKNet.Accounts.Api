@@ -1,5 +1,5 @@
 /**
- * DRK-1886 §7:
+ * DRK-1886 — Scenarios to cover:
  *   R2: the Category filters on the Records screen and the account postings panel still offer
  *   `Reversal`.
  *
