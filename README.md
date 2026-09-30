@@ -228,7 +228,7 @@ column. The **only delete route is on an empty account group**; nothing in the l
 | `POST` | `/v1/postings` | Record one credit or debit. Declares `Idempotency-Key` as a header parameter. Returns `201` + the posting | `postings.write` | Every posting refusal below |
 | `POST` | `/v1/postings/batch` | Record several movements as one all-or-nothing batch. Declares `Idempotency-Key` as a header parameter | `postings.write` | Any one movement's refusal refuses the whole batch and records nothing |
 | `GET` | `/v1/postings/{id}` | Read one posting | `postings.read` | Unknown id → `404` |
-| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
+| `POST` | `/v1/postings/{id}/reverse` | Reverse a posting. Body: `reason` (**required**, ≤ 500 chars, recorded as the reversal's `description`). Declares `Idempotency-Key` as a **required** header parameter. Returns `200` + the reversal | `postings.reverse` | Missing `reason` or `Idempotency-Key` → `400`; already reversed under a new key (`POSTING_ALREADY_REVERSED`); the posting is itself a reversal (`POSTING_IS_REVERSAL`); same key, different reason (`IDEMPOTENCY_KEY_CONFLICT`); the account's status does not accept a movement in the reversal's own direction |
 
 #### Listing groups and accounts
 
