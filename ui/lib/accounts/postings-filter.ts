@@ -7,6 +7,8 @@ export const MAX_POSTING_PERIOD_DAYS = 90;
 
 export const POSTING_DIRECTIONS = ['Credit', 'Debit'] as const;
 export const POSTING_CATEGORIES = ['Transfer', 'Payment', 'Fee', 'Interest', 'Adjustment', 'Refund', 'Reversal', 'OpeningBalance'] as const;
+/** The service refuses `Reversal` on record (DRK-1813) — reversals are written only through the reverse endpoint. */
+export const RECORDABLE_POSTING_CATEGORIES = POSTING_CATEGORIES.filter((category) => category !== 'Reversal');
 export const POSTING_STATUSES = ['Posted', 'Reversed'] as const;
 
 function toDateOnly(date: Date): string {

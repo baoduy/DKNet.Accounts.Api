@@ -29,7 +29,7 @@ import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { RefusalAlert, type LedgerError } from '@/components/feedback/RefusalAlert';
 import { formatDate } from '@/components/records/RecordsTable';
 import { isUnreachable, NO_ANSWER_ERROR, RECORD_POSTING_CODE_FIELDS, routeRefusal } from '@/lib/api/refusal';
-import { POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
+import { RECORDABLE_POSTING_CATEGORIES } from '@/lib/accounts/postings-filter';
 import { useAccounts } from '@/lib/accounts/query';
 import { useDecimalPlaces } from '@/lib/query/currencies';
 import { useRecordPosting } from '@/lib/query/mutations';
@@ -256,7 +256,7 @@ export function RecordPostingForm({ account: lockedAccount, granted = true, onCl
             <Input type="date" aria-label="Effective date" value={effectiveDate} max={today()} onChange={(event) => setEffectiveDate(event.target.value)} className="w-42" />
           </FormRow>
           <FormRow label="Category" required>
-            <Select aria-label="Category" options={[...POSTING_CATEGORIES]} value={category} className="w-full" onChange={(event) => setCategory(event.target.value)} />
+            <Select aria-label="Category" options={RECORDABLE_POSTING_CATEGORIES} value={category} className="w-full" onChange={(event) => setCategory(event.target.value)} />
           </FormRow>
           <FormRow label="Description" hint="Optional.">
             <label className="block">
