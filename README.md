@@ -385,6 +385,7 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `GROUP_HOLDS_BALANCE` | Group close requested while an account it holds carries a balance |
 | `422` | `GROUP_NOT_EMPTY` | Group delete requested while the group still holds any account — a closed, zero-balance account still counts |
 | `422` | `POSTING_ALREADY_REVERSED` | Reverse requested on an already-reversed posting under a key not used before. A retry under the *same* key replays the earlier reversal with `200` instead |
+| `422` | `POSTING_IS_REVERSAL` | Reverse requested on a posting that is itself a reversal. Nothing is recorded |
 | `422` | `DUPLICATE_GROUP_CODE` | A group already exists with that code |
 | `422` | `DUPLICATE_CURRENCY_CODE` | A currency already exists with that code |
 | `422` | `UNSUPPORTED_CURRENCY` | The currency is not in the reference set, or exists but has been deactivated and is no longer offered |
