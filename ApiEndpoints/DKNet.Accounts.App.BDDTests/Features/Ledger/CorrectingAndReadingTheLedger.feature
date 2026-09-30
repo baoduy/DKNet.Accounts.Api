@@ -16,6 +16,16 @@ Feature: Correcting and reading the ledger
     Then the request is refused and the account balance is unchanged
 
   @integration
+  Scenario: Reversing a reversal is refused
+    Given PayHub holds an account not permitted to go negative that was credited 100.00 SGD and then debited 100.00 SGD
+    And PayHub has reversed that debit, bringing the balance back to 100.00 SGD
+    And PayHub has since recorded another debit of 100.00 SGD, bringing the balance to 0.00 SGD
+    When PayHub asks to reverse that reversal
+    Then the request is refused with status 422 and the code "POSTING_IS_REVERSAL"
+    And the account balance still reads 0.00 SGD and its stream holds no new posting
+    And that reversal is not itself marked reversed
+
+  @integration
   Scenario: A reversal lands even when the account can no longer cover it
     Given PayHub recorded a credit of 100.00 SGD against an account not permitted to go negative
     And the account has since been debited down to 20.00 SGD

@@ -578,6 +578,107 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             .ShouldBeTrue($"expected an error carrying code {LedgerErrors.PostingAlreadyReversed}, got: {body}");
     }
 
+    /// <summary>DRK-1813 fix brief #1 setup, on a floor-0 Liability account: credit 100, debit 100, reverse the
+    /// debit (balance 100), debit 100 again (balance 0). Returns the account and the reversal posting.</summary>
+    private async Task<(Guid Account, Guid Reversal)> AReversalFollowedByAnotherDebitAsync()
+    {
+        var account = await OpenAccountAsync();
+        await RecordAsync(account, "Credit", 100m);
+        var debit = await RecordAsync(account, "Debit", 100m);
+        var reversed = await ReverseAsync(debit);
+        reversed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var reversal = (await reversed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await RecordAsync(account, "Debit", 100m);
+        return (account, reversal);
+    }
+
+    private static async Task ShouldBeRefusedWithCodeAsync(HttpResponseMessage response, string code)
+    {
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity, body.ToString());
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == code)
+            .ShouldBeTrue($"expected an error carrying code {code}, got: {body}");
+    }
+
+    /// <summary>A plain input refusal: 400 naming <paramref name="field"/>, and no ledger code on the body (a
+    /// known ledger code would turn it into a 422).</summary>
+    private static async Task ShouldBeRefusedNamingFieldAsync(HttpResponseMessage response, string field)
+    {
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, body.ToString());
+        body.TryGetProperty(LedgerErrors.CodeKey, out _).ShouldBeFalse();
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.GetProperty("field").GetString() == field)
+            .ShouldBeTrue($"expected a '{field}' field error, got: {body}");
+    }
+
+    [Fact]
+    public async Task Reverse_RetryingARefusedReverseOfAReversalUnderTheSameKey_IsRefusedAgain()
+    {
+        // Nothing was recorded by the first refusal, so the retry finds no replay under its key and is
+        // refused the same way — not answered with a reversal that was never written.
+        var (account, reversal) = await AReversalFollowedByAnotherDebitAsync();
+        var before = await SnapshotAsync(account);
+        before.Balance.ShouldBe(0m);
+        var key = $"rev-{Guid.NewGuid():N}";
+
+        var first = await ReverseAsync(reversal, "Recorded in error", key);
+        var retry = await ReverseAsync(reversal, "Recorded in error", key);
+
+        await ShouldBeRefusedWithCodeAsync(first, "POSTING_IS_REVERSAL");
+        await ShouldBeRefusedWithCodeAsync(retry, "POSTING_IS_REVERSAL");
+        (await SnapshotAsync(account)).ShouldBe(before);
+        var target = await (await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{PostingsPath}/{reversal}")))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        target.GetProperty("status").GetString().ShouldBe("posted");
+        (target.TryGetProperty("reversedByPostingId", out var reversedBy) && reversedBy.ValueKind != JsonValueKind.Null)
+            .ShouldBeFalse($"expected no reversedByPostingId, got: {target}");
+    }
+
+    [Fact]
+    public async Task Record_WithCategoryReversal_IsRefusedNamingTheCategoryField()
+    {
+        var account = await OpenAccountAsync();
+        var before = await SnapshotAsync(account);
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
+        {
+            accountId = account,
+            direction = "Credit",
+            amount = 100m,
+            currency = "SGD",
+            category = "Reversal"
+        }));
+
+        await ShouldBeRefusedNamingFieldAsync(response, "Category");
+        (await SnapshotAsync(account)).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task Batch_WithAReversalMovement_IsRefusedWhole()
+    {
+        // The first movement is valid on its own; only the second names the Reversal category. Re-reading both
+        // accounts proves neither leg landed.
+        var account1 = await OpenAccountAsync();
+        var account2 = await OpenAccountAsync();
+        var before1 = await SnapshotAsync(account1);
+        var before2 = await SnapshotAsync(account2);
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, $"{PostingsPath}/batch", new
+        {
+            movements = new object[]
+            {
+                new { accountId = account1, direction = "Credit", amount = 100m, currency = "SGD", category = "Transfer" },
+                new { accountId = account2, direction = "Credit", amount = 100m, currency = "SGD", category = "Reversal" }
+            }
+        }));
+
+        await ShouldBeRefusedNamingFieldAsync(response, "Movements[1].Category");
+        (await SnapshotAsync(account1)).ShouldBe(before1);
+        (await SnapshotAsync(account2)).ShouldBe(before2);
+    }
+
     /// <summary>
     /// Stronger than the frozen acceptance scenario's own assertion (which only checks each request
     /// succeeded): proves the per-account lock actually serializes concurrent postings rather than merely
