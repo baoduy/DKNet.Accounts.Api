@@ -4,7 +4,7 @@ Reference docs for this service — a shared, banking-grade account and ledger s
 [the root README](../README.md) for what the service is, every field of every record type, the
 invariants it guarantees, the full API contract and the decisions on record.
 
-[!Diagram](diagrams/runtime-architecture.visual-check.1440x900.light.png)
+![Diagram](diagrams/runtime-architecture.visual-check.1440x900.light.png)
 
 ## This service
 
