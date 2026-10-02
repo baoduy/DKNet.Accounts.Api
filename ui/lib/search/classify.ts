@@ -1,7 +1,7 @@
 /**
  * DRK-1728 §3 row 3 — which route a typed search takes (DRK-1725 §3 Search): an identifier is
  * looked up as an account, then a group, then a posting; an account number narrows the accounts
- * list; anything else searches accounts and groups together. Below 2 characters nothing is sent.
+ * list; anything else searches accounts and groups together. Below 3 characters nothing is sent.
  */
 export type SearchRoute = 'identifier' | 'accountNumber' | 'text' | 'tooShort';
 
@@ -15,7 +15,8 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 /** A group code of 3 to 5 characters, a dash, then 3 to 10 characters, no spaces; any case. */
 const ACCOUNT_NUMBER_PATTERN = /^[A-Za-z0-9]{3,5}-[A-Za-z0-9]{3,10}$/;
 
-export const MIN_SEARCH_LENGTH = 2;
+/** The one minimum every search box shares: shorter, and nothing is sent. */
+export const MIN_SEARCH_LENGTH = 3;
 
 export function classifySearch(typed: string): ClassifiedSearch {
   const value = typed.trim();

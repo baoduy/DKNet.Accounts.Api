@@ -271,7 +271,7 @@ curl -X PATCH "https://accounts.example.com/v1/accounts/{id}" \
 
 ## 🗃️ Data model
 
-### Account — `pro.Accounts`
+### Account — `acc.Accounts`
 
 One row is one single-currency account, its floor controls and its live posting-stream position.
 

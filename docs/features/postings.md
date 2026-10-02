@@ -269,7 +269,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## 🗃️ Data model
 
-### Posting — `pro.Postings`
+### Posting — `acc.Postings`
 
 One row is one credit or debit recorded against exactly one account, at its gapless position in that account's stream.
 

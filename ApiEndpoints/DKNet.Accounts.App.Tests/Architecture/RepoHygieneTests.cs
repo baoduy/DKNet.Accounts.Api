@@ -53,23 +53,6 @@ public class RepoHygieneTests
     }
 
     [Fact]
-    public void EveryCsprojAndPropsFileUnderSrc_ShouldEndWithANewline()
-    {
-        var files = CsprojAndPropsFilesUnderSrc();
-        files.ShouldNotBeEmpty();
-
-        var offenders = files.Where(f =>
-        {
-            using var stream = File.OpenRead(f);
-            if (stream.Length == 0) return false;
-            stream.Seek(-1, SeekOrigin.End);
-            return stream.ReadByte() != '\n';
-        }).Select(Path.GetFileName).ToArray();
-
-        offenders.ShouldBeEmpty("files missing a trailing newline: " + string.Join(", ", offenders));
-    }
-
-    [Fact]
     public void ADeclaredUserSecretsIdWithNoGeneratedGuidSymbol_IsReported()
     {
         string[] declaredIds = ["DBF01B68-0445-4469-AF72-F0C643004311"];

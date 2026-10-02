@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { isZeroAmount } from '@/lib/api/money-json';
 import { routeRefusal } from '@/lib/api/refusal';
 import { accountGroupKey } from '@/lib/query/keys';
-import { ACCOUNT_GROUPS_PAGE_SIZE, useAccountGroup, useAccountGroupBalances, useAccountGroupsPage } from '@/lib/query/groups';
+import { ACCOUNT_GROUPS_PAGE_SIZE, isSendableSearch, useAccountGroup, useAccountGroupBalances, useAccountGroupsPage } from '@/lib/query/groups';
 import type { AccountGroup, AccountGroupType } from '@/lib/query/groups';
 import { useActivateAccountGroup, useCloseAccountGroup, useCreateAccountGroup, useDeleteAccountGroup, useUpdateAccountGroup } from '@/lib/query/mutations';
 import { pushRecent } from '@/lib/recent/store';
@@ -551,7 +551,7 @@ function AccountGroupsScreenContent({ grantedScopes, directoryObjectId }: Accoun
             orderBy={state.sort?.field}
             desc={state.sort?.desc}
             onSort={(field) => navigate({ ...state, sort: { field, desc: state.sort?.field === field && !state.sort.desc } })}
-            loading={listQuery.isPending}
+            loading={listQuery.isPending && isSendableSearch(state.filters.search)}
             placeholderRows={pageSize}
             emptyMessage={emptyMessage(GROUPS_EMPTY, { total: listQuery.data?.totalItemCount ?? 0, page: currentPage, filtered: Object.values(state.filters).some(Boolean) })}
           />

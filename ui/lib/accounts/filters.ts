@@ -13,8 +13,9 @@ import { formatDate } from '@/components/records/RecordsTable';
 import { Chip } from '@/components/ui/chip';
 import { Caption, Mono } from '@/components/ui/text';
 import type { ListViewState } from '@/lib/url-state';
+import { MIN_SEARCH_LENGTH } from '@/lib/search/classify';
 
-export const MIN_ACCOUNT_SEARCH_LENGTH = 2;
+export const MIN_ACCOUNT_SEARCH_LENGTH = MIN_SEARCH_LENGTH;
 
 /** `null` when the term is acceptable (including empty — no narrowing). */
 export function accountSearchError(term: string): string | null {

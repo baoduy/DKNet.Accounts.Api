@@ -162,7 +162,7 @@ public class PackageArchitectureTests
         var doc = XDocument.Load(directoryPackagesPath);
         var distinctVersions = PackagePinGuard.DistinctDkNetVersions(doc);
 
-        distinctVersions.ShouldBe(["13.1.2"]);
+        distinctVersions.ShouldBe(["13.2.5"]);
     }
 
     [Fact]

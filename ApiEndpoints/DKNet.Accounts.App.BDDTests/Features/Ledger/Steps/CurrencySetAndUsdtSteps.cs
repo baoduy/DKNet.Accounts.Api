@@ -631,9 +631,9 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
     public async Task ThenTheAccountStillHolds()
     {
         _upgradeError.ShouldBeNull("the upgrade failed");
-        (await _scratch!.ScalarAsync<decimal>("""SELECT "Balance" FROM pro."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
+        (await _scratch!.ScalarAsync<decimal>("""SELECT "Balance" FROM acc."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
             .ShouldBe(12400.50m);
-        (await _scratch.ScalarAsync<string>("""SELECT "CurrencyCode" FROM pro."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
+        (await _scratch.ScalarAsync<string>("""SELECT "CurrencyCode" FROM acc."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
             .ShouldBe("SGD");
     }
 
@@ -641,7 +641,7 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
     public async Task ThenSgdUsdAndJpyKeepTheirExistingIds()
     {
         async Task<Guid> IdOfCode(string code) =>
-            await _scratch!.ScalarAsync<Guid>("""SELECT "Id" FROM pro."Currencies" WHERE "Code" = $1""", code);
+            await _scratch!.ScalarAsync<Guid>("""SELECT "Id" FROM acc."Currencies" WHERE "Code" = $1""", code);
 
         (await IdOfCode("SGD")).ShouldBe(new Guid("c0de0001-0000-4000-8000-000000000702"));
         (await IdOfCode("USD")).ShouldBe(new Guid("c0de0001-0000-4000-8000-000000000840"));

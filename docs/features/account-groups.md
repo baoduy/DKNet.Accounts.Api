@@ -274,7 +274,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 
 ## 🗃️ Data model
 
-### AccountGroup — `pro.AccountGroups`
+### AccountGroup — `acc.AccountGroups`
 
 One row is one named, ownable bucket of accounts in one classification.
 

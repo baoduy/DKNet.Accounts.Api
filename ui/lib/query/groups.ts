@@ -4,9 +4,10 @@
  * reads every response through `readLedger` (row 7), so a balance never passes through a JS
  * `number`. DRK-1760 §3 row 3 — the hooks below are the only way a screen reads a group.
  */
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { AccountGroupDto } from '@/lib/accounts/query';
 import { readLedger } from '@/lib/api/ledger-request';
+import { MIN_SEARCH_LENGTH } from '@/lib/search/classify';
 import type { ListViewState } from '@/lib/url-state';
 import { accountGroupBalancesKey, accountGroupKey, accountGroupsKey, accountGroupsListKey } from './keys';
 
@@ -101,11 +102,19 @@ export async function fetchAccountGroupBalances(groupId: string): Promise<Accoun
   return (await readLedger(`/api/ledger/account-groups/${encodeURIComponent(groupId)}/balances`)) as AccountGroupBalance[];
 }
 
+/** Empty (no narrowing) or at least `MIN_SEARCH_LENGTH` characters. */
+export function isSendableSearch(search: string | undefined): boolean {
+  return !search || search.length >= MIN_SEARCH_LENGTH;
+}
+
 /** One page of the groups list, as the screen's view (filters, sort, page, page size) asks for it. */
 export function useAccountGroupsPage(state: ListViewState & { pageSize: number }): UseQueryResult<PagedAccountGroups> {
   return useQuery({
     queryKey: accountGroupsListKey({ ...state.filters, sort: state.sort, page: state.page, pageSize: state.pageSize }),
     queryFn: () => fetchAccountGroups(state),
+    // A search too short to send makes no read; the rows already shown stay until one is sent.
+    enabled: isSendableSearch(state.filters.search),
+    placeholderData: keepPreviousData,
   });
 }
 

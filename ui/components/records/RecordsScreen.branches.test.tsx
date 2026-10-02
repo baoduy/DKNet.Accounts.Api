@@ -201,13 +201,13 @@ describe('RecordsScreen — screen states (DRK-1725 §3)', () => {
     expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 
-  it('reads a search of exactly 2 characters, placeholders standing in meanwhile', async () => {
-    mockSearch = 'search=ab';
+  it('reads a search of exactly 3 characters, placeholders standing in meanwhile', async () => {
+    mockSearch = 'search=abc';
     const fetchMock = stubLedger();
     const answer = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((raw: string) => (String(raw).startsWith('/api/ledger/postings?') ? new Promise(() => {}) : answer(raw)));
     renderScreen();
-    await waitFor(() => expect(lastListQuery(fetchMock).get('search')).toBe('ab'));
+    await waitFor(() => expect(lastListQuery(fetchMock).get('search')).toBe('abc'));
     expect(document.querySelectorAll('tbody tr [data-slot="skeleton"]').length).toBeGreaterThan(0);
   });
 });

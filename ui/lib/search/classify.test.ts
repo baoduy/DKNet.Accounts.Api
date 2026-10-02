@@ -34,10 +34,10 @@ describe('classifySearch', () => {
     expect(classifySearch('  acme-000123 ')).toEqual({ route: 'accountNumber', value: 'ACME-000123' });
   });
 
-  it('sends nothing shorter than 2 characters, spaces not counted', () => {
-    expect(classifySearch('A')).toEqual({ route: 'tooShort', value: 'A' });
-    expect(classifySearch(' A ')).toEqual({ route: 'tooShort', value: 'A' });
-    expect(classifySearch('Ac').route).toBe('text');
+  it('sends nothing shorter than 3 characters, spaces not counted', () => {
+    expect(classifySearch('Ac')).toEqual({ route: 'tooShort', value: 'Ac' });
+    expect(classifySearch(' Ac ')).toEqual({ route: 'tooShort', value: 'Ac' });
+    expect(classifySearch('Acm').route).toBe('text');
   });
 });
 
@@ -47,7 +47,7 @@ describe('SEARCH_CAPTIONS', () => {
       identifier: 'Looked up as an account, then a group, then a posting.',
       accountNumber: 'Matched as an account number.',
       text: 'Searched across accounts and groups.',
-      tooShort: 'A search needs at least 2 characters.',
+      tooShort: 'A search needs at least 3 characters.',
     });
   });
 });

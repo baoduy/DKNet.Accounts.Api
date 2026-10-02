@@ -85,7 +85,7 @@ export async function startDeveloperStack(): Promise<DeveloperStack> {
     '-d',
     'accounts',
     '-c',
-    `INSERT INTO pro."Accounts" ("Id", "GroupId", "AccountNumber", "Name", "CurrencyCode", "Classification", "Status", "Balance", "HeldAmount", "PermittedToGoNegative", "StreamPosition", "CreatedBy", "CreatedOn")
+    `INSERT INTO acc."Accounts" ("Id", "GroupId", "AccountNumber", "Name", "CurrencyCode", "Classification", "Status", "Balance", "HeldAmount", "PermittedToGoNegative", "StreamPosition", "CreatedBy", "CreatedOn")
      VALUES (gen_random_uuid(), '${String(group.id)}', 'DEV-000001', 'Developer account', 'SGD', 'Liability', 'Active', 0, 0, false, 0, 'developer', now())`,
   ]);
   return stack;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LedgerRefusalError } from '@/lib/api/refusal';
-import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups } from './groups';
+import { fetchAccountGroup, fetchAccountGroupBalances, fetchAccountGroups, isSendableSearch } from './groups';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -153,5 +153,11 @@ describe('fetchAccountGroupBalances', () => {
   it('throws the service refusal message on a non-ok response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404, { errors: [{ message: 'Account group not found.' }] })));
     await expect(fetchAccountGroupBalances('missing')).rejects.toThrow('Account group not found.');
+  });
+});
+
+describe('isSendableSearch', () => {
+  it('sends no search, or one of at least 3 characters — never a shorter one', () => {
+    expect([undefined, '', 'Ac', 'Acm'].map(isSendableSearch)).toEqual([true, true, false, true]);
   });
 });

@@ -91,7 +91,7 @@ namespace DKNet.Accounts.Infra.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("AccountGroups", "pro");
+                    b.ToTable("AccountGroups", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Accounts.Entities.Account", b =>
@@ -184,7 +184,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("Accounts", "pro");
+                    b.ToTable("Accounts", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Currencies.Entities.Currency", b =>
@@ -229,7 +229,7 @@ namespace DKNet.Accounts.Infra.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Currencies", "pro");
+                    b.ToTable("Currencies", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Postings.Entities.Posting", b =>
@@ -355,7 +355,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.HasIndex("AccountId", "EffectiveDate", "StreamPosition");
 
-                    b.ToTable("Postings", "pro");
+                    b.ToTable("Postings", "acc");
                 });
 #pragma warning restore 612, 618
         }

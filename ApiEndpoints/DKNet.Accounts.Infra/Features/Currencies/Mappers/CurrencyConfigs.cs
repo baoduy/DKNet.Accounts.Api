@@ -15,7 +15,7 @@ internal sealed class CurrencyConfigs : DefaultEntityTypeConfiguration<Currency>
 
         builder.Property(c => c.Name).HasMaxLength(100).IsRequired();
 
-        builder.ToTable("Currencies", DomainSchemas.Profile);
+        builder.ToTable("Currencies", DomainSchemas.Accounts);
     }
 
     #endregion
