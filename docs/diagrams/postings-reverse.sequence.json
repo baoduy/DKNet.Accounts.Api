@@ -11,7 +11,7 @@
     { "id": "client", "type": "external", "label": "Client", "sublabel": "postings.reverse" },
     { "id": "handler", "type": "backend", "label": "Reverse", "sublabel": "hand-written handler" },
     { "id": "lock", "type": "backend", "label": "Lock", "sublabel": "original.AccountId, 10s" },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts + pro.Postings" },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts + acc.Postings" },
     { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
   ],
   "segments": [

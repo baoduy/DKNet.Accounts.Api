@@ -4,21 +4,22 @@ namespace DKNet.Accounts.Infra.Features.Currencies;
 internal sealed record SeededCurrency(Guid Id, string Code, string Name, int DecimalPlaces);
 
 /// <summary>
-/// The one list of seeded currencies (DRK-1719 §3/§3a), read by the migrations that insert them and by the
-/// test harness that re-seeds a database the migrations never ran on — so the two can never disagree.
+/// The one list of seeded currencies (DRK-1719 §3/§3a), read by <see cref="CurrencySeeding"/> on every
+/// migrate and by the test harness that re-seeds a database the migrations never ran on — so the two can
+/// never disagree. Seeding lives outside the migrations, so regenerating them never drops these rows.
 /// A fiat id ends in its ISO 4217 numeric code (<c>c0de0001-…-000000000978</c> is EUR); a non-ISO asset
 /// takes the <c>c0de0002-</c> prefix, which no ISO-derived id can collide with.
-/// Never edit or reorder a list once its migration has shipped — a migration re-reads it every time it runs.
-/// A new seeded currency goes in a new list, inserted by its own new migration, and joins <see cref="All"/>.
+/// Never change a shipped entry's id or code — a database already holding it is matched by code. A new
+/// seeded currency is simply appended; the next startup inserts it.
 /// </summary>
 internal static class SeededCurrencies
 {
-    /// <summary>Created by <c>system</c> on this fixed date — a literal, so every migration stays deterministic.</summary>
+    /// <summary>Created by <c>system</c> on this fixed date — a literal, so every seed run writes the same rows.</summary>
     public const string SeededBy = "system";
 
-    public static readonly DateTimeOffset SeededOn = new(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    public static readonly DateTimeOffset SeededOn = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-    /// <summary>Inserted by the <c>Initial</c> migration, which carries them as its own hand-written literals.</summary>
+    /// <summary>The original three (R5: SGD, USD and JPY at minimum).</summary>
     public static readonly IReadOnlyList<SeededCurrency> Initial =
     [
         Fiat("702", "SGD", "Singapore Dollar", 2),
@@ -26,7 +27,7 @@ internal static class SeededCurrencies
         Fiat("392", "JPY", "Japanese Yen", 0)
     ];
 
-    /// <summary>Inserted by the <c>CurrencySetAndUsdt</c> migration (DRK-1719).</summary>
+    /// <summary>The DRK-1719 currency set plus USDT.</summary>
     public static readonly IReadOnlyList<SeededCurrency> CurrencySetAndUsdt =
     [
         Fiat("978", "EUR", "Euro", 2),

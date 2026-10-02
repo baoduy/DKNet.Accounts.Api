@@ -10,7 +10,7 @@
   "participants": [
     { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
     { "id": "handler", "type": "backend", "label": "Update", "sublabel": "PATCH handler" },
-    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts" },
+    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts" },
     { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
   ],
   "segments": [

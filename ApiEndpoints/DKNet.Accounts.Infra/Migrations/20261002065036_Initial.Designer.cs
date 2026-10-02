@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DKNet.Accounts.Infra.Migrations
 {
     [DbContext(typeof(CoreDbContext))]
-    [Migration("20260921002809_Initial")]
+    [Migration("20261002065036_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -94,7 +94,7 @@ namespace DKNet.Accounts.Infra.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("AccountGroups", "pro");
+                    b.ToTable("AccountGroups", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Accounts.Entities.Account", b =>
@@ -109,8 +109,8 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("character varying(32)");
 
                     b.Property<decimal>("Balance")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<string>("Classification")
                         .IsRequired()
@@ -129,8 +129,8 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("ExternalReference")
                         .HasMaxLength(200)
@@ -140,8 +140,8 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("HeldAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<DateTimeOffset?>("LastPostedOn")
                         .HasColumnType("timestamp with time zone");
@@ -151,8 +151,8 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("character varying(4000)");
 
                     b.Property<decimal?>("MinimumBalance")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -160,8 +160,8 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<decimal?>("OverdraftLimit")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<bool>("PermittedToGoNegative")
                         .HasColumnType("boolean");
@@ -187,7 +187,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("Accounts", "pro");
+                    b.ToTable("Accounts", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Currencies.Entities.Currency", b =>
@@ -198,8 +198,8 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -232,7 +232,7 @@ namespace DKNet.Accounts.Infra.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Currencies", "pro");
+                    b.ToTable("Currencies", "acc");
                 });
 
             modelBuilder.Entity("DKNet.Accounts.Domains.Features.Postings.Entities.Posting", b =>
@@ -245,12 +245,12 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<decimal>("BalanceAfter")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<string>("CallingSystem")
                         .IsRequired()
@@ -278,8 +278,8 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.Property<string>("Currency")
                         .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -323,8 +323,8 @@ namespace DKNet.Accounts.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("SignedValue")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -358,7 +358,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
                     b.HasIndex("AccountId", "EffectiveDate", "StreamPosition");
 
-                    b.ToTable("Postings", "pro");
+                    b.ToTable("Postings", "acc");
                 });
 #pragma warning restore 612, 618
         }

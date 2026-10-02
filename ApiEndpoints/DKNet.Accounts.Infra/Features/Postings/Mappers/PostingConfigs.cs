@@ -48,7 +48,7 @@ internal sealed class PostingConfigs : DefaultEntityTypeConfiguration<Posting>
             .Metadata.SetValueComparer(MetadataConversion.Comparer);
         builder.Property(p => p.Metadata).HasMaxLength(4000);
 
-        builder.ToTable("Postings", DomainSchemas.Profile);
+        builder.ToTable("Postings", DomainSchemas.Accounts);
     }
 
     #endregion

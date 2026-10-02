@@ -3,6 +3,8 @@
  * `GET /v1/postings`'s own query surface (README.md: a required `from`/`to` window of at
  * most 90 days; narrows on `accountId` (guid), `direction`, `category`, `status`).
  */
+import { MIN_SEARCH_LENGTH } from '@/lib/search/classify';
+
 export const MAX_POSTING_PERIOD_DAYS = 90;
 
 export const POSTING_DIRECTIONS = ['Credit', 'Debit'] as const;
@@ -27,7 +29,7 @@ export function postingPeriodError(from: string, to: string): string | null {
   return spanDays > MAX_POSTING_PERIOD_DAYS ? `The period may span at most ${MAX_POSTING_PERIOD_DAYS} days.` : null;
 }
 
-export const MIN_POSTING_SEARCH_LENGTH = 2;
+export const MIN_POSTING_SEARCH_LENGTH = MIN_SEARCH_LENGTH;
 
 export interface PostingsFilterState {
   from: string;
@@ -65,7 +67,7 @@ export function postingPeriodRange(period: string, now: Date = new Date()): { fr
   return { from: toDateOnly(new Date(now.getTime() - days * 86_400_000)), to: toDateOnly(now) };
 }
 
-/** Screen state → the service's query string. A period over 90 days, or a search term under 2
+/** Screen state → the service's query string. A period over 90 days, or a search term under 3
  * characters, produces no query at all (R2 — no call is ever made for a refused period or term).
  * An empty `accountId` lists postings across every account (DRK-1713 §3 row 3). */
 export function toPostingsQuery(accountId: string, filter: PostingsFilterState, pageSize?: number): URLSearchParams | null {

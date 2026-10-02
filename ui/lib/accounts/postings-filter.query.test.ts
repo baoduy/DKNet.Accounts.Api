@@ -116,9 +116,9 @@ describe('toPostingsQuery — the Records screen (DRK-1713 §3 row 3)', () => {
     expect(toPostingsQuery('', BASE)!.has('accountId')).toBe(false);
   });
 
-  it('sends nothing for a 1-character search, and a 2-character search as typed', () => {
-    expect(toPostingsQuery('', { ...BASE, search: 'P' })).toBeNull();
-    expect(toPostingsQuery('', { ...BASE, search: 'P-' })!.get('search')).toBe('P-');
+  it('sends nothing for a 2-character search, and a 3-character search as typed', () => {
+    expect(toPostingsQuery('', { ...BASE, search: 'P-' })).toBeNull();
+    expect(toPostingsQuery('', { ...BASE, search: 'P-1' })!.get('search')).toBe('P-1');
   });
 
   it('omits search, orderBy, desc and pageNumber when unset', () => {

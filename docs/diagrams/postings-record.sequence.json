@@ -11,7 +11,7 @@
     { "id": "client", "type": "external", "label": "Client", "sublabel": "postings.write" },
     { "id": "handler", "type": "backend", "label": "Record", "sublabel": "hand-written handler" },
     { "id": "lock", "type": "backend", "label": "Lock", "sublabel": "per-account, 10s" },
-    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "pro.Accounts + pro.Postings" },
+    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts + acc.Postings" },
     { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
   ],
   "segments": [

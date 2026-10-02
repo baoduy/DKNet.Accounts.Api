@@ -37,7 +37,7 @@ internal sealed class AccountConfigs : DefaultEntityTypeConfiguration<Account>
         builder.Ignore(a => a.AvailableBalance);
         builder.Ignore(a => a.OpenedOn);
 
-        builder.ToTable("Accounts", DomainSchemas.Profile);
+        builder.ToTable("Accounts", DomainSchemas.Accounts);
     }
 
     #endregion

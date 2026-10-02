@@ -4941,8 +4941,8 @@
           <text data-detail="context" x="378.83333333333337" y="111" class="t-muted" font-size="7" text-anchor="middle">Open handler</text>
         </g>
 
-        <g id="node-db" data-node-id="db" data-node-label="PostgreSQL" tabindex="0" role="button" aria-label="Focus PostgreSQL, pro.Accounts, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="pro.Accounts" data-node-context="Sequence participant">
-          <title>PostgreSQL · pro.Accounts · Sequence participant</title>
+        <g id="node-db" data-node-id="db" data-node-label="PostgreSQL" tabindex="0" role="button" aria-label="Focus PostgreSQL, acc.Accounts, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="acc.Accounts" data-node-context="Sequence participant">
+          <title>PostgreSQL · acc.Accounts · Sequence participant</title>
           <rect x="510.66666666666674" y="72" width="185" height="54" rx="6" class="c-mask"/>
           <rect x="510.66666666666674" y="72" width="185" height="54" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(516.6666666666667 78) scale(0.6875)">
@@ -4950,7 +4950,7 @@
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="603.1666666666667" y="94" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">PostgreSQL</text>
-          <text data-detail="context" x="603.1666666666667" y="111" class="t-muted" font-size="7" text-anchor="middle">pro.Accounts</text>
+          <text data-detail="context" x="603.1666666666667" y="111" class="t-muted" font-size="7" text-anchor="middle">acc.Accounts</text>
         </g>
 
         <g id="node-queue" data-node-id="queue" data-node-label="ledger-events" tabindex="0" role="button" aria-label="Focus ledger-events, outbound queue, Sequence participant" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="outbound queue" data-node-context="Sequence participant">

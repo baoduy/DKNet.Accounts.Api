@@ -12,7 +12,7 @@ namespace DKNet.Accounts.Infra.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.EnsureSchema(
-                name: "pro");
+                name: "acc");
 
             migrationBuilder.EnsureSchema(
                 name: "seq");
@@ -37,7 +37,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
             migrationBuilder.CreateTable(
                 name: "AccountGroups",
-                schema: "pro",
+                schema: "acc",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -60,20 +60,20 @@ namespace DKNet.Accounts.Infra.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Accounts",
-                schema: "pro",
+                schema: "acc",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     AccountNumber = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     GroupId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    CurrencyCode = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
+                    CurrencyCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     Classification = table.Column<string>(type: "text", nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    Balance = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    HeldAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    OverdraftLimit = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: true),
-                    MinimumBalance = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: true),
+                    Balance = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: false),
+                    HeldAmount = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: false),
+                    OverdraftLimit = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: true),
+                    MinimumBalance = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: true),
                     PermittedToGoNegative = table.Column<bool>(type: "boolean", nullable: false),
                     StreamPosition = table.Column<long>(type: "bigint", nullable: false),
                     LastPostedOn = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -92,11 +92,11 @@ namespace DKNet.Accounts.Infra.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Currencies",
-                schema: "pro",
+                schema: "acc",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Code = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
+                    Code = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     DecimalPlaces = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
@@ -112,7 +112,7 @@ namespace DKNet.Accounts.Infra.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Postings",
-                schema: "pro",
+                schema: "acc",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -120,10 +120,10 @@ namespace DKNet.Accounts.Infra.Migrations
                     PostingNumber = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     StreamPosition = table.Column<long>(type: "bigint", nullable: false),
                     Direction = table.Column<string>(type: "text", nullable: false),
-                    Amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
-                    SignedValue = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    BalanceAfter = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    Amount = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: false),
+                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    SignedValue = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: false),
+                    BalanceAfter = table.Column<decimal>(type: "numeric(18,6)", precision: 18, scale: 6, nullable: false),
                     EffectiveDate = table.Column<DateOnly>(type: "date", nullable: false),
                     RecordedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     Category = table.Column<string>(type: "text", nullable: false),
@@ -151,85 +151,63 @@ namespace DKNet.Accounts.Infra.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "IX_AccountGroups_Code",
-                schema: "pro",
+                schema: "acc",
                 table: "AccountGroups",
                 column: "Code",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_AccountNumber",
-                schema: "pro",
+                schema: "acc",
                 table: "Accounts",
                 column: "AccountNumber",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_GroupId",
-                schema: "pro",
+                schema: "acc",
                 table: "Accounts",
                 column: "GroupId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Currencies_Code",
-                schema: "pro",
+                schema: "acc",
                 table: "Currencies",
                 column: "Code",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Postings_AccountId",
-                schema: "pro",
+                schema: "acc",
                 table: "Postings",
                 column: "AccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Postings_AccountId_EffectiveDate_StreamPosition",
-                schema: "pro",
+                schema: "acc",
                 table: "Postings",
                 columns: new[] { "AccountId", "EffectiveDate", "StreamPosition" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Postings_AccountId_StreamPosition",
-                schema: "pro",
+                schema: "acc",
                 table: "Postings",
                 columns: new[] { "AccountId", "StreamPosition" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Postings_CallingSystem_IdempotencyKey",
-                schema: "pro",
+                schema: "acc",
                 table: "Postings",
                 columns: new[] { "CallingSystem", "IdempotencyKey" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Postings_PostingNumber",
-                schema: "pro",
+                schema: "acc",
                 table: "Postings",
                 column: "PostingNumber",
                 unique: true);
-
-            // Fixed, deterministic seed rows (R5: SGD, USD and JPY at minimum), carried over from the
-            // squashed AddCurrencies migration. Hand-written, so `dotnet ef migrations add` never regenerates
-            // them — re-squashing this migration drops them again unless they are copied across by hand.
-            // InsertData bypasses the entity constructor entirely, which is the only way to give these rows
-            // stable ids — Currency's base AggregateRoot ctor hard-codes Guid.NewGuid() with no public Id
-            // setter, so seeding through DataSeedingConfiguration<T> would re-insert (and trip the unique
-            // index) on every startup. CreatedOn is a fixed UTC literal, not DateTimeOffset.UtcNow, so the
-            // migration stays deterministic. Three single-row calls (not one multi-row call) — sidesteps
-            // CA1814 without suppressing it.
-            var seededOn = new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
-            var columns = new[] { "Id", "Code", "Name", "DecimalPlaces", "IsActive", "CreatedBy", "CreatedOn" };
-
-            migrationBuilder.InsertData(
-                schema: "pro", table: "Currencies", columns: columns,
-                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000702"), "SGD", "Singapore Dollar", 2, true, "system", seededOn });
-            migrationBuilder.InsertData(
-                schema: "pro", table: "Currencies", columns: columns,
-                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000840"), "USD", "US Dollar", 2, true, "system", seededOn });
-            migrationBuilder.InsertData(
-                schema: "pro", table: "Currencies", columns: columns,
-                values: new object[] { new Guid("c0de0001-0000-4000-8000-000000000392"), "JPY", "Japanese Yen", 0, true, "system", seededOn });
         }
 
         /// <inheritdoc />
@@ -237,19 +215,19 @@ namespace DKNet.Accounts.Infra.Migrations
         {
             migrationBuilder.DropTable(
                 name: "AccountGroups",
-                schema: "pro");
+                schema: "acc");
 
             migrationBuilder.DropTable(
                 name: "Accounts",
-                schema: "pro");
+                schema: "acc");
 
             migrationBuilder.DropTable(
                 name: "Currencies",
-                schema: "pro");
+                schema: "acc");
 
             migrationBuilder.DropTable(
                 name: "Postings",
-                schema: "pro");
+                schema: "acc");
 
             migrationBuilder.DropSequence(
                 name: "Seq_AccountNumber",

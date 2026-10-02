@@ -11,7 +11,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 /// genuinely succeed.
 /// </summary>
 [Binding]
-public sealed class PostingsListingSteps(HttpClient client, ScenarioState state)
+public sealed class PostingsListingSteps(HttpClient client, ScenarioState state, BddApiFactory factory)
 {
     private const string FeatureName = "Console read and edit routes";
     private const string GroupsPath = "/v1/account-groups";
@@ -113,6 +113,8 @@ public sealed class PostingsListingSteps(HttpClient client, ScenarioState state)
         await RecordPostingAsync(acme, "Debit", 5.00m, "SGD", effectiveDate);
         var reversedCreditId = await RecordPostingAsync(globex, "Credit", 30.00m, "SGD", effectiveDate);
         await RecordPostingAsync(globex, "Credit", 15.00m, "SGD", effectiveDate, category: "Fee");
+        // A reversal is effective-dated "today" — pin it inside the September window the scenario queries.
+        factory.Clock.PinToday(effectiveDate);
         await ReversePostingAsync(reversedCreditId);
     }
 

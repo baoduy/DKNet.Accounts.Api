@@ -3,7 +3,10 @@ using Projects;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var cache = builder.AddRedis("Redis");
-var postgres = builder.AddPostgres("Postgres");
+// pgAdmin (linked from the dashboard) comes pre-registered with this server, so the ledger tables can be browsed
+// without entering a connection.
+var postgres = builder.AddPostgres("Postgres")
+    .WithPgAdmin();
 // The management UI (linked from the dashboard) is where the outbound ledger-events queue can be inspected.
 // Fixed dev login for the management UI (not "guest": RabbitMQ only lets guest in from inside the container).
 var rabbitUser = builder.AddParameter("RabbitMqUser", "admin");
@@ -41,6 +44,7 @@ var api = builder.AddProject<DKNet_Accounts_Api>("Api")
     // Sign-in and scope checks on, trusting only the demo realm: signature, issuer, audience and lifetime are all
     // still checked. The one relaxation, fetching the realm's keys over plain HTTP, is set here and nowhere else.
     .WithEnvironment("FeatureManagement__RequireAuthorization", "true")
+    .WithEnvironment("FeatureManagement__EnableOpenTelemetry", "true")
     .WithEnvironment("Authentication__Schemes__Bearer__MetadataAddress",
         ReferenceExpression.Create($"{realmUrl}/.well-known/openid-configuration"))
     .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", realmUrl)

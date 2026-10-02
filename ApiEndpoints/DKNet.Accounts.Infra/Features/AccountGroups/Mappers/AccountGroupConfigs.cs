@@ -26,7 +26,7 @@ internal sealed class AccountGroupConfigs : DefaultEntityTypeConfiguration<Accou
             .Metadata.SetValueComparer(MetadataConversion.Comparer);
         builder.Property(g => g.Metadata).HasMaxLength(4000);
 
-        builder.ToTable("AccountGroups", DomainSchemas.Profile);
+        builder.ToTable("AccountGroups", DomainSchemas.Accounts);
     }
 
     #endregion

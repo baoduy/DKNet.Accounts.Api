@@ -221,7 +221,7 @@ curl -X POST "https://accounts.example.com/v1/currencies/{id}/deactivate" -H "Au
 
 ## 🗃️ Data model
 
-### Currency — `pro.Currencies`
+### Currency — `acc.Currencies`
 
 One row is one currency this service can denominate an account or a posting in.
 
