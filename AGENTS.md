@@ -58,6 +58,7 @@ The template carries two side-by-side vertical slices demonstrating opposite end
 - Tests currently live mainly under `src/ApiEndpoints/DKNet.Accounts.App.Tests/` (Shouldly + xUnit patterns) and `src/ApiEndpoints/DKNet.Accounts.App.BDDTests/` (Reqnroll + NUnit).
 - `DKNet.Accounts.App.Tests.csproj` disables analyzers for tests; production projects enforce strict warnings-as-errors from `Directory.Packages.props`.
 - Coverage filters are defined in `src/coverage.runsettings`; avoid placing real logic in excluded paths (`bin/`, `obj/`, `*Test*.cs`).
+- `DKNet.Accounts.AppHost`: The AppHost is for local runs only: it is excluded from coverage and has no tests.
 
 ## BDD Testing (Reqnroll + NUnit)
 - BDD tests live in `src/ApiEndpoints/DKNet.Accounts.App.BDDTests/`.
