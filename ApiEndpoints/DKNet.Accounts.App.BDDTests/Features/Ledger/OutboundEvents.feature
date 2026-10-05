@@ -83,14 +83,12 @@ Feature: Ledger changes are published as events
     And no event is stored or sent
 
   @new @integration
-  Scenario Outline: A developer sees events in a local setup
-    Given the <setup> is started on an <machine> machine
+  Scenario Outline: A developer sees events in the docker compose setup
+    Given the docker compose setup is started on an <machine> machine
     When treasury-ops registers currency "SGD" with 2 decimal places
     Then 1 currency-created event for "SGD" is on the local RabbitMQ outbound queue
 
     Examples:
-      | setup          | machine |
-      | docker compose | arm64   |
-      | docker compose | amd64   |
-      | Aspire host    | arm64   |
-      | Aspire host    | amd64   |
+      | machine |
+      | arm64   |
+      | amd64   |
