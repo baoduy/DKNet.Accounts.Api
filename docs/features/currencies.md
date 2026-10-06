@@ -156,7 +156,7 @@ curl -X POST "https://accounts.example.com/v1/currencies" \
 Renames a currency. `code`, `decimalPlaces` and `isActive` are untouched — there is no method that changes them after registration.
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked.
 - **Idempotency:** not idempotent, but repeatable — resending the same name is a no-op that returns the same `200`
 - **Request:** `name` (string, required, ≤ 100 characters, `RenameCurrencyRequestValidator`)
 - **Response:** `200 OK` — `CurrencyDto`
@@ -180,7 +180,7 @@ curl -X PUT "https://accounts.example.com/v1/currencies/{id}" \
 Reactivates a currency. No request body, no validator, no guard on the entity method — always succeeds for a known id.
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked.
 - **Idempotency:** naturally idempotent — activating an already-active currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: true`
@@ -204,7 +204,7 @@ Deactivates a currency — the one hand-written handler in this slice (`Deactiva
 ![Handler checks whether any account in this currency still holds a non-zero balance or held amount; if none do, it deactivates the currency in one save.](../diagrams/currencies-deactivate.svg)
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. `DeactivateCurrencyHandler` refuses deactivation while an account in that currency holds a non-zero balance or held amount.
 - **Idempotency:** naturally idempotent — deactivating an already-inactive currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: false`

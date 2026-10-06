@@ -12,6 +12,7 @@ response fields, refusals, and invariants.
   accounts and ledger service: authenticate, create a group, open an account, post, read the balance
   back, page a statement.
 - [README](../README.md) — overview, local start, architecture, and links.
+- [AGENTS.md](../AGENTS.md) — the architecture conventions this solution is held to.
 - [API contract](api-contract.md) — every route, response field, refusal, invariant, and caller limit.
 - [Deployment guide](deployment.md) — published artifacts, chart prerequisites, verification, and rollback.
 - [Service background](service-background.md) — business scope and decisions on record.
@@ -23,6 +24,13 @@ response fields, refusals, and invariants.
   C# client for calling this service.
 - [Manual verification](manual-verification.md) — the release-time checklist for what the automated
   suites can't reach (a real Entra ID sign-in).
+
+## Delivery status
+
+Every route in the [API contract](api-contract.md) is implemented and exercised by the acceptance
+suite: reference currencies, account groups, accounts, postings, batches, reversals, and statements.
+Held funds remain deferred; `heldAmount` always returns `0` and `availableBalance` equals `balance`.
+Read the [caller limits](api-contract.md) before building against those fields.
 
 ## Features
 

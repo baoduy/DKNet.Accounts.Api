@@ -127,6 +127,7 @@ Records one credit or debit.
 
 - **Auth:** `postings.write`
 - **Idempotency:** `Idempotency-Key` declared `[FromRequestHeader]` — published as a header parameter on the operation itself. **Optional** — omitting it skips the replay/conflict check entirely, so a retry with no key records a second posting. When supplied: same key, same content → `200` with the original posting, nothing new recorded; same key, different content → `409 IDEMPOTENCY_KEY_CONFLICT`. A key placed in the request body instead is discarded — the header source overwrites it before validation
+- **Concurrency:** `IAccountLockProvider` holds a process-local lock for the account during the write. If it cannot acquire the lock within 10 seconds, the route refuses the request with `422 LOCK_TIMEOUT`.
 - **Request:**
 
   | Field | Type | Required | Rules | From |

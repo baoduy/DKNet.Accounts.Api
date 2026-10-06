@@ -197,7 +197,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/accounts
 Changes `name` and/or `metadata` only — generated route (`ChangeDetails`, `[CrudUpdate]`), hand-written validator.
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked.
 - **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`
 - **Request:** `name` (string, ≤ 200, when supplied), `metadata` (map, optional) — at least one required
 - **Response:** `200 OK` — `AccountDto`
@@ -241,7 +241,7 @@ Changes `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative`
 ![Handler merges the supplied controls with the stored ones and rechecks the floor is still determinate, then applies the change in one save and publishes an accounts.updated event.](../diagrams/accounts-patch.svg)
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. `UpdateAccountCommandHandler` refuses a close while the account holds a balance or held amount, and checks that the merged floor controls remain determinate.
 - **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`, since `ChangeStatus` and the floor setters simply reassign the same values
 - **Request:**
 
