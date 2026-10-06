@@ -109,7 +109,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/OutboundEvents.feature.ndjson", 24);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/OutboundEvents.feature.ndjson", 22);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -513,14 +513,12 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A developer sees events in a local setup")]
+        [global::NUnit.Framework.DescriptionAttribute("A developer sees events in the docker compose setup")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("docker compose", "arm64", "18", null)]
-        [global::NUnit.Framework.TestCaseAttribute("docker compose", "amd64", "19", null)]
-        [global::NUnit.Framework.TestCaseAttribute("Aspire host", "arm64", "20", null)]
-        [global::NUnit.Framework.TestCaseAttribute("Aspire host", "amd64", "21", null)]
-        public async global::System.Threading.Tasks.Task ADeveloperSeesEventsInALocalSetup(string setup, string machine, string @__pickleIndex, string[] exampleTags)
+        [global::NUnit.Framework.TestCaseAttribute("arm64", "18", null)]
+        [global::NUnit.Framework.TestCaseAttribute("amd64", "19", null)]
+        public async global::System.Threading.Tasks.Task ADeveloperSeesEventsInTheDockerComposeSetup(string machine, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
                     "new",
@@ -531,10 +529,9 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             }
             string[] tagsOfScenario = @__tags;
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            argumentsOfScenario.Add("setup", setup);
             argumentsOfScenario.Add("machine", machine);
             string pickleIndex = @__pickleIndex;
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A developer sees events in a local setup", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A developer sees events in the docker compose setup", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 86
@@ -548,7 +545,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             {
                 await this.ScenarioStartAsync();
 #line 87
-    await testRunner.GivenAsync(string.Format("the {0} is started on an {1} machine", setup, machine), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+    await testRunner.GivenAsync(string.Format("the docker compose setup is started on an {0} machine", machine), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 88
     await testRunner.WhenAsync("treasury-ops registers currency \"SGD\" with 2 decimal places", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");

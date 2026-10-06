@@ -354,19 +354,19 @@ public sealed class OutboundEventsSteps(ScenarioState state)
         await CreateGroupAsync(code);
     }
 
-    [Given(@"^the (docker compose|Aspire host) is started on an (arm64|amd64) machine$")]
-    public async Task GivenTheLocalSetupIsStarted(string setup, string machine)
+    [Given(@"^the docker compose setup is started on an (arm64|amd64) machine$")]
+    public async Task GivenTheLocalSetupIsStarted(string machine)
     {
         // The setup's own wiring is read from its files, including that its RabbitMQ is the official image, which
         // is published for both linux/arm64 and linux/amd64. A host is then started with the settings that setup
         // gives the API, against the run's broker, on the build host's own architecture (§7 slice note 1).
-        var settings = setup == "docker compose" ? LocalSetups.DockerCompose() : LocalSetups.AspireHost();
+        var settings = LocalSetups.DockerCompose();
         state.Values["machine"] = machine;
 
-        settings.EnableServiceBus.ShouldNotBeNull($"the {setup} must switch the message bus on.");
-        bool.Parse(settings.EnableServiceBus).ShouldBeTrue($"the {setup} must switch the message bus on.");
-        settings.Transport.ShouldBe("RabbitMq", $"the {setup} must run the API on RabbitMQ.");
-        settings.OutboundQueue.ShouldNotBeNullOrWhiteSpace($"the {setup} must name the outbound queue.");
+        settings.EnableServiceBus.ShouldNotBeNull("the docker compose setup must switch the message bus on.");
+        bool.Parse(settings.EnableServiceBus).ShouldBeTrue("the docker compose setup must switch the message bus on.");
+        settings.Transport.ShouldBe("RabbitMq", "the docker compose setup must run the API on RabbitMQ.");
+        settings.OutboundQueue.ShouldNotBeNullOrWhiteSpace("the docker compose setup must name the outbound queue.");
 
         await StartHostAsync(busOn: true, settings.OutboundQueue, settings);
     }

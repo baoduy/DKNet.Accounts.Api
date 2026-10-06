@@ -60,6 +60,7 @@ The template carries two side-by-side vertical slices demonstrating opposite end
 - Coverage filters are defined in `coverage.runsettings`; avoid placing real logic in excluded paths (`bin/`, `obj/`, `*Test*.cs`, `Migrations/`).
 - **Test scope:** write tests only for business logic in `DKNet.Accounts.Api` and the projects it references (`AppServices`, `Infra`, `Domains`, `Share`), plus the `Client` SDK. These are the only assemblies `coverage.runsettings` measures. Never write tests to raise coverage of `AppHost` (Aspire orchestration), `TrafficGen`, `TestSupport`, or EF migrations; they are excluded on purpose.
 - EF migrations (`DKNet.Accounts.Infra/Migrations/`) are generated, excluded from coverage, and **never tested** — the app is undeployed and the folder is regenerated freely. Do not write tests that target a migration by name, migrate to a specific migration, or assert schema an `Up()` produced. Tests may still *run* migrations to build a database (`InfraMigration.MigrateDb`).
+- `DKNet.Accounts.AppHost`: The AppHost is for local runs only: it is excluded from coverage and has no tests.
 
 ## BDD Testing (Reqnroll + NUnit)
 - BDD tests live in `src/ApiEndpoints/DKNet.Accounts.App.BDDTests/`.

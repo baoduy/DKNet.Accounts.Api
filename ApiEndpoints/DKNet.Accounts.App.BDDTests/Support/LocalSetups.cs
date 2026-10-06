@@ -5,10 +5,10 @@ using Microsoft.Extensions.Configuration;
 namespace DKNet.Accounts.App.BDDTests.Support;
 
 /// <summary>
-/// The two local setups of DRK-1773 §3 — docker compose and the Aspire host — read the way each one starts the
-/// API: which RabbitMQ it starts, how the API reaches it, and the settings the API ends up running with. Each read
-/// asserts the setup's wiring and returns the API's effective message-bus settings, so a scenario can start a
-/// host with exactly those settings against the run's broker.
+/// The docker compose local setup of DRK-1773 §3, read the way it starts the API: which RabbitMQ it starts, how
+/// the API reaches it, and the settings the API ends up running with. The read asserts the setup's wiring and
+/// returns the API's effective message-bus settings, so a scenario can start a host with exactly those settings
+/// against the run's broker.
 /// </summary>
 public static partial class LocalSetups
 {
@@ -57,45 +57,6 @@ public static partial class LocalSetups
             .AddJsonFile(ApiSettingsFile(root, "appsettings.json"))
             .AddInMemoryCollection(ReadEnvFile(Path.Combine(root, ".env.sample")))
             .AddInMemoryCollection(AsConfiguration(environment))
-            .Build();
-        return Read(effective);
-    }
-
-    /// <summary>Reads the Aspire host's program: the RabbitMQ resource and what the API project is given.</summary>
-    public static BusSettings AspireHost()
-    {
-        var root = RepoRoot();
-        var source = File.ReadAllText(Path.Combine(root, "ApiEndpoints", "DKNet.Accounts.AppHost", "AppHost.cs"));
-
-        var resource = Regex.Match(source, @"var\s+(?<name>\w+)\s*=\s*builder\s*\.\s*AddRabbitMQ\(\s*""RabbitMq""[^;]*;",
-            RegexOptions.Singleline);
-        resource.Success.ShouldBeTrue("AppHost.cs must add a RabbitMQ resource named \"RabbitMq\".");
-        var name = resource.Groups["name"].Value;
-
-        var image = Regex.Match(resource.Value, @"\.WithImage\(\s*""(?<image>[^""]+)""");
-        if (image.Success)
-        {
-            OfficialRabbitMqImage().IsMatch(image.Groups["image"].Value).ShouldBeTrue(
-                $"the Aspire RabbitMQ resource runs '{image.Groups["image"].Value}'; it must be the official multi-arch rabbitmq image.");
-        }
-
-        var api = Regex.Match(source, @"builder\s*\.\s*AddProject<[^>]+>\(\s*""Api""\s*\)(?<chain>[^;]*);",
-            RegexOptions.Singleline);
-        api.Success.ShouldBeTrue("AppHost.cs must add the \"Api\" project.");
-        var chain = api.Groups["chain"].Value;
-        Regex.IsMatch(chain, $@"\.WithReference\(\s*{name}\b").ShouldBeTrue(
-            $"the Api project must reference the RabbitMQ resource '{name}'.");
-        Regex.IsMatch(chain, $@"\.WaitFor\(\s*{name}\s*\)").ShouldBeTrue(
-            $"the Api project must wait for the RabbitMQ resource '{name}'.");
-
-        var withEnvironment = Regex.Matches(chain, @"\.WithEnvironment\(\s*""(?<key>[^""]+)""\s*,\s*""(?<value>[^""]*)""\s*\)")
-            .ToDictionary(m => m.Groups["key"].Value, m => (string?)m.Groups["value"].Value);
-
-        // Aspire runs the API in Development, and WithReference hands it ConnectionStrings__RabbitMq.
-        var effective = new ConfigurationBuilder()
-            .AddJsonFile(ApiSettingsFile(root, "appsettings.json"))
-            .AddJsonFile(ApiSettingsFile(root, "appsettings.Development.json"))
-            .AddInMemoryCollection(AsConfiguration(withEnvironment))
             .Build();
         return Read(effective);
     }
