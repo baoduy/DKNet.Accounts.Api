@@ -92,6 +92,10 @@ public sealed class DatabaseChoiceSteps(BddApiFactory sharedHost)
 
         _historyBeforeStart = await ReadMigrationHistoryAsync();
         _historyBeforeStart.ShouldNotBeEmpty();
+
+        // The script creates no currencies: the start-up migration seeds them, which is what shows below that
+        // the service really migrated this database rather than skipping it.
+        (await CountCurrenciesAsync()).ShouldBe(0);
     }
 
     [Given(@"^the (PostgreSQL|SQL Server) database rejects a posting because its idempotency key already exists$")]
@@ -258,6 +262,7 @@ public sealed class DatabaseChoiceSteps(BddApiFactory sharedHost)
     public async Task ThenNoMigrationIsPending()
     {
         _startupError.ShouldBeNull();
+        (await CountCurrenciesAsync()).ShouldBeGreaterThan(0, "the service started without migrating the database");
         (await ReadMigrationHistoryAsync()).ShouldBe(_historyBeforeStart);
     }
 
@@ -291,6 +296,14 @@ public sealed class DatabaseChoiceSteps(BddApiFactory sharedHost)
         {
             yield return current;
         }
+    }
+
+    private async Task<long> CountCurrenciesAsync()
+    {
+        await using var connection = new NpgsqlConnection(_scratchConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT COUNT(*) FROM acc.\"Currencies\"", connection);
+        return (long)(await command.ExecuteScalarAsync())!;
     }
 
     private async Task<string[]> ReadMigrationHistoryAsync()
