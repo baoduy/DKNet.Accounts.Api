@@ -23,6 +23,7 @@ public sealed class IdempotencyKeyCaseSteps(HttpClient client, ScenarioState sta
     private HttpResponseMessage? _first;
     private HttpResponseMessage? _second;
     private Guid _lastPostingId;
+    private Guid[] _firstIds = [];
     private Guid _searchedAccount;
     private string? _searchedDescription;
     private CultureInfo? _serverCulture;
@@ -177,7 +178,7 @@ public sealed class IdempotencyKeyCaseSteps(HttpClient client, ScenarioState sta
     {
         _first!.IsSuccessStatusCode.ShouldBeTrue();
         _second!.StatusCode.ShouldBe(HttpStatusCode.OK, await _second.Content.ReadAsStringAsync());
-        (await ReadIdsAsync(_second)).ShouldBe(await ReadIdsAsync(_first));
+        (await ReadIdsAsync(_second)).ShouldBe(_firstIds);
     }
 
     [Then(@"^only one result is recorded$")]
@@ -259,7 +260,8 @@ public sealed class IdempotencyKeyCaseSteps(HttpClient client, ScenarioState sta
         {
             _first = response;
             response.IsSuccessStatusCode.ShouldBeTrue(await response.Content.ReadAsStringAsync());
-            _lastPostingId = (await ReadIdsAsync(response))[0];
+            _firstIds = await ReadIdsAsync(response);
+            _lastPostingId = _firstIds[0];
         }
         else
         {
