@@ -3,6 +3,7 @@ using DKNet.Accounts.AppServices;
 using DKNet.Accounts.Infra.Extensions;
 using DKNet.Accounts.Share.Options;
 using SlimMessageBus.Host;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Unit.Extensions;
 
@@ -31,7 +32,7 @@ public class ServiceBusSetupTests
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddServiceBus(configuration, typeof(AppSetup).Assembly,
-            new FeatureOptions { EnableServiceBus = enableServiceBus });
+            new FeatureOptions { EnableServiceBus = enableServiceBus }, PostgresSetup.AddPostgresOutbox);
 
         // Disposed asynchronously, as a host does: with the bus on, SlimMessageBus's outbox tasks are
         // IAsyncDisposable only.

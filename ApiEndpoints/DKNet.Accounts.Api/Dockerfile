@@ -10,12 +10,16 @@ COPY ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj ApiEndpoints/DKNe
 COPY ApiEndpoints/DKNet.Accounts.AppServices/DKNet.Accounts.AppServices.csproj ApiEndpoints/DKNet.Accounts.AppServices/
 COPY ApiEndpoints/DKNet.Accounts.Domains/DKNet.Accounts.Domains.csproj ApiEndpoints/DKNet.Accounts.Domains/
 COPY ApiEndpoints/DKNet.Accounts.Infra/DKNet.Accounts.Infra.csproj ApiEndpoints/DKNet.Accounts.Infra/
+COPY ApiEndpoints/DKNet.Accounts.Infra.MsSql/DKNet.Accounts.Infra.MsSql.csproj ApiEndpoints/DKNet.Accounts.Infra.MsSql/
+COPY ApiEndpoints/DKNet.Accounts.Infra.Postgres/DKNet.Accounts.Infra.Postgres.csproj ApiEndpoints/DKNet.Accounts.Infra.Postgres/
 COPY ApiEndpoints/DKNet.Accounts.Share/DKNet.Accounts.Share.csproj ApiEndpoints/DKNet.Accounts.Share/
 RUN dotnet restore ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj
 COPY ApiEndpoints/DKNet.Accounts.Api ApiEndpoints/DKNet.Accounts.Api
 COPY ApiEndpoints/DKNet.Accounts.AppServices ApiEndpoints/DKNet.Accounts.AppServices
 COPY ApiEndpoints/DKNet.Accounts.Domains ApiEndpoints/DKNet.Accounts.Domains
 COPY ApiEndpoints/DKNet.Accounts.Infra ApiEndpoints/DKNet.Accounts.Infra
+COPY ApiEndpoints/DKNet.Accounts.Infra.MsSql ApiEndpoints/DKNet.Accounts.Infra.MsSql
+COPY ApiEndpoints/DKNet.Accounts.Infra.Postgres ApiEndpoints/DKNet.Accounts.Infra.Postgres
 COPY ApiEndpoints/DKNet.Accounts.Share ApiEndpoints/DKNet.Accounts.Share
 RUN dotnet publish ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj \
     --configuration Release --no-restore --output /app

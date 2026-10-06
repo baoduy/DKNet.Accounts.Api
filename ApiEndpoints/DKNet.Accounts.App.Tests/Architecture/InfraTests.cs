@@ -7,6 +7,7 @@ using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Extensions;
 using DKNet.Accounts.Infra.Services;
 using SlimMessageBus;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Architecture;
 

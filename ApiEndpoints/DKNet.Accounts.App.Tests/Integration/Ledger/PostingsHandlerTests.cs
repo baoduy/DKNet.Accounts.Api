@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.App.Tests.Integration.Support;
 using DKNet.Accounts.App.TestSupport;
 using DKNet.Accounts.AppServices.Share;
+using DKNet.Accounts.Domains.Features.Postings.Entities;
+using DKNet.Accounts.Infra.Contexts;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -714,5 +717,40 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account}/balance"));
         var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
         balance.GetProperty("balance").GetDecimal().ShouldBe(200m);
+    }
+
+    /// <summary>
+    /// DRK-2120 surface B §6a D6: a posting stored before keys were lowercased keeps its mixed-case key (no data
+    /// change, Q8). A request under the same key in lowercase, with the same content, replays that posting — one
+    /// calling system never records 2 postings under one key, whatever its case.
+    /// </summary>
+    [Fact]
+    public async Task Record_WhenAPostingStoredBeforeLowercasingCarriesTheKeyInUppercase_ReplaysIt()
+    {
+        var account = await OpenAccountAsync();
+        var posting = new { accountId = account, direction = "Credit", amount = 100.00m, currency = "SGD", category = "Transfer" };
+
+        var first = await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, posting, "abc"));
+        first.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // The legacy row: stored as the client sent it, before this change.
+        using (var scope = fixture.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+            var stored = await dbContext.Set<Posting>().SingleAsync(p => p.Id == firstId);
+            dbContext.Entry(stored).Property(p => p.IdempotencyKey).CurrentValue = "ABC";
+            await dbContext.SaveChangesAsync();
+        }
+
+        var replay = await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, posting, "abc"));
+
+        replay.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid().ShouldBe(firstId);
+        using (var scope = fixture.CreateScope())
+        {
+            (await scope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>()
+                .CountAsync(p => p.AccountId == account)).ShouldBe(1);
+        }
     }
 }

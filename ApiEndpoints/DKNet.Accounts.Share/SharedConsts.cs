@@ -21,6 +21,11 @@ public static class SharedConsts
     public static string DbConnectionString => "AppDb";
 
     /// <summary>
+    ///     Gets the configuration key that chooses the database: <c>Postgres</c> or <c>SqlServer</c>.
+    /// </summary>
+    public static string DatabaseProviderKey => "Database:Provider";
+
+    /// <summary>
     ///     Gets the connection string name for RabbitMQ.
     /// </summary>
     public static string RabbitMqConnectionString => "RabbitMq";

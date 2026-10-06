@@ -9,6 +9,7 @@ using SlimMessageBus.Host;
 using SlimMessageBus.Host.AzureServiceBus;
 using SlimMessageBus.Host.Hybrid;
 using SlimMessageBus.Host.RabbitMQ;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Unit.Extensions;
 
@@ -105,7 +106,7 @@ public sealed class OutboundTransportConfigurationTests
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddServiceBus(configuration, typeof(AppSetup).Assembly,
-            new FeatureOptions { EnableServiceBus = true });
+            new FeatureOptions { EnableServiceBus = true }, PostgresSetup.AddPostgresOutbox);
 
         return services.BuildServiceProvider();
     }

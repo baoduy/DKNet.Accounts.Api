@@ -2,11 +2,12 @@ using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// The database the API runs on: "Postgres" (default) or "SqlServer". Switch it here, or per run with
+// `--Database:Provider SqlServer` (or the Database__Provider environment variable).
+var database = builder.Configuration["Database:Provider"] ?? "Postgres";
+var useSqlServer = string.Equals(database, "SqlServer", StringComparison.OrdinalIgnoreCase);
+
 var cache = builder.AddRedis("Redis");
-// pgAdmin (linked from the dashboard) comes pre-registered with this server, so the ledger tables can be browsed
-// without entering a connection.
-var postgres = builder.AddPostgres("Postgres")
-    .WithPgAdmin();
 // The management UI (linked from the dashboard) is where the outbound ledger-events queue can be inspected.
 // Fixed dev login for the management UI (not "guest": RabbitMQ only lets guest in from inside the container).
 var rabbitUser = builder.AddParameter("RabbitMqUser", "admin");
@@ -14,8 +15,11 @@ var rabbitPassword = builder.AddParameter("RabbitMqPassword", "admin", secret: t
 var rabbitMq = builder.AddRabbitMQ("RabbitMq", rabbitUser, rabbitPassword)
     .WithManagementPlugin();
 
-var apDb = postgres
-    .AddDatabase("AppDb");
+// pgAdmin (linked from the dashboard) comes pre-registered with the Postgres server, so the ledger tables can be
+// browsed without entering a connection.
+IResourceBuilder<IResourceWithConnectionString> apDb = useSqlServer
+    ? builder.AddSqlServer("SqlServer").AddDatabase("AppDb")
+    : builder.AddPostgres("Postgres").WithPgAdmin().AddDatabase("AppDb");
 
 // Demo sign-in server (DRK-1796): under AppHost the console, the ledger and TrafficGen all sign in through this local
 // Keycloak, so the demo needs no Entra ID app registration. Its realm (clients, the 5 ledger scopes, the users
@@ -54,6 +58,10 @@ var api = builder.AddProject<DKNet_Accounts_Api>("Api")
     .WaitFor(apDb)
     .WaitFor(rabbitMq)
     .WaitFor(keycloak);
+if (useSqlServer)
+{
+    api.WithEnvironment("Database__Provider", "SqlServer");
+}
 
 // The accounts console (ui/, `pnpm dev`). Its secrets are generated once and kept in this AppHost's user secrets,
 // so sessions survive a restart. The token key must be exactly 32 bytes (ui/lib/config.ts).

@@ -44,6 +44,8 @@
     <ItemGroup>
         <ProjectReference Include="..\DKNet.Accounts.AppServices\DKNet.Accounts.AppServices.csproj" />
         <ProjectReference Include="..\DKNet.Accounts.Infra\DKNet.Accounts.Infra.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.Infra.Postgres\DKNet.Accounts.Infra.Postgres.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.Infra.MsSql\DKNet.Accounts.Infra.MsSql.csproj" />
     </ItemGroup>
 
     <ItemGroup>

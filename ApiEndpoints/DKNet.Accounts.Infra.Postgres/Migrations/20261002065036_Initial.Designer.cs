@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace DKNet.Accounts.Infra.Migrations
+namespace DKNet.Accounts.Infra.Postgres.Migrations
 {
     [DbContext(typeof(CoreDbContext))]
     [Migration("20261002065036_Initial")]

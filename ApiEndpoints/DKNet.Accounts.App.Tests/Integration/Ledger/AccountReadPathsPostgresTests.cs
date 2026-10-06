@@ -15,6 +15,7 @@ using DKNet.Accounts.Share;
 using Testcontainers.PostgreSql;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 using DomainAccount = DKNet.Accounts.Domains.Features.Accounts.Entities.Account;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -56,7 +57,7 @@ public sealed class AccountReadPathsPostgresTests : IAsyncLifetime
         _services = new ServiceCollection()
             .AddSingleton<IConfiguration>(config)
             .AddAppServices()
-            .AddInfraServices()
+            .AddInfraServices((builder, conn) => builder.UsePostgres(conn))
             .AddCurrentUserProvider<CoreDbContext, FixedDataOwnerProvider>()
             .AddSlimMessageBus(mbb => mbb.AddJsonSerializer().AddMemoryBus(typeof(InfraSetup).Assembly))
             .AddLogging()

@@ -4,7 +4,6 @@ using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Services;
 using DKNet.Accounts.Share.Options;
 using SlimMessageBus.Host.Outbox;
-using SlimMessageBus.Host.Outbox.PostgreSql.DbContext;
 using SlimMessageBus.Host.RabbitMQ;
 
 namespace DKNet.Accounts.Infra.Extensions;
@@ -116,11 +115,34 @@ public static class ServiceBusSetup
         return builder;
     }
 
+    /// <summary>
+    ///     A stored event is kept until the bus accepts it (R2): never give up on it, and retry a failed send soon
+    ///     after the bus is back. Applied to whichever database's outbox <see cref="AddServiceBus"/> is given.
+    /// </summary>
+    private static void ConfigureOutbox(OutboxSettings outbox)
+    {
+        outbox.MaxDeliveryAttempts = int.MaxValue;
+        outbox.PollIdleSleep = TimeSpan.FromSeconds(10);
+    }
+
+    /// <summary>
+    ///     Registers the message bus: the in-memory bus always, plus the outbound transport and the outbox when the
+    ///     bus is on.
+    /// </summary>
+    /// <param name="service">The service collection used to register dependencies.</param>
+    /// <param name="configuration">The configuration holding <see cref="MessageBusOptions"/> and the bus connection strings.</param>
+    /// <param name="serviceAssembly">The assembly whose handlers the in-memory bus dispatches to.</param>
+    /// <param name="features">The feature switches; <see cref="FeatureOptions.EnableServiceBus"/> turns the outbound bus on.</param>
+    /// <param name="addOutbox">
+    ///     The chosen database's outbox registration, given the shared outbox settings to apply.
+    /// </param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for chaining.</returns>
     public static IServiceCollection AddServiceBus(
         this IServiceCollection service,
         IConfiguration configuration,
         Assembly serviceAssembly,
-        FeatureOptions features)
+        FeatureOptions features,
+        Action<MessageBusBuilder, Action<OutboxSettings>> addOutbox)
     {
         var options = configuration.GetSection(MessageBusOptions.Name).Get<MessageBusOptions>()
                       ?? new MessageBusOptions();
@@ -157,13 +179,7 @@ public static class ServiceBusSetup
                 mbb.AddAzureBus(busConnectionString!, options.OutboundQueue);
             }
 
-            mbb.AddOutboxUsingDbContext<CoreDbContext>(outbox =>
-            {
-                // A stored event is kept until the bus accepts it (R2): never give up on it, and retry a failed
-                // send soon after the bus is back.
-                outbox.MaxDeliveryAttempts = int.MaxValue;
-                outbox.PollIdleSleep = TimeSpan.FromSeconds(10);
-            });
+            addOutbox(mbb, ConfigureOutbox);
         });
 
         return service;
