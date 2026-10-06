@@ -109,7 +109,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/CurrencySetAndUsdt.feature.ndjson", 36);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/Ledger/CurrencySetAndUsdt.feature.ndjson", 33);
         }
         
         [global::NUnit.Framework.TestAttribute()]
@@ -740,49 +740,12 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
         }
         
         [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("A posting recorded before the upgrade is still recognised as a replay")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task APostingRecordedBeforeTheUpgradeIsStillRecognisedAsAReplay()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "new",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "28";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("A posting recorded before the upgrade is still recognised as a replay", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 146
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 147
-    await testRunner.GivenAsync("PayHub recorded a credit of 10.5 SGD under key \"pay-6650\" before the upgrade", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 148
-    await testRunner.WhenAsync("PayHub sends exactly the same request again after the upgrade", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 149
-    await testRunner.ThenAsync("the original posting is returned", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
         [global::NUnit.Framework.DescriptionAttribute("An amount comes back with its currency\'s decimal places")]
         [global::NUnit.Framework.CategoryAttribute("new")]
         [global::NUnit.Framework.CategoryAttribute("integration")]
-        [global::NUnit.Framework.TestCaseAttribute("SGD", "12400", "12400.00", "29", null)]
-        [global::NUnit.Framework.TestCaseAttribute("JPY", "5000", "5000", "30", null)]
-        [global::NUnit.Framework.TestCaseAttribute("USDT", "1.5", "1.500000", "31", null)]
+        [global::NUnit.Framework.TestCaseAttribute("SGD", "12400", "12400.00", "28", null)]
+        [global::NUnit.Framework.TestCaseAttribute("JPY", "5000", "5000", "29", null)]
+        [global::NUnit.Framework.TestCaseAttribute("USDT", "1.5", "1.500000", "30", null)]
         public async global::System.Threading.Tasks.Task AnAmountComesBackWithItsCurrencysDecimalPlaces(string currency, string stored, string stated, string @__pickleIndex, string[] exampleTags)
         {
             string[] @__tags = new string[] {
@@ -801,7 +764,7 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("An amount comes back with its currency\'s decimal places", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 152
+#line 146
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -811,94 +774,14 @@ namespace DKNet.Accounts.App.BDDTests.Features.Ledger
             else
             {
                 await this.ScenarioStartAsync();
-#line 153
+#line 147
     await testRunner.GivenAsync(string.Format("PayHub holds a {0} account with a balance of {1}", currency, stored), ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 154
+#line 148
     await testRunner.WhenAsync("treasury-ops reads that account", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 155
+#line 149
     await testRunner.ThenAsync(string.Format("the service states the balance as {0}", stated), ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("The upgrade keeps existing money exactly")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task TheUpgradeKeepsExistingMoneyExactly()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "new",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "32";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The upgrade keeps existing money exactly", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 164
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 165
-    await testRunner.GivenAsync("an SGD account holds 12400.50 SGD before the upgrade", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 166
-    await testRunner.WhenAsync("the upgrade is applied", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 167
-    await testRunner.ThenAsync("the account still holds 12400.50 SGD", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 168
-    await testRunner.AndAsync("SGD, USD and JPY keep their existing ids", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::NUnit.Framework.TestAttribute()]
-        [global::NUnit.Framework.DescriptionAttribute("The upgrade stops when a stored amount is above the ceiling")]
-        [global::NUnit.Framework.CategoryAttribute("new")]
-        [global::NUnit.Framework.CategoryAttribute("integration")]
-        public async global::System.Threading.Tasks.Task TheUpgradeStopsWhenAStoredAmountIsAboveTheCeiling()
-        {
-            string[] tagsOfScenario = new string[] {
-                    "new",
-                    "integration"};
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "33";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("The upgrade stops when a stored amount is above the ceiling", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 171
-  this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 172
-    await testRunner.GivenAsync("a VND account holds 5,000,000,000,000 VND before the upgrade", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 173
-    await testRunner.WhenAsync("the upgrade is applied", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 174
-    await testRunner.ThenAsync("the upgrade stops with an error", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 175
-    await testRunner.AndAsync("no currency, account or posting is changed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

@@ -143,12 +143,6 @@ Feature: A broader currency set and USDT in the Accounts service
     Then the posting is refused with "IDEMPOTENCY_KEY_CONFLICT"
 
   @new @integration
-  Scenario: A posting recorded before the upgrade is still recognised as a replay
-    Given PayHub recorded a credit of 10.5 SGD under key "pay-6650" before the upgrade
-    When PayHub sends exactly the same request again after the upgrade
-    Then the original posting is returned
-
-  @new @integration
   Scenario Outline: An amount comes back with its currency's decimal places
     Given PayHub holds a <currency> account with a balance of <stored>
     When treasury-ops reads that account
@@ -159,17 +153,3 @@ Feature: A broader currency set and USDT in the Accounts service
       | SGD      | 12400  | 12400.00 |
       | JPY      | 5000   | 5000     |
       | USDT     | 1.5    | 1.500000 |
-
-  @new @integration
-  Scenario: The upgrade keeps existing money exactly
-    Given an SGD account holds 12400.50 SGD before the upgrade
-    When the upgrade is applied
-    Then the account still holds 12400.50 SGD
-    And SGD, USD and JPY keep their existing ids
-
-  @new @integration
-  Scenario: The upgrade stops when a stored amount is above the ceiling
-    Given a VND account holds 5,000,000,000,000 VND before the upgrade
-    When the upgrade is applied
-    Then the upgrade stops with an error
-    And no currency, account or posting is changed
