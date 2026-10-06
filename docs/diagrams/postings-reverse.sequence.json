@@ -5,38 +5,200 @@
     "title": "Reverse a Posting",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [1080, 700]
+    "output": "docs/diagrams/postings-reverse.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    },
+    "viewBox": [
+      1120,
+      700
+    ]
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "postings.reverse" },
-    { "id": "handler", "type": "backend", "label": "Reverse", "sublabel": "hand-written handler" },
-    { "id": "lock", "type": "backend", "label": "Lock", "sublabel": "original.AccountId, 10s" },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts + acc.Postings" },
-    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
-  ],
-  "segments": [
-    { "from": 170, "to": 280, "label": "Idempotency pre-check" },
-    { "from": 296, "to": 410, "label": "Lock + re-check" },
-    { "from": 426, "to": 530, "label": "Apply + save" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "Reverse",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Reverse.cs",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "type": "backend",
+      "label": "Lock",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Reverse.cs",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Postings/Mappers/PostingConfigs.cs",
+          "line": 51
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "ledger-events",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/ServiceConfigs.cs",
+          "line": 33
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/postings/{id}/reverse (reason, Idempotency-Key required)", "variant": "emphasis" },
-    { "from": "handler", "to": "db", "y": 240, "label": "existing reversal under this key + content signature?", "variant": "default" },
-    { "from": "db", "to": "handler", "y": 270, "label": "none — proceed", "variant": "return", "note": "Same key + same reason replays the earlier reversal with 200. Same key + different reason: 409 IDEMPOTENCY_KEY_CONFLICT. Missing reason or key: 400." },
-    { "from": "handler", "to": "lock", "y": 320, "label": "AcquireAsync(original.AccountId, 10s)", "variant": "default" },
-    { "from": "handler", "to": "db", "y": 360, "label": "re-read the original, tracked, inside the lock", "variant": "default" },
-    { "from": "db", "to": "handler", "y": 400, "label": "Status == Posted", "variant": "return", "note": "Already Reversed under a new key: 422 POSTING_ALREADY_REVERSED" },
-    { "from": "handler", "to": "db", "y": 460, "label": "TryApplyPosting(opposite direction, isReversal: true) — floor check skipped, status gate still applies", "variant": "default", "note": "Refused per the account's status in the reversal's own direction: 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN / ACCOUNT_DORMANT_DEBIT_REFUSED" },
-    { "from": "handler", "to": "db", "y": 500, "label": "insert reversal Posting; original.MarkReversedBy(reversal.Id), one save", "variant": "emphasis" },
-    { "from": "handler", "to": "queue", "y": 540, "label": "postings.created (reversal) + postings.updated (original) events", "variant": "dashed" },
-    { "from": "handler", "to": "client", "y": 610, "label": "200 OK + reversal PostingDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "handler",
+      "y": 200,
+      "label": "POST /v1/postings/{id}/reverse",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 235,
+      "label": "existing reversal under this key + content signature?",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "handler",
+      "y": 265,
+      "label": "none \u2014 proceed",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 300,
+      "label": "read original.AccountId (no tracking)",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "lock",
+      "y": 345,
+      "label": "AcquireAsync(original.AccountId, 10s)",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 385,
+      "label": "re-read the original, tracked, inside the lock",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "handler",
+      "y": 420,
+      "label": "Posted, no reversal link",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 450,
+      "label": "load Account",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 485,
+      "label": "save Account + both postings (+ outbox if on)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "queue",
+      "y": 530,
+      "label": "postings.created (reversal) + postings.updated (original) (if bus on)",
+      "variant": "dashed"
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "y": 570,
+      "label": "200 OK + reversal PostingDto",
+      "variant": "return"
+    }
   ],
   "activations": [
-    { "participant": "handler", "from": 190, "to": 635, "type": "backend" },
-    { "participant": "lock", "from": 310, "to": 420, "type": "backend" }
+    {
+      "participant": "handler",
+      "from": 190,
+      "to": 590,
+      "type": "backend"
+    },
+    {
+      "participant": "lock",
+      "from": 345,
+      "to": 380,
+      "type": "backend"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Exempt from the floor, not from status", "items": ["A reversal may leave the account below its floor — that is a real, readable debt", "It is still refused wherever the account's status does not accept a movement in the reversal's own direction"] },
-    { "dot": "amber", "title": "Two events, one save", "items": ["The reversing posting's postings.created and the original's postings.updated are both raised from the one SaveChanges call that links them"] }
+    {
+      "dot": "cyan",
+      "title": "Exempt from the floor, not from status",
+      "items": [
+        "A reversal may leave the account below its floor \u2014 that is a real, readable debt",
+        "The account status gate and amount ceiling still apply in the reversal direction"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Two events, one save",
+      "items": [
+        "The reversing posting's postings.created and the original's postings.updated are both raised from the one SaveChanges call that links them"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Checks and outcomes",
+      "items": [
+        "POST /v1/postings/{id}/reverse: Requires reason in the body and Idempotency-Key in the header",
+        "none \u2014 proceed: Same key + same original id and reason replays the earlier reversal with 200. Same key + different original id or reason: 409 IDEMPOTENCY_KEY_CONFLICT. Missing reason or key: 400.",
+        "Status == Posted: Refused: 422 POSTING_ALREADY_REVERSED if already reversed; 422 POSTING_IS_REVERSAL if this row is itself a reversal",
+        "TryApplyPosting(opposite direction, isReversal: true) \u2014 floor check skipped, status gate still applies: Refused per the account's status in the reversal's own direction: 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN / ACCOUNT_DORMANT_DEBIT_REFUSED"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Local reversal checks",
+      "items": [
+        "ReversePostingCommandHandler reads original.AccountId without tracking before taking its account lock",
+        "Inside the lock it re-reads the original, refuses POSTING_ALREADY_REVERSED or POSTING_IS_REVERSAL, then loads the account",
+        "Account.TryApplyPosting applies the opposite direction with isReversal=true: the floor is skipped, but status and amount ceiling still apply"
+      ]
+    }
   ]
 }

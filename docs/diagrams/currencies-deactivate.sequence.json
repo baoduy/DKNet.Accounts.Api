@@ -5,30 +5,131 @@
     "title": "Deactivate a Currency",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [960, 560]
+    "output": "docs/diagrams/currencies-deactivate.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    }
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
-    { "id": "handler", "type": "backend", "label": "Deactivate", "sublabel": "hand-written handler" },
-    { "id": "accounts", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts" },
-    { "id": "currency", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Currencies" }
-  ],
-  "segments": [
-    { "from": 170, "to": 300, "label": "Cross-aggregate check" },
-    { "from": 316, "to": 430, "label": "Apply + save" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Currencies/CurrenciesV1Endpoint.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "Deactivate",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Currencies/V1/Actions/Deactivate.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Currencies/Mappers/CurrencyConfigs.cs",
+          "line": 18
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Accounts/Mappers/AccountConfigs.cs",
+          "line": 40
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/DatabaseConfig.cs",
+          "line": 43
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/currencies/{id}/deactivate", "variant": "emphasis" },
-    { "from": "handler", "to": "accounts", "y": 260, "label": "any account in this currency with Balance != 0 or HeldAmount != 0?", "variant": "default", "note": "SpecListAccounts(currency: code) — a different aggregate than the one being deactivated" },
-    { "from": "accounts", "to": "handler", "y": 340, "label": "none found", "variant": "return", "note": "Otherwise refused: 422 CURRENCY_HOLDS_BALANCE, and the currency is left active" },
-    { "from": "handler", "to": "currency", "y": 400, "label": "Deactivate() — IsActive = false, one save", "variant": "emphasis" },
-    { "from": "handler", "to": "client", "y": 460, "label": "200 OK + CurrencyDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "handler",
+      "y": 200,
+      "label": "POST /v1/currencies/{id}/deactivate",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 235,
+      "label": "load Currency by id",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 295,
+      "label": "acc.Accounts: any nonzero balance or hold?",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "handler",
+      "y": 340,
+      "label": "none found",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 400,
+      "label": "acc.Currencies: set IsActive=false, save",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "y": 460,
+      "label": "200 OK + CurrencyDto",
+      "variant": "return"
+    }
   ],
   "activations": [
-    { "participant": "handler", "from": 190, "to": 480, "type": "backend" }
+    {
+      "participant": "handler",
+      "from": 190,
+      "to": 480,
+      "type": "backend"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Why this route stays hand-written", "items": ["The refusal reads Account, not Currency — a generated [CrudAction] handler can only see the aggregate it mutates", "The entity method Deactivate() itself carries no guard at all"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["Existing accounts and postings already in this currency keep working unchanged", "Only a NEW account open (UNSUPPORTED_CURRENCY) is refused going forward"] }
+    {
+      "dot": "cyan",
+      "title": "Why this route stays hand-written",
+      "items": [
+        "The refusal reads Account, not Currency \u2014 a generated [CrudAction] handler can only see the aggregate it mutates",
+        "The entity method Deactivate() itself carries no guard at all"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "Existing accounts and historical postings remain stored after deactivation",
+        "RecordPostingCommandHandler refuses a new posting in an inactive currency with UNSUPPORTED_CURRENCY; ReversePostingCommandHandler does not check currency activity"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Checks and outcomes",
+      "items": [
+        "any account in this currency with Balance != 0 or HeldAmount != 0?: SpecListAccounts(currency: code) \u2014 a different aggregate than the one being deactivated",
+        "none found: Otherwise refused: 422 CURRENCY_HOLDS_BALANCE, and the currency status is unchanged"
+      ]
+    }
   ]
 }

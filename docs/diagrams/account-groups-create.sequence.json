@@ -5,33 +5,148 @@
     "title": "Create an Account Group",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [960, 620]
+    "output": "docs/diagrams/account-groups-create.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    }
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
-    { "id": "endpoint", "type": "backend", "label": "Groups API", "sublabel": "Create handler" },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "acc.AccountGroups" },
-    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
-  ],
-  "segments": [
-    { "from": 170, "to": 280, "label": "Validate" },
-    { "from": 316, "to": 430, "label": "Create + save" },
-    { "from": 446, "to": 560, "label": "Respond" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "endpoint",
+      "type": "backend",
+      "label": "Groups API",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/AccountGroups/V1/Actions/Create.cs",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/AccountGroups/Mappers/AccountGroupConfigs.cs",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "ledger-events",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/ServiceConfigs.cs",
+          "line": 33
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "endpoint", "y": 200, "label": "POST /v1/account-groups", "variant": "emphasis" },
-    { "from": "endpoint", "to": "db", "y": 240, "label": "code already used?", "variant": "default" },
-    { "from": "db", "to": "endpoint", "y": 270, "label": "code free", "variant": "return", "note": "Otherwise refused: 422 DUPLICATE_GROUP_CODE, before the handler runs" },
-    { "from": "endpoint", "to": "db", "y": 380, "label": "insert AccountGroup + outbox row, one save", "variant": "emphasis", "note": "new AccountGroup(code, name, description, type, ownerId, metadata), Status = Active. SlimBus EF Core interceptor auto-saves after the handler returns." },
-    { "from": "endpoint", "to": "queue", "y": 460, "label": "account-groups.created event", "variant": "dashed", "note": "Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable." },
-    { "from": "endpoint", "to": "client", "y": 530, "label": "201 Created + AccountGroupDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "endpoint",
+      "y": 200,
+      "label": "POST /v1/account-groups",
+      "variant": "emphasis"
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "y": 240,
+      "label": "validator: code unique?",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "endpoint",
+      "y": 270,
+      "label": "code free",
+      "variant": "return"
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "y": 380,
+      "label": "insert AccountGroup (+ outbox if bus on), one save",
+      "variant": "emphasis"
+    },
+    {
+      "from": "endpoint",
+      "to": "queue",
+      "y": 460,
+      "label": "account-groups.created (if bus on)",
+      "variant": "dashed"
+    },
+    {
+      "from": "endpoint",
+      "to": "client",
+      "y": 530,
+      "label": "201 Created + AccountGroupDto",
+      "variant": "return"
+    }
   ],
   "activations": [
-    { "participant": "endpoint", "from": 190, "to": 545, "type": "backend" },
-    { "participant": "db", "from": 240, "to": 400, "type": "database" }
+    {
+      "participant": "endpoint",
+      "from": 190,
+      "to": 545,
+      "type": "backend"
+    },
+    {
+      "participant": "db",
+      "from": 240,
+      "to": 400,
+      "type": "database"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "One save, one event", "items": ["The entity and its outbox row are written in the same database save", "The event is raised by the save hook, never sent from application code"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["The transaction boundary is the one SaveChanges call: entity and outbox row commit together or not at all", "A group holds accounts only by reference (GroupId) — never a mapped EF Core relationship"] }
+    {
+      "dot": "cyan",
+      "title": "One save; optional event",
+      "items": [
+        "The entity and outbox row commit in the same save when messaging is enabled",
+        "The event is raised by the save hook, never sent from application code"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "The transaction boundary is the one SaveChanges call: entity and enabled outbox row commit together or not at all",
+        "A group holds accounts only by reference (GroupId) — never a mapped EF Core relationship"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Checks and outcomes",
+      "items": [
+        "code free: Otherwise refused: 422 DUPLICATE_GROUP_CODE, before the handler runs",
+        "insert AccountGroup + outbox row, one save: new AccountGroup(code, name, description, type, ownerId, metadata), Status = Active. SlimBus EF Core interceptor auto-saves after the handler returns.",
+        "account-groups.created event: Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Validation precedes creation",
+      "items": [
+        "The duplicate-code lookup runs in the request validator before the generated create handler"
+      ]
+    }
   ]
 }

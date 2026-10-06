@@ -1,26 +1,113 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "diagram_type": "lifecycle",
   "meta": {
     "title": "Account Group Status",
     "quality_profile": "showcase",
-    "viewBox": [720, 580]
+    "output": "docs/diagrams/account-groups-status.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    }
   },
   "lanes": [
-    { "id": "main", "label": "AccountGroup.Status" }
+    {
+      "id": "main",
+      "label": "Created and active"
+    },
+    {
+      "id": "terminal",
+      "label": "Inactive or reversed"
+    }
   ],
   "states": [
-    { "id": "start", "type": "start", "label": "Created", "sublabel": "POST /v1/account-groups", "lane": "main", "col": 0, "step": "01" },
-    { "id": "active", "type": "success", "label": "Active", "sublabel": "holds/changes accounts", "lane": "main", "col": 1, "step": "02", "tag": "default" },
-    { "id": "closed", "type": "neutral", "label": "Closed", "sublabel": "refused if it holds a balance", "lane": "main", "col": 2, "step": "03", "tag": "closed" }
+    {
+      "id": "start",
+      "type": "start",
+      "label": "Created",
+      "sublabel": "POST /v1/account-groups",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "active",
+      "type": "success",
+      "label": "Active",
+      "sublabel": "holds/changes accounts",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "default",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "closed",
+      "type": "neutral",
+      "label": "Closed",
+      "sublabel": "refused if it holds a balance",
+      "lane": "terminal",
+      "col": 1,
+      "step": "03",
+      "tag": "closed",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/AccountGroups/Entities/AccountGroup.cs",
+          "line": 22
+        }
+      ]
+    }
   ],
   "transitions": [
-    { "from": "start", "to": "active", "label": "Create — always active", "labelDy": -25 },
-    { "from": "active", "to": "closed", "label": "POST /{id}/close", "route": "top-channel", "channelY": 60, "note": "Refused 422 GROUP_HOLDS_BALANCE if any account it holds carries a non-zero balance or held amount" },
-    { "from": "closed", "to": "active", "label": "POST /{id}/activate — unconditional", "route": "bottom-channel", "channelY": 240 }
+    {
+      "from": "start",
+      "to": "active",
+      "label": "Create — always active"
+    },
+    {
+      "from": "active",
+      "to": "closed",
+      "label": "POST /{id}/close"
+    },
+    {
+      "from": "closed",
+      "to": "active",
+      "label": "POST /{id}/activate — unconditional"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Delete is not on this diagram", "items": ["DELETE removes the row entirely — refused (GROUP_NOT_EMPTY) while the group holds any account, regardless of status", "It is not a status transition, since the row stops existing"] },
-    { "dot": "amber", "title": "Why Close stays hand-written", "items": ["The refusal reads Account, a different aggregate, so a generated [CrudAction] handler can't express it"] }
+    {
+      "dot": "cyan",
+      "title": "Delete is not on this diagram",
+      "items": [
+        "DELETE removes the row entirely — refused (GROUP_NOT_EMPTY) while the group holds any account, regardless of status",
+        "It is not a status transition, since the row stops existing"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Why Close stays hand-written",
+      "items": [
+        "The refusal reads Account, a different aggregate, so a generated [CrudAction] handler can't express it"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Transition checks",
+      "items": [
+        "POST /{id}/close: Refused 422 GROUP_HOLDS_BALANCE if any account it holds carries a non-zero balance or held amount"
+      ]
+    }
   ]
 }

@@ -59,11 +59,11 @@ Authorization: Bearer {token}
 
 Unlike Currencies and Account Groups, **Open is entirely hand-written** — `Account` carries no `[CrudCreate]` constructor, because account-number allocation and the currency/floor checks are handler logic, not something a generator can express from a request shape alone.
 
-![Client posts to /v1/accounts; the handler checks the currency, group and floor, allocates an account number, inserts the account and its outbox row in one save, then publishes an accounts.created event.](../diagrams/accounts-open.svg)
+![POST /v1/accounts checks active currency, a determinate floor and group existence; the handler allocates the account number, saves the active account and optional outbox event, then returns it.](../diagrams/accounts-open.svg)
 
-The entity and its outbox row commit in the one `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. This diagram can't show a posting being recorded against the account afterward — that flow, including the status gate and floor check `TryApplyPosting` runs, lives in [Postings' end-to-end flow](postings.md#-end-to-end-flow), since the rules are the account's own but the write is a posting.
+The account commits in the `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. Posting flow, including the status gate and floor check in `TryApplyPosting`, is shown in [Postings' end-to-end flow](postings.md#-end-to-end-flow).
 
-![Account status starts Active on open; PATCH can set any of Active, Frozen, Dormant or Closed directly from any other value — including Frozen to or from Dormant, and Closed to or from Frozen or Dormant without passing through Active — refused only when the target is Closed and the balance or held amount is non-zero.](../diagrams/accounts-status.svg)
+![An opened account starts Active. A PATCH status request can set Active, Frozen, Dormant or Closed from any current status; entering Closed requires zero balance and held amount.](../diagrams/accounts-status.svg)
 
 `ChangeStatus` assigns the requested value unconditionally; there is no ordering between the four states, so every one of the twelve directed moves among them is reachable in a single `PATCH`. The one guard `UpdateAccountCommandHandler` applies is on the *target*: entering `Closed` is refused (`ACCOUNT_HOLDS_BALANCE`) while the balance or held amount is non-zero, whatever the current status was. `Frozen` accepts no posting in either direction; `Dormant` accepts credits only — enforced by `AccountPostingPolicy.StatusGate` on every posting and reversal, not by the `PATCH` route itself.
 
@@ -238,7 +238,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/accounts
 
 Changes `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative` **only** — rename and metadata are on `PUT`, not here.
 
-![Handler merges the supplied controls with the stored ones and rechecks the floor is still determinate, then applies the change in one save and publishes an accounts.updated event.](../diagrams/accounts-patch.svg)
+![PATCH /v1/accounts/{id} loads the account, merges supplied status and floor controls with stored values, checks floor and close guards, then saves changes and an optional update event.](../diagrams/accounts-patch.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `UpdateAccountCommandHandler` refuses a close while the account holds a balance or held amount, and checks that the merged floor controls remain determinate.

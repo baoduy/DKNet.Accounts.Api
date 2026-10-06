@@ -5,45 +5,204 @@
     "title": "Record a Posting",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [1080, 900]
+    "output": "docs/diagrams/postings-record.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    },
+    "viewBox": [
+      1120,
+      720
+    ]
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "postings.write" },
-    { "id": "handler", "type": "backend", "label": "Record", "sublabel": "hand-written handler" },
-    { "id": "lock", "type": "backend", "label": "Lock", "sublabel": "per-account, 10s" },
-    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts + acc.Postings" },
-    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
-  ],
-  "segments": [
-    { "from": 170, "to": 280, "label": "Validate currency, amount, date" },
-    { "from": 296, "to": 380, "label": "Idempotency pre-check" },
-    { "from": 396, "to": 430, "label": "Acquire lock" },
-    { "from": 446, "to": 570, "label": "Re-check inside the lock" },
-    { "from": 586, "to": 690, "label": "Apply + save" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Postings/PostingsV1Endpoint.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "Record",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs",
+          "line": 52
+        }
+      ]
+    },
+    {
+      "id": "lock",
+      "type": "backend",
+      "label": "Lock",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs",
+          "line": 52
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Postings/Mappers/PostingConfigs.cs",
+          "line": 51
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "ledger-events",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/ServiceConfigs.cs",
+          "line": 33
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/postings (Idempotency-Key header)", "variant": "emphasis" },
-    { "from": "handler", "to": "account", "y": 240, "label": "currency active? amount valid? date not future?", "variant": "default" },
-    { "from": "account", "to": "handler", "y": 270, "label": "valid", "variant": "return", "note": "Refused otherwise: 422 UNSUPPORTED_CURRENCY / INVALID_POSTING_AMOUNT / EFFECTIVE_DATE_IN_FUTURE" },
-    { "from": "handler", "to": "account", "y": 320, "label": "existing posting under this key + content signature?", "variant": "default" },
-    { "from": "account", "to": "handler", "y": 350, "label": "none — proceed", "variant": "return", "note": "Same key + same content replays with 200. Same key + different content: 409. No key skips this check." },
-    { "from": "handler", "to": "lock", "y": 410, "label": "AcquireAsync(accountId, 10s)", "variant": "default", "note": "Times out: 422 LOCK_TIMEOUT, nothing recorded" },
-    { "from": "handler", "to": "account", "y": 460, "label": "fetch the account", "variant": "default" },
-    { "from": "account", "to": "handler", "y": 490, "label": "found", "variant": "return", "note": "Otherwise: 404, account not found" },
-    { "from": "handler", "to": "account", "y": 520, "label": "account currency == posting currency?", "variant": "default" },
-    { "from": "account", "to": "handler", "y": 550, "label": "match", "variant": "return", "note": "Refused otherwise: 422 CURRENCY_MISMATCH" },
-    { "from": "handler", "to": "account", "y": 610, "label": "TryApplyPosting(direction, amount, effectiveDate)", "variant": "default", "note": "Status gate + floor check — see Accounts' status/floor rules" },
-    { "from": "account", "to": "handler", "y": 650, "label": "signedValue, balanceAfter, streamPosition", "variant": "return", "note": "Refused otherwise: 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN / ACCOUNT_DORMANT_DEBIT_REFUSED / INSUFFICIENT_FUNDS / AMOUNT_OUT_OF_RANGE" },
-    { "from": "handler", "to": "account", "y": 740, "label": "insert Posting + outbox row, one save", "variant": "emphasis" },
-    { "from": "handler", "to": "queue", "y": 780, "label": "postings.created event", "variant": "dashed" },
-    { "from": "handler", "to": "client", "y": 810, "label": "201 Created + PostingDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "handler",
+      "y": 200,
+      "label": "POST /v1/postings (optional Idempotency-Key)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "y": 235,
+      "label": "load currency",
+      "variant": "default"
+    },
+    {
+      "from": "account",
+      "to": "handler",
+      "y": 265,
+      "label": "active + decimal places",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "y": 305,
+      "label": "existing posting under this key + content signature?",
+      "variant": "default"
+    },
+    {
+      "from": "account",
+      "to": "handler",
+      "y": 335,
+      "label": "none — proceed",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "lock",
+      "y": 380,
+      "label": "AcquireAsync(accountId, 10s)",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "y": 420,
+      "label": "fetch the account",
+      "variant": "default"
+    },
+    {
+      "from": "account",
+      "to": "handler",
+      "y": 450,
+      "label": "found",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "y": 505,
+      "label": "save Account + Posting (+ outbox if on)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "queue",
+      "y": 545,
+      "label": "postings.created (if bus on)",
+      "variant": "dashed"
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "y": 585,
+      "label": "201 Created + PostingDto",
+      "variant": "return"
+    }
   ],
   "activations": [
-    { "participant": "handler", "from": 190, "to": 865, "type": "backend" },
-    { "participant": "lock", "from": 400, "to": 700, "type": "backend" }
+    {
+      "participant": "handler",
+      "from": 190,
+      "to": 605,
+      "type": "backend"
+    },
+    {
+      "participant": "lock",
+      "from": 380,
+      "to": 415,
+      "type": "backend"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Lock after the idempotency pre-check", "items": ["A deliberate, documented trade-off: two first-uses of the same key can both miss that read", "The second is refused 409 by the database's own unique index on (CallingSystem, IdempotencyKey), not silently double-posted"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["The per-account lock is single-process, in-memory — correct for one instance, not a horizontally-scaled deployment", "The account's own status-gate and floor rules are Accounts' domain logic, applied here through TryApplyPosting"] }
+    {
+      "dot": "cyan",
+      "title": "Lock after the idempotency pre-check",
+      "items": [
+        "Two concurrent first uses of one key can both miss the pre-lock read",
+        "The second is refused 409 by the database's own unique index on (CallingSystem, IdempotencyKey), not silently double-posted"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "The per-account lock is single-process, in-memory — correct for one instance, not a horizontally-scaled deployment",
+        "The account's own status-gate and floor rules are Accounts' domain logic, applied here through TryApplyPosting"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Checks and outcomes",
+      "items": [
+        "valid: Refused otherwise: 422 UNSUPPORTED_CURRENCY / INVALID_POSTING_AMOUNT / EFFECTIVE_DATE_IN_FUTURE",
+        "none — proceed: Same key + same content replays with 200. Same key + different content: 409. No key skips this check.",
+        "AcquireAsync(accountId, 10s): Times out: 422 LOCK_TIMEOUT, nothing recorded",
+        "found: Otherwise: 404, account not found",
+        "match: Refused otherwise: 422 CURRENCY_MISMATCH",
+        "TryApplyPosting(direction, amount, effectiveDate): Status gate + floor check — see Accounts' status/floor rules",
+        "signedValue, balanceAfter, streamPosition: Refused otherwise: 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN / ACCOUNT_DORMANT_DEBIT_REFUSED / INSUFFICIENT_FUNDS / AMOUNT_OUT_OF_RANGE"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Checks in the handler and account",
+      "items": [
+        "RecordPostingCommandHandler validates amount and date, then compares posting currency with the loaded account",
+        "Account.TryApplyPosting applies the status gate, amount ceiling and floor before SaveChangesAsync",
+        "The save updates acc.Accounts and inserts acc.Postings; the selected database also stores the outbox row when messaging is enabled"
+      ]
+    }
   ]
 }

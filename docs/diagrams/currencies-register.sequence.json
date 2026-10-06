@@ -5,33 +5,148 @@
     "title": "Register a Currency",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [960, 620]
+    "output": "docs/diagrams/currencies-register.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    }
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
-    { "id": "endpoint", "type": "backend", "label": "Currencies API", "sublabel": "Create handler" },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Currencies" },
-    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
-  ],
-  "segments": [
-    { "from": 170, "to": 280, "label": "Validate" },
-    { "from": 316, "to": 430, "label": "Create + save" },
-    { "from": 446, "to": 560, "label": "Respond" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Currencies/CurrenciesV1Endpoint.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "endpoint",
+      "type": "backend",
+      "label": "Currencies API",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Currencies/V1/Actions/Create.cs",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Currencies/Mappers/CurrencyConfigs.cs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "ledger-events",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/ServiceConfigs.cs",
+          "line": 33
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "endpoint", "y": 200, "label": "POST /v1/currencies", "variant": "emphasis" },
-    { "from": "endpoint", "to": "db", "y": 240, "label": "code already used?", "variant": "default" },
-    { "from": "db", "to": "endpoint", "y": 270, "label": "code free", "variant": "return", "note": "Otherwise refused: 422 DUPLICATE_CURRENCY_CODE, before the handler runs" },
-    { "from": "endpoint", "to": "db", "y": 380, "label": "insert Currency + outbox row, one save", "variant": "emphasis", "note": "new Currency(code, name, decimalPlaces), IsActive = true. DKNet's SlimBus EF Core interceptor auto-saves after the handler returns." },
-    { "from": "endpoint", "to": "queue", "y": 460, "label": "currencies.created event", "variant": "dashed", "note": "Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable." },
-    { "from": "endpoint", "to": "client", "y": 530, "label": "201 Created + CurrencyDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "endpoint",
+      "y": 200,
+      "label": "POST /v1/currencies",
+      "variant": "emphasis"
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "y": 240,
+      "label": "validator: code unique?",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "endpoint",
+      "y": 270,
+      "label": "code free",
+      "variant": "return"
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "y": 380,
+      "label": "insert Currency (+ outbox if bus on), one save",
+      "variant": "emphasis"
+    },
+    {
+      "from": "endpoint",
+      "to": "queue",
+      "y": 460,
+      "label": "currencies.created (if bus on)",
+      "variant": "dashed"
+    },
+    {
+      "from": "endpoint",
+      "to": "client",
+      "y": 530,
+      "label": "201 Created + CurrencyDto",
+      "variant": "return"
+    }
   ],
   "activations": [
-    { "participant": "endpoint", "from": 190, "to": 545, "type": "backend" },
-    { "participant": "db", "from": 240, "to": 400, "type": "database" }
+    {
+      "participant": "endpoint",
+      "from": 190,
+      "to": 545,
+      "type": "backend"
+    },
+    {
+      "participant": "db",
+      "from": 240,
+      "to": 400,
+      "type": "database"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "One save, one event", "items": ["The entity and its outbox row are written in the same database save", "The event is never sent from application code directly — the save hook raises it"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["The transaction boundary is the one SaveChanges call: entity and outbox row commit together or not at all", "A bus outage never fails the write — the event waits in the outbox and is retried every 10 seconds"] }
+    {
+      "dot": "cyan",
+      "title": "One save; optional event",
+      "items": [
+        "The entity and outbox row commit in the same save when messaging is enabled",
+        "The event is never sent from application code directly — the save hook raises it"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "The transaction boundary is the one SaveChanges call: entity and enabled outbox row commit together or not at all",
+        "A bus outage never fails the write — the event waits in the outbox and is retried every 10 seconds"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Checks and outcomes",
+      "items": [
+        "code free: Otherwise refused: 422 DUPLICATE_CURRENCY_CODE, before the handler runs",
+        "insert Currency + outbox row, one save: new Currency(code, name, decimalPlaces), IsActive = true. DKNet's SlimBus EF Core interceptor auto-saves after the handler returns.",
+        "currencies.created event: Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Validation precedes creation",
+      "items": [
+        "The duplicate-code lookup runs in the request validator before the generated create handler"
+      ]
+    }
   ]
 }
