@@ -42,10 +42,4 @@
         </None>
     </ItemGroup>
 
-    <ItemGroup>
-      <Reference Include="Aspire.Hosting">
-        <HintPath>bin\Debug\net10.0\Aspire.Hosting.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
 </Project>
