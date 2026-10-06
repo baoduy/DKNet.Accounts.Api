@@ -5,6 +5,8 @@
         <ImplicitUsings>true</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
+        <!-- CA1861: dotnet ef generates the migrations with constant array arguments. -->
+        <NoWarn>$(NoWarn);CA1861</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace DKNet.Accounts.Infra.Migrations
+namespace DKNet.Accounts.Infra.Postgres.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration

@@ -1,5 +1,6 @@
 using DKNet.Accounts.Infra.Extensions;
 using Npgsql;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
 
@@ -41,7 +42,8 @@ public sealed class ScratchDatabaseApiFactory : TestApiFactoryBase
 
     protected override string DbConnectionString => _connectionString;
 
-    protected override void ConfigureDatabase(DbContextOptionsBuilder options) => options.UseNpgsql(_connectionString);
+    protected override void ConfigureDatabase(DbContextOptionsBuilder options) =>
+        options.UseNpgsql(_connectionString, o => o.MigrationsAssembly(typeof(PostgresSetup).Assembly));
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
@@ -51,5 +53,6 @@ public sealed class ScratchDatabaseApiFactory : TestApiFactoryBase
 
     /// <summary>Creates the database, applies every migration and seeds it, the way a fresh deployment does
     /// (<see cref="InfraMigration.MigrateDb"/>) — the DI context has no <c>UseAutoDataSeeding</c>.</summary>
-    public Task MigrateToLatestAsync() => InfraMigration.MigrateDb(_connectionString);
+    public Task MigrateToLatestAsync() =>
+        InfraMigration.MigrateDb(_connectionString, (builder, conn) => builder.UsePostgres(conn));
 }

@@ -4,6 +4,7 @@ using DKNet.AspCore.Idempotency.Store;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.BDDTests.Support;
 
@@ -28,7 +29,8 @@ public sealed class BddApiFactory(string? redisConnectionString = null) : TestAp
     public string ContainerConnectionString => _container.GetConnectionString();
 
     protected override void ConfigureDatabase(DbContextOptionsBuilder options) =>
-        options.UseNpgsql(_container.GetConnectionString());
+        options.UseNpgsql(
+            _container.GetConnectionString(), o => o.MigrationsAssembly(typeof(PostgresSetup).Assembly));
 
     /// <summary>
     /// Base <see cref="TestApiFactoryBase.ResetDatabaseAsync"/> drops and recreates the database, which

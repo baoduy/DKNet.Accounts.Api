@@ -5,6 +5,8 @@
         <ImplicitUsings>true</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
+        <!-- CA1861: dotnet ef generates the migrations with constant array arguments. -->
+        <NoWarn>$(NoWarn);CA1861</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,5 +20,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DKNet.Accounts.Infra\DKNet.Accounts.Infra.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The architecture tests read the model through internal DbContextFactory. -->
+        <InternalsVisibleTo Include="DKNet.Accounts.App.Tests"/>
     </ItemGroup>
 </Project>

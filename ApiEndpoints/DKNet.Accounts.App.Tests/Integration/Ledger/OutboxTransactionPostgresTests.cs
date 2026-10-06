@@ -12,6 +12,7 @@ using DKNet.Accounts.Share;
 using DKNet.Accounts.Share.Options;
 using Npgsql;
 using Testcontainers.PostgreSql;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -47,12 +48,13 @@ public sealed class OutboxTransactionPostgresTests : IAsyncLifetime
         var services = new ServiceCollection()
             .AddSingleton<IConfiguration>(config)
             .AddAppServices()
-            .AddInfraServices()
+            .AddInfraServices((builder, conn) => builder.UsePostgres(conn))
             .AddCurrentUserProvider<CoreDbContext, FixedDataOwnerProvider>()
             .AddLogging()
             // The outbox's clean-up task needs the host's lifetime; this bare collection is not a host.
             .AddSingleton<IHostApplicationLifetime>(new ApplicationLifetime(NullLogger<ApplicationLifetime>.Instance));
-        services.AddServiceBus(config, typeof(AppSetup).Assembly, new FeatureOptions { EnableServiceBus = true });
+        services.AddServiceBus(config, typeof(AppSetup).Assembly, new FeatureOptions { EnableServiceBus = true },
+            PostgresSetup.AddPostgresOutbox);
         _services = services.BuildServiceProvider();
 
         await using var scope = _services.CreateAsyncScope();

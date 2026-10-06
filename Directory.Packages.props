@@ -39,6 +39,7 @@
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.6.0" />
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageVersion Include="AutoBogus" Version="2.13.1" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
@@ -102,6 +103,7 @@
     <PackageVersion Include="SlimMessageBus.Host.AzureServiceBus" Version="3.5.0" />
     <PackageVersion Include="SlimMessageBus.Host.FluentValidation" Version="3.5.0" />
     <PackageVersion Include="SlimMessageBus.Host.Memory" Version="3.5.0" />
+    <PackageVersion Include="SlimMessageBus.Host.Outbox" Version="3.5.0" />
     <PackageVersion Include="SlimMessageBus.Host.Outbox.PostgreSql.DbContext" Version="3.5.0" />
     <PackageVersion Include="SlimMessageBus.Host.Outbox.Sql.DbContext" Version="3.5.0" />
     <PackageVersion Include="SlimMessageBus.Host.RabbitMQ" Version="3.5.0" />
