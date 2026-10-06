@@ -102,10 +102,3 @@ Further caller limits and deferred behavior live in the [API contract](docs/api-
 | [Operations console](docs/console.md) | Local console and sign-in |
 
 [MIT license](LICENSE).
-
-## ❓ Open questions
-
-| Question | Why it matters | Checked | Who can answer |
-|---|---|---|---|
-| Who owns production operation and support? | Readers need an escalation route. | Repository docs and workflows name no owner or support route. | Service owner |
-| What recovery and service objectives apply? | Operators need a target for backup, restore, and alerting. | Chart and workflows contain no recovery or service objective policy. | Service owner |
