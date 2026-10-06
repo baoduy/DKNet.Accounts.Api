@@ -12,7 +12,7 @@
     },
     "viewBox": [
       1120,
-      720
+      718
     ]
   },
   "participants": [
@@ -35,6 +35,21 @@
         {
           "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs",
           "line": 52
+        }
+      ]
+    },
+    {
+      "id": "checks",
+      "type": "backend",
+      "label": "Local rules",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Postings/V1/Actions/Record.cs",
+          "line": 98
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/Account.cs",
+          "line": 214
         }
       ]
     },
@@ -76,95 +91,124 @@
     {
       "from": "client",
       "to": "handler",
-      "y": 200,
       "label": "POST /v1/postings (optional Idempotency-Key)",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "y": 160
     },
     {
       "from": "handler",
       "to": "account",
-      "y": 235,
       "label": "load currency",
-      "variant": "default"
-    },
-    {
-      "from": "account",
-      "to": "handler",
-      "y": 265,
-      "label": "active + decimal places",
-      "variant": "return"
-    },
-    {
-      "from": "handler",
-      "to": "account",
-      "y": 305,
-      "label": "existing posting under this key + content signature?",
-      "variant": "default"
-    },
-    {
-      "from": "account",
-      "to": "handler",
-      "y": 335,
-      "label": "none — proceed",
-      "variant": "return"
-    },
-    {
-      "from": "handler",
-      "to": "lock",
-      "y": 380,
-      "label": "AcquireAsync(accountId, 10s)",
-      "variant": "default"
-    },
-    {
-      "from": "handler",
-      "to": "account",
-      "y": 420,
-      "label": "fetch the account",
-      "variant": "default"
-    },
-    {
-      "from": "account",
-      "to": "handler",
-      "y": 450,
-      "label": "found",
-      "variant": "return"
-    },
-    {
-      "from": "handler",
-      "to": "account",
-      "y": 505,
-      "label": "save Account + Posting (+ outbox if on)",
-      "variant": "emphasis"
-    },
-    {
-      "from": "handler",
-      "to": "queue",
-      "y": 545,
-      "label": "postings.created (if bus on)",
-      "variant": "dashed"
+      "variant": "default",
+      "y": 188
     },
     {
       "from": "handler",
       "to": "client",
-      "y": 585,
-      "label": "201 Created + PostingDto",
-      "variant": "return"
-    }
-  ],
-  "activations": [
-    {
-      "participant": "handler",
-      "from": 190,
-      "to": 605,
-      "type": "backend"
+      "label": "inactive/missing: 422 UNSUPPORTED_CURRENCY",
+      "variant": "return",
+      "y": 216
     },
     {
-      "participant": "lock",
-      "from": 380,
-      "to": 415,
-      "type": "backend"
+      "from": "handler",
+      "to": "checks",
+      "label": "validate amount and effective date",
+      "variant": "default",
+      "y": 244
+    },
+    {
+      "from": "checks",
+      "to": "handler",
+      "label": "or 422 INVALID_POSTING_AMOUNT / EFFECTIVE_DATE_IN_FUTURE",
+      "variant": "return",
+      "y": 272
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "label": "key + content signature replay?",
+      "variant": "default",
+      "y": 300
+    },
+    {
+      "from": "account",
+      "to": "handler",
+      "label": "none; else 200 replay / 409 IDEMPOTENCY_KEY_CONFLICT",
+      "variant": "return",
+      "y": 328
+    },
+    {
+      "from": "handler",
+      "to": "lock",
+      "label": "AcquireAsync(accountId, 10s); else LOCK_TIMEOUT",
+      "variant": "default",
+      "y": 356
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "label": "load Account; else 404",
+      "variant": "default",
+      "y": 384
+    },
+    {
+      "from": "handler",
+      "to": "checks",
+      "label": "currency match; else CURRENCY_MISMATCH",
+      "variant": "default",
+      "y": 412
+    },
+    {
+      "from": "handler",
+      "to": "checks",
+      "label": "Account.TryApplyPosting: status, ceiling, floor",
+      "variant": "default",
+      "y": 440
+    },
+    {
+      "from": "checks",
+      "to": "handler",
+      "label": "or 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN",
+      "variant": "return",
+      "y": 468
+    },
+    {
+      "from": "checks",
+      "to": "handler",
+      "label": "or 422 ACCOUNT_DORMANT_DEBIT_REFUSED",
+      "variant": "return",
+      "y": 496
+    },
+    {
+      "from": "checks",
+      "to": "handler",
+      "label": "or 422 INSUFFICIENT_FUNDS / AMOUNT_OUT_OF_RANGE",
+      "variant": "return",
+      "y": 524
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "label": "save Account + Posting (+ outbox if on)",
+      "variant": "emphasis",
+      "y": 552
+    },
+    {
+      "from": "handler",
+      "to": "queue",
+      "label": "postings.created (if bus on)",
+      "variant": "dashed",
+      "y": 580
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "label": "201 Created + PostingDto",
+      "variant": "return",
+      "y": 608
     }
   ],
+  "activations": [],
   "cards": [
     {
       "dot": "cyan",
@@ -178,21 +222,8 @@
       "dot": "amber",
       "title": "What this can't show",
       "items": [
-        "The per-account lock is single-process, in-memory — correct for one instance, not a horizontally-scaled deployment",
+        "The per-account lock is single-process, in-memory \u2014 correct for one instance, not a horizontally-scaled deployment",
         "The account's own status-gate and floor rules are Accounts' domain logic, applied here through TryApplyPosting"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Checks and outcomes",
-      "items": [
-        "valid: Refused otherwise: 422 UNSUPPORTED_CURRENCY / INVALID_POSTING_AMOUNT / EFFECTIVE_DATE_IN_FUTURE",
-        "none — proceed: Same key + same content replays with 200. Same key + different content: 409. No key skips this check.",
-        "AcquireAsync(accountId, 10s): Times out: 422 LOCK_TIMEOUT, nothing recorded",
-        "found: Otherwise: 404, account not found",
-        "match: Refused otherwise: 422 CURRENCY_MISMATCH",
-        "TryApplyPosting(direction, amount, effectiveDate): Status gate + floor check — see Accounts' status/floor rules",
-        "signedValue, balanceAfter, streamPosition: Refused otherwise: 422 ACCOUNT_CLOSED / ACCOUNT_FROZEN / ACCOUNT_DORMANT_DEBIT_REFUSED / INSUFFICIENT_FUNDS / AMOUNT_OUT_OF_RANGE"
       ]
     },
     {

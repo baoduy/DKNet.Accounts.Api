@@ -13,11 +13,11 @@
   "lanes": [
     {
       "id": "main",
-      "label": "Created and active"
+      "label": "Record and posted"
     },
     {
       "id": "terminal",
-      "label": "Inactive or reversed"
+      "label": "Reversed posting"
     }
   ],
   "states": [
@@ -40,7 +40,7 @@
       "id": "posted",
       "type": "success",
       "label": "Posted",
-      "sublabel": "the normal, correctable state",
+      "sublabel": "account status gate applies",
       "lane": "main",
       "col": 1,
       "step": "02",
@@ -59,7 +59,6 @@
       "lane": "terminal",
       "col": 1,
       "step": "03",
-      "tag": "terminal",
       "sources": [
         {
           "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Postings/Entities/Posting.cs",
@@ -72,12 +71,12 @@
     {
       "from": "start",
       "to": "posted",
-      "label": "Record / RecordBatch — always"
+      "label": "Record / RecordBatch \u2014 always"
     },
     {
       "from": "posted",
       "to": "reversed",
-      "label": "reverse"
+      "label": "reverse; else POSTING_ALREADY_REVERSED / POSTING_IS_REVERSAL"
     }
   ],
   "cards": [
@@ -94,7 +93,7 @@
       "dot": "amber",
       "title": "A reversal is itself a Posting",
       "items": [
-        "The reversing entry starts at Posted like any other — see Reverse a Posting for how the two rows link"
+        "The reversing entry starts at Posted like any other \u2014 see Reverse a Posting for how the two rows link"
       ]
     }
   ]

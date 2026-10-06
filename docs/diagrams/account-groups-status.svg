@@ -429,8 +429,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <rect width="100%" height="100%" fill="url(#grid)"/>
 
         <!-- Lifecycle bands -->
-        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Created and active</text>
-        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Inactive or reversed</text>
+        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Creation and active</text>
+        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Closed group</text>
 
         <!-- Primary lifecycle rail -->
 
@@ -442,16 +442,16 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         </g>
         <g data-graph-role="automatic-crossover" style="--step:1">
           <path data-graph-role="automatic-crossover-underlay" d="M 399 120 L 399 240" fill="none" stroke="var(--mask)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="active" data-edge-to="closed" data-edge-label="POST /{id}/close" data-edge-key="1" data-composition-points="399,120;399,240" data-composition-crossover="halo" d="M 399 120 L 399 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
+          <path data-edge-from="active" data-edge-to="closed" data-edge-label="close; else GROUP_HOLDS_BALANCE" data-edge-key="1" data-composition-points="399,120;399,240" data-composition-crossover="halo" d="M 399 120 L 399 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
         </g>
         <g data-graph-role="automatic-crossover" style="--step:2">
           <path data-graph-role="automatic-crossover-underlay" d="M 429 240 L 429 120" fill="none" stroke="var(--mask)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="closed" data-edge-to="active" data-edge-label="POST /{id}/activate — unconditional" data-edge-key="2" data-composition-points="429,240;429,120" data-composition-crossover="halo" d="M 429 240 L 429 120" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
+          <path data-edge-from="closed" data-edge-to="active" data-edge-label="activate (always)" data-edge-key="2" data-composition-points="429,240;429,120" data-composition-crossover="halo" d="M 429 240 L 429 120" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
         </g>
 
         <!-- States -->
-        <g id="node-start" data-node-id="start" data-node-label="Created" tabindex="0" role="button" aria-label="Focus Created, POST /v1/account-groups, Created and active" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/account-groups" data-node-context="Created and active">
-          <title>Created · POST /v1/account-groups · Created and active</title>
+        <g id="node-start" data-node-id="start" data-node-label="Created" tabindex="0" role="button" aria-label="Focus Created, POST /v1/account-groups, Creation and active" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/account-groups" data-node-context="Creation and active">
+          <title>Created · POST /v1/account-groups · Creation and active</title>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-frontend" stroke-width="1.5"/>
           <g aria-hidden="true" data-lifecycle-initial-marker="">
@@ -466,8 +466,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <text x="130" y="96" class="t-muted" font-size="8" text-anchor="middle">POST /v1/account-groups</text>
         </g>
 
-        <g id="node-active" data-node-id="active" data-node-label="Active" tabindex="0" role="button" aria-label="Focus Active, holds/changes accounts, Created and active" aria-pressed="false" data-node-kind="success" data-node-sublabel="holds/changes accounts" data-node-tag="default" data-node-context="Created and active">
-          <title>Active · holds/changes accounts · Created and active · default</title>
+        <g id="node-active" data-node-id="active" data-node-label="Active" tabindex="0" role="button" aria-label="Focus Active, holds/changes accounts, Creation and active" aria-pressed="false" data-node-kind="success" data-node-sublabel="holds/changes accounts" data-node-tag="default" data-node-context="Creation and active">
+          <title>Active · holds/changes accounts · Creation and active · default</title>
           <rect x="344" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="344" y="56" width="140" height="64" rx="7" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="success" class="semantic-sigil s-backend" transform="translate(350 62) scale(0.6875)">
@@ -480,8 +480,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <text x="414" y="108" class="t-backend" font-size="8" text-anchor="middle">default</text>
         </g>
 
-        <g id="node-closed" data-node-id="closed" data-node-label="Closed" tabindex="0" role="button" aria-label="Focus Closed, refused if it holds a balance, Inactive or reversed" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="refused if it holds a balance" data-node-tag="closed" data-node-context="Inactive or reversed">
-          <title>Closed · refused if it holds a balance · Inactive or reversed · closed</title>
+        <g id="node-closed" data-node-id="closed" data-node-label="Closed" tabindex="0" role="button" aria-label="Focus Closed, zero balance + held, Closed group" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="zero balance + held" data-node-tag="closed" data-node-context="Closed group">
+          <title>Closed · zero balance + held · Closed group · closed</title>
           <rect x="344" y="240" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="344" y="240" width="140" height="64" rx="7" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="neutral" class="semantic-sigil s-external" transform="translate(350 246) scale(0.6875)">
@@ -490,7 +490,7 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           </g>
         <text x="367" y="254" class="t-muted" font-size="8" font-weight="700">03</text>
           <text data-node-label="" x="414" y="263" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Closed</text>
-          <text x="414" y="280" class="t-muted" font-size="7.5" text-anchor="middle">refused if it holds a balance</text>
+          <text x="414" y="280" class="t-muted" font-size="8" text-anchor="middle">zero balance + held</text>
         <text x="414" y="292" class="t-muted" font-size="8" text-anchor="middle">closed</text>
         </g>
 
@@ -499,13 +499,13 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <rect x="212.1" y="67" width="119.80000000000001" height="16" rx="4" class="c-mask"/>
           <text x="272" y="78" class="t-edge-emphasis" font-size="8" text-anchor="middle">Create — always active</text>
         </g>
-        <g data-edge-from="active" data-edge-to="closed" data-edge-label="POST /{id}/close" data-edge-key="1">
-          <rect x="302.6" y="172" width="90.4" height="16" rx="4" class="c-mask"/>
-          <text x="347.8" y="183" class="t-edge-default" font-size="8" text-anchor="middle">POST /{id}/close</text>
+        <g data-edge-from="active" data-edge-to="closed" data-edge-label="close; else GROUP_HOLDS_BALANCE" data-edge-key="1">
+          <rect x="229.10000000000002" y="172" width="163.9" height="16" rx="4" class="c-mask"/>
+          <text x="311.05" y="183" class="t-edge-default" font-size="8" text-anchor="middle">close; else GROUP_HOLDS_BALANCE</text>
         </g>
-        <g data-edge-from="closed" data-edge-to="active" data-edge-label="POST /{id}/activate — unconditional" data-edge-key="2">
-          <rect x="435" y="172" width="183.5" height="16" rx="4" class="c-mask"/>
-          <text x="526.75" y="183" class="t-edge-default" font-size="8" text-anchor="middle">POST /{id}/activate — unconditional</text>
+        <g data-edge-from="closed" data-edge-to="active" data-edge-label="activate (always)" data-edge-key="2">
+          <rect x="435" y="172" width="95.30000000000001" height="16" rx="4" class="c-mask"/>
+          <text x="482.65" y="183" class="t-edge-default" font-size="8" text-anchor="middle">activate (always)</text>
         </g>
 
         <!-- Legend -->

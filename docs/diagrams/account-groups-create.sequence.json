@@ -9,7 +9,11 @@
     "repository": {
       "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
       "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
-    }
+    },
+    "viewBox": [
+      920,
+      522
+    ]
   },
   "participants": [
     {
@@ -61,60 +65,54 @@
     {
       "from": "client",
       "to": "endpoint",
-      "y": 200,
+      "y": 160,
       "label": "POST /v1/account-groups",
       "variant": "emphasis"
     },
     {
       "from": "endpoint",
       "to": "db",
-      "y": 240,
+      "y": 202,
       "label": "validator: code unique?",
       "variant": "default"
     },
     {
       "from": "db",
       "to": "endpoint",
-      "y": 270,
+      "y": 244,
       "label": "code free",
       "variant": "return"
     },
     {
       "from": "endpoint",
+      "to": "client",
+      "label": "or 422 DUPLICATE_GROUP_CODE",
+      "variant": "return",
+      "y": 286
+    },
+    {
+      "from": "endpoint",
       "to": "db",
-      "y": 380,
+      "y": 328,
       "label": "insert AccountGroup (+ outbox if bus on), one save",
       "variant": "emphasis"
     },
     {
       "from": "endpoint",
       "to": "queue",
-      "y": 460,
+      "y": 370,
       "label": "account-groups.created (if bus on)",
       "variant": "dashed"
     },
     {
       "from": "endpoint",
       "to": "client",
-      "y": 530,
+      "y": 412,
       "label": "201 Created + AccountGroupDto",
       "variant": "return"
     }
   ],
-  "activations": [
-    {
-      "participant": "endpoint",
-      "from": 190,
-      "to": 545,
-      "type": "backend"
-    },
-    {
-      "participant": "db",
-      "from": 240,
-      "to": 400,
-      "type": "database"
-    }
-  ],
+  "activations": [],
   "cards": [
     {
       "dot": "cyan",
@@ -129,16 +127,7 @@
       "title": "What this can't show",
       "items": [
         "The transaction boundary is the one SaveChanges call: entity and enabled outbox row commit together or not at all",
-        "A group holds accounts only by reference (GroupId) — never a mapped EF Core relationship"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Checks and outcomes",
-      "items": [
-        "code free: Otherwise refused: 422 DUPLICATE_GROUP_CODE, before the handler runs",
-        "insert AccountGroup + outbox row, one save: new AccountGroup(code, name, description, type, ownerId, metadata), Status = Active. SlimBus EF Core interceptor auto-saves after the handler returns.",
-        "account-groups.created event: Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable."
+        "A group holds accounts only by reference (GroupId) \u2014 never a mapped EF Core relationship"
       ]
     },
     {

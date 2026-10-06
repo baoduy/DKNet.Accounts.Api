@@ -9,7 +9,11 @@
     "repository": {
       "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
       "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
-    }
+    },
+    "viewBox": [
+      1120,
+      606
+    ]
   },
   "participants": [
     {
@@ -31,6 +35,17 @@
         {
           "path": "ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/Actions/Update.cs",
           "line": 36
+        }
+      ]
+    },
+    {
+      "id": "floor",
+      "type": "backend",
+      "label": "AccountFloorPolicy",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/AccountFloorPolicy.cs",
+          "line": 16
         }
       ]
     },
@@ -61,60 +76,74 @@
     {
       "from": "client",
       "to": "handler",
-      "y": 200,
       "label": "PATCH /v1/accounts/{id}",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "y": 160
     },
     {
       "from": "handler",
       "to": "account",
-      "y": 240,
       "label": "load Account",
-      "variant": "default"
+      "variant": "default",
+      "y": 202
     },
     {
       "from": "account",
       "to": "handler",
-      "y": 270,
       "label": "stored status and floor controls",
-      "variant": "return"
+      "variant": "return",
+      "y": 244
     },
     {
       "from": "handler",
-      "to": "account",
-      "y": 350,
-      "label": "ChangeStatus / update controls, one save",
-      "variant": "emphasis"
+      "to": "floor",
+      "label": "RequiresOverdraftLimit(merged controls)?",
+      "variant": "default",
+      "y": 286
     },
     {
-      "from": "handler",
-      "to": "queue",
-      "y": 390,
-      "label": "accounts.updated (if changed, bus on)",
-      "variant": "dashed"
+      "from": "floor",
+      "to": "handler",
+      "label": "determinate; else 422 OVERDRAFT_LIMIT_REQUIRED",
+      "variant": "return",
+      "y": 328
     },
     {
       "from": "handler",
       "to": "client",
-      "y": 480,
-      "label": "200 OK + AccountDto",
-      "variant": "return"
-    }
-  ],
-  "activations": [
+      "label": "close with money: 422 ACCOUNT_HOLDS_BALANCE",
+      "variant": "return",
+      "y": 370
+    },
     {
-      "participant": "handler",
-      "from": 190,
-      "to": 495,
-      "type": "backend"
+      "from": "handler",
+      "to": "account",
+      "label": "ChangeStatus / update controls, one save",
+      "variant": "emphasis",
+      "y": 412
+    },
+    {
+      "from": "handler",
+      "to": "queue",
+      "label": "accounts.updated (if changed, bus on)",
+      "variant": "dashed",
+      "y": 454
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "label": "200 OK + AccountDto",
+      "variant": "return",
+      "y": 496
     }
   ],
+  "activations": [],
   "cards": [
     {
       "dot": "cyan",
       "title": "Two separate update routes",
       "items": [
-        "PUT changes name/metadata only — a different route entirely",
+        "PUT changes name/metadata only \u2014 a different route entirely",
         "PATCH changes status and the three floor controls only; neither route overlaps the other's fields"
       ]
     },
@@ -122,17 +151,7 @@
       "dot": "amber",
       "title": "What this can't show",
       "items": [
-        "accounts.updated is raised only when this route actually changes a tracked field — never on a posting's balance movement alone"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Checks and outcomes",
-      "items": [
-        "PATCH /v1/accounts/{id}: Optional status, overdraftLimit, minimumBalance and permittedToGoNegative fields",
-        "merge supplied controls with the stored ones — still determinate?: AccountFloorPolicy.RequiresOverdraftLimit on the merged state",
-        "determinate: Otherwise refused: 422 OVERDRAFT_LIMIT_REQUIRED. Closing while Balance != 0 or HeldAmount != 0 is refused: 422 ACCOUNT_HOLDS_BALANCE",
-        "ChangeStatus / update controls, one save: ClosedOn is set when Status becomes Closed, cleared on any other status change"
+        "accounts.updated is raised only when this route actually changes a tracked field \u2014 never on a posting's balance movement alone"
       ]
     },
     {

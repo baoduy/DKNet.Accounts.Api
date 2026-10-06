@@ -130,7 +130,11 @@
     },
     {
       "from": "closed",
-      "to": "change"
+      "to": "change",
+      "route": "right-channel",
+      "fromSide": "right",
+      "toSide": "right",
+      "channelX": 650
     },
     {
       "from": "change",
@@ -147,7 +151,10 @@
     {
       "from": "change",
       "to": "closed",
-      "label": "balance + held = 0"
+      "label": "else ACCOUNT_HOLDS_BALANCE",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
     }
   ],
   "cards": [
@@ -165,13 +172,6 @@
       "items": [
         "Entering Closed is refused with ACCOUNT_HOLDS_BALANCE when Balance or HeldAmount is non-zero",
         "Frozen refuses all postings; Dormant refuses debits, including a debiting reversal"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Transition checks",
-      "items": [
-        "balance + held = 0: 422 ACCOUNT_HOLDS_BALANCE when Balance or HeldAmount is non-zero"
       ]
     }
   ]

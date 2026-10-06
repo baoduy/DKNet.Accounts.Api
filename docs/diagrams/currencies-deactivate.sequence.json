@@ -9,7 +9,11 @@
     "repository": {
       "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
       "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
-    }
+    },
+    "viewBox": [
+      920,
+      522
+    ]
   },
   "participants": [
     {
@@ -58,54 +62,54 @@
     {
       "from": "client",
       "to": "handler",
-      "y": 200,
+      "y": 160,
       "label": "POST /v1/currencies/{id}/deactivate",
       "variant": "emphasis"
     },
     {
       "from": "handler",
       "to": "db",
-      "y": 235,
+      "y": 202,
       "label": "load Currency by id",
       "variant": "default"
     },
     {
       "from": "handler",
       "to": "db",
-      "y": 295,
+      "y": 244,
       "label": "acc.Accounts: any nonzero balance or hold?",
       "variant": "default"
     },
     {
       "from": "db",
       "to": "handler",
-      "y": 340,
+      "y": 286,
       "label": "none found",
       "variant": "return"
     },
     {
       "from": "handler",
+      "to": "client",
+      "label": "or 422 CURRENCY_HOLDS_BALANCE",
+      "variant": "return",
+      "y": 328
+    },
+    {
+      "from": "handler",
       "to": "db",
-      "y": 400,
+      "y": 370,
       "label": "acc.Currencies: set IsActive=false, save",
       "variant": "emphasis"
     },
     {
       "from": "handler",
       "to": "client",
-      "y": 460,
+      "y": 412,
       "label": "200 OK + CurrencyDto",
       "variant": "return"
     }
   ],
-  "activations": [
-    {
-      "participant": "handler",
-      "from": 190,
-      "to": 480,
-      "type": "backend"
-    }
-  ],
+  "activations": [],
   "cards": [
     {
       "dot": "cyan",
@@ -121,14 +125,6 @@
       "items": [
         "Existing accounts and historical postings remain stored after deactivation",
         "RecordPostingCommandHandler refuses a new posting in an inactive currency with UNSUPPORTED_CURRENCY; ReversePostingCommandHandler does not check currency activity"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Checks and outcomes",
-      "items": [
-        "any account in this currency with Balance != 0 or HeldAmount != 0?: SpecListAccounts(currency: code) \u2014 a different aggregate than the one being deactivated",
-        "none found: Otherwise refused: 422 CURRENCY_HOLDS_BALANCE, and the currency status is unchanged"
       ]
     }
   ]

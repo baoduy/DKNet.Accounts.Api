@@ -57,11 +57,11 @@ Authorization: Bearer {token}
 
 Create, list, read, update, delete, activate and close are one generated composite route (`group.MapAccountGroupCrud(...)`), except Close, whose generated handler is replaced by a hand-written one because its refusal reads a different aggregate.
 
-![POST /v1/account-groups validates code uniqueness before generated creation, saves the active group and optional outbox event in PostgreSQL or SQL Server, and returns the group.](../diagrams/account-groups-create.svg)
+![POST /v1/account-groups checks code uniqueness, refuses DUPLICATE_GROUP_CODE, saves AccountGroup with an optional outbox event in Postgres or SQL Server, and returns AccountGroupDto.](../diagrams/account-groups-create.svg)
 
 The group commits in the `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. If the broker is unreachable, the outbox retries delivery every 10 seconds without failing the group write (see [📣 Events](#-events)).
 
-![A created group starts Active. Close moves it to Closed only if all its accounts have zero balance and held amount; Activate returns it to Active.](../diagrams/account-groups-status.svg)
+![Creation starts Active. Close enters Closed with zero balance and held amount, or refuses GROUP_HOLDS_BALANCE. Activate returns to Active.](../diagrams/account-groups-status.svg)
 
 `Delete` is not on this diagram — it removes the row entirely, refused (`GROUP_NOT_EMPTY`) while the group holds any account regardless of status, so it is not a status transition.
 
@@ -197,7 +197,7 @@ curl -X DELETE "https://accounts.example.com/v1/account-groups/{id}" -H "Authori
 
 Closes a group — the one hand-written handler in this slice (`CloseAccountGroupHandler`, replacing the generated one on the same route) because its refusal reads the group's *accounts*, a different aggregate.
 
-![The close handler checks all accounts in the group for non-zero balance or held amount before saving Closed status in PostgreSQL or SQL Server.](../diagrams/account-groups-close.svg)
+![The handler loads AccountGroup, checks acc.Accounts for non-zero balance or held amount, refuses GROUP_HOLDS_BALANCE when money remains, otherwise saves Closed in Postgres or SQL Server.](../diagrams/account-groups-close.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `CloseAccountGroupHandler` refuses a group whose accounts hold a non-zero balance or held amount.

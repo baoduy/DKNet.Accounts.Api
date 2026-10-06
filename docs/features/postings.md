@@ -61,11 +61,11 @@ Idempotency-Key: 9c1b7e6f-4d3c-4a7c-8f1d-1a2b5c6d7e02
 
 Only `GET /v1/postings/{id}` is generated; every other route in this slice — list, record, batch, reverse, and the statement route mapped on the accounts group — is hand-written, because each carries orchestration a generator cannot express: a lock, an idempotency replay, or a cross-aggregate refusal.
 
-![POST /v1/postings with an optional Idempotency-Key loads an active currency, checks amount, date and replay, locks the account, applies its status and floor rules, saves Account and Posting, and emits a posting event when messaging is enabled.](../diagrams/postings-record.svg)
+![POST /v1/postings with an optional Idempotency-Key checks currency, amount, date and replay, locks and loads the account, checks currency match and TryApplyPosting rules, then saves Account and Posting with an optional event.](../diagrams/postings-record.svg)
 
 The idempotency pre-check runs *before* the lock is acquired — a deliberate, documented trade-off: two first-uses of the same key can both miss that read, and the second is then refused `409` by the database's own unique index on `(CallingSystem, IdempotencyKey)` rather than replayed — a narrow, accepted race, not a silent double-post. The handler calls `SaveChangesAsync` once for the account and posting, including an outbox row when messaging is enabled. If the broker is unreachable, the event remains in the outbox for retry (see [📣 Events](#-events)).
 
-![A recorded posting starts Posted. Reverse marks it Reversed once; a posting that is itself a reversal cannot be reversed, and Reversed has no return path.](../diagrams/postings-status.svg)
+![A recorded posting starts Posted. Reverse uses the account status gate and can refuse POSTING_ALREADY_REVERSED or POSTING_IS_REVERSAL; Reversed is terminal.](../diagrams/postings-status.svg)
 
 `MarkReversedBy` throws if called twice, so a posting can be reversed at most once — there is no path back to `Posted`.
 
@@ -210,7 +210,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/postings
 
 Reverses a posting — mapped through the generic `MapActionById<ReversePostingRequest, Guid, PostingDto>` (deliberately **not** `[CrudAction]`, since the handler is entirely hand-written).
 
-![POST /v1/postings/{id}/reverse checks idempotency, reads the original account id, locks that account and re-reads the original, then applies the opposite direction without a floor check and saves the account and both postings, with events when messaging is enabled.](../diagrams/postings-reverse.svg)
+![Reverse requires a reason and Idempotency-Key, checks replay, reads the original account id, locks and re-reads the original, rejects reversed or reversal rows, then applies the opposite direction without a floor check and saves Account and both postings.](../diagrams/postings-reverse.svg)
 
 - **Auth:** `postings.reverse`
 - **Concurrency:** `IAccountLockProvider` takes a process-local per-account lock, then the handler re-reads the original. No ETag or row version is sent. A competing reversal is refused `POSTING_ALREADY_REVERSED` after the first commits.

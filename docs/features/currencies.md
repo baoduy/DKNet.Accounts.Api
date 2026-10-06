@@ -63,13 +63,13 @@ Authorization: Bearer {token}
 
 The whole slice — Create, List, Get, Rename, Activate, Deactivate — rides one generated composite route (`group.MapCurrencyCrud(o => o.Exclude(CrudOp.Delete))`), except Deactivate, whose generated handler is replaced by a hand-written one.
 
-![POST /v1/currencies enters the request validator for a unique code, then the generated create handler saves the active currency and optional outbox event in the selected PostgreSQL or SQL Server database.](../diagrams/currencies-register.svg)
+![POST /v1/currencies checks code uniqueness, refuses DUPLICATE_CURRENCY_CODE, inserts Currency with an optional outbox event in Postgres or SQL Server, and returns CurrencyDto.](../diagrams/currencies-register.svg)
 
 The currency commits in the `SaveChanges` call that DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. If the broker is unreachable, the outbox retries delivery every 10 seconds without failing the currency write (see [📣 Events](#-events)).
 
 `IsActive` is a plain boolean, but it does gate behaviour — new accounts may only open in an active currency:
 
-![Registration starts Active. Deactivate moves to Inactive only when no account in that currency holds money; Activate restores Active. New accounts and postings are refused while inactive.](../diagrams/currencies-status.svg)
+![Registration starts Active. Deactivate enters Inactive with zero balance and held amount, or refuses CURRENCY_HOLDS_BALANCE. Activate returns to Active.](../diagrams/currencies-status.svg)
 
 ## 🔌 Endpoints
 
@@ -201,7 +201,7 @@ curl -X POST "https://accounts.example.com/v1/currencies/{id}/activate" -H "Auth
 
 Deactivates a currency — the one hand-written handler in this slice (`DeactivateCurrencyHandler`, replacing the generated one on the same route), because its refusal reads a different aggregate (`Account`) than the one being mutated.
 
-![The deactivation handler checks balances of accounts in the currency, then sets IsActive false and saves it in PostgreSQL or SQL Server; inactive currencies reject new postings and account opens.](../diagrams/currencies-deactivate.svg)
+![The handler loads Currency, checks acc.Accounts for balance or held amount, refuses CURRENCY_HOLDS_BALANCE when money remains, otherwise saves IsActive false in Postgres or SQL Server.](../diagrams/currencies-deactivate.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `DeactivateCurrencyHandler` refuses deactivation while an account in that currency holds a non-zero balance or held amount.

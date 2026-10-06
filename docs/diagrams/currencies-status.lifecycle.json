@@ -13,11 +13,11 @@
   "lanes": [
     {
       "id": "main",
-      "label": "Created and active"
+      "label": "Registration and active"
     },
     {
       "id": "terminal",
-      "label": "Inactive or reversed"
+      "label": "Inactive currency"
     }
   ],
   "states": [
@@ -56,7 +56,7 @@
       "id": "inactive",
       "type": "neutral",
       "label": "Inactive",
-      "sublabel": "IsActive = false",
+      "sublabel": "zero balance + held to enter",
       "lane": "terminal",
       "col": 1,
       "step": "03",
@@ -73,17 +73,17 @@
     {
       "from": "start",
       "to": "active",
-      "label": "Create — always active"
+      "label": "Create \u2014 always active"
     },
     {
       "from": "active",
       "to": "inactive",
-      "label": "POST /{id}/deactivate"
+      "label": "deactivate; else CURRENCY_HOLDS_BALANCE"
     },
     {
       "from": "inactive",
       "to": "active",
-      "label": "POST /{id}/activate — unconditional"
+      "label": "activate (always)"
     }
   ],
   "cards": [
@@ -101,13 +101,6 @@
       "items": [
         "Existing accounts and historical postings remain stored",
         "New account opens and new postings in this currency are refused with UNSUPPORTED_CURRENCY; reversal does not check currency activity"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Transition checks",
-      "items": [
-        "POST /{id}/deactivate: Refused 422 CURRENCY_HOLDS_BALANCE if any account in this currency still holds a balance or held amount"
       ]
     }
   ]

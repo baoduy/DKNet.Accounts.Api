@@ -429,8 +429,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <rect width="100%" height="100%" fill="url(#grid)"/>
 
         <!-- Lifecycle bands -->
-        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Created and active</text>
-        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Inactive or reversed</text>
+        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Record and posted</text>
+        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Reversed posting</text>
 
         <!-- Primary lifecycle rail -->
 
@@ -442,12 +442,12 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         </g>
         <g data-graph-role="automatic-crossover" style="--step:1">
           <path data-graph-role="automatic-crossover-underlay" d="M 449 120 L 449 240" fill="none" stroke="var(--mask)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="posted" data-edge-to="reversed" data-edge-label="reverse" data-edge-key="1" data-composition-points="449,120;449,240" data-composition-crossover="halo" d="M 449 120 L 449 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
+          <path data-edge-from="posted" data-edge-to="reversed" data-edge-label="reverse; else POSTING_ALREADY_REVERSED / POSTING_IS_REVERSAL" data-edge-key="1" data-composition-points="449,120;449,240" data-composition-crossover="halo" d="M 449 120 L 449 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
         </g>
 
         <!-- States -->
-        <g id="node-start" data-node-id="start" data-node-label="Recorded" tabindex="0" role="button" aria-label="Focus Recorded, POST /v1/postings or /batch, Created and active" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/postings or /batch" data-node-context="Created and active">
-          <title>Recorded · POST /v1/postings or /batch · Created and active</title>
+        <g id="node-start" data-node-id="start" data-node-label="Recorded" tabindex="0" role="button" aria-label="Focus Recorded, POST /v1/postings or /batch, Record and posted" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/postings or /batch" data-node-context="Record and posted">
+          <title>Recorded · POST /v1/postings or /batch · Record and posted</title>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-frontend" stroke-width="1.5"/>
           <g aria-hidden="true" data-lifecycle-initial-marker="">
@@ -462,8 +462,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <text x="130" y="96" class="t-muted" font-size="8" text-anchor="middle">POST /v1/postings or /batch</text>
         </g>
 
-        <g id="node-posted" data-node-id="posted" data-node-label="Posted" tabindex="0" role="button" aria-label="Focus Posted, the normal, correctable state, Created and active" aria-pressed="false" data-node-kind="success" data-node-sublabel="the normal, correctable state" data-node-context="Created and active">
-          <title>Posted · the normal, correctable state · Created and active</title>
+        <g id="node-posted" data-node-id="posted" data-node-label="Posted" tabindex="0" role="button" aria-label="Focus Posted, account status gate applies, Record and posted" aria-pressed="false" data-node-kind="success" data-node-sublabel="account status gate applies" data-node-context="Record and posted">
+          <title>Posted · account status gate applies · Record and posted</title>
           <rect x="379" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="379" y="56" width="140" height="64" rx="7" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="success" class="semantic-sigil s-backend" transform="translate(385 62) scale(0.6875)">
@@ -472,11 +472,11 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           </g>
         <text x="402" y="70" class="t-backend" font-size="8" font-weight="700">02</text>
           <text data-node-label="" x="449" y="79" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Posted</text>
-          <text x="449" y="96" class="t-muted" font-size="7.5" text-anchor="middle">the normal, correctable state</text>
+          <text x="449" y="96" class="t-muted" font-size="8" text-anchor="middle">account status gate applies</text>
         </g>
 
-        <g id="node-reversed" data-node-id="reversed" data-node-label="Reversed" tabindex="0" role="button" aria-label="Focus Reversed, terminal, Inactive or reversed" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="terminal" data-node-tag="terminal" data-node-context="Inactive or reversed">
-          <title>Reversed · terminal · Inactive or reversed · terminal</title>
+        <g id="node-reversed" data-node-id="reversed" data-node-label="Reversed" tabindex="0" role="button" aria-label="Focus Reversed, terminal, Reversed posting" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="terminal" data-node-context="Reversed posting">
+          <title>Reversed · terminal · Reversed posting</title>
           <rect x="379" y="240" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="379" y="240" width="140" height="64" rx="7" class="c-external" stroke-width="1.5"/>
           <rect x="382" y="243" width="134" height="58" rx="4" class="c-external" style="fill: none" stroke-width="1"/>
@@ -487,7 +487,6 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <text x="402" y="254" class="t-muted" font-size="8" font-weight="700">03</text>
           <text data-node-label="" x="449" y="263" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Reversed</text>
           <text x="449" y="280" class="t-muted" font-size="8" text-anchor="middle">terminal</text>
-        <text x="449" y="292" class="t-muted" font-size="8" text-anchor="middle">terminal</text>
         </g>
 
         <!-- Transition labels -->
@@ -495,9 +494,9 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <rect x="212.45" y="67" width="154.10000000000002" height="16" rx="4" class="c-mask"/>
           <text x="289.5" y="78" class="t-edge-emphasis" font-size="8" text-anchor="middle">Record / RecordBatch — always</text>
         </g>
-        <g data-edge-from="posted" data-edge-to="reversed" data-edge-label="reverse" data-edge-key="1">
-          <rect x="396.70000000000005" y="172" width="46.300000000000004" height="16" rx="4" class="c-mask"/>
-          <text x="419.85" y="183" class="t-edge-default" font-size="8" text-anchor="middle">reverse</text>
+        <g data-edge-from="posted" data-edge-to="reversed" data-edge-label="reverse; else POSTING_ALREADY_REVERSED / POSTING_IS_REVERSAL" data-edge-key="1">
+          <rect x="137" y="172" width="306" height="16" rx="4" class="c-mask"/>
+          <text x="290" y="183" class="t-edge-default" font-size="8" text-anchor="middle">reverse; else POSTING_ALREADY_REVERSED / POSTING_IS_REVERSAL</text>
         </g>
 
         <!-- Legend -->

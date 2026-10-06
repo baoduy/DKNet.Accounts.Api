@@ -9,7 +9,11 @@
     "repository": {
       "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
       "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
-    }
+    },
+    "viewBox": [
+      1120,
+      648
+    ]
   },
   "participants": [
     {
@@ -31,6 +35,17 @@
         {
           "path": "ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/Actions/Open.cs",
           "line": 42
+        }
+      ]
+    },
+    {
+      "id": "floor",
+      "type": "backend",
+      "label": "AccountFloorPolicy",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/AccountFloorPolicy.cs",
+          "line": 16
         }
       ]
     },
@@ -61,66 +76,81 @@
     {
       "from": "client",
       "to": "endpoint",
-      "y": 200,
       "label": "POST /v1/accounts",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "y": 160
     },
     {
       "from": "endpoint",
       "to": "db",
-      "y": 240,
-      "label": "query active currency, then group",
-      "variant": "default"
-    },
-    {
-      "from": "db",
-      "to": "endpoint",
-      "y": 270,
-      "label": "both found",
-      "variant": "return"
-    },
-    {
-      "from": "endpoint",
-      "to": "db",
-      "y": 380,
-      "label": "insert Account (+ outbox if bus on), one save",
-      "variant": "emphasis"
-    },
-    {
-      "from": "endpoint",
-      "to": "queue",
-      "y": 460,
-      "label": "accounts.created (if bus on)",
-      "variant": "dashed"
+      "label": "load active currency",
+      "variant": "default",
+      "y": 202
     },
     {
       "from": "endpoint",
       "to": "client",
-      "y": 530,
-      "label": "201 Created + AccountDto",
-      "variant": "return"
-    }
-  ],
-  "activations": [
-    {
-      "participant": "endpoint",
-      "from": 190,
-      "to": 545,
-      "type": "backend"
+      "label": "or 422 UNSUPPORTED_CURRENCY",
+      "variant": "return",
+      "y": 244
     },
     {
-      "participant": "db",
-      "from": 240,
-      "to": 400,
-      "type": "database"
+      "from": "endpoint",
+      "to": "floor",
+      "label": "RequiresOverdraftLimit?",
+      "variant": "default",
+      "y": 286
+    },
+    {
+      "from": "floor",
+      "to": "endpoint",
+      "label": "determinate; else 422 OVERDRAFT_LIMIT_REQUIRED",
+      "variant": "return",
+      "y": 328
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "label": "load group by id",
+      "variant": "default",
+      "y": 370
+    },
+    {
+      "from": "db",
+      "to": "endpoint",
+      "label": "found; else 404",
+      "variant": "return",
+      "y": 412
+    },
+    {
+      "from": "endpoint",
+      "to": "db",
+      "label": "allocate number, insert Account (+ outbox if bus on)",
+      "variant": "emphasis",
+      "y": 454
+    },
+    {
+      "from": "endpoint",
+      "to": "queue",
+      "label": "accounts.created (if bus on)",
+      "variant": "dashed",
+      "y": 496
+    },
+    {
+      "from": "endpoint",
+      "to": "client",
+      "label": "201 Created + AccountDto",
+      "variant": "return",
+      "y": 538
     }
   ],
+  "activations": [],
   "cards": [
     {
       "dot": "cyan",
       "title": "Entirely hand-written",
       "items": [
-        "Account carries no [CrudCreate] constructor — account-number allocation and the floor/currency checks are all handler logic"
+        "Account carries no [CrudCreate] constructor \u2014 account-number allocation and the floor/currency checks are all handler logic"
       ]
     },
     {
@@ -128,16 +158,7 @@
       "title": "What this can't show",
       "items": [
         "The transaction boundary is the one SaveChanges call: entity and enabled outbox row commit together or not at all",
-        "A posting against this account is a separate flow — see Postings"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Checks and outcomes",
-      "items": [
-        "all pass: Otherwise refused: 422 UNSUPPORTED_CURRENCY, 404 unknown group, or 422 OVERDRAFT_LIMIT_REQUIRED",
-        "insert Account + outbox row, one save: accountNumber = \"{group.Code}-{suffix}\" (caller's suffix or a generated one); new Account(...), Status = Active, Balance = 0",
-        "accounts.created event: Dropped, not stored, if the bus is off. Retried indefinitely from the outbox if the bus is on but unreachable."
+        "A posting against this account is a separate flow \u2014 see Postings"
       ]
     },
     {

@@ -59,7 +59,7 @@ Authorization: Bearer {token}
 
 Unlike Currencies and Account Groups, **Open is entirely hand-written** — `Account` carries no `[CrudCreate]` constructor, because account-number allocation and the currency/floor checks are handler logic, not something a generator can express from a request shape alone.
 
-![POST /v1/accounts checks active currency, a determinate floor and group existence; the handler allocates the account number, saves the active account and optional outbox event, then returns it.](../diagrams/accounts-open.svg)
+![POST /v1/accounts checks active currency, floor determinacy and group existence, showing UNSUPPORTED_CURRENCY, OVERDRAFT_LIMIT_REQUIRED and 404 alternatives before number allocation and an optional creation event.](../diagrams/accounts-open.svg)
 
 The account commits in the `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. Posting flow, including the status gate and floor check in `TryApplyPosting`, is shown in [Postings' end-to-end flow](postings.md#-end-to-end-flow).
 
@@ -238,7 +238,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/accounts
 
 Changes `status`, `overdraftLimit`, `minimumBalance` and `permittedToGoNegative` **only** — rename and metadata are on `PUT`, not here.
 
-![PATCH /v1/accounts/{id} loads the account, merges supplied status and floor controls with stored values, checks floor and close guards, then saves changes and an optional update event.](../diagrams/accounts-patch.svg)
+![PATCH /v1/accounts/{id} loads stored controls, rechecks the merged floor and close guard, shows OVERDRAFT_LIMIT_REQUIRED and ACCOUNT_HOLDS_BALANCE alternatives, then saves changes with an optional update event.](../diagrams/accounts-patch.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `UpdateAccountCommandHandler` refuses a close while the account holds a balance or held amount, and checks that the merged floor controls remain determinate.

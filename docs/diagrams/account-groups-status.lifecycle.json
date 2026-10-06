@@ -13,11 +13,11 @@
   "lanes": [
     {
       "id": "main",
-      "label": "Created and active"
+      "label": "Creation and active"
     },
     {
       "id": "terminal",
-      "label": "Inactive or reversed"
+      "label": "Closed group"
     }
   ],
   "states": [
@@ -56,7 +56,7 @@
       "id": "closed",
       "type": "neutral",
       "label": "Closed",
-      "sublabel": "refused if it holds a balance",
+      "sublabel": "zero balance + held",
       "lane": "terminal",
       "col": 1,
       "step": "03",
@@ -73,17 +73,17 @@
     {
       "from": "start",
       "to": "active",
-      "label": "Create — always active"
+      "label": "Create \u2014 always active"
     },
     {
       "from": "active",
       "to": "closed",
-      "label": "POST /{id}/close"
+      "label": "close; else GROUP_HOLDS_BALANCE"
     },
     {
       "from": "closed",
       "to": "active",
-      "label": "POST /{id}/activate — unconditional"
+      "label": "activate (always)"
     }
   ],
   "cards": [
@@ -91,7 +91,7 @@
       "dot": "cyan",
       "title": "Delete is not on this diagram",
       "items": [
-        "DELETE removes the row entirely — refused (GROUP_NOT_EMPTY) while the group holds any account, regardless of status",
+        "DELETE removes the row entirely \u2014 refused (GROUP_NOT_EMPTY) while the group holds any account, regardless of status",
         "It is not a status transition, since the row stops existing"
       ]
     },
@@ -100,13 +100,6 @@
       "title": "Why Close stays hand-written",
       "items": [
         "The refusal reads Account, a different aggregate, so a generated [CrudAction] handler can't express it"
-      ]
-    },
-    {
-      "dot": "slate",
-      "title": "Transition checks",
-      "items": [
-        "POST /{id}/close: Refused 422 GROUP_HOLDS_BALANCE if any account it holds carries a non-zero balance or held amount"
       ]
     }
   ]

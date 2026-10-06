@@ -429,8 +429,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <rect width="100%" height="100%" fill="url(#grid)"/>
 
         <!-- Lifecycle bands -->
-        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Created and active</text>
-        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Inactive or reversed</text>
+        <text x="18" y="88" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Registration and active</text>
+        <text x="18" y="272" class="t-dim" font-size="10" font-weight="600" writing-mode="vertical-rl" text-anchor="middle">Inactive currency</text>
 
         <!-- Primary lifecycle rail -->
 
@@ -442,16 +442,16 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         </g>
         <g data-graph-role="automatic-crossover" style="--step:1">
           <path data-graph-role="automatic-crossover-underlay" d="M 399 120 L 399 240" fill="none" stroke="var(--mask)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="active" data-edge-to="inactive" data-edge-label="POST /{id}/deactivate" data-edge-key="1" data-composition-points="399,120;399,240" data-composition-crossover="halo" d="M 399 120 L 399 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
+          <path data-edge-from="active" data-edge-to="inactive" data-edge-label="deactivate; else CURRENCY_HOLDS_BALANCE" data-edge-key="1" data-composition-points="399,120;399,240" data-composition-crossover="halo" d="M 399 120 L 399 240" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
         </g>
         <g data-graph-role="automatic-crossover" style="--step:2">
           <path data-graph-role="automatic-crossover-underlay" d="M 429 240 L 429 120" fill="none" stroke="var(--mask)" stroke-width="5.1" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="inactive" data-edge-to="active" data-edge-label="POST /{id}/activate — unconditional" data-edge-key="2" data-composition-points="429,240;429,120" data-composition-crossover="halo" d="M 429 240 L 429 120" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
+          <path data-edge-from="inactive" data-edge-to="active" data-edge-label="activate (always)" data-edge-key="2" data-composition-points="429,240;429,120" data-composition-crossover="halo" d="M 429 240 L 429 120" class="a-default" stroke-width="1.1" marker-end="url(#arrowhead)"/>
         </g>
 
         <!-- States -->
-        <g id="node-start" data-node-id="start" data-node-label="Registered" tabindex="0" role="button" aria-label="Focus Registered, POST /v1/currencies, Created and active" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/currencies" data-node-context="Created and active">
-          <title>Registered · POST /v1/currencies · Created and active</title>
+        <g id="node-start" data-node-id="start" data-node-label="Registered" tabindex="0" role="button" aria-label="Focus Registered, POST /v1/currencies, Registration and active" aria-pressed="false" data-node-kind="start" data-node-sublabel="POST /v1/currencies" data-node-context="Registration and active">
+          <title>Registered · POST /v1/currencies · Registration and active</title>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="60" y="56" width="140" height="64" rx="7" class="c-frontend" stroke-width="1.5"/>
           <g aria-hidden="true" data-lifecycle-initial-marker="">
@@ -466,8 +466,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <text x="130" y="105.1" class="t-muted" font-size="8" text-anchor="middle">POST /v1/currencies</text>
         </g>
 
-        <g id="node-active" data-node-id="active" data-node-label="Active" tabindex="0" role="button" aria-label="Focus Active, IsActive = true, Created and active" aria-pressed="false" data-node-kind="success" data-node-sublabel="IsActive = true" data-node-tag="default" data-node-context="Created and active">
-          <title>Active · IsActive = true · Created and active · default</title>
+        <g id="node-active" data-node-id="active" data-node-label="Active" tabindex="0" role="button" aria-label="Focus Active, IsActive = true, Registration and active" aria-pressed="false" data-node-kind="success" data-node-sublabel="IsActive = true" data-node-tag="default" data-node-context="Registration and active">
+          <title>Active · IsActive = true · Registration and active · default</title>
           <rect x="344" y="56" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="344" y="56" width="140" height="64" rx="7" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="success" class="semantic-sigil s-backend" transform="translate(350 62) scale(0.6875)">
@@ -480,8 +480,8 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
         <text x="414" y="108" class="t-backend" font-size="8" text-anchor="middle">default</text>
         </g>
 
-        <g id="node-inactive" data-node-id="inactive" data-node-label="Inactive" tabindex="0" role="button" aria-label="Focus Inactive, IsActive = false, Inactive or reversed" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="IsActive = false" data-node-tag="retired" data-node-context="Inactive or reversed">
-          <title>Inactive · IsActive = false · Inactive or reversed · retired</title>
+        <g id="node-inactive" data-node-id="inactive" data-node-label="Inactive" tabindex="0" role="button" aria-label="Focus Inactive, zero balance + held to enter, Inactive currency" aria-pressed="false" data-node-kind="neutral" data-node-sublabel="zero balance + held to enter" data-node-tag="retired" data-node-context="Inactive currency">
+          <title>Inactive · zero balance + held to enter · Inactive currency · retired</title>
           <rect x="344" y="240" width="140" height="64" rx="7" class="c-mask"/>
           <rect x="344" y="240" width="140" height="64" rx="7" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="neutral" class="semantic-sigil s-external" transform="translate(350 246) scale(0.6875)">
@@ -490,7 +490,7 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           </g>
         <text x="367" y="254" class="t-muted" font-size="8" font-weight="700">03</text>
           <text data-node-label="" x="414" y="263" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Inactive</text>
-          <text x="414" y="280" class="t-muted" font-size="8" text-anchor="middle">IsActive = false</text>
+          <text x="414" y="280" class="t-muted" font-size="7.8" text-anchor="middle">zero balance + held to enter</text>
         <text x="414" y="292" class="t-muted" font-size="8" text-anchor="middle">retired</text>
         </g>
 
@@ -499,13 +499,13 @@ svg[data-preset="editorial"][data-animation="trace"] [data-animate="node"] { ani
           <rect x="212.1" y="67" width="119.80000000000001" height="16" rx="4" class="c-mask"/>
           <text x="272" y="78" class="t-edge-emphasis" font-size="8" text-anchor="middle">Create — always active</text>
         </g>
-        <g data-edge-from="active" data-edge-to="inactive" data-edge-label="POST /{id}/deactivate" data-edge-key="1">
-          <rect x="278.1" y="172" width="114.9" height="16" rx="4" class="c-mask"/>
-          <text x="335.55" y="183" class="t-edge-default" font-size="8" text-anchor="middle">POST /{id}/deactivate</text>
+        <g data-edge-from="active" data-edge-to="inactive" data-edge-label="deactivate; else CURRENCY_HOLDS_BALANCE" data-edge-key="1">
+          <rect x="189.89999999999998" y="172" width="203.10000000000002" height="16" rx="4" class="c-mask"/>
+          <text x="291.45" y="183" class="t-edge-default" font-size="8" text-anchor="middle">deactivate; else CURRENCY_HOLDS_BALANCE</text>
         </g>
-        <g data-edge-from="inactive" data-edge-to="active" data-edge-label="POST /{id}/activate — unconditional" data-edge-key="2">
-          <rect x="435" y="172" width="183.5" height="16" rx="4" class="c-mask"/>
-          <text x="526.75" y="183" class="t-edge-default" font-size="8" text-anchor="middle">POST /{id}/activate — unconditional</text>
+        <g data-edge-from="inactive" data-edge-to="active" data-edge-label="activate (always)" data-edge-key="2">
+          <rect x="435" y="172" width="95.30000000000001" height="16" rx="4" class="c-mask"/>
+          <text x="482.65" y="183" class="t-edge-default" font-size="8" text-anchor="middle">activate (always)</text>
         </g>
 
         <!-- Legend -->
