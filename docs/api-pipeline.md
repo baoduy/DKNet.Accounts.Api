@@ -3,7 +3,7 @@
 This page traces everything that happens to a request before it reaches a handler, in the order it
 actually runs. The [feature guides](index.md#features) cover what each handler does; this page covers
 only the pipeline stages upstream of it, which aren't visible from reading a single handler. This
-service's routes are listed in [the README's API contract](../README.md#the-api-contract).
+service's routes are listed in [the API contract](api-contract.md#the-api-contract).
 
 ## At a glance
 
@@ -352,15 +352,17 @@ route opted in via `.RequiredIdempotentKey()`, that registration currently has n
 The real idempotency mechanism is hand-written, on the three postings write routes:
 `POST /v1/postings`, `POST /v1/postings/batch` and `POST /v1/postings/{id}/reverse` each declare
 `IdempotencyKey` as `[FromRequestHeader("Idempotency-Key")]` on their own request type
-(`Postings/V1/Actions/Record.cs:47`, `RecordBatch.cs:55`, `Reverse.cs:28`). The handler looks the key
+(`RecordPostingRequest`, `RecordPostingBatchRequest`, `ReversePostingRequest`). The handler looks the key
 up itself (`SpecGetPosting(byCallingSystem, byIdempotencyKey)`), compares a content signature
 (`PostingSignature`) against any existing row, and answers accordingly — the same key with the same
 content returns the original posting, the same key with different content is refused
 `409 IDEMPOTENCY_KEY_CONFLICT`. Full mechanics: [Postings — the per-account lock](features/postings.md#the-per-account-lock).
 
+On record, record batch, and reverse, each request type lowercases the header with `ToLowerInvariant()` before lookup and storage. `SpecGetPosting` compares the stored key after `ToLower()`, so keys differing only by case match for the same calling system. A new posting response returns the lowercased key. A replay of an older posting returns that posting's stored mixed-case key. This lookup cannot use the unique index on the raw key column; it scans postings for the calling system.
+
 The key is **required** on `Reverse` (`RuleFor(r => r.IdempotencyKey).NotEmpty()`) and **optional** on
 `Record`/`RecordBatch` — omitting it on either of those two simply skips the replay/conflict check
-entirely (`Record.cs:119`), so a retry with no key records a second posting rather than deduplicating.
+entirely (`RecordPostingCommandHandler`), so a retry with no key records a second posting rather than deduplicating.
 
 ## Rate limiting
 
@@ -409,11 +411,11 @@ Every one of the three answers with the same body — `title`, `status`, `type`,
 `errors` list of `{ message, code, field }` entries. There is no `detail` member on any of them. On the
 two refusal kinds `type` is the final status' own name, never an exception's; on an unhandled error it
 is the exception's type name inside a `Development` run and absent outside one
-(`LedgerErrorResponseOptions.cs:133`).
+(`LedgerErrorResponseOptions`).
 
 On the result path, nothing in this service puts the stable code on the body: the package places it
 on each `errors[].code` entry itself, so this service registers no callback of its own to add it
-(`LedgerErrorResponseOptions.cs:17`). The two callbacks it does pass decide the status and the shape of
+(`LedgerErrorResponseOptions`). The two callbacks it does pass decide the status and the shape of
 an unhandled error:
 
 - `LedgerErrorResponseOptions.StatusCode` answers `422` when the failure carries one of the service's

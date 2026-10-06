@@ -208,6 +208,8 @@ reservation flow on them yet.
 ## 5. Post a credit
 
 A posting is one credit or debit against one account. The amount is always **strictly positive**; the
+For `POST /v1/postings`, `POST /v1/postings/batch`, and `POST /v1/postings/{id}/reverse`, the `Idempotency-Key` header is compared without regard to case. New keys are stored and returned lowercased. Replaying a posting written before this rule returns its original stored casing. Use the same key on retries, regardless of letter case.
+
 `direction` says which way the money moved. Send your own idempotency key in the `Idempotency-Key`
 header on every posting write.
 
@@ -455,6 +457,7 @@ HTTP/1.1 200 OK
   "status": "posted",
   "reversesPostingId": "a3b6f961-c181-40c9-97d0-8d9b84b9530f",
   "callingSystem": "PayHub",
+  "idempotencyKey": "reverse-inv-9001-1",
   "description": "Invoice INV-9001 was settled twice"
 }
 ```
@@ -500,7 +503,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 The statement comes back in an envelope — the postings are under `items`. `GET /v1/accounts` and
 `GET /v1/account-groups` answer with the same envelope, but page with `pageNumber` rather than the
 statement's `pageIndex`; see the README's
-[API contract](../README.md#the-api-contract) for their query surface.
+[API contract](api-contract.md#the-api-contract) for their query surface.
 
 ```json
 {

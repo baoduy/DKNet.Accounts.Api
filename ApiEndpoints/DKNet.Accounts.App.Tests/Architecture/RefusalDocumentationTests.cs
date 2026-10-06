@@ -16,7 +16,7 @@ public sealed class RefusalDocumentationTests
     private const string RefusalSectionEnd = "### Invariants the service guarantees";
 
     private static string ReadmePath => Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory, "../../../../..", "README.md"));
+        AppContext.BaseDirectory, "../../../../..", "docs/api-contract.md"));
 
     private static string ReadSection(string startHeading, string endHeading)
     {
