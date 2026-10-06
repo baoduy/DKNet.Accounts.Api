@@ -208,10 +208,13 @@ reservation flow on them yet.
 ## 5. Post a credit
 
 A posting is one credit or debit against one account. The amount is always **strictly positive**; the
-For `POST /v1/postings`, `POST /v1/postings/batch`, and `POST /v1/postings/{id}/reverse`, the `Idempotency-Key` header is compared without regard to case. New keys are stored and returned lowercased. Replaying a posting written before this rule returns its original stored casing. Use the same key on retries, regardless of letter case.
-
 `direction` says which way the money moved. Send your own idempotency key in the `Idempotency-Key`
 header on every posting write.
+
+For `POST /v1/postings`, `POST /v1/postings/batch`, and `POST /v1/postings/{id}/reverse`, the
+`Idempotency-Key` header is compared without regard to case. New keys are stored and returned
+lowercased. Replaying a posting written before this rule returns its original stored casing. Use the
+same key on retries, regardless of letter case.
 
 ```bash
 curl -X POST "$BASE/v1/postings" \

@@ -152,7 +152,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 Updates `name`, `description` and/or `metadata`. A member left out (or `null`) is unchanged; `code`, `type` and `ownerId` have no update path at all.
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked.
 - **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`
 - **Request:** `name` (string, ≤ 200, when supplied), `description` (string, ≤ 1000 — a column limit only, not validated), `metadata` (map, optional) — at least one of the three must be supplied
 - **Response:** `200 OK` — `AccountGroupDto`
@@ -200,7 +200,7 @@ Closes a group — the one hand-written handler in this slice (`CloseAccountGrou
 ![Handler checks whether any account the group holds still carries a non-zero balance or held amount; if none do, it closes the group in one save.](../diagrams/account-groups-close.svg)
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. `CloseAccountGroupHandler` refuses a group whose accounts hold a non-zero balance or held amount.
 - **Idempotency:** naturally idempotent — closing an already-closed group is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "closed"`
@@ -223,7 +223,7 @@ curl -X POST "https://accounts.example.com/v1/account-groups/{id}/close" -H "Aut
 Reactivates a closed group. No request body, no guard on the entity method.
 
 - **Auth:** `accounts.write`
-- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
+- **Concurrency:** none: the last write wins; no ETag or row version is checked.
 - **Idempotency:** naturally idempotent — activating an already-active group is a no-op `200`
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "active"`
 - **Errors:**
