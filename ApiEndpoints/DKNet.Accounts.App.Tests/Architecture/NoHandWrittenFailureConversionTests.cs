@@ -40,7 +40,9 @@ public sealed class NoHandWrittenFailureConversionTests
         const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic |
                                   BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 
+        // Filtered before GetTypes(): under coverage, coverlet injects a tracker type NetArchTest cannot resolve.
         var offenders = Types.InAssembly(ApiAssembly)
+            .That().DoNotResideInNamespaceStartingWith("Coverlet")
             .GetTypes()
             .SelectMany(t => t.GetMethods(all))
             .Where(m => typeof(AspResult).IsAssignableFrom(m.ReturnType))

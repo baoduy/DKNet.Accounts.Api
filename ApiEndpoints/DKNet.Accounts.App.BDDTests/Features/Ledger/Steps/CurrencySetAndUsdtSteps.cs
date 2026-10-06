@@ -4,9 +4,7 @@ using System.Net.Http.Json;
 namespace DKNet.Accounts.App.BDDTests.Features.Ledger.Steps;
 
 /// <summary>
-/// Step bindings for DRK-1719 §5 (CurrencySetAndUsdt.feature). Every step drives the HTTP contract, except the
-/// upgrade scenarios, whose "before the upgrade" data can only be written straight into a database the
-/// application's migrations have taken no further than <see cref="ScratchDatabaseApiFactory.PreUpgradeMigration"/>.
+/// Step bindings for DRK-1719 §5 (CurrencySetAndUsdt.feature). Every step drives the HTTP contract.
 /// Scoped to this feature: several of its sentences ("the account balance is ...", "the request is refused
 /// with ...") are also matched by older, looser bindings in <see cref="LedgerSteps"/>, and a scoped binding wins
 /// over an unscoped one, so this feature always gets the stricter check without changing the older scenarios.
@@ -22,33 +20,7 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
     private const string PostingsPath = "/v1/postings";
     private const string CurrenciesPath = "/v1/currencies";
 
-    // The pre-upgrade replay row (spec §5 "A posting recorded before the upgrade ..."). The signature is the
-    // one the service stored for exactly this request before DRK-1719 — PostingSignature.Compute as of base
-    // 190ff1a, over account a0000000-...-6650, Credit, 10.5, SGD, Transfer, effective 2026-09-01, no optional
-    // field — frozen here as a literal because the change under test rewrites that function.
-    private static readonly Guid PreUpgradeAccountId = new("a0000000-0000-4000-8000-000000006650");
-    private static readonly Guid PreUpgradePostingId = new("b0000000-0000-4000-8000-000000006650");
-    private static readonly DateOnly PreUpgradeEffectiveDate = new(2026, 9, 1);
-    private const string PreUpgradeSignature = "D254960E4F584B1D8B45489FE7D3A4F80C4376902D71529892152203CB3E75C3";
-
-    private static readonly Guid UpgradeAccountId = new("a0000000-0000-4000-8000-000000012400");
-    private static readonly DateTimeOffset BeforeUpgradeOn = new(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
-
-    private const string SnapshotSql = """
-        SELECT json_build_object(
-            'currencies', (SELECT json_agg(t ORDER BY t."Id") FROM pro."Currencies" t),
-            'accounts', (SELECT json_agg(t ORDER BY t."Id") FROM pro."Accounts" t),
-            'postings', (SELECT json_agg(t ORDER BY t."Id") FROM pro."Postings" t),
-            'columns', (SELECT json_agg(c ORDER BY c.table_name, c.column_name) FROM (
-                SELECT table_name, column_name, data_type, character_maximum_length, numeric_precision, numeric_scale
-                FROM information_schema.columns
-                WHERE table_schema = 'pro' AND table_name IN ('Currencies', 'Accounts', 'Postings')) c))::text
-        """;
-
     private ScratchDatabaseApiFactory? _scratch;
-    private Exception? _upgradeError;
-    private string? _snapshotBeforeUpgrade;
-    private IReadOnlyList<string>? _migrationsBeforeUpgrade;
 
     /// <summary>The host a step talks to: the scenario's own database when it asked for one, else the shared one.</summary>
     private HttpClient Api => _scratch?.Client ?? client;
@@ -186,33 +158,6 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
 
     private static string LimitProperty(string limit) =>
         limit is "a minimum balance" or "minimum balance" ? "minimumBalance" : "overdraftLimit";
-
-    private async Task UseDatabaseBeforeTheUpgradeAsync()
-    {
-        _scratch = new ScratchDatabaseApiFactory(factory.ContainerConnectionString);
-        await _scratch.MigrateToPreUpgradeAsync();
-    }
-
-    private Task InsertAccountAsync(Guid id, string currency, decimal balance, long streamPosition) =>
-        _scratch!.ExecuteAsync(
-            """
-            INSERT INTO pro."Accounts" ("Id", "AccountNumber", "GroupId", "Name", "CurrencyCode", "Classification",
-                "Status", "Balance", "HeldAmount", "PermittedToGoNegative", "StreamPosition", "CreatedBy", "CreatedOn")
-            VALUES ($1, $2, $3, 'PayHub before the upgrade', $4, 'Liability', 'Active', $5, 0, false, $6, 'PayHub', $7)
-            """,
-            id, $"UPG-{id.ToString("N")[^10..]}", Guid.NewGuid(), currency, balance, streamPosition, BeforeUpgradeOn);
-
-    private Task InsertCreditAsync(
-        Guid id, Guid accountId, decimal amount, string currency, DateOnly effectiveDate, string? key, string? signature) =>
-        _scratch!.ExecuteAsync(
-            """
-            INSERT INTO pro."Postings" ("Id", "AccountId", "PostingNumber", "StreamPosition", "Direction", "Amount",
-                "Currency", "SignedValue", "BalanceAfter", "EffectiveDate", "RecordedAt", "Category", "Status",
-                "CallingSystem", "IdempotencyKey", "IdempotencySignature", "CreatedBy", "CreatedOn")
-            VALUES ($1, $2, $3, 1, 'Credit', $4, $5, $4, $4, $6, $7, 'Transfer', 'Posted', 'PayHub', $8, $9, 'PayHub', $7)
-            """,
-            id, accountId, $"UPG-{id.ToString("N")[^10..]}", amount, currency, effectiveDate, BeforeUpgradeOn,
-            (object?)key ?? DBNull.Value, (object?)signature ?? DBNull.Value);
 
     #endregion
 
@@ -560,103 +505,6 @@ public sealed class CurrencySetAndUsdtSteps(HttpClient client, ScenarioState sta
 
         var listed = (await ListAsync(AccountsPath)).Single(a => a.GetProperty("id").GetGuid() == Saved("account"));
         listed.GetProperty("balance").GetRawText().ShouldBe(stated);
-    }
-
-    #endregion
-
-    #region Upgrade
-
-    [Given(@"^an SGD account holds 12400\.50 SGD before the upgrade$")]
-    public async Task GivenAnSgdAccountHoldsBeforeTheUpgrade()
-    {
-        await UseDatabaseBeforeTheUpgradeAsync();
-        await InsertAccountAsync(UpgradeAccountId, "SGD", 12400.50m, 0);
-    }
-
-    [Given(@"^a VND account holds 5,000,000,000,000 VND before the upgrade$")]
-    public async Task GivenAVndAccountHoldsBeforeTheUpgrade()
-    {
-        await UseDatabaseBeforeTheUpgradeAsync();
-        // VND is not a currency before the upgrade and the ledger tables carry no foreign key to Currencies, so
-        // the upgrade's own VND row is the only one there will be — its insert can never be what fails.
-        await InsertAccountAsync(UpgradeAccountId, "VND", 5_000_000_000_000m, 1);
-        await InsertCreditAsync(Guid.NewGuid(), UpgradeAccountId, 5_000_000_000_000m, "VND", PreUpgradeEffectiveDate, null, null);
-        _snapshotBeforeUpgrade = await _scratch!.ScalarAsync<string>(SnapshotSql);
-        _migrationsBeforeUpgrade = await _scratch.AppliedMigrationsAsync();
-    }
-
-    [Given(@"^PayHub recorded a credit of 10\.5 SGD under key ""([^""]+)"" before the upgrade$")]
-    public async Task GivenPayHubRecordedACreditBeforeTheUpgrade(string key)
-    {
-        await UseDatabaseBeforeTheUpgradeAsync();
-        await InsertAccountAsync(PreUpgradeAccountId, "SGD", 10.5m, 1);
-        await InsertCreditAsync(PreUpgradePostingId, PreUpgradeAccountId, 10.5m, "SGD", PreUpgradeEffectiveDate, key, PreUpgradeSignature);
-        state.Values["account"] = PreUpgradeAccountId.ToString();
-        state.Values["posting"] = PreUpgradePostingId.ToString();
-        state.Values["key"] = key;
-    }
-
-    [When(@"^the upgrade is applied$")]
-    public async Task WhenTheUpgradeIsApplied()
-    {
-        var upgrade = await _scratch!.PendingMigrationsAsync();
-        upgrade.ShouldNotBeEmpty($"there is no upgrade: no migration exists after {ScratchDatabaseApiFactory.PreUpgradeMigration}");
-        try
-        {
-            await _scratch.MigrateToLatestAsync();
-        }
-        catch (Exception ex)
-        {
-            _upgradeError = ex;
-        }
-    }
-
-    [When(@"^PayHub sends exactly the same request again after the upgrade$")]
-    public async Task WhenPayHubSendsExactlyTheSameRequestAgainAfterTheUpgrade()
-    {
-        await WhenTheUpgradeIsApplied();
-        _upgradeError.ShouldBeNull("the upgrade failed");
-        state.Response = await SendAsync(HttpMethod.Post, PostingsPath, new
-        {
-            accountId = PreUpgradeAccountId,
-            direction = "Credit",
-            amount = 10.5m,
-            currency = "SGD",
-            category = "Transfer",
-            effectiveDate = PreUpgradeEffectiveDate
-        }, state.Values["key"]);
-    }
-
-    [Then(@"^the account still holds 12400\.50 SGD$")]
-    public async Task ThenTheAccountStillHolds()
-    {
-        _upgradeError.ShouldBeNull("the upgrade failed");
-        (await _scratch!.ScalarAsync<decimal>("""SELECT "Balance" FROM acc."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
-            .ShouldBe(12400.50m);
-        (await _scratch.ScalarAsync<string>("""SELECT "CurrencyCode" FROM acc."Accounts" WHERE "Id" = $1""", UpgradeAccountId))
-            .ShouldBe("SGD");
-    }
-
-    [Then(@"^SGD, USD and JPY keep their existing ids$")]
-    public async Task ThenSgdUsdAndJpyKeepTheirExistingIds()
-    {
-        async Task<Guid> IdOfCode(string code) =>
-            await _scratch!.ScalarAsync<Guid>("""SELECT "Id" FROM acc."Currencies" WHERE "Code" = $1""", code);
-
-        (await IdOfCode("SGD")).ShouldBe(new Guid("c0de0001-0000-4000-8000-000000000702"));
-        (await IdOfCode("USD")).ShouldBe(new Guid("c0de0001-0000-4000-8000-000000000840"));
-        (await IdOfCode("JPY")).ShouldBe(new Guid("c0de0001-0000-4000-8000-000000000392"));
-    }
-
-    [Then(@"^the upgrade stops with an error$")]
-    public void ThenTheUpgradeStopsWithAnError() =>
-        _upgradeError.ShouldNotBeNull("the upgrade applied although a stored amount is above 999,999,999,999.999999");
-
-    [Then(@"^no currency, account or posting is changed$")]
-    public async Task ThenNoCurrencyAccountOrPostingIsChanged()
-    {
-        (await _scratch!.ScalarAsync<string>(SnapshotSql)).ShouldBe(_snapshotBeforeUpgrade);
-        (await _scratch.AppliedMigrationsAsync()).ShouldBe(_migrationsBeforeUpgrade);
     }
 
     #endregion

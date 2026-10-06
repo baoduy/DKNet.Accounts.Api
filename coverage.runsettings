@@ -4,15 +4,22 @@
         <DataCollectors>
             <DataCollector friendlyName="XPlat Code Coverage">
                 <Configuration>
+                    <!-- Business-logic code only: the API, the projects it references, and its client SDK.
+                         AppHost (Aspire orchestration), TrafficGen (load tool), TestSupport and EF migrations
+                         are deliberately out — do not write tests to cover them. -->
                     <Include>
-                        [DKNet*]*,
-                        [DKNet.Accounts*]*
+                        [DKNet.Accounts.Api]*,
+                        [DKNet.Accounts.AppServices]*,
+                        [DKNet.Accounts.Infra]*,
+                        [DKNet.Accounts.Domains]*,
+                        [DKNet.Accounts.Share]*,
+                        [DKNet.Accounts.Client]*
                     </Include>
                     <Exclude>
-                        [*.Tests]*,
-                        [*Tests]*,
-                        [*.TestObjects]*,
-                        [*TestDataLayer]*
+                        [DKNet.Accounts.AppHost]*,
+                        [DKNet.Accounts.TrafficGen]*,
+                        [DKNet.Accounts.App.TestSupport]*,
+                        [*Tests]*
                     </Exclude>
                     <ExcludeByFile>
                         **/bin/**,
@@ -21,7 +28,8 @@
                         **/*Test.cs,
                         **/TestObjects/**,
                         **/GlobalUsings.cs,
-                        **/*.g.cs
+                        **/*.g.cs,
+                        **/Migrations/**
                     </ExcludeByFile>
                     <ExcludeByAttribute>GeneratedCodeAttribute</ExcludeByAttribute>
                 </Configuration>
