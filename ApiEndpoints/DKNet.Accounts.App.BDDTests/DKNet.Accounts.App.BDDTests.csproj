@@ -40,6 +40,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- The release-before-DRK-2120 PostgreSQL schema the upgrade scenario starts from. -->
+        <None Update="Features\Database\Data\*.sql" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
         <Using Include="System.Net"/>
         <Using Include="Microsoft.Extensions.DependencyInjection"/>
         <Using Include="NUnit.Framework"/>
@@ -48,6 +53,8 @@
     <ItemGroup>
         <ProjectReference Include="../DKNet.Accounts.Api/DKNet.Accounts.Api.csproj" />
         <ProjectReference Include="../DKNet.Accounts.App.TestSupport/DKNet.Accounts.App.TestSupport.csproj" />
+        <ProjectReference Include="../DKNet.Accounts.Infra.Postgres/DKNet.Accounts.Infra.Postgres.csproj" />
+        <ProjectReference Include="../DKNet.Accounts.Infra.MsSql/DKNet.Accounts.Infra.MsSql.csproj" />
     </ItemGroup>
 
 </Project>
