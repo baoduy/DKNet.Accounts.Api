@@ -5,7 +5,7 @@ The bucket accounts belong to — a named, coded owner for a set of accounts in 
 ## 📖 Overview
 
 - **Every account needs an owner bucket.** `Account.GroupId` always points at one group; there is no ungrouped account, and a group holds accounts only, never another group.
-- **Closing and deleting need a safety gate.** A group cannot be closed or deleted while any account it holds carries a balance or held amount — the group-level equivalent of the account-level floor.
+- **Closing and deleting have different guards.** Closing is refused while an account holds a balance or held amount. Deleting is refused while the group contains any account.
 - **Reporting needs a rollup.** `GET /{id}/balances` sums a group's own accounts by currency, so a caller doesn't have to page every account in the group and sum client-side.
 - Called by any system that opens and organizes accounts on behalf of a customer, merchant, or its own internal or settlement bookkeeping.
 
@@ -57,11 +57,11 @@ Authorization: Bearer {token}
 
 Create, list, read, update, delete, activate and close are one generated composite route (`group.MapAccountGroupCrud(...)`), except Close, whose generated handler is replaced by a hand-written one because its refusal reads a different aggregate.
 
-![Client posts to /v1/account-groups; the handler checks the code is free, inserts the group and its outbox row in one save, then publishes an account-groups.created event to the ledger-events queue.](../diagrams/account-groups-create.svg)
+![POST /v1/account-groups checks code uniqueness, refuses DUPLICATE_GROUP_CODE, saves AccountGroup with an optional outbox event in Postgres or SQL Server, and returns AccountGroupDto.](../diagrams/account-groups-create.svg)
 
-The entity and its outbox row commit in the one `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. This diagram can't show what happens when the bus is unreachable: the event stays in the outbox and is retried every 10 seconds, indefinitely, without ever failing the write that created the group (see [📣 Events](#-events)).
+The group commits in the `SaveChanges` call DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. If the broker is unreachable, the outbox retries delivery every 10 seconds without failing the group write (see [📣 Events](#-events)).
 
-![Account group status starts Active on create; POST /{id}/close moves it to Closed unless an account it holds still carries a balance; POST /{id}/activate moves it back to Active unconditionally.](../diagrams/account-groups-status.svg)
+![Creation starts Active. Close enters Closed with zero balance and held amount, or refuses GROUP_HOLDS_BALANCE. Activate returns to Active.](../diagrams/account-groups-status.svg)
 
 `Delete` is not on this diagram — it removes the row entirely, refused (`GROUP_NOT_EMPTY`) while the group holds any account regardless of status, so it is not a status transition.
 
@@ -197,7 +197,7 @@ curl -X DELETE "https://accounts.example.com/v1/account-groups/{id}" -H "Authori
 
 Closes a group — the one hand-written handler in this slice (`CloseAccountGroupHandler`, replacing the generated one on the same route) because its refusal reads the group's *accounts*, a different aggregate.
 
-![Handler checks whether any account the group holds still carries a non-zero balance or held amount; if none do, it closes the group in one save.](../diagrams/account-groups-close.svg)
+![The handler loads AccountGroup, checks acc.Accounts for non-zero balance or held amount, refuses GROUP_HOLDS_BALANCE when money remains, otherwise saves Closed in Postgres or SQL Server.](../diagrams/account-groups-close.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `CloseAccountGroupHandler` refuses a group whose accounts hold a non-zero balance or held amount.

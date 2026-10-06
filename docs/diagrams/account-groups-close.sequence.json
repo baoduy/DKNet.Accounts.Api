@@ -5,30 +5,125 @@
     "title": "Close an Account Group",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [960, 560]
+    "output": "docs/diagrams/account-groups-close.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    },
+    "viewBox": [
+      920,
+      522
+    ]
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
-    { "id": "handler", "type": "backend", "label": "Close", "sublabel": "hand-written handler" },
-    { "id": "accounts", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts" },
-    { "id": "group", "type": "database", "label": "PostgreSQL", "sublabel": "acc.AccountGroups" }
-  ],
-  "segments": [
-    { "from": 170, "to": 300, "label": "Cross-aggregate check" },
-    { "from": 316, "to": 430, "label": "Apply + save" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/AccountGroups/AccountGroupsV1Endpoint.cs",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "Close",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/AccountGroups/V1/Actions/Close.cs",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/AccountGroups/Mappers/AccountGroupConfigs.cs",
+          "line": 29
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Accounts/Mappers/AccountConfigs.cs",
+          "line": 40
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/DatabaseConfig.cs",
+          "line": 43
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "handler", "y": 200, "label": "POST /v1/account-groups/{id}/close", "variant": "emphasis" },
-    { "from": "handler", "to": "accounts", "y": 260, "label": "any account with Balance != 0 or HeldAmount != 0?", "variant": "default", "note": "SpecListAccounts(groupId) — a different aggregate than the one being closed" },
-    { "from": "accounts", "to": "handler", "y": 290, "label": "none found", "variant": "return", "note": "Otherwise refused: 422 GROUP_HOLDS_BALANCE, and the group is left active" },
-    { "from": "handler", "to": "group", "y": 400, "label": "Close() — Status = Closed, one save", "variant": "emphasis" },
-    { "from": "handler", "to": "client", "y": 460, "label": "200 OK + AccountGroupDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "handler",
+      "y": 160,
+      "label": "POST /v1/account-groups/{id}/close",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 202,
+      "label": "load AccountGroup by id",
+      "variant": "default"
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 244,
+      "label": "acc.Accounts: any nonzero balance or hold?",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "handler",
+      "y": 286,
+      "label": "none found",
+      "variant": "return"
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "label": "or 422 GROUP_HOLDS_BALANCE",
+      "variant": "return",
+      "y": 328
+    },
+    {
+      "from": "handler",
+      "to": "db",
+      "y": 370,
+      "label": "acc.AccountGroups: set Closed, save",
+      "variant": "emphasis"
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "y": 412,
+      "label": "200 OK + AccountGroupDto",
+      "variant": "return"
+    }
   ],
-  "activations": [
-    { "participant": "handler", "from": 190, "to": 480, "type": "backend" }
-  ],
+  "activations": [],
   "cards": [
-    { "dot": "cyan", "title": "Why this route stays hand-written", "items": ["The refusal reads Account, not AccountGroup — a generated [CrudAction] handler can only see the aggregate it mutates"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["A closed, zero-balance group can still be deleted separately — Delete has its own, stricter check (GROUP_NOT_EMPTY)"] }
+    {
+      "dot": "cyan",
+      "title": "Why this route stays hand-written",
+      "items": [
+        "The refusal reads Account, not AccountGroup \u2014 a generated [CrudAction] handler can only see the aggregate it mutates"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "DELETE is refused with GROUP_NOT_EMPTY whenever the group contains any account, including closed zero-balance accounts"
+      ]
+    }
   ]
 }

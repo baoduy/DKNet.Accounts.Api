@@ -5,8 +5,8 @@ The append-only ledger — single credits and debits, all-or-nothing batches, an
 ## 📖 Overview
 
 - **The ledger is provably append-only.** A recorded posting is never altered or removed; a mistake is corrected by writing an opposing posting, so both stay readable and attributable.
-- **A retry is free.** Every write is keyed by the caller's own `Idempotency-Key`, scoped to its calling system — a repeat returns the original outcome instead of double-posting.
-- **Concurrent postings on one account never race.** A per-account lock and a signed-content idempotency check together mean every posting is either recorded exactly once or refused with a stated reason — none silently dropped or double-applied.
+- **Keyed writes can be retried.** `Idempotency-Key` is optional for record and batch, and required for reversal. A matching retry under the same calling system returns the original outcome.
+- **Writes are serialized within one service process.** A per-account lock guards changes to one account; the idempotency key's unique index prevents duplicate keyed postings.
 - Called by any system recording a movement it caused elsewhere (a payment, a settlement, an adjustment) against an account it already opened here.
 
 ## 🏢 Business domain
@@ -61,11 +61,11 @@ Idempotency-Key: 9c1b7e6f-4d3c-4a7c-8f1d-1a2b5c6d7e02
 
 Only `GET /v1/postings/{id}` is generated; every other route in this slice — list, record, batch, reverse, and the statement route mapped on the accounts group — is hand-written, because each carries orchestration a generator cannot express: a lock, an idempotency replay, or a cross-aggregate refusal.
 
-![Client posts to /v1/postings; the handler validates the currency, amount and effective date, checks idempotency, acquires the per-account lock, re-fetches the account and checks the currency matches, applies the posting against the account's status and floor, inserts the posting and its outbox row in one save, then publishes a postings.created event.](../diagrams/postings-record.svg)
+![POST /v1/postings with an optional Idempotency-Key checks currency, amount, date and replay, locks and loads the account, checks currency match and TryApplyPosting rules, then saves Account and Posting with an optional event.](../diagrams/postings-record.svg)
 
-The idempotency pre-check runs *before* the lock is acquired — a deliberate, documented trade-off: two first-uses of the same key can both miss that read, and the second is then refused `409` by the database's own unique index on `(CallingSystem, IdempotencyKey)` rather than replayed — a narrow, accepted race, not a silent double-post. This diagram can't show the transaction boundary in full: the entity and its outbox row commit in the one `SaveChanges` call that runs after the handler returns, and a bus outage never fails the write — the event waits in the outbox and is retried every 10 seconds, indefinitely (see [📣 Events](#-events)).
+The idempotency pre-check runs *before* the lock is acquired — a deliberate, documented trade-off: two first-uses of the same key can both miss that read, and the second is then refused `409` by the database's own unique index on `(CallingSystem, IdempotencyKey)` rather than replayed — a narrow, accepted race, not a silent double-post. The handler calls `SaveChangesAsync` once for the account and posting, including an outbox row when messaging is enabled. If the broker is unreachable, the event remains in the outbox for retry (see [📣 Events](#-events)).
 
-![Posting status starts Posted on record; POST {id}/reverse moves it to Reversed, refused if it is already reversed under a new key or if the account's status does not accept a movement in the reversal's own direction. Reversed is terminal.](../diagrams/postings-status.svg)
+![A recorded posting starts Posted. Reverse uses the account status gate and can refuse POSTING_ALREADY_REVERSED or POSTING_IS_REVERSAL; Reversed is terminal.](../diagrams/postings-status.svg)
 
 `MarkReversedBy` throws if called twice, so a posting can be reversed at most once — there is no path back to `Posted`.
 
@@ -210,7 +210,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/postings
 
 Reverses a posting — mapped through the generic `MapActionById<ReversePostingRequest, Guid, PostingDto>` (deliberately **not** `[CrudAction]`, since the handler is entirely hand-written).
 
-![Handler pre-checks idempotency, acquires the original posting's account lock, re-reads the original inside the lock, applies the opposite direction against the account's status only (the floor check is skipped), then inserts the reversal and marks the original reversed in one save.](../diagrams/postings-reverse.svg)
+![Reverse requires a reason and Idempotency-Key, checks replay, reads the original account id, locks and re-reads the original, rejects reversed or reversal rows, then applies the opposite direction without a floor check and saves Account and both postings.](../diagrams/postings-reverse.svg)
 
 - **Auth:** `postings.reverse`
 - **Concurrency:** `IAccountLockProvider` takes a process-local per-account lock, then the handler re-reads the original. No ETag or row version is sent. A competing reversal is refused `POSTING_ALREADY_REVERSED` after the first commits.
@@ -231,6 +231,7 @@ Reverses a posting — mapped through the generic `MapActionById<ReversePostingR
   | `404` | — | Unknown posting id |
   | `409` | `IDEMPOTENCY_KEY_CONFLICT` | Same key, different reason |
   | `422` | `POSTING_ALREADY_REVERSED` | Already reversed under a new key (a retry under the *same* key replays the earlier reversal with `200` instead) |
+  | `422` | `POSTING_IS_REVERSAL` | The selected posting already reverses another posting |
   | `422` | `ACCOUNT_CLOSED` / `ACCOUNT_FROZEN` / `ACCOUNT_DORMANT_DEBIT_REFUSED` | Every status-gate refusal from `POST /v1/postings` still applies, to the reversal's own direction |
   | `422` | `AMOUNT_OUT_OF_RANGE` | The ceiling check is a storage limit, not a policy a reversal is exempt from, unlike the floor check |
   | `422` | `LOCK_TIMEOUT` | The 10-second per-account lock timed out |

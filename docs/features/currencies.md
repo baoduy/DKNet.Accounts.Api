@@ -6,7 +6,7 @@ The reference list of currencies a caller can denominate accounts and postings i
 
 - **A currency is a stored, editable row, not a hard-coded table.** Registering `USDT` at 6 decimal places is a `POST`, not a deploy — the same way a fiat currency like `SGD` is registered.
 - **Every posting amount is checked against its currency's precision.** `10.555 USD` is refused because USD is denominated to 2 decimal places; a currency's `decimalPlaces` is fixed for life once registered, so every amount ever posted in it stays comparable.
-- **A currency is retired, never deleted.** Deactivating removes it from the set new accounts may open in; every account and posting already in it is untouched, and there is no delete route at all — the same append-only philosophy the ledger itself follows.
+- **A currency is retired, never deleted.** Deactivating blocks new accounts and postings in it. Existing accounts and posting records remain, and there is no delete route.
 - Called by any system integrating with the ledger — most often at onboarding time, to look up or register the currencies it will open accounts in.
 
 ## 🏢 Business domain
@@ -63,13 +63,13 @@ Authorization: Bearer {token}
 
 The whole slice — Create, List, Get, Rename, Activate, Deactivate — rides one generated composite route (`group.MapCurrencyCrud(o => o.Exclude(CrudOp.Delete))`), except Deactivate, whose generated handler is replaced by a hand-written one.
 
-![Client posts to /v1/currencies; the handler checks the code is free, inserts the currency and its outbox row in one save, then publishes a currencies.created event to the ledger-events queue.](../diagrams/currencies-register.svg)
+![POST /v1/currencies checks code uniqueness, refuses DUPLICATE_CURRENCY_CODE, inserts Currency with an optional outbox event in Postgres or SQL Server, and returns CurrencyDto.](../diagrams/currencies-register.svg)
 
-The entity and its outbox row commit in the one `SaveChanges` call that DKNet's SlimBus EF Core interceptor runs after the handler returns — the handler itself never calls `SaveChangesAsync`. This diagram can't show what happens when the bus is unreachable: the event stays in the outbox and is retried every 10 seconds, indefinitely, without ever failing the write that created the currency (see [📣 Events](#-events)).
+The currency commits in the `SaveChanges` call that DKNet's SlimBus EF Core interceptor runs after the handler returns. When messaging is enabled, its outbox row commits in that same save. If the broker is unreachable, the outbox retries delivery every 10 seconds without failing the currency write (see [📣 Events](#-events)).
 
 `IsActive` is a plain boolean, but it does gate behaviour — new accounts may only open in an active currency:
 
-![Currency status starts Active on create; POST /{id}/deactivate moves it to Inactive unless an account in that currency still holds a balance; POST /{id}/activate moves it back to Active unconditionally.](../diagrams/currencies-status.svg)
+![Registration starts Active. Deactivate enters Inactive with zero balance and held amount, or refuses CURRENCY_HOLDS_BALANCE. Activate returns to Active.](../diagrams/currencies-status.svg)
 
 ## 🔌 Endpoints
 
@@ -201,7 +201,7 @@ curl -X POST "https://accounts.example.com/v1/currencies/{id}/activate" -H "Auth
 
 Deactivates a currency — the one hand-written handler in this slice (`DeactivateCurrencyHandler`, replacing the generated one on the same route), because its refusal reads a different aggregate (`Account`) than the one being mutated.
 
-![Handler checks whether any account in this currency still holds a non-zero balance or held amount; if none do, it deactivates the currency in one save.](../diagrams/currencies-deactivate.svg)
+![The handler loads Currency, checks acc.Accounts for balance or held amount, refuses CURRENCY_HOLDS_BALANCE when money remains, otherwise saves IsActive false in Postgres or SQL Server.](../diagrams/currencies-deactivate.svg)
 
 - **Auth:** `accounts.write`
 - **Concurrency:** none: the last write wins; no ETag or row version is checked. `DeactivateCurrencyHandler` refuses deactivation while an account in that currency holds a non-zero balance or held amount.
@@ -245,7 +245,7 @@ The DB type names below describe the PostgreSQL mapping. SQL Server uses its own
 | Status | Meaning | Reached by | Next |
 |---|---|---|---|
 | `IsActive = true` | New accounts may open in this currency | Create (always), or `POST /{id}/activate` | `IsActive = false` |
-| `IsActive = false` | Existing accounts and postings in this currency are unaffected; new accounts may not open in it | `POST /{id}/deactivate`, refused with `CURRENCY_HOLDS_BALANCE` while any account in this currency holds a non-zero balance or held amount | `IsActive = true` |
+| `IsActive = false` | Existing accounts and posting records remain; new accounts and postings are refused in this currency | `POST /{id}/deactivate`, refused with `CURRENCY_HOLDS_BALANCE` while any account in this currency holds a non-zero balance or held amount | `IsActive = true` |
 
 The `CurrencyDecimalPlaces` cache keeps decimal places by currency code for the life of the process. A miss reloads the currency table. `decimalPlaces` is immutable after registration, so the cached precision cannot become stale; `Clear()` is used by test resets. No time-based expiry is configured.
 
@@ -284,7 +284,7 @@ Every non-2xx response is `application/problem+json` — `title`, `status`, `typ
 
 - **No delete route exists.** A currency is retired by deactivating it, never removed — the same append-only philosophy as the ledger itself.
 - **`decimalPlaces` can never be changed after registration.** There is deliberately no rename-precision method, because every posting amount and every stored money value elsewhere rounds against the value fixed at registration.
-- **Deactivating is not retroactive.** Every existing account and posting in a deactivated currency keeps working; only opening a *new* account in it is refused.
+- **Deactivating is not retroactive.** Existing accounts and posting records remain. New account opens and new postings are refused with `UNSUPPORTED_CURRENCY`; a reversal does not check currency activity.
 - The service ships 26 seeded currencies; registering more has no fixed cap.
 
 ## 🔗 Related features
