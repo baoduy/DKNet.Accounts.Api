@@ -75,16 +75,6 @@ The acceptance suite starts its own `postgres:16-alpine` container through Testc
 | Run local stack | `dotnet run --project ApiEndpoints/DKNet.Accounts.AppHost` |
 | Format check | `dotnet format DKNet.Accounts.sln --verify-no-changes` |
 
-## ⚠️ Known limitations
-
-- An older posting replays with its stored mixed-case idempotency key. New keyed requests are compared without regard to case and stored and returned lowercased.
-- A keyed posting lookup lowercases the stored key, so it cannot use the unique index on the raw key column. It scans that calling system's postings.
-- The per-account posting lock is process-local. See [posting concurrency](docs/features/postings.md#the-per-account-lock).
-- Held funds are not implemented: `heldAmount` stays `0` and `availableBalance` equals `balance`.
-- The chart's Azure Key Vault CSI workload identity needs the manual `clientID` patch described in [deployment](docs/deployment.md).
-
-Further caller limits and deferred behavior live in the [API contract](docs/api-contract.md#-gotchas--limits).
-
 ## 📚 Documentation
 
 | Page | What it answers |
