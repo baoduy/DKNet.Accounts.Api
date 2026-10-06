@@ -27,6 +27,6 @@ public sealed class DatabaseSetupTests
         relational.MinBatchSize.ShouldBe(1);
         relational.MaxBatchSize.ShouldBe(100);
         relational.QuerySplittingBehavior.ShouldBe(QuerySplittingBehavior.SplitQuery);
-        relational.ExecutionStrategyFactory.ShouldNotBeNull("retry on failure is off");
+        relational.ExecutionStrategyFactory.ShouldNotBeNull("retry on failure is not configured");
     }
 }
