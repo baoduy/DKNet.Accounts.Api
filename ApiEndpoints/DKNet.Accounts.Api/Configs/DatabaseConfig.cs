@@ -40,14 +40,20 @@ internal static class DatabaseConfig
     }
 
     /// <summary>The chosen database's EF Core provider setup, which brings that database's own migrations.</summary>
-    public static Action<DbContextOptionsBuilder, string> UseDatabase(DatabaseProvider provider) =>
-        provider == DatabaseProvider.SqlServer
-            ? (builder, connectionString) => builder.UseMsSql(connectionString)
-            : (builder, connectionString) => builder.UsePostgres(connectionString);
+    public static Action<DbContextOptionsBuilder, string> UseDatabase(DatabaseProvider provider) => provider switch
+    {
+        DatabaseProvider.Postgres => (builder, connectionString) => builder.UsePostgres(connectionString),
+        DatabaseProvider.SqlServer => (builder, connectionString) => builder.UseMsSql(connectionString),
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database.")
+    };
 
     /// <summary>The chosen database's outbox registration.</summary>
-    public static Action<MessageBusBuilder, Action<OutboxSettings>> AddOutbox(DatabaseProvider provider) =>
-        provider == DatabaseProvider.SqlServer ? MsSqlSetup.AddMsSqlOutbox : PostgresSetup.AddPostgresOutbox;
+    public static Action<MessageBusBuilder, Action<OutboxSettings>> AddOutbox(DatabaseProvider provider) => provider switch
+    {
+        DatabaseProvider.Postgres => PostgresSetup.AddPostgresOutbox,
+        DatabaseProvider.SqlServer => MsSqlSetup.AddMsSqlOutbox,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database.")
+    };
 
     #endregion
 }
