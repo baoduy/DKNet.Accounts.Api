@@ -1,18 +1,20 @@
 # DKNet.Accounts.Api Documentation
 
-Reference docs for this service — a shared, banking-grade account and ledger service. Start with
-[the root README](../README.md) for what the service is, every field of every record type, the
-invariants it guarantees, the full API contract and the decisions on record.
+Reference docs for this account and ledger service. Start with
+[the root README](../README.md), then use the [API contract](api-contract.md) for routes,
+response fields, refusals, and invariants.
 
-![Diagram](diagrams/runtime-architecture.visual-check.1440x900.light.png)
+![An operator calls the API through the console; handlers use the selected database and an outbox relays events.](diagrams/runtime-architecture.svg)
 
 ## This service
 
 - [Integration Guide](integration-guide.md) — the end-to-end walkthrough for a system calling this
   accounts and ledger service: authenticate, create a group, open an account, post, read the balance
   back, page a statement.
-- [Readme](../README.md) — what the service is, every field of every record type, the invariants it
-  guarantees, the API contract and the decisions on record.
+- [README](../README.md) — overview, local start, architecture, and links.
+- [API contract](api-contract.md) — every route, response field, refusal, invariant, and caller limit.
+- [Deployment guide](deployment.md) — published artifacts, chart prerequisites, verification, and rollback.
+- [Service background](service-background.md) — business scope and decisions on record.
 - [Console](console.md) — the Next.js operations console: how to run it locally, its environment
   keys, and the Entra ID app registration it needs.
 - [Local setup with Microsoft Entra ID](local-setup-entra.md) — register the Entra apps, fill in

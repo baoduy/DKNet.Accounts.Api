@@ -2,7 +2,7 @@
 
 Every configuration key this service reads, what it means, what it defaults to, what it changes, and
 the code path that reads it. This service's own slices are `Currencies`, `AccountGroups`, `Accounts`
-and `Postings`; its routes are listed in [the README's API contract](../README.md#the-api-contract).
+and `Postings`; its routes are listed in [the API contract](api-contract.md#the-api-contract).
 
 ## Where configuration comes from
 
@@ -28,11 +28,19 @@ fixture therefore cannot flip a feature flag with an in-memory entry — only an
 `appsettings.{Environment}.json` file or a `FeatureManagement__<Flag>` environment variable lands
 early enough.
 
+## `Database:Provider`
+
+`DatabaseConfig.ResolveProvider` reads this once at startup. `Postgres` and `SqlServer` are accepted without regard to case; an absent or whitespace value selects PostgreSQL. An unknown value throws before the service accepts requests, and the error names both allowed values. `DatabaseConfig.UseDatabase` selects that provider's migrations; `DatabaseConfig.AddOutbox` selects its outbox. Set `Database__Provider=SqlServer` when running the API alone, together with a SQL Server `ConnectionStrings__AppDb`.
+
+The provider also affects text queries. SQL Server text matching ignores case under the configured SQL Server collation; PostgreSQL matching follows case. Sort order follows each database's collation. The repository does not pin a cross-database collation, so callers should not assume identical ordered pages across providers.
+
+The SQL Server login needs permission to create tables when startup migrations are enabled: `InfraMigration.MigrateDb` applies EF migrations, and the SQL Server outbox creates its tables at startup. The exact least-privilege grant depends on the SQL Server installation and is an operator decision.
+
 ## `ConnectionStrings`
 
 | Key | Type | Shipped default | Effect | Read by |
 |---|---|---|---|---|
-| `AppDb` | string | `""` in the `Development` overlay; absent from the base file | The PostgreSQL connection for `CoreDbContext`. Without it the API cannot open a database connection. Supplied automatically when you launch through the Aspire host, which injects it from the `AppDb` resource. | `SharedConsts.DbConnectionString`; `DKNet.Accounts.Infra/Extensions/InfraSetup.cs` (`AddInfraServices`) and `DKNet.Accounts.Api/Configs/DbMigration.cs` (`RunMigrationAsync`) |
+| `AppDb` | string | `""` in the `Development` overlay; absent from the base file | The selected PostgreSQL or SQL Server connection for `CoreDbContext`. Without it the API cannot open a database connection. Supplied automatically when you launch through the Aspire host, which injects it from the `AppDb` resource. | `SharedConsts.DbConnectionString`; `InfraSetup.AddInfraServices` and `DbMigration.RunMigrationAsync` |
 | `Redis` | string | not shipped in any file | Selects the distributed-cache backing store **and** the idempotency-key store. Set → `AddStackExchangeRedisCache` plus `AddIdempotencyWithRedisStore`. Unset → `AddDistributedMemoryCache` plus the in-process `AddIdempotentKey()` fallback, which is correct only for a single instance. Injected by the Aspire host from the `Redis` resource. | `SharedConsts.RedisConnectionString`; `DKNet.Accounts.Api/Configs/CacheConfig.cs` and `DKNet.Accounts.Api/Configs/AppConfig.cs` |
 | `AzureBus` | string | `""` in the `Development` overlay | The Azure Service Bus namespace connection string. Non-empty **and** `FeatureManagement:EnableServiceBus` true is what adds the `AzureBus` child bus; either one missing leaves external messaging off while in-memory dispatch keeps working. | `SharedConsts.AzureBusConnectionString`; `DKNet.Accounts.Infra/Extensions/ServiceBusSetup.cs` |
 | `AzureAppConfig` | string | **not shipped** | The Azure App Configuration endpoint URI. `AzureAppConfigSetup` looks it up under the name in `AzureAppConfig:ConnectionStringName`, which defaults to `AzureAppConfig`. Without it the integration silently no-ops even with the flag on. | `DKNet.Accounts.Api/Configs/AzureAppConfig/AzureAppConfigSetup.cs` |
@@ -82,7 +90,7 @@ The scope side is not a sample: `AuthConfig` registers one authorization policy 
 |---|---|---|---|---|
 | `Cors:AllowedOrigins` | string array | `[]` | `[ "http://localhost:3000", "http://localhost:5173" ]` | Deny-by-default allow-list. Empty or all-blank → neither `AddCors` nor `UseCors` is registered at all, so no `Access-Control-Allow-*` header is emitted. Non-empty → a default policy allowing exactly those origins, the methods and headers below, and nothing else. Credentials are never allowed on any path. |
 | `Cors:AllowedMethods` | string array | `[ "GET", "POST", "PUT", "PATCH" ]` | — | The methods reflected in `Access-Control-Allow-Methods`. `DELETE` is absent by default, and the service does have one delete route — `DELETE /v1/account-groups/{id}`, on an empty group — so a browser front-end that deletes a group has to add `DELETE` here. See [Closing up](integration-guide.md#10-closing-up). Widen or narrow the list freely — an entry not listed is never reflected, so a preflight for it fails. |
-| `Cors:AllowedHeaders` | string array | `[ "Authorization", "Content-Type", "Accept", "Idempotency-Key" ]` | — | The request headers reflected in `Access-Control-Allow-Headers`. `Idempotency-Key` is there because that's the header the posting routes actually read (`Record.cs`/`RecordBatch.cs`/`Reverse.cs`'s `[FromRequestHeader("Idempotency-Key")]`) — not `DKNet.AspCore.Idempotency`'s `X-Idempotency-Key` default, which this service doesn't use (`CrosConfig.cs:11-12`). No tracing header (`traceparent`, `X-Request-Id`, …) is enumerated — add yours if your front-end sends one. |
+| `Cors:AllowedHeaders` | string array | `[ "Authorization", "Content-Type", "Accept", "Idempotency-Key" ]` | — | The request headers reflected in `Access-Control-Allow-Headers`. `Idempotency-Key` is there because that's the header the posting routes actually read (`Record.cs`/`RecordBatch.cs`/`Reverse.cs`'s `[FromRequestHeader("Idempotency-Key")]`) — not `DKNet.AspCore.Idempotency`'s `X-Idempotency-Key` default, which this service doesn't use (`CrosConfig`). No tracing header (`traceparent`, `X-Request-Id`, …) is enumerated — add yours if your front-end sends one. |
 
 Entries in `AllowedOrigins` are absolute origins — scheme included, no trailing slash, no path. This
 is a plain configuration array, not a `FeatureManagement` flag; the empty array is its off switch,
@@ -225,12 +233,9 @@ Both exporter keys are additive: set both and both exporters run.
 
 ## `DKNet.Accounts.AppHost`
 
-The Aspire application host (`DKNet.Accounts.AppHost/AppHost.cs`) carries no business logic and reads
-no `SampleData` or other feature key: it provisions a `Redis` container and a `Postgres` container,
-adds the `AppDb` database to the Postgres resource, and starts `DKNet.Accounts.Api` wired to both
-connection strings. It is not part of what gets published — `dotnet run --project DKNet.Accounts.Api`
-on its own skips it, so `ConnectionStrings:AppDb` and `ConnectionStrings:Redis` become yours to
-supply directly.
+`AppHost.cs` reads `Database:Provider`, defaulting to `Postgres`. Set the switch at the top of `AppHost.cs`, run `dotnet run --project ApiEndpoints/DKNet.Accounts.AppHost -- --Database:Provider SqlServer` from the repository root, or set `Database__Provider=SqlServer` in its environment. `SqlServer` starts a SQL Server container and passes the setting to the API; every other value starts PostgreSQL with pgAdmin. An unknown value is therefore **not** rejected by the AppHost switch, although the API's own `DatabaseConfig` rejects unknown values when given directly. Redis, RabbitMQ, Keycloak, the console, and TrafficGen are the same in both modes.
+
+The AppHost is for local runs. It does not ship in the image. Running the API alone requires supplying `ConnectionStrings:AppDb` and any optional Redis or broker connection string. `docker-compose.yml` and the Helm chart configure PostgreSQL only; they contain no SQL Server deployment path.
 
 ## FeatureManagement flags
 
@@ -339,3 +344,11 @@ export Cors__AllowedOrigins__0="https://app.example.com"
 Environment variables outrank every JSON file, and — unlike an in-memory test override — they are
 in place before `Program.cs` binds `FeatureOptions`. The one source that outranks them is Azure App
 Configuration, which is appended after the host builder has already read the environment.
+
+
+## ❓ Open questions
+
+| Question | Why it matters | Checked | Who can answer |
+|---|---|---|---|
+| Which database provider and collation are used in each deployment? | Matching and sort behavior can differ. | Repository settings show supported providers but no deployed values. | Service operator |
+| What SQL Server login grants are approved? | Startup migrations and outbox table creation need create-table rights. | `DbMigration`, `InfraMigration`, and `MsSqlSetup` show startup writes; no access policy is in the repo. | Database administrator |

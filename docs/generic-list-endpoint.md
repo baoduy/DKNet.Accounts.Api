@@ -6,7 +6,7 @@ The two routes in this service that use this contract are `GET /v1/account-group
 `ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs`. For their concrete
 query surface — the fields you may filter and order by, the defaults this service sets, and the one
 field that is *not* queryable — read
-[the README's API contract](../README.md#listing-groups-and-accounts) instead. Everything below is
+[the API contract](api-contract.md#listing-groups-and-accounts) instead. Everything below is
 the underlying package contract both of them inherit.
 
 ## Where it comes from
@@ -260,7 +260,7 @@ public sealed partial record AccountDto;
 `CurrencyCode`, `AvailableBalance` and `OpenedOn` are excluded from the generated shape and then
 re-declared by hand on the DTO for exactly the reasons in
 [the trap below](#trap-a-dto-field-must-map-to-a-real-column) — see
-[the README's note on `CurrencyCode` vs `Currency`](../README.md#listing-groups-and-accounts) for the
+[the API contract's note on `CurrencyCode` vs `Currency`](api-contract.md#listing-groups-and-accounts) for the
 full story of why one of the three is queryable and the other two are not.
 
 ### Trap: a DTO field must map to a real column

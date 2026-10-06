@@ -75,6 +75,8 @@ The idempotency pre-check runs *before* the lock is acquired — a deliberate, d
 
 This is a **single-process, in-memory lock** — correct for one running instance, not for a horizontally-scaled deployment, where two instances could each acquire "their own" lock for the same account. Upgrade path: a database-level advisory lock (e.g. Postgres `pg_advisory_xact_lock`), or an optimistic unique-index-plus-retry scheme, if this service is ever scaled to more than one instance.
 
+On record, record batch, and reverse, `Idempotency-Key` is compared without regard to case for the same calling system. New postings store and return the lowercase key; a replay of a posting stored before this change returns its original mixed-case key. `SpecGetPosting` lowercases the stored column during lookup, so a keyed request scans that calling system's postings instead of using the raw-key unique index.
+
 ## 🔌 Endpoints
 
 | Verb | Path | Purpose | Auth |
@@ -210,6 +212,7 @@ Reverses a posting — mapped through the generic `MapActionById<ReversePostingR
 ![Handler pre-checks idempotency, acquires the original posting's account lock, re-reads the original inside the lock, applies the opposite direction against the account's status only (the floor check is skipped), then inserts the reversal and marks the original reversed in one save.](../diagrams/postings-reverse.svg)
 
 - **Auth:** `postings.reverse`
+- **Concurrency:** `IAccountLockProvider` takes a process-local per-account lock, then the handler re-reads the original. No ETag or row version is sent. A competing reversal is refused `POSTING_ALREADY_REVERSED` after the first commits.
 - **Idempotency:** `Idempotency-Key` **required** header (unlike Record/RecordBatch, a reversal refuses outright if it is missing)
 - **Request:**
 
@@ -273,6 +276,8 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 One row is one credit or debit recorded against exactly one account, at its gapless position in that account's stream.
 
+The DB type names below describe the PostgreSQL mapping. SQL Server uses its own migration assembly and provider type mapping; see [Configuration reference](../configuration-reference.md#databaseprovider).
+
 | Field | Column | DB type | Length / precision | Required | Key / index | Default | Purpose |
 |---|---|---|---|---|---|---|---|
 | `Id` | `Id` | uuid | — | ✓ | PK | new Guid | Service-generated identifier |
@@ -326,14 +331,16 @@ A credit raises a `Liability`, `Equity` or `Income` account and lowers an `Asset
 | `Posted` | The normal, correctable state | `POST /v1/postings`, `POST /v1/postings/batch` (always) | `Reversed` |
 | `Reversed` | Terminal — `MarkReversedBy` throws if called on an already-reversed posting | `POST /v1/postings/{id}/reverse` | none — a reversal can itself never be reversed as the *original* side of another reversal |
 
+No delete or archival path for posting rows is wired in this repository. The deployment guide covers schema changes; an online retention target is an operator policy question.
+
 ## 📣 Events
 
 Declared on `Posting` with `[RaisesEvent]` (DRK-1773 §3a) and raised by the DKNet EF Core save hook. `postings.updated` fires only when `Status` changes — i.e. only on a reversal — and its payload never carries `IdempotencySignature`.
 
-| Event | Raised when | Payload | Transport | Consumers |
-|---|---|---|---|---|
-| `postings.created` | A posting (including each leg of a batch, and a reversal's own opposing entry) is recorded | `id`, `accountId`, `postingNumber`, `streamPosition`, `direction`, `amount`, `currency`, `signedValue`, `balanceAfter`, `effectiveDate`, `recordedAt`, `category`, `status`, `reversedByPostingId`, `reversesPostingId`, `transactionGroupId`, `counterpartyAccountId`, `counterpartyReference`, `callingSystem`, `idempotencyKey`, `externalReference`, `description`, `metadata`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue |
-| `postings.updated` | A posting is marked reversed | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue |
+| Event | Raised when | Payload | Transport | Consumers | Ordering | Duplicates | On failure |
+|---|---|---|---|---|---|---|---|
+| `postings.created` | A posting (including each leg of a batch, and a reversal's own opposing entry) is recorded | `id`, `accountId`, `postingNumber`, `streamPosition`, `direction`, `amount`, `currency`, `signedValue`, `balanceAfter`, `effectiveDate`, `recordedAt`, `category`, `status`, `reversedByPostingId`, `reversesPostingId`, `transactionGroupId`, `counterpartyAccountId`, `counterpartyReference`, `callingSystem`, `idempotencyKey`, `externalReference`, `description`, `metadata`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
+| `postings.updated` | A posting is marked reversed | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
 
 Every event is wrapped as `{ "type": "postings.created", "payload": { ... } }` (`OutboundEnvelope`), stored in the same database save as the change, and sent over Azure Service Bus or RabbitMQ depending on `MessageBus:Transport`. A reversal raises both: `postings.created` for the new opposing entry and `postings.updated` for the original, from the one save that links them. With the message bus off, an event is dropped: nothing is stored and nothing is sent, but the posting itself is still recorded. With the bus on but the broker unreachable, the event waits in the outbox and is retried every 10 seconds, without limit, until it is delivered.
 
@@ -341,21 +348,23 @@ Every event is wrapped as `{ "type": "postings.created", "payload": { ... } }` (
 
 | System | Direction | How | What for | When it is down |
 |---|---|---|---|---|
-| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (production) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a posting was recorded or reversed | Event is retried from the PostgreSQL outbox every 10 seconds, indefinitely |
+| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (when configured) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a posting was recorded or reversed | Event is retried from the selected database's outbox every 10 seconds, indefinitely |
 
 Configuration keys: `FeatureManagement:EnableServiceBus`, `MessageBus:Transport`, `MessageBus:OutboundQueue`, `ConnectionStrings:AzureBus` / `ConnectionStrings:RabbitMq`.
 
 ## ⚙️ Configuration reference
 
-| Key | Type | Default | Effect |
-|---|---|---|---|
-| `MessageBus:Transport` | enum | `AzureServiceBus` | Which broker `postings.*` events are sent on |
-| `MessageBus:OutboundQueue` | string | `ledger-events` | The queue/exchange every outbound event, this feature's included, is sent to |
-| `FeatureManagement:EnableServiceBus` | bool | `true` | External bus wiring. Off means every event is dropped, not queued |
+| Key | Type | Required | Default | Rules | Secret | Takes effect | Effect |
+|---|---|---|---|---|---|---|---|
+| `MessageBus:Transport` | enum | no | `AzureServiceBus` | `AzureServiceBus` or `RabbitMq` | no | startup | Which broker `postings.*` events are sent on |
+| `MessageBus:OutboundQueue` | string | no | `ledger-events` | No validator in `MessageBusOptions` | no | startup | The queue/exchange every outbound event, this feature's included, is sent to |
+| `FeatureManagement:EnableServiceBus` | bool | no | `true` in base settings | `true` or `false` | no | startup | External bus wiring. Off means every event is dropped, not queued |
+
+Shared settings, connection strings, and environment-variable mapping: [Configuration reference](../configuration-reference.md).
 
 ## ⚠️ Errors & limits
 
-Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the root README](../../README.md#refusals-and-error-codes).
+Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the API contract](../api-contract.md#refusals-and-error-codes).
 
 - **The per-account lock is single-process, in-memory** (`ConcurrentDictionary<Guid, SemaphoreSlim>`) — correct for one running instance, not a horizontally-scaled deployment, where two instances could each acquire "their own" lock for the same account. Upgrade path: a database-level advisory lock (e.g. Postgres `pg_advisory_xact_lock`), or an optimistic unique-index-plus-retry scheme, if this service is ever scaled to more than one instance.
 - **`GET /v1/postings` requires an effective-date window of at most 90 days.** The per-account statement (`GET /v1/accounts/{id}/statement`) has no such cap.
@@ -367,3 +376,10 @@ Every non-2xx response is `application/problem+json` — `title`, `status`, `typ
 - [Accounts](accounts.md) — every posting moves exactly one account, and carries its status/floor rules.
 - [Currencies](currencies.md) — every posting amount is validated against its currency's `decimalPlaces`.
 - [Accounts client (.NET)](../accounts-client.md) — reach for the `DKNet.Accounts.Client` NuGet package when calling this and the other three features from a .NET caller instead of raw HTTP.
+
+## ❓ Open questions
+
+| Question | Why it matters | Checked | Who can answer |
+|---|---|---|---|
+| Which systems consume this feature's outbound events? | Operators need a recipient list and replay coordination. | `ServiceBusSetup` declares outbound transport, but no subscriber registry. | Service owner |
+| What online retention period applies to postings? | Operators need capacity and archival plans. | No posting delete or archive path is wired in this repo. | Service owner |

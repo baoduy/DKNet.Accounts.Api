@@ -1,0 +1,284 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Accounts release path",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/release-path.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "56df0ef91ce342fb8a80ad3c44c6c16825fc530f"
+    }
+  },
+  "lanes": [
+    {
+      "id": "integration",
+      "label": "Integration checks"
+    },
+    {
+      "id": "publish",
+      "label": "Publish on main"
+    },
+    {
+      "id": "packages",
+      "label": "Other artifacts"
+    },
+    {
+      "id": "operator",
+      "label": "Manual deployment"
+    }
+  ],
+  "mainPath": [
+    "devpr",
+    "build",
+    "promote",
+    "version",
+    "images",
+    "helm",
+    "cluster"
+  ],
+  "nodes": [
+    {
+      "id": "devpr",
+      "lane": "integration",
+      "col": 0,
+      "type": "external",
+      "label": "PR to dev",
+      "sublabel": "or push / dispatch",
+      "sources": [
+        {
+          "path": ".github/workflows/build.yml",
+          "line": 3,
+          "end_line": 9
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "build",
+      "lane": "integration",
+      "col": 1,
+      "type": "backend",
+      "label": "Build & Test",
+      "sublabel": ".NET, console, chart",
+      "sources": [
+        {
+          "path": ".github/workflows/build.yml",
+          "line": 21,
+          "end_line": 60
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "promote",
+      "lane": "integration",
+      "col": 2,
+      "type": "security",
+      "label": "Merge to main",
+      "sublabel": "manual",
+      "sources": [
+        {
+          "path": ".github/workflows/docker-publish.yml",
+          "line": 3,
+          "end_line": 7
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "version",
+      "lane": "publish",
+      "col": 3,
+      "type": "backend",
+      "label": "Version",
+      "sublabel": "from Git tags",
+      "sources": [
+        {
+          "path": ".github/workflows/docker-publish.yml",
+          "line": 29,
+          "end_line": 45
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "images",
+      "lane": "publish",
+      "col": 4,
+      "type": "cloud",
+      "label": "Publish images",
+      "sublabel": "API + console",
+      "sources": [
+        {
+          "path": ".github/workflows/docker-publish.yml",
+          "line": 53,
+          "end_line": 78
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "release",
+      "lane": "publish",
+      "col": 5,
+      "type": "cloud",
+      "label": "GitHub Release",
+      "sublabel": "v<version> tag",
+      "sources": [
+        {
+          "path": ".github/workflows/docker-publish.yml",
+          "line": 91,
+          "end_line": 101
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "nuget",
+      "lane": "packages",
+      "col": 5,
+      "type": "cloud",
+      "label": "Client package",
+      "sublabel": "GitHub Packages",
+      "sources": [
+        {
+          "path": ".github/workflows/docker-publish.yml",
+          "line": 80,
+          "end_line": 90
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "chart",
+      "lane": "operator",
+      "col": 3,
+      "type": "database",
+      "label": "Chart values",
+      "sublabel": "secrets + image tags",
+      "sources": [
+        {
+          "path": "helm/dknet-accounts/values.yaml",
+          "line": 1,
+          "end_line": 78
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "helm",
+      "lane": "operator",
+      "col": 4,
+      "type": "security",
+      "label": "Helm upgrade",
+      "sublabel": "manual operator step",
+      "sources": [
+        {
+          "path": "helm/dknet-accounts/Chart.yaml",
+          "line": 1,
+          "end_line": 19
+        }
+      ],
+      "width": 140
+    },
+    {
+      "id": "cluster",
+      "lane": "operator",
+      "col": 5,
+      "type": "cloud",
+      "label": "Kubernetes",
+      "sublabel": "API + console",
+      "sources": [
+        {
+          "path": "helm/dknet-accounts/values.yaml",
+          "line": 110,
+          "end_line": 132
+        }
+      ],
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "pr-check",
+      "from": "devpr",
+      "to": "build",
+      "variant": "emphasis"
+    },
+    {
+      "id": "checks-promote",
+      "from": "build",
+      "to": "promote",
+      "label": "reviewed commit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main-version",
+      "from": "promote",
+      "to": "version",
+      "label": "main push",
+      "variant": "emphasis"
+    },
+    {
+      "id": "version-images",
+      "from": "version",
+      "to": "images",
+      "variant": "emphasis"
+    },
+    {
+      "id": "images-helm",
+      "from": "images",
+      "to": "helm",
+      "label": "choose tag",
+      "variant": "emphasis"
+    },
+    {
+      "id": "helm-cluster",
+      "from": "helm",
+      "to": "cluster",
+      "variant": "emphasis"
+    },
+    {
+      "id": "version-package",
+      "from": "version",
+      "to": "nuget",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "version-release",
+      "from": "version",
+      "to": "release",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "chart-helm",
+      "from": "chart",
+      "to": "helm",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Operator boundary",
+      "items": [
+        "No workflow deploys this chart",
+        "Supply cluster, namespace, Gateway, Key Vault secrets and image tags",
+        "Chart version 0.1.0 is independent of image version"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Published artifacts",
+      "items": [
+        "API and console images: ghcr.io/baoduy",
+        "DKNet.Accounts.Client: GitHub Packages",
+        "Release step may fail without failing workflow"
+      ]
+    }
+  ]
+}

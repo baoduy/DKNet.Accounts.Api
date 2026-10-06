@@ -87,7 +87,7 @@ The entity and its outbox row commit in the one `SaveChanges` call that DKNet's 
 Lists currencies. Generated `MapGetList<Currency, Guid, CurrencyDto>()` route — full filter/search/order/page contract: [Generic List Endpoint](../generic-list-endpoint.md).
 
 - **Auth:** `accounts.read`
-- **Request:** none of its own — shares the generic list query surface ([Listing groups and accounts](../../README.md#listing-groups-and-accounts))
+- **Request:** none of its own — shares the generic list query surface ([Listing groups and accounts](../api-contract.md#listing-groups-and-accounts))
 - **Response:** `200 OK` — `PagedResponse<CurrencyDto>`
 - **Errors:**
 
@@ -156,6 +156,7 @@ curl -X POST "https://accounts.example.com/v1/currencies" \
 Renames a currency. `code`, `decimalPlaces` and `isActive` are untouched — there is no method that changes them after registration.
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** not idempotent, but repeatable — resending the same name is a no-op that returns the same `200`
 - **Request:** `name` (string, required, ≤ 100 characters, `RenameCurrencyRequestValidator`)
 - **Response:** `200 OK` — `CurrencyDto`
@@ -179,6 +180,7 @@ curl -X PUT "https://accounts.example.com/v1/currencies/{id}" \
 Reactivates a currency. No request body, no validator, no guard on the entity method — always succeeds for a known id.
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** naturally idempotent — activating an already-active currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: true`
@@ -202,6 +204,7 @@ Deactivates a currency — the one hand-written handler in this slice (`Deactiva
 ![Handler checks whether any account in this currency still holds a non-zero balance or held amount; if none do, it deactivates the currency in one save.](../diagrams/currencies-deactivate.svg)
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** naturally idempotent — deactivating an already-inactive currency is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `CurrencyDto`, `isActive: false`
@@ -225,6 +228,8 @@ curl -X POST "https://accounts.example.com/v1/currencies/{id}/deactivate" -H "Au
 
 One row is one currency this service can denominate an account or a posting in.
 
+The DB type names below describe the PostgreSQL mapping. SQL Server uses its own migration assembly and provider type mapping; see [Configuration reference](../configuration-reference.md#databaseprovider).
+
 | Field | Column | DB type | Length / precision | Required | Key / index | Default | Purpose |
 |---|---|---|---|---|---|---|---|
 | `Id` | `Id` | uuid | — | ✓ | PK | new Guid | Service-generated identifier |
@@ -235,43 +240,47 @@ One row is one currency this service can denominate an account or a posting in.
 | `CreatedBy` / `UpdatedBy` | same | varchar | 255 | `CreatedBy` required, `UpdatedBy` nullable | — | — | Stamped by the audit hook from the caller's credential on save, never by a request field |
 | `CreatedOn` / `UpdatedOn` | same | timestamptz | — | `CreatedOn` required, `UpdatedOn` nullable | — | — | When the row was created / last touched |
 
-`Currency` carries no foreign key of its own — `Account.CurrencyCode` (see [Accounts' data model](accounts.md#account--proaccounts)) references `Currency.Code` by value, not by a mapped EF Core relationship, so there is no navigation property either direction.
+`Currency` carries no foreign key of its own — `Account.CurrencyCode` (see [Accounts' data model](accounts.md#-data-model)) references `Currency.Code` by value, not by a mapped EF Core relationship, so there is no navigation property either direction.
 
 | Status | Meaning | Reached by | Next |
 |---|---|---|---|
 | `IsActive = true` | New accounts may open in this currency | Create (always), or `POST /{id}/activate` | `IsActive = false` |
 | `IsActive = false` | Existing accounts and postings in this currency are unaffected; new accounts may not open in it | `POST /{id}/deactivate`, refused with `CURRENCY_HOLDS_BALANCE` while any account in this currency holds a non-zero balance or held amount | `IsActive = true` |
 
+The `CurrencyDecimalPlaces` cache keeps decimal places by currency code for the life of the process. A miss reloads the currency table. `decimalPlaces` is immutable after registration, so the cached precision cannot become stale; `Clear()` is used by test resets. No time-based expiry is configured.
+
 ## 📣 Events
 
 Declared on `Currency` with `[RaisesEvent]` (DRK-1773 §3a) and raised by the DKNet EF Core save hook — no application code calls a publish method directly.
 
-| Event | Raised when | Payload | Transport | Consumers |
-|---|---|---|---|---|
-| `currencies.created` | A currency is registered | `id`, `code`, `name`, `decimalPlaces`, `isActive`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue |
-| `currencies.updated` | A currency is renamed, activated or deactivated | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue |
+| Event | Raised when | Payload | Transport | Consumers | Ordering | Duplicates | On failure |
+|---|---|---|---|---|---|---|---|
+| `currencies.created` | A currency is registered | `id`, `code`, `name`, `decimalPlaces`, `isActive`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
+| `currencies.updated` | A currency is renamed, activated or deactivated | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
 
-Every event is wrapped as `{ "type": "currencies.created", "payload": { ... } }` (`OutboundEnvelope`), stored in the same database save as the change (a PostgreSQL outbox), and sent over Azure Service Bus or RabbitMQ depending on `MessageBus:Transport`. With the message bus off (`FeatureManagement:EnableServiceBus` false, or no connection string configured), an event is dropped: nothing is stored and nothing is sent, but the currency change itself still succeeds. With the bus on but the broker unreachable, the event waits in the outbox and is retried every 10 seconds, without limit, until it is delivered — see [🌐 Downstream systems](#-downstream-systems).
+Every event is wrapped as `{ "type": "currencies.created", "payload": { ... } }` (`OutboundEnvelope`), stored in the same database save as the change (the selected database's outbox), and sent over Azure Service Bus or RabbitMQ depending on `MessageBus:Transport`. With the message bus off (`FeatureManagement:EnableServiceBus` false, or no connection string configured), an event is dropped: nothing is stored and nothing is sent, but the currency change itself still succeeds. With the bus on but the broker unreachable, the event waits in the outbox and is retried every 10 seconds, without limit, until it is delivered — see [🌐 Downstream systems](#-downstream-systems).
 
 ## 🌐 Downstream systems
 
 | System | Direction | How | What for | When it is down |
 |---|---|---|---|---|
-| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (production) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a currency was registered, renamed, activated or deactivated | Event is retried from the PostgreSQL outbox every 10 seconds, indefinitely — nothing is lost, but delivery is delayed until the broker is reachable again |
+| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (when configured) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a currency was registered, renamed, activated or deactivated | Event is retried from the selected database's outbox every 10 seconds, indefinitely — nothing is lost, but delivery is delayed until the broker is reachable again |
 
 Configuration keys: `FeatureManagement:EnableServiceBus`, `MessageBus:Transport` (`AzureServiceBus` or `RabbitMq`), `MessageBus:OutboundQueue`, `ConnectionStrings:AzureBus` / `ConnectionStrings:RabbitMq`.
 
 ## ⚙️ Configuration reference
 
-| Key | Type | Default | Effect |
-|---|---|---|---|
-| `MessageBus:Transport` | enum | `AzureServiceBus` | Which broker `currencies.created`/`currencies.updated` are sent on |
-| `MessageBus:OutboundQueue` | string | `ledger-events` | The queue/exchange every outbound event, this feature's included, is sent to |
-| `FeatureManagement:EnableServiceBus` | bool | `true` | External bus wiring. Off means every event is dropped, not queued |
+| Key | Type | Required | Default | Rules | Secret | Takes effect | Effect |
+|---|---|---|---|---|---|---|---|
+| `MessageBus:Transport` | enum | no | `AzureServiceBus` | `AzureServiceBus` or `RabbitMq` | no | startup | Which broker `currencies.created`/`currencies.updated` are sent on |
+| `MessageBus:OutboundQueue` | string | no | `ledger-events` | No validator in `MessageBusOptions` | no | startup | The queue/exchange every outbound event, this feature's included, is sent to |
+| `FeatureManagement:EnableServiceBus` | bool | no | `true` in base settings | `true` or `false` | no | startup | External bus wiring. Off means every event is dropped, not queued |
+
+Shared settings, connection strings, and environment-variable mapping: [Configuration reference](../configuration-reference.md).
 
 ## ⚠️ Errors & limits
 
-Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the root README](../../README.md#refusals-and-error-codes).
+Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the API contract](../api-contract.md#refusals-and-error-codes).
 
 - **No delete route exists.** A currency is retired by deactivating it, never removed — the same append-only philosophy as the ledger itself.
 - **`decimalPlaces` can never be changed after registration.** There is deliberately no rename-precision method, because every posting amount and every stored money value elsewhere rounds against the value fixed at registration.
@@ -283,3 +292,9 @@ Every non-2xx response is `application/problem+json` — `title`, `status`, `typ
 - [Accounts](accounts.md) — every account opens in exactly one currency, and `CurrencyCode` is immutable once set.
 - [Postings](postings.md) — every posting amount is validated against its currency's `decimalPlaces`, and its own currency must always equal its account's.
 - [Accounts client (.NET)](../accounts-client.md) — reach for the `DKNet.Accounts.Client` NuGet package when calling this and the other three features from a .NET caller instead of raw HTTP.
+
+## ❓ Open questions
+
+| Question | Why it matters | Checked | Who can answer |
+|---|---|---|---|
+| Which systems consume this feature's outbound events? | Operators need a recipient list and replay coordination. | `ServiceBusSetup` declares outbound transport, but no subscriber registry. | Service owner |

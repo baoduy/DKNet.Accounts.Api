@@ -114,7 +114,7 @@ curl -X POST "https://accounts.example.com/v1/account-groups" \
 
 ### `GET /v1/account-groups`
 
-Lists groups. Generated `MapGetList<AccountGroup, Guid, AccountGroupDto>()` route — full contract: [Generic List Endpoint](../generic-list-endpoint.md); this service's queryable fields and defaults: [the root README](../../README.md#listing-groups-and-accounts).
+Lists groups. Generated `MapGetList<AccountGroup, Guid, AccountGroupDto>()` route — full contract: [Generic List Endpoint](../generic-list-endpoint.md); this service's queryable fields and defaults: [the API contract](../api-contract.md#listing-groups-and-accounts).
 
 - **Auth:** `accounts.read`
 - **Response:** `200 OK` — `PagedResponse<AccountGroupDto>`
@@ -152,6 +152,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 Updates `name`, `description` and/or `metadata`. A member left out (or `null`) is unchanged; `code`, `type` and `ownerId` have no update path at all.
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** not idempotent in the retry sense, but naturally repeatable — resending the same body is a no-op that returns the same `200`
 - **Request:** `name` (string, ≤ 200, when supplied), `description` (string, ≤ 1000 — a column limit only, not validated), `metadata` (map, optional) — at least one of the three must be supplied
 - **Response:** `200 OK` — `AccountGroupDto`
@@ -175,6 +176,7 @@ curl -X PUT "https://accounts.example.com/v1/account-groups/{id}" \
 The service's only delete route. Generated route; validation is `DeleteAccountGroupRequestValidator`.
 
 - **Auth:** `accounts.write`
+- **Concurrency:** no ETag or row version. The delete handler checks for accounts; a competing write has no optimistic-concurrency refusal.
 - **Idempotency:** not idempotent in the retry sense — a second delete of an already-deleted id returns `404`
 - **Response:** `204 No Content`
 - **Errors:**
@@ -198,6 +200,7 @@ Closes a group — the one hand-written handler in this slice (`CloseAccountGrou
 ![Handler checks whether any account the group holds still carries a non-zero balance or held amount; if none do, it closes the group in one save.](../diagrams/account-groups-close.svg)
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** naturally idempotent — closing an already-closed group is a no-op `200`
 - **Request:** none
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "closed"`
@@ -220,6 +223,7 @@ curl -X POST "https://accounts.example.com/v1/account-groups/{id}/close" -H "Aut
 Reactivates a closed group. No request body, no guard on the entity method.
 
 - **Auth:** `accounts.write`
+- **Concurrency:** none: the last write wins; no ETag or row version is checked. Domain guards still reject invalid state changes.
 - **Idempotency:** naturally idempotent — activating an already-active group is a no-op `200`
 - **Response:** `200 OK` — `AccountGroupDto`, `status: "active"`
 - **Errors:**
@@ -278,6 +282,8 @@ curl -H "Authorization: Bearer $TOKEN" "https://accounts.example.com/v1/account-
 
 One row is one named, ownable bucket of accounts in one classification.
 
+The DB type names below describe the PostgreSQL mapping. SQL Server uses its own migration assembly and provider type mapping; see [Configuration reference](../configuration-reference.md#databaseprovider).
+
 | Field | Column | DB type | Length / precision | Required | Key / index | Default | Purpose |
 |---|---|---|---|---|---|---|---|
 | `Id` | `Id` | uuid | — | ✓ | PK | new Guid | Service-generated identifier |
@@ -304,11 +310,11 @@ One row is one named, ownable bucket of accounts in one classification.
 
 Declared on `AccountGroup` with `[RaisesEvent]` (DRK-1773 §3a) and raised by the DKNet EF Core save hook.
 
-| Event | Raised when | Payload | Transport | Consumers |
-|---|---|---|---|---|
-| `account-groups.created` | A group is created | `id`, `code`, `name`, `description`, `type`, `status`, `ownerId`, `metadata`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue |
-| `account-groups.updated` | A group is updated, closed or activated | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue |
-| `account-groups.deleted` | A group is deleted | The group as it stood the moment before deletion — same field set | `ledger-events` queue | Any system subscribed to the outbound queue |
+| Event | Raised when | Payload | Transport | Consumers | Ordering | Duplicates | On failure |
+|---|---|---|---|---|---|---|---|
+| `account-groups.created` | A group is created | `id`, `code`, `name`, `description`, `type`, `status`, `ownerId`, `metadata`, `createdBy`, `createdOn`, `updatedBy`, `updatedOn` | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
+| `account-groups.updated` | A group is updated, closed or activated | Same field set, current values | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
+| `account-groups.deleted` | A group is deleted | The group as it stood the moment before deletion — same field set | `ledger-events` queue | Any system subscribed to the outbound queue | No order guarantee in `ServiceBusSetup` | Redelivery retains `OutboundMessageId`; consumers can deduplicate by message ID | The selected database's outbox retries every 10 seconds without a configured limit; when external messaging is off, the event is dropped |
 
 Every event is wrapped as `{ "type": "account-groups.created", "payload": { ... } }` (`OutboundEnvelope`), stored in the same database save as the change, and sent over Azure Service Bus or RabbitMQ depending on `MessageBus:Transport`. With the message bus off, an event is dropped: nothing is stored and nothing is sent, but the change itself still succeeds. With the bus on but the broker unreachable, the event waits in the outbox and is retried every 10 seconds, without limit, until it is delivered.
 
@@ -316,21 +322,23 @@ Every event is wrapped as `{ "type": "account-groups.created", "payload": { ... 
 
 | System | Direction | How | What for | When it is down |
 |---|---|---|---|---|
-| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (production) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a group was created, updated, closed, activated or deleted | Event is retried from the PostgreSQL outbox every 10 seconds, indefinitely |
+| Any subscriber to `ledger-events` | it consumes our events | Azure Service Bus queue (when configured) or RabbitMQ fanout exchange + queue (local/integration), both named by `MessageBus:OutboundQueue` (default `ledger-events`) | Learn a group was created, updated, closed, activated or deleted | Event is retried from the selected database's outbox every 10 seconds, indefinitely |
 
 Configuration keys: `FeatureManagement:EnableServiceBus`, `MessageBus:Transport`, `MessageBus:OutboundQueue`, `ConnectionStrings:AzureBus` / `ConnectionStrings:RabbitMq`.
 
 ## ⚙️ Configuration reference
 
-| Key | Type | Default | Effect |
-|---|---|---|---|
-| `MessageBus:Transport` | enum | `AzureServiceBus` | Which broker `account-groups.*` events are sent on |
-| `MessageBus:OutboundQueue` | string | `ledger-events` | The queue/exchange every outbound event, this feature's included, is sent to |
-| `FeatureManagement:EnableServiceBus` | bool | `true` | External bus wiring. Off means every event is dropped, not queued |
+| Key | Type | Required | Default | Rules | Secret | Takes effect | Effect |
+|---|---|---|---|---|---|---|---|
+| `MessageBus:Transport` | enum | no | `AzureServiceBus` | `AzureServiceBus` or `RabbitMq` | no | startup | Which broker `account-groups.*` events are sent on |
+| `MessageBus:OutboundQueue` | string | no | `ledger-events` | No validator in `MessageBusOptions` | no | startup | The queue/exchange every outbound event, this feature's included, is sent to |
+| `FeatureManagement:EnableServiceBus` | bool | no | `true` in base settings | `true` or `false` | no | startup | External bus wiring. Off means every event is dropped, not queued |
+
+Shared settings, connection strings, and environment-variable mapping: [Configuration reference](../configuration-reference.md).
 
 ## ⚠️ Errors & limits
 
-Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the root README](../../README.md#refusals-and-error-codes).
+Every non-2xx response is `application/problem+json` — `title`, `status`, `type`, `traceId`, and an `errors[]` list of `{ message, code, field }`. Full shape and the complete refusal-code table: [the API contract](../api-contract.md#refusals-and-error-codes).
 
 - **Delete is the service's only delete route**, and it is refused while the group holds any account — a closed, zero-balance account still counts.
 - **`description` has no length validator** — its 1000-character bound is a database column limit, so an over-long value fails when the row is saved, not with a clean `400`.
@@ -340,3 +348,9 @@ Every non-2xx response is `application/problem+json` — `title`, `status`, `typ
 
 - [Accounts](accounts.md) — every account belongs to exactly one group.
 - [Accounts client (.NET)](../accounts-client.md) — reach for the `DKNet.Accounts.Client` NuGet package when calling this and the other three features from a .NET caller instead of raw HTTP.
+
+## ❓ Open questions
+
+| Question | Why it matters | Checked | Who can answer |
+|---|---|---|---|
+| Which systems consume this feature's outbound events? | Operators need a recipient list and replay coordination. | `ServiceBusSetup` declares outbound transport, but no subscriber registry. | Service owner |

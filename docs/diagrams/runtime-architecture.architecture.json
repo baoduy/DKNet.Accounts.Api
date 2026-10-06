@@ -7,10 +7,10 @@
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/baoduy/DKNet.Accounts.Api",
-      "revision": "ccc05ace5aa95c5fe36e82e7eac4cdecb3ee7851"
+      "revision": "56df0ef91ce342fb8a80ad3c44c6c16825fc530f"
     },
     "viewBox": [
-      1320,
+      1240,
       680
     ],
     "views": [
@@ -25,7 +25,7 @@
           "handler",
           "db"
         ],
-        "note": "An operator action travels from the browser through the BFF and the API pipeline to one PostgreSQL transaction."
+        "note": "An operator action travels from the browser through the BFF and the API pipeline to one transaction on the selected database."
       },
       {
         "id": "identity",
@@ -48,9 +48,10 @@
           "outbox",
           "broker"
         ],
-        "note": "Events are written to a Postgres outbox in the same transaction, then relayed to the broker."
+        "note": "Events are written to a selected database outbox in the same transaction, then relayed to the broker."
       }
-    ]
+    ],
+    "output": "docs/diagrams/runtime-architecture.html"
   },
   "components": [
     {
@@ -92,7 +93,7 @@
       "id": "api",
       "type": "security",
       "label": "API pipeline",
-      "sublabel": "rate limit · JWT · scp",
+      "sublabel": "rate limit \u00b7 JWT \u00b7 scp",
       "tag": "default-deny",
       "pos": [
         410,
@@ -143,7 +144,7 @@
       "id": "handler",
       "type": "backend",
       "label": "AppServices handlers",
-      "sublabel": "idempotency · lock",
+      "sublabel": "idempotency \u00b7 lock",
       "pos": [
         790,
         230
@@ -162,8 +163,8 @@
     {
       "id": "db",
       "type": "database",
-      "label": "PostgreSQL",
-      "sublabel": "AppDb + outbox",
+      "label": "Selected database",
+      "sublabel": "Postgres / SQL Server",
       "pos": [
         980,
         230
@@ -174,10 +175,16 @@
       ],
       "sources": [
         {
-          "path": "ApiEndpoints/DKNet.Accounts.Infra/Extensions/InfraSetup.cs",
-          "line": 36,
-          "end_line": 41,
-          "label": "Npgsql context"
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/DatabaseConfig.cs",
+          "line": 20,
+          "end_line": 55,
+          "label": "provider and outbox selection"
+        },
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/DbMigration.cs",
+          "line": 8,
+          "end_line": 33,
+          "label": "chosen migrations"
         }
       ]
     },
@@ -185,7 +192,7 @@
       "id": "idp",
       "type": "security",
       "label": "Identity provider",
-      "sublabel": "Keycloak dev · Entra ID prod",
+      "sublabel": "Keycloak AppHost \u00b7 Entra chart",
       "pos": [
         252,
         30
@@ -220,7 +227,7 @@
       "id": "redis",
       "type": "database",
       "label": "Redis",
-      "sublabel": "sessions · HybridCache",
+      "sublabel": "sessions \u00b7 HybridCache",
       "pos": [
         220,
         430
@@ -258,7 +265,7 @@
       "label": "Event broker",
       "sublabel": "RabbitMQ / ASB",
       "pos": [
-        1160,
+        1070,
         430
       ],
       "size": [
@@ -270,7 +277,7 @@
   "boundaries": [
     {
       "kind": "region",
-      "label": "Deployment: AppHost / docker-compose / AKS",
+      "label": "Runtime and external dependencies",
       "wraps": [
         "console",
         "api",
@@ -284,7 +291,7 @@
     },
     {
       "kind": "security-group",
-      "label": "API process · JWT + scp required",
+      "label": "API process \u00b7 JWT + scp required",
       "wraps": [
         "api",
         "bus",
@@ -401,7 +408,7 @@
       "items": [
         "Browser holds only a session cookie; BFF keeps tokens in Redis",
         "API: issuer, audience, signature, lifetime + scp scope; default-deny",
-        "Helm: console HTTPRoute public, API ClusterIP only"
+        "Chart: console HTTPRoute on, API ClusterIP only"
       ]
     },
     {
@@ -409,17 +416,26 @@
       "title": "Write path",
       "items": [
         "Rate limit, timeouts, auth, then FluentValidation",
-        "Postings: Idempotency-Key replay via unique DB index",
-        "Per-account SemaphoreSlim lock: single replica only"
+        "Postings: lowercase key lookup scans caller postings",
+        "Per-account lock is process-local"
       ]
     },
     {
       "dot": "amber",
       "title": "Platform",
       "items": [
-        "MessageBus__Transport: RabbitMQ local, ASB on AKS",
+        "MessageBus__Transport: RabbitMQ or Azure Service Bus",
         "Machine callers: TrafficGen, DKNet.Accounts.Client",
         "Key Vault via CSI; OTLP / Azure Monitor telemetry"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Database choice",
+      "items": [
+        "Database__Provider: Postgres by default; SqlServer selects SQL Server",
+        "AppHost starts either database; compose and chart configure PostgreSQL only",
+        "Chosen provider supplies migrations and outbox"
       ]
     }
   ]
