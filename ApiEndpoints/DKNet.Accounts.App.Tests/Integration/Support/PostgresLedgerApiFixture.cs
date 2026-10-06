@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using DKNet.Accounts.App.TestSupport;
 using DKNet.Accounts.Infra.Extensions;
 using Testcontainers.PostgreSql;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Integration.Support;
 
@@ -42,7 +43,7 @@ public sealed class PostgresLedgerApiFixture : TestApiFactoryBase, IAsyncLifetim
 
         // The API's real startup path: the factory's DI context has no UseAutoDataSeeding, so migrating it
         // directly would leave the seeded currencies out and every account open would 422.
-        await InfraMigration.MigrateDb(_container.GetConnectionString());
+        await InfraMigration.MigrateDb(_container.GetConnectionString(), (builder, conn) => builder.UsePostgres(conn));
     }
 
     async Task IAsyncLifetime.DisposeAsync() => await _container.DisposeAsync();

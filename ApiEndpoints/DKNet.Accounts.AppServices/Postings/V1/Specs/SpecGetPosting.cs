@@ -27,7 +27,14 @@ internal sealed class SpecGetPosting : Specification<Posting>
 
         if (byCallingSystem is not null && byIdempotencyKey is not null)
         {
-            predicate = predicate.And(p => p.CallingSystem == byCallingSystem && p.IdempotencyKey == byIdempotencyKey);
+            // The request lowercases its key; the stored side is lowercased too so a row written before that
+            // (DRK-2120, no data change) still replays or conflicts under any case of its key. ToLower() is the
+            // form the PostgreSQL and SQL Server providers translate to LOWER(), so the culture analyzers that
+            // ask for a culture-aware overload are suppressed here: the comparison runs in the database.
+#pragma warning disable CA1304, CA1311, CA1862
+            predicate = predicate.And(p => p.CallingSystem == byCallingSystem
+                && p.IdempotencyKey != null && p.IdempotencyKey.ToLower() == byIdempotencyKey);
+#pragma warning restore CA1304, CA1311, CA1862
         }
 
         if (byId is null && byCallingSystem is null)

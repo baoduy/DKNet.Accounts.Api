@@ -15,7 +15,8 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 /// it — a posting is never edited), and the key makes a retried reversal replay its first outcome instead of
 /// being refused POSTING_ALREADY_REVERSED. <see cref="IdempotencyKey"/> is populated from the
 /// <c>Idempotency-Key</c> request header via <see cref="FromRequestHeaderAttribute"/> — before validation and
-/// before the handler runs — so a caller-supplied body field of the same name can never forge it (R3).
+/// before the handler runs — so a caller-supplied body field of the same name can never forge it (R3). It is
+/// lowercased culture-invariantly on set, as on <see cref="RecordPostingRequest.IdempotencyKey"/>.
 /// </summary>
 public sealed record ReversePostingRequest
     : Fluents.Requests.IWitResponse<PostingDto>, Fluents.Requests.IWithKey<Guid>
@@ -27,7 +28,7 @@ public sealed record ReversePostingRequest
     public string Reason { get; set; } = null!;
 
     [FromRequestHeader("Idempotency-Key")]
-    public string? IdempotencyKey { get; set; }
+    public string? IdempotencyKey { get; set => field = value?.ToLowerInvariant(); }
 }
 
 internal sealed class ReversePostingCommandValidator : AbstractValidator<ReversePostingRequest>

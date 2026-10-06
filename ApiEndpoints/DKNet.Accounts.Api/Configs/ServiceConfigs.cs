@@ -24,12 +24,13 @@ internal static class ServiceConfigs
             // never set the acting user (DRK-715 R1).
             .AddCurrentUserProvider<CoreDbContext, PrincipalProvider>();
 
+        var database = DatabaseConfig.ResolveProvider(configuration);
         services
             .AddAppServices()
-            .AddInfraServices()
+            .AddInfraServices(DatabaseConfig.UseDatabase(database))
 
             //Service Bus
-            .AddServiceBus(configuration, typeof(AppSetup).Assembly, features);
+            .AddServiceBus(configuration, typeof(AppSetup).Assembly, features, DatabaseConfig.AddOutbox(database));
 
         // GROUP_NOT_EMPTY's 422+code mapping (DRK-1421 §3 row 3) is registered once, alongside every other
         // stable LedgerErrors code, via AddFluentValidationConfig's AddErrorResponses call

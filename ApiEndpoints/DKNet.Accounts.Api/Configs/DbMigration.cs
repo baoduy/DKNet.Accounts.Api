@@ -11,11 +11,14 @@ internal static class DbMigration
         params string[] args)
     {
         var isMigration = args.Any(x => string.Equals(x, "migration", StringComparison.OrdinalIgnoreCase));
+        // Resolved before anything else, so an unknown database setting stops the service before it builds.
+        var useDatabase = DatabaseConfig.UseDatabase(DatabaseConfig.ResolveProvider(builder.Configuration));
+        var connectionString = builder.Configuration.GetConnectionString(SharedConsts.DbConnectionString)!;
 
         if (isMigration)
         {
             Console.WriteLine("Running Db migration...");
-            await InfraMigration.MigrateDb(builder.Configuration.GetConnectionString(SharedConsts.DbConnectionString)!);
+            await InfraMigration.MigrateDb(connectionString, useDatabase);
             Console.WriteLine("Db migration is completed");
 
             Environment.Exit(0);
@@ -25,7 +28,7 @@ internal static class DbMigration
             // Unlike the `migration` CLI arg above, this runs the migration as part of normal app
             // startup and does not exit — the host keeps serving afterward.
             Console.WriteLine("Running Db migration on app start...");
-            await InfraMigration.MigrateDb(builder.Configuration.GetConnectionString(SharedConsts.DbConnectionString)!);
+            await InfraMigration.MigrateDb(connectionString, useDatabase);
             Console.WriteLine("Db migration is completed");
         }
     }

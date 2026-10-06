@@ -11,6 +11,8 @@
                         [DKNet.Accounts.Api]*,
                         [DKNet.Accounts.AppServices]*,
                         [DKNet.Accounts.Infra]*,
+                        [DKNet.Accounts.Infra.Postgres]*,
+                        [DKNet.Accounts.Infra.MsSql]*,
                         [DKNet.Accounts.Domains]*,
                         [DKNet.Accounts.Share]*,
                         [DKNet.Accounts.Client]*

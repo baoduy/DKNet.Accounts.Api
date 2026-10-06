@@ -3,6 +3,7 @@ using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Extensions;
 using DKNet.Accounts.Infra.Features.Currencies;
 using Testcontainers.PostgreSql;
+using DKNet.Accounts.Infra.Postgres;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -24,8 +25,8 @@ public sealed class CurrencySeedingPostgresTests : IAsyncLifetime
     {
         var conn = _container.GetConnectionString();
 
-        await InfraMigration.MigrateDb(conn);
-        await InfraMigration.MigrateDb(conn);
+        await InfraMigration.MigrateDb(conn, (builder, c) => builder.UsePostgres(c));
+        await InfraMigration.MigrateDb(conn, (builder, c) => builder.UsePostgres(c));
 
         await using var db = new CoreDbContext(new DbContextOptionsBuilder<CoreDbContext>().UseNpgsql(conn).Options);
         var rows = await db.Database

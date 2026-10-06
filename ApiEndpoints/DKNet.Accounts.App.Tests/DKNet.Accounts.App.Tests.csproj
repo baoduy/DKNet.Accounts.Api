@@ -45,6 +45,8 @@
         <ProjectReference Include="..\DKNet.Accounts.Api\DKNet.Accounts.Api.csproj" />
         <ProjectReference Include="..\DKNet.Accounts.App.TestSupport\DKNet.Accounts.App.TestSupport.csproj" />
         <ProjectReference Include="..\DKNet.Accounts.Client\DKNet.Accounts.Client.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.Infra.Postgres\DKNet.Accounts.Infra.Postgres.csproj" />
+        <ProjectReference Include="..\DKNet.Accounts.Infra.MsSql\DKNet.Accounts.Infra.MsSql.csproj" />
     </ItemGroup>
 
     <ItemGroup>

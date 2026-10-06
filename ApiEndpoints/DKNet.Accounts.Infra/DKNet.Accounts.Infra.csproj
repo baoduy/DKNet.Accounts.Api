@@ -14,13 +14,12 @@
         </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational"/>
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL"/>
         <PackageReference Include="Microsoft.Extensions.FileProviders.Abstractions"/>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
         <PackageReference Include="SlimMessageBus.Host.AzureServiceBus"/>
         <PackageReference Include="SlimMessageBus.Host.FluentValidation"/>
         <PackageReference Include="SlimMessageBus.Host.Memory"/>
-        <PackageReference Include="SlimMessageBus.Host.Outbox.PostgreSql.DbContext"/>
+        <PackageReference Include="SlimMessageBus.Host.Outbox"/>
         <PackageReference Include="SlimMessageBus.Host.RabbitMQ"/>
         <PackageReference Include="SlimMessageBus.Host.Serialization.SystemTextJson"/>
         <PackageReference Include="DKNet.EfCore.Events"/>
@@ -38,12 +37,11 @@
     <ItemGroup>
         <!-- DKNet.Accounts.Api needs internal CoreDbContext for ServiceConfigs.cs's PrincipalProvider registration. -->
         <InternalsVisibleTo Include="DKNet.Accounts.Api"/>
+        <!-- Each database project configures internal CoreDbContext: its provider, migrations and outbox. -->
+        <InternalsVisibleTo Include="DKNet.Accounts.Infra.Postgres"/>
+        <InternalsVisibleTo Include="DKNet.Accounts.Infra.MsSql"/>
         <InternalsVisibleTo Include="DKNet.Accounts.App.Tests"/>
         <InternalsVisibleTo Include="DKNet.Accounts.App.BDDTests"/>
         <InternalsVisibleTo Include="DKNet.Accounts.App.TestSupport"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Migrations\"/>
     </ItemGroup>
 </Project>

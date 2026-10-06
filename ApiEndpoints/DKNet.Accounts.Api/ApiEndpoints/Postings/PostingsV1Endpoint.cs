@@ -94,7 +94,8 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .Produces<PostingDto>(StatusCodes.Status201Created)
             .WithDescription(
                 "Record one credit or debit. Idempotency key is required in the header: " +
-                "Idempotency-Key: {IdempotencyKey}.");
+                "Idempotency-Key: {IdempotencyKey}. The key is compared without regard to case and returned " +
+                "lowercased.");
 
         group.MapPost("batch", async (
                 RecordPostingBatchRequest req,
@@ -106,7 +107,9 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             })
             .RequireScope(group, ScopeNames.PostingsWrite)
             .Produces<IReadOnlyCollection<PostingDto>>(StatusCodes.Status201Created)
-            .WithDescription("Record several movements as one all-or-nothing batch.");
+            .WithDescription(
+                "Record several movements as one all-or-nothing batch. An optional Idempotency-Key header is " +
+                "compared without regard to case and returned lowercased.");
 
         // Get-by-id (GEN, DRK-1277 §3 row 11): plain generic entity mapper. The explicit "{id:guid}" endpoint
         // keeps the same route pattern this used before (the mapper's own default is the looser "{id}").
@@ -128,6 +131,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
             .Produces<PostingDto>()
             .WithDescription(
                 "Reverse a posting. Requires a reason in the body and an idempotency key in the header: " +
-                "Idempotency-Key: {IdempotencyKey}.");
+                "Idempotency-Key: {IdempotencyKey}. The key is compared without regard to case and returned " +
+                "lowercased.");
     }
 }

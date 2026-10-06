@@ -6,52 +6,6 @@ namespace DKNet.Accounts.App.Tests.Architecture;
 public class PackageArchitectureTests
 {
     [Fact]
-    public void NoSqlServerEfCorePackage_ShouldExist()
-    {
-        var srcDir = Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-
-        var csprojFiles = Directory.GetFiles(srcDir, "*.csproj", SearchOption.AllDirectories);
-
-        var sqlServerRefs = csprojFiles
-            .SelectMany(file =>
-            {
-                var doc = XDocument.Load(file);
-                return doc.Descendants("PackageReference")
-                    .Select(e => e.Attribute("Include")?.Value ?? "")
-                    .Where(v => v.Contains("Microsoft.EntityFrameworkCore.SqlServer",
-                        StringComparison.OrdinalIgnoreCase));
-            })
-            .Distinct()
-            .ToArray();
-
-        sqlServerRefs.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void NoSqlServerTestcontainers_ShouldExist()
-    {
-        var srcDir = Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-
-        var csprojFiles = Directory.GetFiles(srcDir, "*.csproj", SearchOption.AllDirectories);
-
-        var msSqlRefs = csprojFiles
-            .SelectMany(file =>
-            {
-                var doc = XDocument.Load(file);
-                return doc.Descendants("PackageReference")
-                    .Select(e => e.Attribute("Include")?.Value ?? "")
-                    .Where(v => v.Contains("MsSql", StringComparison.OrdinalIgnoreCase)
-                                || v.Contains("SqlServer", StringComparison.OrdinalIgnoreCase));
-            })
-            .Distinct()
-            .ToArray();
-
-        msSqlRefs.ShouldBeEmpty();
-    }
-
-    [Fact]
     public void NpgsqlEfCorePackage_ShouldBeReferenced()
     {
         var srcDir = Path.GetFullPath(
