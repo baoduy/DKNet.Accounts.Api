@@ -51,9 +51,10 @@ public sealed record RecordPostingBatchRequest : Fluents.Requests.IWitResponse<I
     public string? RecordedBy { get; set; }
 
     /// <summary>Populated from the <c>Idempotency-Key</c> request header via <see cref="FromRequestHeaderAttribute"/>
-    /// — a caller-supplied value in the request body is always overwritten (R3).</summary>
+    /// — a caller-supplied value in the request body is always overwritten (R3). Lowercased culture-invariantly
+    /// on set, as on <see cref="RecordPostingRequest.IdempotencyKey"/>.</summary>
     [FromRequestHeader("Idempotency-Key")]
-    public string? IdempotencyKey { get; set; }
+    public string? IdempotencyKey { get; set => field = value?.ToLowerInvariant(); }
 }
 
 internal sealed class RecordPostingBatchCommandValidator : AbstractValidator<RecordPostingBatchRequest>

@@ -11,7 +11,8 @@ namespace DKNet.Accounts.AppServices.Postings.V1.Actions;
 /// <summary>
 /// Records a single credit or debit. <see cref="IdempotencyKey"/> is populated from the <c>Idempotency-Key</c>
 /// request header via <see cref="FromRequestHeaderAttribute"/> — before validation and before the handler runs
-/// — scoped to the calling system. A caller-supplied value for this property is always overwritten, so it can
+/// — scoped to the calling system, and lowercased culture-invariantly on set so keys that differ only by case
+/// are the same key (DRK-2120). A caller-supplied value for this property is always overwritten, so it can
 /// never be forged through the request body (R3). <see cref="RecordedBy"/> mirrors the contract's
 /// <c>recordedBy</c> body field — model-bound but never read: the calling system is always taken from the
 /// credential's <c>client_id</c> claim (§5), never from the request body.
@@ -45,7 +46,7 @@ public sealed record RecordPostingRequest : Fluents.Requests.IWitResponse<Postin
     public string? RecordedBy { get; set; }
 
     [FromRequestHeader("Idempotency-Key")]
-    public string? IdempotencyKey { get; set; }
+    public string? IdempotencyKey { get; set => field = value?.ToLowerInvariant(); }
 }
 
 internal sealed class RecordPostingCommandValidator : AbstractValidator<RecordPostingRequest>
