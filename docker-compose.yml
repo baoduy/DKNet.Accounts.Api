@@ -49,6 +49,8 @@ services:
     build:
       context: .
       dockerfile: ApiEndpoints/DKNet.Accounts.Api/Dockerfile
+      secrets:
+        - GITHUB_PACKAGES_TOKEN
     pull_policy: build
   api-build-off:
     profiles: [base]
@@ -126,6 +128,10 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+
+secrets:
+  GITHUB_PACKAGES_TOKEN:
+    environment: GITHUB_PACKAGES_TOKEN
 
 volumes:
   pgdata:

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Local builds only: docker-compose.yml builds the API from this file when API_IMAGE is blank.
 # The published ghcr image is produced by the .NET SDK container publish in
 # .github/workflows/docker-publish.yml (container properties live in the csproj), not by this file.
@@ -5,7 +6,7 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /repo
-COPY Directory.Packages.props global.json ./
+COPY Directory.Packages.props global.json nuget.config ./
 COPY ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj ApiEndpoints/DKNet.Accounts.Api/
 COPY ApiEndpoints/DKNet.Accounts.AppServices/DKNet.Accounts.AppServices.csproj ApiEndpoints/DKNet.Accounts.AppServices/
 COPY ApiEndpoints/DKNet.Accounts.Domains/DKNet.Accounts.Domains.csproj ApiEndpoints/DKNet.Accounts.Domains/
@@ -13,7 +14,8 @@ COPY ApiEndpoints/DKNet.Accounts.Infra/DKNet.Accounts.Infra.csproj ApiEndpoints/
 COPY ApiEndpoints/DKNet.Accounts.Infra.MsSql/DKNet.Accounts.Infra.MsSql.csproj ApiEndpoints/DKNet.Accounts.Infra.MsSql/
 COPY ApiEndpoints/DKNet.Accounts.Infra.Postgres/DKNet.Accounts.Infra.Postgres.csproj ApiEndpoints/DKNet.Accounts.Infra.Postgres/
 COPY ApiEndpoints/DKNet.Accounts.Share/DKNet.Accounts.Share.csproj ApiEndpoints/DKNet.Accounts.Share/
-RUN dotnet restore ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj
+RUN --mount=type=secret,id=GITHUB_PACKAGES_TOKEN,env=GITHUB_PACKAGES_TOKEN \
+    dotnet restore ApiEndpoints/DKNet.Accounts.Api/DKNet.Accounts.Api.csproj
 COPY ApiEndpoints/DKNet.Accounts.Api ApiEndpoints/DKNet.Accounts.Api
 COPY ApiEndpoints/DKNet.Accounts.AppServices ApiEndpoints/DKNet.Accounts.AppServices
 COPY ApiEndpoints/DKNet.Accounts.Domains ApiEndpoints/DKNet.Accounts.Domains
