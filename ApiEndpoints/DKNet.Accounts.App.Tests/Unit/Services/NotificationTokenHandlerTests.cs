@@ -18,6 +18,7 @@ public sealed class NotificationTokenHandlerTests
 
     private readonly ScriptedHandler _token = new();
     private readonly ScriptedHandler _notification = new();
+    private readonly FixedClock _clock = new();
 
     [Fact]
     public async Task EveryCall_CarriesTheClientCredentialsToken_AsABearer()
@@ -42,10 +43,13 @@ public sealed class NotificationTokenHandlerTests
 
         using var client = Client(Options());
         await client.PostAsync("http://notification.test/v1/notifications", null);
+        _clock.Now += TimeSpan.FromSeconds(239);
+        await client.PostAsync("http://notification.test/v1/notifications", null);
+        _clock.Now += TimeSpan.FromSeconds(1);
         await client.PostAsync("http://notification.test/v1/notifications", null);
 
-        _token.Requests.Count.ShouldBe(1);
-        _notification.Requests.Select(r => r.Authorization).ShouldBe(["Bearer tok-1", "Bearer tok-1"]);
+        _token.Requests.Count.ShouldBe(2);
+        _notification.Requests.Select(r => r.Authorization).ShouldBe(["Bearer tok-1", "Bearer tok-1", "Bearer tok-2"]);
     }
 
     [Fact]
@@ -103,7 +107,8 @@ public sealed class NotificationTokenHandlerTests
     };
 
     private HttpClient Client(OnboardingEmailOptions options) =>
-        new(new NotificationTokenHandler(new TokenClientFactory(_token), Microsoft.Extensions.Options.Options.Create(options))
+        new(new NotificationTokenHandler(new TokenClientFactory(_token), Microsoft.Extensions.Options.Options.Create(options),
+            _clock)
         {
             InnerHandler = _notification
         });
@@ -128,6 +133,14 @@ public sealed class NotificationTokenHandlerTests
             Requests.Add(new Seen(request.RequestUri, request.Headers.Authorization?.ToString(), body));
             return Answer(request);
         }
+    }
+
+    /// <summary>A clock that moves only when a test moves it.</summary>
+    private sealed class FixedClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 10, 7, 9, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     private sealed class TokenClientFactory(HttpMessageHandler handler) : IHttpClientFactory

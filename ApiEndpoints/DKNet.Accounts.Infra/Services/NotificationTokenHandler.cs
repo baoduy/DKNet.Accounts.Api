@@ -14,7 +14,8 @@ namespace DKNet.Accounts.Infra.Services;
 /// </summary>
 internal sealed class NotificationTokenHandler(
     IHttpClientFactory httpClientFactory,
-    IOptions<OnboardingEmailOptions> options) : DelegatingHandler
+    IOptions<OnboardingEmailOptions> options,
+    TimeProvider clock) : DelegatingHandler
 {
     // Only one caller fetches a new token; the others wait for it.
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -39,7 +40,7 @@ internal sealed class NotificationTokenHandler(
         await _lock.WaitAsync(ct);
         try
         {
-            if (_token is not null && DateTimeOffset.UtcNow < _renewAt) return _token;
+            if (_token is not null && clock.GetUtcNow() < _renewAt) return _token;
 
             var settings = options.Value;
             var tokenUrl = settings.TokenUrl ?? throw NotSet(nameof(settings.TokenUrl));
@@ -57,7 +58,7 @@ internal sealed class NotificationTokenHandler(
                 cancellationToken: ct);
             _token = body.RootElement.GetProperty("access_token").GetString()!;
             // Renewed a minute early, so no call goes out with a token that lapses in flight.
-            _renewAt = DateTimeOffset.UtcNow.AddSeconds(body.RootElement.GetProperty("expires_in").GetInt32() - 60);
+            _renewAt = clock.GetUtcNow().AddSeconds(body.RootElement.GetProperty("expires_in").GetInt32() - 60);
             return _token;
         }
         finally

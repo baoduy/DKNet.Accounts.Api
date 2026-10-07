@@ -25,8 +25,8 @@ public static class ServiceBusSetup
             "AzureBus",
             azb =>
             {
-                azb.AddServicesFromAssembly(typeof(InfraSetup).Assembly)
-                    .WithProviderServiceBus(st =>
+                // No assembly scan: Infra's only consumer is the RabbitMQ-only onboarding email (DRK-2160 finding 1).
+                azb.WithProviderServiceBus(st =>
                     {
                         st.ConnectionString = connectionString;
                         st.ClientFactory = (_, settings) =>

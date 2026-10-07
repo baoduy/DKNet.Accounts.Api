@@ -114,6 +114,8 @@ public sealed class OutboundTransportConfigurationTests
         consumer.ConsumerType.ShouldBe(typeof(OnboardingEmailConsumer));
         consumer.MessageType.ShouldBe(typeof(OutboundEnvelope));
         provider.GetService<INotificationClient>().ShouldNotBeNull();
+        // The token handler resolves with what AddServiceBus registers, its clock included.
+        provider.GetRequiredService<NotificationTokenHandler>().ShouldNotBeNull();
 
         var broker = EmptyBroker();
         await ProvisionTopologyAsync(rabbitBus, broker.Object);
