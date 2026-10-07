@@ -32,12 +32,57 @@ IResourceBuilder<IResourceWithConnectionString> apDb = useSqlServer
 // machines cannot reach it.
 const string demoRealm = "dknet-accounts";
 const string ledgerAudience = "dknet-accounts-api";
+const int keycloakPort = 8180;
 // Fixed admin screen login, set the same way as the RabbitMQ one above.
 var keycloakUser = builder.AddParameter("KeycloakAdminUser", "admin");
 var keycloakPassword = builder.AddParameter("KeycloakAdminPassword", "admin", secret: true);
-var keycloak = builder.AddKeycloak("Keycloak", 8180, keycloakUser, keycloakPassword)
+var keycloak = builder.AddKeycloak("Keycloak", keycloakPort, keycloakUser, keycloakPassword)
     .WithRealmImport("./Realms");
 var realmUrl = ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/{demoRealm}");
+
+// The local mail catcher, as in DKNet Notification's own AppHost: it takes mail over STARTTLS only, on the developer
+// certificate, so Notification checks its certificate as it checks any other. Its inbox is the "http" endpoint.
+var mailpit = builder.AddContainer("Mailpit", "axllent/mailpit", "v1.27")
+    .WithEndpoint(targetPort: 1025, name: "smtp")
+    .WithHttpEndpoint(targetPort: 8025, name: "http")
+    .WithEnvironment("MP_SMTP_REQUIRE_STARTTLS", "true")
+    .WithHttpsDeveloperCertificate()
+    .WithHttpsCertificateConfiguration(context =>
+    {
+        context.EnvironmentVariables["MP_SMTP_TLS_CERT"] = context.CertificatePath;
+        context.EnvironmentVariables["MP_SMTP_TLS_KEY"] = context.KeyPath;
+        return Task.CompletedTask;
+    });
+var smtp = mailpit.GetEndpoint("smtp");
+
+// DKNet Notification (DRK-2156): the API asks it to send the welcome mail when an account is opened. The release
+// image, pinned, with email on and sign-in on. It trusts only the demo realm and only tokens made out to its own
+// audience, so a ledger token is refused there and its own token is refused by the ledger. The issuer is the address
+// every token carries (the one the API signs in on); the keys are fetched over the container network, over plain
+// HTTP, a relaxation set here and nowhere else. The developer certificate is added to its trusted authorities so the
+// STARTTLS check against Mailpit stays on.
+const string notificationAudience = "dknet-notification-api";
+var tokenIssuer = $"http://localhost:{keycloakPort}/realms/{demoRealm}";
+var notification = builder.AddContainer("Notification", "ghcr.io/baoduy/dknet.notification-api", "0.0.4")
+    .WithHttpEndpoint(targetPort: 8080, name: "http")
+    .WithReference(cache, "Redis")
+    .WithDeveloperCertificateTrust(true)
+    .WithEnvironment("FeatureManagement__EnableHttps", "false")
+    .WithEnvironment("FeatureManagement__RequireAuthorization", "true")
+    .WithEnvironment("Authentication__Schemes__Bearer__MetadataAddress",
+        ReferenceExpression.Create($"{realmUrl}/.well-known/openid-configuration"))
+    .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", tokenIssuer)
+    .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", notificationAudience)
+    .WithEnvironment("Authentication__Schemes__Bearer__RequireHttpsMetadata", "false")
+    .WithEnvironment("Notifications__Email__Enabled", "true")
+    .WithEnvironment("Notifications__Email__Sender", "Smtp")
+    .WithEnvironment("Notifications__Email__Smtp__Host", smtp.Property(EndpointProperty.Host))
+    .WithEnvironment("Notifications__Email__Smtp__Port", smtp.Property(EndpointProperty.TargetPort))
+    .WithEnvironment("Notifications__Email__Smtp__Security", "StartTls")
+    .WithEnvironment("Notifications__Email__Smtp__FromAddress", "notifications@dknet-accounts.local")
+    .WaitFor(cache)
+    .WaitFor(keycloak)
+    .WaitFor(mailpit);
 
 var api = builder.AddProject<DKNet_Accounts_Api>("Api")
     .WithReference(cache, "Redis")
@@ -54,6 +99,13 @@ var api = builder.AddProject<DKNet_Accounts_Api>("Api")
     .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", realmUrl)
     .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", ledgerAudience)
     .WithEnvironment("Authentication__Schemes__Bearer__RequireHttpsMetadata", "false")
+    // Opening an account sends a welcome mail through Notification, signed in as its own machine client of the demo
+    // realm, which holds only the send permission. No WaitFor: opening an account never waits on Notification.
+    .WithEnvironment("FeatureManagement__EnableOnboardingEmail", "true")
+    .WithEnvironment("OnboardingEmail__NotificationBaseUrl", notification.GetEndpoint("http"))
+    .WithEnvironment("OnboardingEmail__TokenUrl", ReferenceExpression.Create($"{realmUrl}/protocol/openid-connect/token"))
+    .WithEnvironment("OnboardingEmail__ClientId", "dknet-accounts-onboarding-email")
+    .WithEnvironment("OnboardingEmail__ClientSecret", "dknet-accounts-onboarding-email-demo-secret")
     .WaitFor(cache)
     .WaitFor(apDb)
     .WaitFor(rabbitMq)
