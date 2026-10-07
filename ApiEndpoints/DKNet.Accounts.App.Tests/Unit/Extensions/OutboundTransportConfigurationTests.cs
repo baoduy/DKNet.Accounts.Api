@@ -155,11 +155,13 @@ public sealed class OutboundTransportConfigurationTests
         }
     }
 
-    [Fact]
-    public void OnboardingEmail_OnWithNoNotificationAddress_FailsAtStart()
+    [Theory]
+    [InlineData("")]
+    [InlineData("notification-without-scheme")]
+    public void OnboardingEmail_OnWithNoAbsoluteNotificationAddress_FailsAtStart(string notificationBaseUrl)
     {
         var thrown = Should.Throw<InvalidOperationException>(
-            () => StartService("RabbitMq", onboardingEmail: true, notificationBaseUrl: ""));
+            () => StartService("RabbitMq", onboardingEmail: true, notificationBaseUrl: notificationBaseUrl));
 
         thrown.Message.ShouldBe("OnboardingEmail:NotificationBaseUrl is not set.");
     }

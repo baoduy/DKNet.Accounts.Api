@@ -127,13 +127,15 @@ public sealed class OnboardingEmailConsumerTests : IDisposable
         again.Request.Parameters.ShouldBe(first.Request.Parameters);
         again.IdempotencyKey.ShouldBe(first.IdempotencyKey);
 
-        var to = first.Request.Parameters["to"];
-        to.ShouldEndWith("@example.com");
-        to.ShouldMatch(@"^[a-z]+\.[a-z]+\.[0-9a-f]{8}@example\.com$");
-        first.Request.Parameters["customerName"].ShouldMatch("^[A-Z][a-z]+ [A-Z][a-z]+$");
-        first.Request.Parameters.Keys.Order().ShouldBe(["accountNumber", "customerName", "to"]);
-
-        other.Request.Parameters["to"].ShouldNotBe(to);
+        // Pinned per id, so a change to how the fakes are derived shows up here.
+        first.Request.Parameters.ShouldBe(new Dictionary<string, string>
+        {
+            ["to"] = "rowan.pryce.1c0b504f@example.com",
+            ["customerName"] = "Rowan Pryce",
+            ["accountNumber"] = AccountNumber
+        });
+        other.Request.Parameters["to"].ShouldBe("jordan.irwin.e9f0a5b6@example.com");
+        other.Request.Parameters["customerName"].ShouldBe("Jordan Irwin");
     }
 
     /// <summary>R4: the key keeps letters, digits and <c>-</c> only.</summary>
