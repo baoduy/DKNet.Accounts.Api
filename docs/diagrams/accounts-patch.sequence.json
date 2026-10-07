@@ -5,32 +5,162 @@
     "title": "Change Account Status or Floor",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [960, 600]
+    "output": "docs/diagrams/accounts-patch.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    },
+    "viewBox": [
+      1120,
+      606
+    ]
   },
   "participants": [
-    { "id": "client", "type": "external", "label": "Client", "sublabel": "accounts.write" },
-    { "id": "handler", "type": "backend", "label": "Update", "sublabel": "PATCH handler" },
-    { "id": "account", "type": "database", "label": "PostgreSQL", "sublabel": "acc.Accounts" },
-    { "id": "queue", "type": "messagebus", "label": "ledger-events", "sublabel": "outbound queue" }
-  ],
-  "segments": [
-    { "from": 170, "to": 285, "label": "Recheck the floor" },
-    { "from": 300, "to": 410, "label": "Apply + save" },
-    { "from": 426, "to": 540, "label": "Respond" }
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Client",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/ApiEndpoints/Accounts/AccountsV1Endpoint.cs",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "id": "handler",
+      "type": "backend",
+      "label": "Update",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.AppServices/Accounts/V1/Actions/Update.cs",
+          "line": 36
+        }
+      ]
+    },
+    {
+      "id": "floor",
+      "type": "backend",
+      "label": "AccountFloorPolicy",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Accounts/Entities/AccountFloorPolicy.cs",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "type": "database",
+      "label": "Postgres / SQL Server",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Infra/Features/Accounts/Mappers/AccountConfigs.cs",
+          "line": 40
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "ledger-events",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Api/Configs/ServiceConfigs.cs",
+          "line": 33
+        }
+      ]
+    }
   ],
   "messages": [
-    { "from": "client", "to": "handler", "y": 200, "label": "PATCH /v1/accounts/{id} { status?, overdraftLimit?, minimumBalance?, permittedToGoNegative? }", "variant": "emphasis" },
-    { "from": "handler", "to": "account", "y": 240, "label": "merge supplied controls with the stored ones — still determinate?", "variant": "default", "note": "AccountFloorPolicy.RequiresOverdraftLimit on the merged state" },
-    { "from": "account", "to": "handler", "y": 270, "label": "determinate", "variant": "return", "note": "Otherwise refused: 422 OVERDRAFT_LIMIT_REQUIRED. Closing while Balance != 0 or HeldAmount != 0 is refused: 422 ACCOUNT_HOLDS_BALANCE" },
-    { "from": "handler", "to": "account", "y": 350, "label": "ChangeStatus / update controls, one save", "variant": "emphasis", "note": "ClosedOn is set when Status becomes Closed, cleared on any other status change" },
-    { "from": "handler", "to": "queue", "y": 390, "label": "accounts.updated event", "variant": "dashed" },
-    { "from": "handler", "to": "client", "y": 480, "label": "200 OK + AccountDto", "variant": "return" }
+    {
+      "from": "client",
+      "to": "handler",
+      "label": "PATCH /v1/accounts/{id}",
+      "variant": "emphasis",
+      "y": 160
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "label": "load Account",
+      "variant": "default",
+      "y": 202
+    },
+    {
+      "from": "account",
+      "to": "handler",
+      "label": "stored status and floor controls",
+      "variant": "return",
+      "y": 244
+    },
+    {
+      "from": "handler",
+      "to": "floor",
+      "label": "RequiresOverdraftLimit(merged controls)?",
+      "variant": "default",
+      "y": 286
+    },
+    {
+      "from": "floor",
+      "to": "handler",
+      "label": "determinate; else 422 OVERDRAFT_LIMIT_REQUIRED",
+      "variant": "return",
+      "y": 328
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "label": "close with money: 422 ACCOUNT_HOLDS_BALANCE",
+      "variant": "return",
+      "y": 370
+    },
+    {
+      "from": "handler",
+      "to": "account",
+      "label": "ChangeStatus / update controls, one save",
+      "variant": "emphasis",
+      "y": 412
+    },
+    {
+      "from": "handler",
+      "to": "queue",
+      "label": "accounts.updated (if changed, bus on)",
+      "variant": "dashed",
+      "y": 454
+    },
+    {
+      "from": "handler",
+      "to": "client",
+      "label": "200 OK + AccountDto",
+      "variant": "return",
+      "y": 496
+    }
   ],
-  "activations": [
-    { "participant": "handler", "from": 190, "to": 495, "type": "backend" }
-  ],
+  "activations": [],
   "cards": [
-    { "dot": "cyan", "title": "Two separate update routes", "items": ["PUT changes name/metadata only — a different route entirely", "PATCH changes status and the three floor controls only; neither route overlaps the other's fields"] },
-    { "dot": "amber", "title": "What this can't show", "items": ["accounts.updated is raised only when this route actually changes a tracked field — never on a posting's balance movement alone"] }
+    {
+      "dot": "cyan",
+      "title": "Two separate update routes",
+      "items": [
+        "PUT changes name/metadata only \u2014 a different route entirely",
+        "PATCH changes status and the three floor controls only; neither route overlaps the other's fields"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What this can't show",
+      "items": [
+        "accounts.updated is raised only when this route actually changes a tracked field \u2014 never on a posting's balance movement alone"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Handler-owned guard",
+      "items": [
+        "UpdateAccountCommandHandler merges supplied floor controls with stored values",
+        "It refuses OVERDRAFT_LIMIT_REQUIRED or ACCOUNT_HOLDS_BALANCE before a successful save"
+      ]
+    }
   ]
 }

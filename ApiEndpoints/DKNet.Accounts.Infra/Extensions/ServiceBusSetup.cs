@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus;
 using DKNet.Accounts.Infra.Contexts;
 using DKNet.Accounts.Infra.Services;
 using DKNet.Accounts.Share.Options;
+using DKNet.Notification.Client;
 using SlimMessageBus.Host.Outbox;
 using SlimMessageBus.Host.RabbitMQ;
 
@@ -24,8 +25,8 @@ public static class ServiceBusSetup
             "AzureBus",
             azb =>
             {
-                azb.AddServicesFromAssembly(typeof(InfraSetup).Assembly)
-                    .WithProviderServiceBus(st =>
+                // No assembly scan: Infra's only consumer is the RabbitMQ-only onboarding email (DRK-2160 finding 1).
+                azb.WithProviderServiceBus(st =>
                     {
                         st.ConnectionString = connectionString;
                         st.ClientFactory = (_, settings) =>
@@ -65,34 +66,69 @@ public static class ServiceBusSetup
     /// <summary>
     ///     The outbound transport when it is RabbitMQ (local runs and integration tests): events are published to a
     ///     fanout exchange named after the outbound queue, and the queue is declared (created when missing) and bound
-    ///     to it whenever the bus connects, so a local setup needs no manual step.
+    ///     to it whenever the bus connects, so a local setup needs no manual step. With an onboarding queue
+    ///     (DRK-2156 R5), that durable queue is bound to the same exchange and read by
+    ///     <see cref="OnboardingEmailConsumer" />: the email feature gets its own copy of every event.
     /// </summary>
     private static MessageBusBuilder AddRabbitMqBus(this MessageBusBuilder builder, string connectionString,
-        string outboundQueue)
+        string outboundQueue, string? onboardingQueue)
     {
         builder.AddChildBus(
             "RabbitMq",
-            rmq => rmq
-                .WithProviderRabbitMQ(st =>
-                {
-                    st.ConnectionString = connectionString;
-                    st.UseTopologyInitializer(async (channel, applyDefaultTopology) =>
+            rmq =>
+            {
+                rmq
+                    .WithProviderRabbitMQ(st =>
                     {
-                        await channel.QueueDeclareAsync(outboundQueue, durable: true, exclusive: false,
-                            autoDelete: false);
-                        await applyDefaultTopology();
-                        await channel.QueueBindAsync(outboundQueue, outboundQueue, routingKey: string.Empty);
-                    });
-                })
-                .Produce<OutboundEnvelope>(x => x
-                    .Exchange(outboundQueue, ExchangeType.Fanout, durable: true)
-                    .MessagePropertiesModifier((_, properties) =>
-                    {
-                        properties.Persistent = true;
-                        OutboundMessageId.ApplyTo(properties);
+                        st.ConnectionString = connectionString;
+                        st.UseTopologyInitializer(async (channel, applyDefaultTopology) =>
+                        {
+                            await channel.QueueDeclareAsync(outboundQueue, durable: true, exclusive: false,
+                                autoDelete: false);
+                            await applyDefaultTopology();
+                            await channel.QueueBindAsync(outboundQueue, outboundQueue, routingKey: string.Empty);
+                        });
                     })
-                    .UseOutbox()));
+                    .Produce<OutboundEnvelope>(x => x
+                        .Exchange(outboundQueue, ExchangeType.Fanout, durable: true)
+                        .MessagePropertiesModifier((_, properties) =>
+                        {
+                            properties.Persistent = true;
+                            OutboundMessageId.ApplyTo(properties);
+                        })
+                        .UseOutbox());
+
+                if (onboardingQueue is not null)
+                {
+                    rmq.Consume<OutboundEnvelope>(x => x
+                        .Queue(onboardingQueue, durable: true, autoDelete: false)
+                        .ExchangeBinding(outboundQueue)
+                        .WithConsumer<OnboardingEmailConsumer>());
+                }
+            });
         return builder;
+    }
+
+    /// <summary>
+    ///     The onboarding email (DRK-2156 R5), registered only with the feature on and the bus on over RabbitMQ:
+    ///     its settings, its token handler, the DKNet Notification client (no retry or resilience handler, R6) and
+    ///     the consumer. Returns the queue the consumer reads.
+    /// </summary>
+    private static string AddOnboardingEmail(this IServiceCollection service, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(OnboardingEmailOptions.Name);
+        var settings = section.Get<OnboardingEmailOptions>() ?? new OnboardingEmailOptions();
+        if (settings.NotificationBaseUrl is not { IsAbsoluteUri: true })
+        {
+            throw new InvalidOperationException(
+                $"{OnboardingEmailOptions.Name}:{nameof(OnboardingEmailOptions.NotificationBaseUrl)} is not set.");
+        }
+
+        service.Configure<OnboardingEmailOptions>(section)
+            .AddTransient<NotificationTokenHandler>()
+            .AddTransient<OnboardingEmailConsumer>()
+            .AddNotificationClient(settings.NotificationBaseUrl, typeof(NotificationTokenHandler));
+        return settings.Queue;
     }
 
     internal static MessageBusBuilder AddMemoryBus(this MessageBusBuilder builder, Assembly serviceAssembly)
@@ -132,7 +168,10 @@ public static class ServiceBusSetup
     /// <param name="service">The service collection used to register dependencies.</param>
     /// <param name="configuration">The configuration holding <see cref="MessageBusOptions"/> and the bus connection strings.</param>
     /// <param name="serviceAssembly">The assembly whose handlers the in-memory bus dispatches to.</param>
-    /// <param name="features">The feature switches; <see cref="FeatureOptions.EnableServiceBus"/> turns the outbound bus on.</param>
+    /// <param name="features">
+    ///     The feature switches; <see cref="FeatureOptions.EnableServiceBus"/> turns the outbound bus on, and
+    ///     <see cref="FeatureOptions.EnableOnboardingEmail"/> the onboarding email on top of a RabbitMQ bus.
+    /// </param>
     /// <param name="addOutbox">
     ///     The chosen database's outbox registration, given the shared outbox settings to apply.
     /// </param>
@@ -150,6 +189,9 @@ public static class ServiceBusSetup
         var busConnectionString = configuration.GetConnectionString(
             isRabbitMq ? SharedConsts.RabbitMqConnectionString : SharedConsts.AzureBusConnectionString);
         var isBusOn = features.EnableServiceBus && !string.IsNullOrWhiteSpace(busConnectionString);
+        var onboardingQueue = features.EnableOnboardingEmail && isBusOn && isRabbitMq
+            ? service.AddOnboardingEmail(configuration)
+            : null;
 
         // Its presence is what tells EventPublisher and CoreDbContext the outbound bus is on (R3).
         if (isBusOn)
@@ -172,7 +214,7 @@ public static class ServiceBusSetup
 
             if (isRabbitMq)
             {
-                mbb.AddRabbitMqBus(busConnectionString!, options.OutboundQueue);
+                mbb.AddRabbitMqBus(busConnectionString!, options.OutboundQueue, onboardingQueue);
             }
             else
             {

@@ -10,19 +10,25 @@ namespace DKNet.Accounts.App.TestSupport;
 /// </summary>
 public sealed class TestLogCapture : ILoggerProvider
 {
-    private readonly ConcurrentQueue<string> _messages = new();
+    private readonly ConcurrentQueue<Entry> _entries = new();
 
-    public IReadOnlyCollection<string> Messages => _messages.ToArray();
+    /// <summary>One captured log line and the level it was written at.</summary>
+    public sealed record Entry(LogLevel Level, string Message);
 
-    public void Clear() => _messages.Clear();
+    public IReadOnlyCollection<string> Messages => _entries.Select(e => e.Message).ToArray();
 
-    public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages);
+    /// <summary>Every captured line with its level, in the order written.</summary>
+    public IReadOnlyCollection<Entry> Entries => _entries.ToArray();
+
+    public void Clear() => _entries.Clear();
+
+    public ILogger CreateLogger(string categoryName) => new CapturingLogger(_entries);
 
     public void Dispose()
     {
     }
 
-    private sealed class CapturingLogger(ConcurrentQueue<string> sink) : ILogger
+    private sealed class CapturingLogger(ConcurrentQueue<Entry> sink) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -34,6 +40,6 @@ public sealed class TestLogCapture : ILoggerProvider
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter) =>
-            sink.Enqueue(formatter(state, exception));
+            sink.Enqueue(new Entry(logLevel, formatter(state, exception)));
     }
 }

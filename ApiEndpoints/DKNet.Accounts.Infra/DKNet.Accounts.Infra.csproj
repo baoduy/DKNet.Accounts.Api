@@ -23,6 +23,7 @@
         <PackageReference Include="SlimMessageBus.Host.RabbitMQ"/>
         <PackageReference Include="SlimMessageBus.Host.Serialization.SystemTextJson"/>
         <PackageReference Include="DKNet.EfCore.Events"/>
+        <PackageReference Include="DKNet.Notification.Client"/>
         <PackageReference Include="DKNet.EfCore.Extensions"/>
         <PackageReference Include="DKNet.EfCore.Relational.Helpers"/>
         <PackageReference Include="DKNet.SlimBus.Extensions"/>

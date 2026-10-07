@@ -24,6 +24,8 @@ env:
 jobs:
   publish-image:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_PACKAGES_TOKEN: ${{ github.token }}
 
     steps:
       - uses: actions/checkout@v4

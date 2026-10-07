@@ -66,4 +66,17 @@ public class PackagePinGuardTests
 
         result.ShouldBe(["10.1.24"]);
     }
+
+    [Fact]
+    public void ANotificationPin_IsIgnored_WhileDifferingFrameworkPinsAreStillReported()
+    {
+        var doc = PropsWith(
+            ("DKNet.Fw.Extensions", "10.1.24"),
+            ("DKNet.Notification.Client", "[0.0.4]"),
+            ("DKNet.EfCore.Events", "10.1.21"));
+
+        var result = PackagePinGuard.DistinctDkNetVersions(doc);
+
+        result.ShouldBe(["10.1.24", "10.1.21"]);
+    }
 }

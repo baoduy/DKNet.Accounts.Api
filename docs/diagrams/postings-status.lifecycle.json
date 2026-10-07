@@ -1,25 +1,100 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "diagram_type": "lifecycle",
   "meta": {
     "title": "Posting Status",
     "quality_profile": "showcase",
-    "viewBox": [720, 580]
+    "output": "docs/diagrams/postings-status.html",
+    "repository": {
+      "url": "https://github.com/baoduy/DKNet.Accounts.Api.git",
+      "revision": "30c5675e945b13e3c197598b867b9c23fb6d8db1"
+    }
   },
   "lanes": [
-    { "id": "main", "label": "Posting.Status" }
+    {
+      "id": "main",
+      "label": "Record and posted"
+    },
+    {
+      "id": "terminal",
+      "label": "Reversed posting"
+    }
   ],
   "states": [
-    { "id": "start", "type": "start", "label": "Recorded", "sublabel": "POST /v1/postings or /batch", "lane": "main", "col": 0, "step": "01" },
-    { "id": "posted", "type": "success", "label": "Posted", "sublabel": "the normal, correctable state", "lane": "main", "col": 1, "step": "02" },
-    { "id": "reversed", "type": "neutral", "label": "Reversed", "sublabel": "terminal", "lane": "main", "col": 2, "step": "03", "tag": "terminal" }
+    {
+      "id": "start",
+      "type": "start",
+      "label": "Recorded",
+      "sublabel": "POST /v1/postings or /batch",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Postings/Entities/Posting.cs",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "posted",
+      "type": "success",
+      "label": "Posted",
+      "sublabel": "account status gate applies",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Postings/Entities/Posting.cs",
+          "line": 26
+        }
+      ]
+    },
+    {
+      "id": "reversed",
+      "type": "neutral",
+      "label": "Reversed",
+      "sublabel": "terminal",
+      "lane": "terminal",
+      "col": 1,
+      "step": "03",
+      "sources": [
+        {
+          "path": "ApiEndpoints/DKNet.Accounts.Domains/Features/Postings/Entities/Posting.cs",
+          "line": 27
+        }
+      ]
+    }
   ],
   "transitions": [
-    { "from": "start", "to": "posted", "label": "Record / RecordBatch — always", "labelDy": -25 },
-    { "from": "posted", "to": "reversed", "label": "POST {id}/reverse", "labelDy": 55, "note": "Refused 422 POSTING_ALREADY_REVERSED if already reversed under a new key; refused per the account's own status gate in the reversal's direction" }
+    {
+      "from": "start",
+      "to": "posted",
+      "label": "Record / RecordBatch \u2014 always"
+    },
+    {
+      "from": "posted",
+      "to": "reversed",
+      "label": "reverse; else POSTING_ALREADY_REVERSED / POSTING_IS_REVERSAL"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "One-way and once only", "items": ["MarkReversedBy throws if called twice — a posting can be reversed at most once", "There is no path back to Posted: a mistake is corrected by a new posting, never by editing this one"] },
-    { "dot": "amber", "title": "A reversal is itself a Posting", "items": ["The reversing entry starts at Posted like any other — see Reverse a Posting for how the two rows link"] }
+    {
+      "dot": "cyan",
+      "title": "One-way and once only",
+      "items": [
+        "MarkReversedBy throws if called twice; ReversePostingCommandHandler also refuses a row that is itself a reversal",
+        "There is no path back to Posted: a mistake is corrected by a new posting, never by editing this one",
+        "Reverse refuses POSTING_ALREADY_REVERSED, POSTING_IS_REVERSAL and account status violations before writing"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "A reversal is itself a Posting",
+      "items": [
+        "The reversing entry starts at Posted like any other \u2014 see Reverse a Posting for how the two rows link"
+      ]
+    }
   ]
 }

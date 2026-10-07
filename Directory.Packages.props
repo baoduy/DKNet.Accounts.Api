@@ -57,6 +57,7 @@
     <PackageVersion Include="DKNet.EfCore.Relational.Helpers" Version="13.2.5" />
     <PackageVersion Include="DKNet.EfCore.Specifications" Version="13.2.5" />
     <PackageVersion Include="DKNet.Fw.Extensions" Version="13.2.5" />
+    <PackageVersion Include="DKNet.Notification.Client" Version="[0.0.4]" />
     <PackageVersion Include="DKNet.SlimBus.Extensions" Version="13.2.5" />
     <PackageVersion Include="DKNet.SlimBus.Generators" Version="13.2.5" />
     <PackageVersion Include="FluentResults" Version="4.0.0" />

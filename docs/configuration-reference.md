@@ -34,7 +34,7 @@ early enough.
 
 The provider also affects text queries. SQL Server text matching ignores case under the configured SQL Server collation; PostgreSQL matching follows case. Sort order follows each database's collation. The repository does not pin a cross-database collation, so callers should not assume identical ordered pages across providers.
 
-The SQL Server login needs permission to create tables when startup migrations are enabled: `InfraMigration.MigrateDb` applies EF migrations, and the SQL Server outbox creates its tables at startup. The exact least-privilege grant depends on the SQL Server installation and is an operator decision.
+The SQL Server login needs permission to create tables for EF migrations when `RunDbMigrationWhenAppStart` is on. The outbox also creates its tables when `EnableServiceBus` is on and the configured bus has a connection string, even if startup migrations are off. The base settings enable the bus and disable startup migrations. The exact least-privilege grant depends on the SQL Server installation and is an operator decision.
 
 ## `ConnectionStrings`
 
