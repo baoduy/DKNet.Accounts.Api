@@ -136,6 +136,14 @@
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       }
+    },
+    {
+      "name": "notifications.send",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
     }
   ],
   "scopeMappings": [
@@ -246,6 +254,34 @@
         "postings.write",
         "postings.reverse"
       ]
+    },
+    {
+      "clientId": "dknet-accounts-onboarding-email",
+      "name": "DKNet Accounts onboarding email",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dknet-accounts-onboarding-email-demo-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "notification-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "dknet-notification-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "notifications.send"
+      ],
+      "optionalClientScopes": []
     }
   ],
   "users": [
