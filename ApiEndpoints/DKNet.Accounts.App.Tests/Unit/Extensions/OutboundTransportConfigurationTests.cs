@@ -101,7 +101,10 @@ public sealed class OutboundTransportConfigurationTests
     [Fact]
     public async Task OnboardingEmail_OnWithRabbitMq_ReadsItsOwnCopyOfTheEvents()
     {
-        await using var provider = StartService("RabbitMq", onboardingEmail: true);
+        var services = Register("RabbitMq", onboardingEmail: true);
+        services.Count(d => d.ServiceType == typeof(OnboardingEmailConsumer)).ShouldBe(1);
+
+        await using var provider = services.BuildServiceProvider();
         var bus = (HybridMessageBus)provider.GetRequiredService<IMasterMessageBus>();
         var rabbitBus = (RabbitMqMessageBus)bus.GetChildBus(RabbitMqChild);
 
@@ -138,7 +141,12 @@ public sealed class OutboundTransportConfigurationTests
     public async Task OnboardingEmail_WithoutFlagBusAndRabbitMq_AddsNoQueueConsumerOrClient(
         bool onboardingEmail, string transport, bool busOn)
     {
-        await using var provider = StartService(transport, onboardingEmail, busOn);
+        var services = Register(transport, onboardingEmail, busOn);
+
+        // DRK-2160 finding 1: not even registered, or the host's DI validation fails on its missing client.
+        services.ShouldNotContain(d => d.ServiceType == typeof(OnboardingEmailConsumer));
+
+        await using var provider = services.BuildServiceProvider();
         var bus = (HybridMessageBus)provider.GetRequiredService<IMasterMessageBus>();
 
         bus.Settings.Children.SelectMany(c => c.Consumers)
@@ -167,6 +175,11 @@ public sealed class OutboundTransportConfigurationTests
     }
 
     private static ServiceProvider StartService(string transport, bool onboardingEmail = false, bool busOn = true,
+        string notificationBaseUrl = "http://notification.test") =>
+        Register(transport, onboardingEmail, busOn, notificationBaseUrl).BuildServiceProvider();
+
+    /// <summary>The service collection <see cref="StartService"/> builds its provider from.</summary>
+    private static ServiceCollection Register(string transport, bool onboardingEmail = false, bool busOn = true,
         string notificationBaseUrl = "http://notification.test")
     {
         var configuration = new ConfigurationBuilder()
@@ -187,7 +200,7 @@ public sealed class OutboundTransportConfigurationTests
             new FeatureOptions { EnableServiceBus = busOn, EnableOnboardingEmail = onboardingEmail },
             PostgresSetup.AddPostgresOutbox);
 
-        return services.BuildServiceProvider();
+        return services;
     }
 
     /// <summary>A broker channel that records every call and answers each declare as if the entity was created.</summary>
