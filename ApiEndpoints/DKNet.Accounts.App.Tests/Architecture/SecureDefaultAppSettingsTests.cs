@@ -59,6 +59,28 @@ public class SecureDefaultAppSettingsTests
     }
 
     /// <summary>
+    /// DRK-2156 "The email feature is off by default": the flag defaults to off in code and is written as off in
+    /// the base file, and no appsettings file carries the onboarding email's settings — the AppHost alone sets
+    /// them, the client secret included.
+    /// </summary>
+    [Fact]
+    public void BaseAppSettings_OnboardingEmail_IsOff_AndCarriesNoSettings()
+    {
+        new FeatureOptions().EnableOnboardingEmail.ShouldBeFalse();
+
+        var config = LoadBaseConfig();
+        config[$"{FeatureOptions.Name}:{nameof(FeatureOptions.EnableOnboardingEmail)}"].ShouldBe("False");
+
+        var apiDir = Path.GetDirectoryName(AppsettingsPath())!;
+        foreach (var file in Directory.GetFiles(apiDir, "appsettings*.json"))
+        {
+            new ConfigurationBuilder().AddJsonFile(file, optional: false).Build()
+                .GetSection(OnboardingEmailOptions.Name).GetChildren()
+                .ShouldBeEmpty($"{Path.GetFileName(file)} must not carry an {OnboardingEmailOptions.Name} section.");
+        }
+    }
+
+    /// <summary>
     /// <see cref="RateLimitOptions"/> defaults <c>DefaultRequestLimit</c> to 2 — a value chosen for the
     /// class, not the product. The base file's explicit <c>RateLimit</c> section must be what actually binds,
     /// or a host with <c>EnableRateLimit: true</c> would silently run a limiter far stricter than intended.

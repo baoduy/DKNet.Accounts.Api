@@ -25,12 +25,16 @@ namespace DKNet.Accounts.App.BDDTests.Support;
 public sealed class OutboundApiFactory : TestApiFactoryBase
 {
     private readonly string _connectionString;
+    private readonly Action<IServiceCollection>? _configureServices;
 
     /// <param name="connectionString">The host's database; created on start when missing.</param>
     /// <param name="environment">Environment variables (<c>Section__Key</c>) read while the host is built.</param>
-    public OutboundApiFactory(string connectionString, IReadOnlyDictionary<string, string?> environment)
+    /// <param name="configureServices">Further test substitutions, applied after the base ones.</param>
+    public OutboundApiFactory(string connectionString, IReadOnlyDictionary<string, string?> environment,
+        Action<IServiceCollection>? configureServices = null)
     {
         _connectionString = connectionString;
+        _configureServices = configureServices;
 
         var variables = new Dictionary<string, string?>(environment)
         {
@@ -66,5 +70,6 @@ public sealed class OutboundApiFactory : TestApiFactoryBase
         services.RemoveAll<IMembershipService>();
         services.AddSingleton<IMembershipService, TestMembershipService>();
         LedgerCallerAuthHandler.Register(services);
+        _configureServices?.Invoke(services);
     }
 }
