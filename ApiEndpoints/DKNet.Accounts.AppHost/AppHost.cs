@@ -59,10 +59,14 @@ var smtp = mailpit.GetEndpoint("smtp");
 // image, pinned, with email on and sign-in on. It trusts only the demo realm and only tokens made out to its own
 // audience, so a ledger token is refused there and its own token is refused by the ledger. The issuer is the address
 // every token carries (the one the API signs in on); the keys are fetched over the container network, over plain
-// HTTP, the same relaxation as the API's and, like it, set only in this AppHost. The developer certificate is added
-// to its trusted authorities so the STARTTLS check against Mailpit stays on.
+// HTTP when no developer certificate is trusted, the same relaxation as the API's and, like it, set only in this
+// AppHost. The developer certificate is added to its trusted authorities so the STARTTLS check against Mailpit stays
+// on.
 const string notificationAudience = "dknet-notification-api";
-var tokenIssuer = $"http://localhost:{keycloakPort}/realms/{demoRealm}";
+// Built from the endpoint's scheme, not its host: under a trusted developer certificate Aspire serves Keycloak over
+// HTTPS, and every token then names https://localhost:8180.
+var keycloakScheme = keycloak.GetEndpoint("http").Property(EndpointProperty.Scheme);
+var tokenIssuer = ReferenceExpression.Create($"{keycloakScheme}://localhost:{keycloakPort.ToString()}/realms/{demoRealm}");
 var notification = builder.AddContainer("Notification", "ghcr.io/baoduy/dknet.notification-api", "0.0.4")
     .WithHttpEndpoint(targetPort: 8080, name: "http")
     .WithReference(cache, "Redis")
