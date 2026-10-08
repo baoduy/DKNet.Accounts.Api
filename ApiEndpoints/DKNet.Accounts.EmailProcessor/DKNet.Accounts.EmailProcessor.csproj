@@ -1,0 +1,33 @@
+<!-- Dev-only onboarding email processor (DRK-2166), started with DKNet.Accounts.AppHost: reads its own copy of the
+     ledger events and asks DKNet Notification for the onboarding email. Web SDK only for the shared framework's
+     generic host — it serves nothing over HTTP. -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <EnableNETAnalyzers>false</EnableNETAnalyzers>
+        <AnalysisMode>None</AnalysisMode>
+        <RunAnalyzers>false</RunAnalyzers>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Owner test waiver (DRK-2166 §4): a demo app only the AppHost starts; checked on the running demo. -->
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="DKNet.Notification.Client" />
+        <PackageReference Include="SlimMessageBus.Host.RabbitMQ" />
+        <PackageReference Include="SlimMessageBus.Host.Serialization.SystemTextJson" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DKNet.Accounts.Client\DKNet.Accounts.Client.csproj" />
+    </ItemGroup>
+
+</Project>
