@@ -36,6 +36,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DKNet.Accounts.Infra.Postgr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DKNet.Accounts.Infra.MsSql", "ApiEndpoints\DKNet.Accounts.Infra.MsSql\DKNet.Accounts.Infra.MsSql.csproj", "{0B848CC6-A5D3-4265-B013-BCB46ACD3387}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DKNet.Accounts.EmailProcessor", "ApiEndpoints\DKNet.Accounts.EmailProcessor\DKNet.Accounts.EmailProcessor.csproj", "{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -202,6 +204,18 @@ Global
 		{0B848CC6-A5D3-4265-B013-BCB46ACD3387}.Release|x64.Build.0 = Release|Any CPU
 		{0B848CC6-A5D3-4265-B013-BCB46ACD3387}.Release|x86.ActiveCfg = Release|Any CPU
 		{0B848CC6-A5D3-4265-B013-BCB46ACD3387}.Release|x86.Build.0 = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|x64.Build.0 = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Debug|x86.Build.0 = Debug|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|x64.ActiveCfg = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|x64.Build.0 = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|x86.ActiveCfg = Release|Any CPU
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -220,5 +234,6 @@ Global
 		{1A47969F-7A57-4026-B485-6C639E8F0607} = {5217F0FC-7FBA-4FB2-9B86-9BCD8969049E}
 		{3E3A530E-4D81-4C37-9E49-0D93176D938C} = {5217F0FC-7FBA-4FB2-9B86-9BCD8969049E}
 		{0B848CC6-A5D3-4265-B013-BCB46ACD3387} = {5217F0FC-7FBA-4FB2-9B86-9BCD8969049E}
+		{D4C02A97-F18D-4F7A-8E3D-95DE1B84DC0E} = {5217F0FC-7FBA-4FB2-9B86-9BCD8969049E}
 	EndGlobalSection
 EndGlobal

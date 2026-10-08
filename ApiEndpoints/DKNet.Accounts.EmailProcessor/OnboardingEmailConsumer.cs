@@ -1,23 +1,24 @@
+using System.Net;
 using System.Text.RegularExpressions;
-using DKNet.Accounts.Domains.Features.AccountGroups.Entities;
-using DKNet.Accounts.Infra.Contexts;
+using DKNet.Accounts.Client;
+using DKNet.Accounts.Client.Contracts;
 using DKNet.Notification.Client;
-using Microsoft.Extensions.Logging;
 using SlimMessageBus;
 
-namespace DKNet.Accounts.Infra.Services;
+namespace DKNet.Accounts.EmailProcessor;
 
 /// <summary>
-///     Reads the email feature's own copy of the ledger events (DRK-2156) and asks DKNet Notification for one
-///     onboarding email per account opened in a Customer or Merchant group (R1, R2). The recipient and the
-///     customer name are fakes derived from the account id, so a redelivery builds the same request (R3), sent under
-///     the key <c>onboarding-email-&lt;accountNumber&gt;</c> that DKNet Notification replays (R4). A failure is
-///     logged once and the message acknowledged: this never throws, so nothing is requeued or retried (R6).
+///     Reads the email processor's own copy of the ledger events (DRK-2166) and asks DKNet Notification for one
+///     onboarding email per account opened in a Customer or Merchant group (R1), the group type read from the Accounts
+///     API. The recipient and the customer name are fakes derived from the account id (R7), so a redelivery builds the
+///     same request, sent under the key <c>onboarding-email-&lt;accountNumber&gt;</c> that DKNet Notification replays
+///     (R5). A failed group read or request is logged once as an error and the message acknowledged: this never throws,
+///     so nothing is requeued or retried (R2, R3, R4).
 /// </summary>
 internal sealed partial class OnboardingEmailConsumer(
-    CoreDbContext db,
+    IAccountClient accounts,
     INotificationClient notifications,
-    ILogger<OnboardingEmailConsumer> logger) : IConsumer<OutboundEnvelope>
+    ILogger<OnboardingEmailConsumer> logger) : IConsumer<LedgerEvent>
 {
     private const string AccountCreated = "accounts.created";
 
@@ -33,30 +34,22 @@ internal sealed partial class OnboardingEmailConsumer(
         "Irwin", "Keller", "Lowe", "Marsh", "Norris", "Pryce", "Sloane", "Wren"
     ];
 
-    public async Task OnHandle(OutboundEnvelope message, CancellationToken cancellationToken)
+    public async Task OnHandle(LedgerEvent message, CancellationToken cancellationToken)
     {
         if (message.Type != AccountCreated) return;
 
         string? accountNumber = null;
+        var step = "group read";
         try
         {
             var payload = message.Payload;
             accountNumber = payload.GetProperty("accountNumber").GetString()!;
-            var groupId = payload.GetProperty("groupId").GetGuid();
-
-            var groupType = await db.Set<AccountGroup>().AsNoTracking()
-                .Where(g => g.Id == groupId)
-                .Select(g => (AccountGroupType?)g.Type)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (groupType is null)
-            {
-                LogGroupNotFound(accountNumber, groupId);
-                return;
-            }
+            var group = await accounts.GetAccountGroupAsync(payload.GetProperty("groupId").GetGuid(), cancellationToken);
 
             // Allow-list: a group type added later gets no email until it is named here.
-            if (groupType is not (AccountGroupType.Customer or AccountGroupType.Merchant)) return;
+            if (group.Type is not (AccountGroupType.Customer or AccountGroupType.Merchant)) return;
 
+            step = "onboarding email request";
             await notifications.SendAsync(
                 Request(payload.GetProperty("id").GetGuid(), accountNumber),
                 IdempotencyKey(accountNumber),
@@ -67,19 +60,23 @@ internal sealed partial class OnboardingEmailConsumer(
         {
             // Host shutdown, not a failed request: nothing to report.
         }
+        catch (AccountApiException e)
+        {
+            LogRefused(accountNumber, step, e.StatusCode);
+        }
         catch (NotificationApiException e)
         {
-            LogRefused(accountNumber, (int)e.StatusCode);
+            LogRefused(accountNumber, step, e.StatusCode);
         }
-#pragma warning disable CA1031 // R6: any failure is logged once and swallowed, so the message is never requeued.
         catch (Exception e)
-#pragma warning restore CA1031
         {
-            LogFailed(accountNumber, e.GetType().Name, e.Message);
+            // Any other failure (unreachable, timeout, an unreadable answer) is logged once and swallowed, so the
+            // message is never requeued.
+            LogFailed(accountNumber, step, e.GetType().Name, e.Message);
         }
     }
 
-    /// <summary>R3: the name and address are picked by the account id's bytes, never looked up or stored.</summary>
+    /// <summary>R7: the name and address are picked by the account id's bytes, never looked up or stored.</summary>
     private static SendNotificationRequest Request(Guid accountId, string accountNumber)
     {
         var bytes = accountId.ToByteArray();
@@ -103,17 +100,13 @@ internal sealed partial class OnboardingEmailConsumer(
     [LoggerMessage(Level = LogLevel.Information, Message = "Onboarding email requested for account {AccountNumber}.")]
     private partial void LogRequested(string accountNumber);
 
-    [LoggerMessage(Level = LogLevel.Warning,
-        Message = "No onboarding email for account {AccountNumber}: account group {GroupId} was not found.")]
-    private partial void LogGroupNotFound(string accountNumber, Guid groupId);
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "No onboarding email for account {AccountNumber}: the {Step} was refused with status {StatusCode}.")]
+    private partial void LogRefused(string? accountNumber, string step, HttpStatusCode statusCode);
 
     [LoggerMessage(Level = LogLevel.Error,
-        Message = "Onboarding email request for account {AccountNumber} failed: status {StatusCode}.")]
-    private partial void LogRefused(string? accountNumber, int statusCode);
-
-    [LoggerMessage(Level = LogLevel.Error,
-        Message = "Onboarding email request for account {AccountNumber} failed: {Reason}: {Detail}")]
-    private partial void LogFailed(string? accountNumber, string reason, string detail);
+        Message = "No onboarding email for account {AccountNumber}: the {Step} failed: {Reason}: {Detail}")]
+    private partial void LogFailed(string? accountNumber, string step, string reason, string detail);
 
     [GeneratedRegex("[^A-Za-z0-9-]")]
     private static partial Regex NotKeySafe();

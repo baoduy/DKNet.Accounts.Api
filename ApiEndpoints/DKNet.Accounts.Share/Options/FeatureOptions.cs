@@ -43,13 +43,6 @@ public class FeatureOptions
     public bool EnableServiceBus { get; set; }
 
     /// <summary>
-    ///     Gets or sets a value indicating whether an onboarding email is requested from DKNet Notification for each
-    ///     account opened in a Customer or Merchant group (DRK-2156). Takes effect only with the service bus on over
-    ///     RabbitMQ, and needs the <see cref="OnboardingEmailOptions" /> settings. Default is false.
-    /// </summary>
-    public bool EnableOnboardingEmail { get; set; }
-
-    /// <summary>
     ///     Gets or sets a value indicating whether Swagger/OpenAPI documentation is enabled.
     /// </summary>
     public bool EnableSwagger { get; set; }
