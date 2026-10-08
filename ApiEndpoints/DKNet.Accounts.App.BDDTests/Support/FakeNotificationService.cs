@@ -48,16 +48,6 @@ public sealed class FakeNotificationService : HttpMessageHandler
     /// <summary>Every notification request received so far, in arrival order.</summary>
     public IReadOnlyList<NotificationRequest> Requests => _requests.ToArray();
 
-    /// <summary>The environment that points the host's onboarding email settings at this fake.</summary>
-    public static IReadOnlyDictionary<string, string?> Settings(string queue) => new Dictionary<string, string?>
-    {
-        ["OnboardingEmail__NotificationBaseUrl"] = BaseUrl,
-        ["OnboardingEmail__TokenUrl"] = TokenUrl,
-        ["OnboardingEmail__ClientId"] = "accounts-onboarding-email",
-        ["OnboardingEmail__ClientSecret"] = ClientSecret,
-        ["OnboardingEmail__Queue"] = queue
-    };
-
     /// <summary>
     /// Makes this fake the primary handler of every HttpClient the host creates. Set after every other handler
     /// builder action, because the Notification client's own registration sets a primary handler of its own, which

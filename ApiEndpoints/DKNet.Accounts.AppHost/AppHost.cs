@@ -55,9 +55,9 @@ var mailpit = builder.AddContainer("Mailpit", "axllent/mailpit", "v1.27")
     });
 var smtp = mailpit.GetEndpoint("smtp");
 
-// DKNet Notification (DRK-2156): the API asks it to send the welcome mail when an account is opened. The release
-// image, pinned, with email on and sign-in on. It trusts only the demo realm and only tokens made out to its own
-// audience, so a ledger token is refused there and its own token is refused by the ledger. The issuer is the address
+// DKNet Notification (DRK-2156): the email processor below asks it to send the welcome mail when an account is
+// opened. The release image, pinned, with email on and sign-in on. It trusts only the demo realm and only tokens made
+// out to its own audience, so a ledger token is refused there. The issuer is the address
 // every token carries (the one the API signs in on); the keys are fetched over the container network, over plain
 // HTTP when no developer certificate is trusted, the same relaxation as the API's and, like it, set only in this
 // AppHost. The developer certificate is added to its trusted authorities so the STARTTLS check against Mailpit stays
@@ -103,13 +103,6 @@ var api = builder.AddProject<DKNet_Accounts_Api>("Api")
     .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", realmUrl)
     .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", ledgerAudience)
     .WithEnvironment("Authentication__Schemes__Bearer__RequireHttpsMetadata", "false")
-    // Opening an account sends a welcome mail through Notification, signed in as its own machine client of the demo
-    // realm, which holds only the send permission. No WaitFor: opening an account never waits on Notification.
-    .WithEnvironment("FeatureManagement__EnableOnboardingEmail", "true")
-    .WithEnvironment("OnboardingEmail__NotificationBaseUrl", notification.GetEndpoint("http"))
-    .WithEnvironment("OnboardingEmail__TokenUrl", ReferenceExpression.Create($"{realmUrl}/protocol/openid-connect/token"))
-    .WithEnvironment("OnboardingEmail__ClientId", "dknet-accounts-onboarding-email")
-    .WithEnvironment("OnboardingEmail__ClientSecret", "dknet-accounts-onboarding-email-demo-secret")
     .WaitFor(cache)
     .WaitFor(apDb)
     .WaitFor(rabbitMq)
@@ -145,6 +138,24 @@ var console = builder.AddExecutable("UI", "pnpm", "../../ui", "dev")
     .WaitFor(cache)
     .WaitFor(keycloak);
 console.WithEnvironment("CONSOLE_BASE_URL", console.GetEndpoint("http"));
+
+// The onboarding email (DRK-2166), started with the AppHost: it reads its own copy of the ledger events (its own
+// queue on the API's fanout exchange) and, for each account opened in a Customer or Merchant group, reads the group
+// from the API and asks Notification for one welcome mail. It signs in as its own machine client of the demo realm,
+// which holds only the send permission and read-only accounts.read, so the API refuses its token for any write.
+builder.AddProject<DKNet_Accounts_EmailProcessor>("EmailProcessor")
+    .WithReference(rabbitMq)
+    .WithEnvironment("MessageBus__Exchange", "ledger-events")
+    .WithEnvironment("MessageBus__Queue", "ledger-events.onboarding-email")
+    .WithEnvironment("ApiBaseUrl", api.GetEndpoint("http"))
+    .WithEnvironment("NotificationBaseUrl", notification.GetEndpoint("http"))
+    .WithEnvironment("Auth__TokenUrl", ReferenceExpression.Create($"{realmUrl}/protocol/openid-connect/token"))
+    .WithEnvironment("Auth__ClientId", "dknet-accounts-onboarding-email")
+    .WithEnvironment("Auth__ClientSecret", "dknet-accounts-onboarding-email-demo-secret")
+    .WaitFor(rabbitMq)
+    .WaitFor(keycloak)
+    .WaitFor(api)
+    .WaitFor(notification);
 
 // Dev-only traffic: press ▶ on TrafficGen in the dashboard to create groups, accounts and postings through the API
 // on a loop, then watch the ledger events land in the RabbitMQ management UI. Stop it with ■.

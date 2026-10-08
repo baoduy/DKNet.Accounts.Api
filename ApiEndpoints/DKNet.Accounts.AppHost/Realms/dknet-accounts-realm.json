@@ -275,11 +275,22 @@
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
+        },
+        {
+          "name": "ledger-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "dknet-accounts-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ],
       "defaultClientScopes": [
         "basic",
-        "notifications.send"
+        "notifications.send",
+        "accounts.read"
       ],
       "optionalClientScopes": []
     }
@@ -357,6 +368,14 @@
         "postings.read",
         "postings.write",
         "postings.reverse"
+      ]
+    },
+    {
+      "username": "service-account-dknet-accounts-onboarding-email",
+      "enabled": true,
+      "serviceAccountClientId": "dknet-accounts-onboarding-email",
+      "realmRoles": [
+        "accounts.read"
       ]
     }
   ]
