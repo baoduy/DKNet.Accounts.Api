@@ -137,26 +137,23 @@ internal sealed class RecordPostingBatchCommandHandler(
 
         var accountIds = request.Movements.Select(m => m.AccountId).Distinct().OrderBy(id => id).ToList();
         var acquired = new List<IDisposable>();
+        // The locks are taken inside the try whose finally releases them: a timeout, a cancellation or any other
+        // exception part-way through releases every lock already held (DRK-2282).
         try
         {
-            foreach (var accountId in accountIds)
+            try
             {
-                acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
+                foreach (var accountId in accountIds)
+                {
+                    acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
+                }
             }
-        }
-        catch (TimeoutException)
-        {
-            foreach (var handle in acquired)
+            catch (TimeoutException)
             {
-                handle.Dispose();
+                return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
+                    LedgerErrors.LockTimeout, "Timed out waiting to record against one of this batch's accounts."));
             }
 
-            return Result.Fail<IReadOnlyCollection<PostingDto>>(LedgerErrors.Error(
-                LedgerErrors.LockTimeout, "Timed out waiting to record against one of this batch's accounts."));
-        }
-
-        try
-        {
             var accounts = new Dictionary<Guid, Account>();
             foreach (var accountId in accountIds)
             {
