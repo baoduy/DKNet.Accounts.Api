@@ -162,11 +162,13 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
         // arrive, so only what the transfer sends is read after this point.
         _accounts.Clear();
         _groupId = null;
-        await OpenBackgroundAccountsAsync();
-        var seeded = _accounts.Values.Select(a => a.Id).ToHashSet();
+        var postings = await OpenBackgroundAccountsAsync();
+        var accounts = _accounts.Values.Select(a => a.Id).ToList();
         (await _queue.WaitUntilAsync(
-                events => seeded.All(id => events.Any(e => e.Type == "accounts.created" && e.PayloadId == id)), Arrival))
-            .ShouldBeTrue($"the accounts opened for the scenario never reached the outbound queue. {_queue.Describe()}");
+                events => accounts.All(id => events.Any(e => e.Type == "accounts.created" && e.PayloadId == id))
+                          && postings.All(id => events.Any(e => e.Type == "postings.created" && e.PayloadId == id)),
+                Arrival))
+            .ShouldBeTrue($"the accounts and balances set up for the scenario never reached the outbound queue. {_queue.Describe()}");
         await _queue.SettleAsync(Settle);
         _eventsBefore = _queue.Received.Count;
     }
@@ -279,14 +281,7 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
     [When(@"^PayHub records a batch debiting ([\d.]+) ([A-Z]+) from ""([^""]+)"" and crediting ([\d.]+) ([A-Z]+) to ""([^""]+)""$")]
     public async Task WhenPayHubRecordsABatch(
         decimal debit, string debitCurrency, string debited, decimal credit, string creditCurrency, string credited) =>
-        await SendAsync(HttpMethod.Post, $"{PostingsPath}/batch", new
-        {
-            movements = new object[]
-            {
-                new { accountId = _accounts[debited].Id, direction = "Debit", amount = debit, currency = debitCurrency, category = "Transfer" },
-                new { accountId = _accounts[credited].Id, direction = "Credit", amount = credit, currency = creditCurrency, category = "Transfer" }
-            }
-        }, NewKey());
+        await RecordBatchAsync(debited, debit, debitCurrency, credited, credit, creditCurrency, NewKey());
 
     #endregion
 
@@ -702,14 +697,10 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
         if ((m = Regex.Match(text, @"^a batch moving ([\d.]+) ([A-Z]+) from ""([^""]+)"" to ""([^""]+)""$")).Success)
         {
             var match = m;
-            return (() => Task.CompletedTask, key => SendAsync(HttpMethod.Post, $"{PostingsPath}/batch", new
-            {
-                movements = new object[]
-                {
-                    new { accountId = _accounts[match.Groups[3].Value].Id, direction = "Debit", amount = Decimal(match.Groups[1].Value), currency = match.Groups[2].Value, category = "Transfer" },
-                    new { accountId = _accounts[match.Groups[4].Value].Id, direction = "Credit", amount = Decimal(match.Groups[1].Value), currency = match.Groups[2].Value, category = "Transfer" }
-                }
-            }, key));
+            var amount = Decimal(match.Groups[1].Value);
+            var currency = match.Groups[2].Value;
+            return (() => Task.CompletedTask, key => RecordBatchAsync(
+                match.Groups[3].Value, amount, currency, match.Groups[4].Value, amount, currency, key));
         }
 
         if ((m = Regex.Match(text, @"^the reversal of a ([\d.]+) ([A-Z]+) debit on ""([^""]+)""$")).Success)
@@ -757,6 +748,17 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
         SendAsync(HttpMethod.Post, PostingsPath,
             new { accountId, direction, amount, currency, category = "Transfer" }, key);
 
+    private Task<HttpResponseMessage> RecordBatchAsync(
+        string debited, decimal debit, string debitCurrency, string credited, decimal credit, string creditCurrency, string key) =>
+        SendAsync(HttpMethod.Post, $"{PostingsPath}/batch", new
+        {
+            movements = new object[]
+            {
+                new { accountId = _accounts[debited].Id, direction = "Debit", amount = debit, currency = debitCurrency, category = "Transfer" },
+                new { accountId = _accounts[credited].Id, direction = "Credit", amount = credit, currency = creditCurrency, category = "Transfer" }
+            }
+        }, key);
+
     private static async Task<JsonElement> SucceedsAsync(HttpResponseMessage response, string what)
     {
         var body = await response.Content.ReadAsStringAsync();
@@ -764,13 +766,21 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
         return Json(body);
     }
 
-    private async Task OpenBackgroundAccountsAsync()
+    /// <summary>Opens the Background's accounts on the current host. Returns the postings that set their
+    /// balances.</summary>
+    private async Task<List<Guid>> OpenBackgroundAccountsAsync()
     {
+        var postings = new List<Guid>();
         foreach (var (name, balance, currency) in _background)
         {
             await OpenAccountAsync(name, currency, "Liability");
-            await SetBalanceAsync(name, balance);
+            if (await SetBalanceAsync(name, balance) is { } posting)
+            {
+                postings.Add(posting);
+            }
         }
+
+        return postings;
     }
 
     private async Task OpenAccountAsync(string name, string currency, string classification)
@@ -794,21 +804,22 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
     }
 
     /// <summary>Moves the account's balance to <paramref name="target"/> with one posting: on a Liability a credit
-    /// raises the balance, on an Asset a debit does.</summary>
-    private async Task SetBalanceAsync(string name, decimal target)
+    /// raises the balance, on an Asset a debit does. Returns that posting, or null when none was needed.</summary>
+    private async Task<Guid?> SetBalanceAsync(string name, decimal target)
     {
         var account = _accounts[name];
         var (balance, _) = await BalanceAsync(name);
         if (balance == target)
         {
-            return;
+            return null;
         }
 
         var raise = target > balance;
         var direction = (account.Classification == "Asset") == raise ? "Debit" : "Credit";
-        await SucceedsAsync(
+        var posting = await SucceedsAsync(
             await RecordPostingAsync(account.Id, direction, Math.Abs(target - balance), account.Currency, NewKey()),
             $"bringing {name} to {target}");
+        return posting.GetProperty("id").GetGuid();
     }
 
     private async Task<(decimal Balance, long StreamPosition)> BalanceAsync(string name)
