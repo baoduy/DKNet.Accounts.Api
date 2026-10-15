@@ -193,23 +193,9 @@ internal sealed class RecordTransferCommandHandler(
             return Result.Fail<TransferDto>(PostingRefusalReason.AmountOutOfRange.ToError());
         }
 
-        var accountIds = new[] { request.SourceAccountId, request.DestinationAccountId, request.FeeAccountId }
-            .OfType<Guid>().Distinct().Order().ToList();
-        var acquired = new List<IDisposable>();
-        try
+        var acquired = await AcquireLocksAsync(request, cancellationToken);
+        if (acquired is null)
         {
-            foreach (var accountId in accountIds)
-            {
-                acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
-            }
-        }
-        catch (TimeoutException)
-        {
-            foreach (var handle in acquired)
-            {
-                handle.Dispose();
-            }
-
             return Result.Fail<TransferDto>(LedgerErrors.Error(
                 LedgerErrors.LockTimeout, "Timed out waiting to record against one of this transfer's accounts."));
         }
@@ -224,6 +210,35 @@ internal sealed class RecordTransferCommandHandler(
             {
                 handle.Dispose();
             }
+        }
+    }
+
+    /// <summary>Locks every distinct account the transfer names, in ascending id order, as a batch does
+    /// (<c>RecordBatch.cs</c>), so two transfers sharing accounts never deadlock. Null, with every lock already
+    /// taken released, when one of them times out.</summary>
+    private async Task<List<IDisposable>?> AcquireLocksAsync(
+        RecordTransferRequest request, CancellationToken cancellationToken)
+    {
+        var accountIds = new[] { request.SourceAccountId, request.DestinationAccountId, request.FeeAccountId }
+            .OfType<Guid>().Distinct().Order().ToList();
+        var acquired = new List<IDisposable>();
+        try
+        {
+            foreach (var accountId in accountIds)
+            {
+                acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
+            }
+
+            return acquired;
+        }
+        catch (TimeoutException)
+        {
+            foreach (var handle in acquired)
+            {
+                handle.Dispose();
+            }
+
+            return null;
         }
     }
 
