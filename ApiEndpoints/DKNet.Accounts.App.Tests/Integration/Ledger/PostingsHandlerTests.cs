@@ -777,10 +777,37 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         return await scope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Transfer>().LongCountAsync();
     }
 
-    private static RecordTransferCommandHandler TransferHandler(IServiceProvider services, string? callingSystem) =>
+    private static RecordTransferCommandHandler TransferHandler(
+        IServiceProvider services, string? callingSystem, IAccountLockProvider? locks = null) =>
         new(services.GetRequiredService<IRepositorySpec>(), services.GetRequiredService<IMapper>(),
-            services.GetRequiredService<IPostingNumberGenerator>(), services.GetRequiredService<IAccountLockProvider>(),
+            services.GetRequiredService<IPostingNumberGenerator>(), locks ?? services.GetRequiredService<IAccountLockProvider>(),
             new FixedCallingSystem(callingSystem), services.GetRequiredService<TimeProvider>());
+
+    /// <summary>Grants every lock asked for and records it; unless told otherwise, throws
+    /// <see cref="OperationCanceledException"/> on the 2nd, as an aborted request does while it waits.</summary>
+    private sealed class CancelsOnSecondLock(bool cancels = true) : IAccountLockProvider
+    {
+        public List<(Guid AccountId, Handle Handle)> Granted { get; } = [];
+
+        public Task<IDisposable> AcquireAsync(Guid accountId, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (cancels && Granted.Count > 0)
+            {
+                throw new OperationCanceledException();
+            }
+
+            var handle = new Handle();
+            Granted.Add((accountId, handle));
+            return Task.FromResult<IDisposable>(handle);
+        }
+
+        public sealed class Handle : IDisposable
+        {
+            public bool Disposed { get; private set; }
+
+            public void Dispose() => Disposed = true;
+        }
+    }
 
     private sealed class FixedCallingSystem(string? callingSystem) : ICallingSystemAccessor
     {
@@ -1013,6 +1040,57 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         result.IsFailed.ShouldBeTrue();
         result.Errors.ShouldHaveSingleItem().Message.ShouldBe("An Idempotency-Key header is required to record a transfer.");
         (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>PR #74 review finding 1: a request cancelled while it waits for its 2nd account lock releases the
+    /// lock it already holds — a held lock would otherwise block that account until the process restarts — and
+    /// records nothing.</summary>
+    [Fact]
+    public async Task TransferHandler_CancelledWhileTakingItsLocks_ReleasesTheLocksItHolds_AndRecordsNothing()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock();
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub", locks);
+        var transfers = await TransferCountAsync();
+        long postings;
+        using (var countScope = fixture.CreateScope())
+        {
+            postings = await countScope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>().LongCountAsync();
+        }
+
+        await Should.ThrowAsync<OperationCanceledException>(() => handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = $"tr-{Guid.NewGuid():N}"
+        }, CancellationToken.None));
+
+        locks.Granted.ShouldHaveSingleItem().Handle.Disposed.ShouldBeTrue();
+        (await TransferCountAsync()).ShouldBe(transfers);
+        using var after = fixture.CreateScope();
+        (await after.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>().LongCountAsync()).ShouldBe(postings);
+    }
+
+    /// <summary>Each distinct account is locked once, in ascending id order — the order a batch uses, so two
+    /// writers sharing accounts never deadlock — and every lock is released when the handler returns, here with
+    /// a not-found refusal because the accounts do not exist.</summary>
+    [Fact]
+    public async Task TransferHandler_LocksEachDistinctAccountOnceInAscendingOrder_AndReleasesThemAll()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock(cancels: false);
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub", locks);
+        var low = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var high = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = high, DestinationAccountId = low, FeeAccountId = low, Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 1.00m, IdempotencyKey = $"tr-{Guid.NewGuid():N}"
+        }, CancellationToken.None);
+
+        result.Errors.ShouldHaveSingleItem().ShouldBeOfType<DKNet.SlimBus.Extensions.NotFoundError>();
+        locks.Granted.Select(g => g.AccountId).ShouldBe([low, high]);
+        locks.Granted.ShouldAllBe(g => g.Handle.Disposed);
     }
 
     [Fact]
