@@ -908,7 +908,35 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, changed, key));
 
         await ShouldBeRefusedWithAsync(response, HttpStatusCode.Conflict, LedgerErrors.IdempotencyKeyConflict);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").EnumerateArray()
+            .Select(e => e.GetProperty("message").GetString())
+            .ShouldContain("This idempotency key was already used for a different request.");
         (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>§3a: the largest rate allowed, 9,999,999,999.99999999, is accepted — 0.01 USD at that rate
+    /// credits 100,000,000 VND, rounded half away from zero to VND's 0 places.</summary>
+    [Fact]
+    public async Task Transfer_AtTheLargestRateAllowed_IsRecorded()
+    {
+        var source = await OpenAccountAsync("USD");
+        var destination = await OpenAccountAsync("VND");
+        await RecordAsync(source, "Credit", 0.01m, "USD");
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 0.01m,
+            sourceCurrency = "USD",
+            destinationCurrency = "VND",
+            exchangeRate = 9_999_999_999.99999999m,
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("convertedAmount").GetDecimal()
+            .ShouldBe(100_000_000m);
     }
 
     /// <summary>R1: the handler fails closed on a missing key rather than trusting the validator to have run —

@@ -266,6 +266,54 @@ internal sealed class RecordTransferCommandHandler(
     private async Task<IResult<TransferDto>> RecordAsync(
         RecordTransferRequest request, string callingSystemId, CancellationToken cancellationToken)
     {
+        var loaded = await LoadAccountsAsync(request, cancellationToken);
+        if (loaded.IsFailed)
+        {
+            return Result.Fail<TransferDto>(loaded.Errors);
+        }
+
+        var accounts = loaded.Value;
+        var amount = request.Amount!.Value;
+        var fee = request.Fee!.Value;
+        var source = accounts[request.SourceAccountId];
+        var destination = accounts[request.DestinationAccountId];
+        var destinationPlaces = await repository.Query(new SpecGetCurrency(byCode: destination.CurrencyCode))
+            .Select(c => c.DecimalPlaces).FirstAsync(cancellationToken);
+        var transfer = new Transfer(
+            source.Id, destination.Id, amount, source.CurrencyCode, destination.CurrencyCode, request.ExchangeRate,
+            fee, request.FeeAccountId,
+            TransferConversion.Convert(amount, fee, request.ExchangeRate, destinationPlaces),
+            clock.GetUtcNow(), callingSystemId, request.IdempotencyKey!);
+
+        var legs = new List<(Account Account, PostingDirection Direction, decimal Amount, PostingCategory Category)>
+        {
+            (source, PostingDirection.Debit, amount - fee, PostingCategory.Transfer),
+            (destination, PostingDirection.Credit, transfer.ConvertedAmount, PostingCategory.Transfer)
+        };
+        if (fee > 0m)
+        {
+            legs.Add((source, PostingDirection.Debit, fee, PostingCategory.Fee));
+            legs.Add((accounts[request.FeeAccountId!.Value], PostingDirection.Credit, fee, PostingCategory.Fee));
+        }
+
+        var postings = await ApplyLegsAsync(transfer, legs);
+        if (postings.IsFailed)
+        {
+            return Result.Fail<TransferDto>(postings.Errors);
+        }
+
+        await repository.AddAsync(transfer, cancellationToken);
+        await repository.AddRangeAsync(postings.Value, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
+
+        return Result.Ok(await TransferReading.ToDtoAsync(repository, mapper, transfer, cancellationToken));
+    }
+
+    /// <summary>Each distinct account the transfer names, read once; a missing one is not found, and the
+    /// message names the request field that pointed at it.</summary>
+    private async Task<Result<Dictionary<Guid, Account>>> LoadAccountsAsync(
+        RecordTransferRequest request, CancellationToken cancellationToken)
+    {
         var accounts = new Dictionary<Guid, Account>();
         foreach (var (accountId, field) in new[]
                  {
@@ -282,62 +330,42 @@ internal sealed class RecordTransferCommandHandler(
             var account = await repository.FirstOrDefaultAsync(new SpecGetAccount(id), cancellationToken);
             if (account is null)
             {
-                return Result.Fail<TransferDto>(new NotFoundError($"The account {id} named by {field} was not found."));
+                return Result.Fail(new NotFoundError($"The account {id} named by {field} was not found."));
             }
 
             accounts[id] = account;
         }
 
-        var amount = request.Amount!.Value;
-        var fee = request.Fee!.Value;
-        var source = accounts[request.SourceAccountId];
-        var destination = accounts[request.DestinationAccountId];
-        var destinationPlaces = await repository.Query(new SpecGetCurrency(byCode: destination.CurrencyCode))
-            .Select(c => c.DecimalPlaces).FirstAsync(cancellationToken);
-        var recordedAt = clock.GetUtcNow();
-        var transfer = new Transfer(
-            source.Id, destination.Id, amount, source.CurrencyCode, destination.CurrencyCode, request.ExchangeRate,
-            fee, request.FeeAccountId,
-            TransferConversion.Convert(amount, fee, request.ExchangeRate, destinationPlaces),
-            recordedAt, callingSystemId, request.IdempotencyKey!);
+        return accounts;
+    }
 
-        var legs = new List<(Account Account, PostingDirection Direction, decimal Amount, PostingCategory Category)>
-        {
-            (source, PostingDirection.Debit, amount - fee, PostingCategory.Transfer),
-            (destination, PostingDirection.Credit, transfer.ConvertedAmount, PostingCategory.Transfer)
-        };
-        if (fee > 0m)
-        {
-            legs.Add((source, PostingDirection.Debit, fee, PostingCategory.Fee));
-            legs.Add((accounts[request.FeeAccountId!.Value], PostingDirection.Credit, fee, PostingCategory.Fee));
-        }
-
+    /// <summary>Applies each leg, in order, to its account's one instance and builds its posting (R7). The first
+    /// refusal stops the transfer. The key lives on the first posting (R5), so a single posting, batch or
+    /// reversal sent later under it finds that posting and is refused with 409 — no transfer signature can
+    /// equal theirs.</summary>
+    private async Task<Result<List<Posting>>> ApplyLegsAsync(
+        Transfer transfer,
+        IReadOnlyList<(Account Account, PostingDirection Direction, decimal Amount, PostingCategory Category)> legs)
+    {
         var postings = new List<Posting>(legs.Count);
         foreach (var leg in legs)
         {
-            var application = leg.Account.TryApplyPosting(leg.Direction == PostingDirection.Debit, leg.Amount, recordedAt);
+            var application = leg.Account.TryApplyPosting(leg.Direction == PostingDirection.Debit, leg.Amount, transfer.RecordedAt);
             if (!application.Success)
             {
-                return Result.Fail<TransferDto>(application.Refusal.ToError());
+                return Result.Fail(application.Refusal.ToError());
             }
 
             postings.Add(new Posting(
                 leg.Account.Id, await postingNumbers.NextValueAsync(), application.Position, leg.Direction, leg.Amount,
                 leg.Account.CurrencyCode, application.SignedValue, application.BalanceAfter,
-                DateOnly.FromDateTime(recordedAt.UtcDateTime), recordedAt, leg.Category, transfer.Id,
-                null, null, callingSystemId, null, null, null, null, null));
+                DateOnly.FromDateTime(transfer.RecordedAt.UtcDateTime), transfer.RecordedAt, leg.Category, transfer.Id,
+                null, null, transfer.CallingSystem, null, null, null, null, null));
         }
 
-        // R5: the key also lives on the first posting, so a single posting, batch or reversal sent later under
-        // it finds that posting and is refused with 409 — no transfer signature can equal theirs.
         postings[0].StampIdempotency(
-            request.IdempotencyKey!,
+            transfer.IdempotencyKey,
             PostingSignature.Hash(string.Create(CultureInfo.InvariantCulture, $"transfer|{transfer.Id}")));
-
-        await repository.AddAsync(transfer, cancellationToken);
-        await repository.AddRangeAsync(postings, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-
-        return Result.Ok(await TransferReading.ToDtoAsync(repository, mapper, transfer, cancellationToken));
+        return postings;
     }
 }
