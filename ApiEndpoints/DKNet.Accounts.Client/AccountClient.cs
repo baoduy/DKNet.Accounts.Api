@@ -144,6 +144,15 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         SendAsync<PostingDto>(
             HttpMethod.Post, $"/{Version}/postings/{id}/reverse", new { reason }, idempotencyKey, ct);
 
+    // ---- Transfers (2) ----
+
+    public Task<TransferDto> RecordTransferAsync(
+        RecordTransferRequest request, string idempotencyKey, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     // ---- Wire plumbing ----
 
     private async Task<TResponse> SendAsync<TResponse>(

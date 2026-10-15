@@ -3,7 +3,7 @@ using DKNet.Accounts.Client.Contracts;
 namespace DKNet.Accounts.Client;
 
 /// <summary>
-/// One typed method per live route of the accounts service — 28 today (spec §3 "must stay true"). The
+/// One typed method per live route of the accounts service — 30 today (spec §3 "must stay true"). The
 /// route each method calls is declared with <see cref="AccountRouteAttribute"/>, walked by reflection in
 /// the route-parity acceptance test rather than kept twice. No method exists for the health, OpenAPI or
 /// docs-browser addresses (R5).
@@ -136,4 +136,14 @@ public interface IAccountClient
     [AccountRoute("POST", "/v{version:apiVersion}/postings/{id:guid}/reverse")]
     Task<PostingDto> ReversePostingAsync(
         Guid id, string reason, string idempotencyKey, CancellationToken ct = default);
+
+    // ---- Transfers (2) ----
+
+    /// <summary>Sends <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request header, never as a
+    /// body field.</summary>
+    [AccountRoute("POST", "/v{version:apiVersion}/transfers/")]
+    Task<TransferDto> RecordTransferAsync(RecordTransferRequest request, string idempotencyKey, CancellationToken ct = default);
+
+    [AccountRoute("GET", "/v{version:apiVersion}/transfers/{id:guid}")]
+    Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default);
 }
