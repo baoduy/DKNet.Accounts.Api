@@ -815,21 +815,22 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
     }
 
     /// <summary>An amount above 999,999,999,999.999999 can never be stored, so the handler refuses it before it
-    /// converts it.</summary>
+    /// converts it: 10,000,000,000,000,000,000 at the largest whole rate would overflow the conversion itself.</summary>
     [Fact]
     public async Task Transfer_WhoseAmountIsAboveTheCeiling_IsRefusedAmountOutOfRange()
     {
         var source = await OpenAccountAsync();
-        var destination = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
         var transfers = await TransferCountAsync();
 
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
         {
             sourceAccountId = source,
             destinationAccountId = destination,
-            amount = 1_000_000_000_000.00m,
+            amount = 10_000_000_000_000_000_000.00m,
             sourceCurrency = "SGD",
-            destinationCurrency = "SGD",
+            destinationCurrency = "USD",
+            exchangeRate = 9_999_999_999m,
             fee = 0m
         }, $"tr-{Guid.NewGuid():N}"));
 
@@ -937,6 +938,30 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("convertedAmount").GetDecimal()
             .ShouldBe(100_000_000m);
+    }
+
+    /// <summary>R4: a key a single posting already used is refused on a transfer by the handler itself — not
+    /// left to the database's unique index, which a provider without one (InMemory) never enforces.</summary>
+    [Fact]
+    public async Task Transfer_UnderAKeyASinglePostingAlreadyUsed_IsRefusedIdempotencyKeyConflict()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync();
+        var key = $"k-{Guid.NewGuid():N}";
+        (await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
+        {
+            accountId = source, direction = "Credit", amount = 100.00m, currency = "SGD", category = "Transfer"
+        }, key))).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var transfers = await TransferCountAsync();
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "SGD", destinationCurrency = "SGD", fee = 0m
+        }, key));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.Conflict, LedgerErrors.IdempotencyKeyConflict);
+        (await TransferCountAsync()).ShouldBe(transfers);
     }
 
     /// <summary>R1: the handler fails closed on a missing key rather than trusting the validator to have run —
