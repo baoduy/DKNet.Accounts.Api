@@ -32,4 +32,22 @@ public class LedgerErrorsTests
     {
         Result.Ok("value").IsReplayed().ShouldBeFalse();
     }
+
+    /// <summary>DRK-2276 §3a: the transfer refusal codes are the spec's literals, character for character.</summary>
+    [Fact]
+    public void TransferCodes_AreTheSpecsLiterals()
+    {
+        string[] codes =
+        [
+            LedgerErrors.SameAccountTransfer, LedgerErrors.ExchangeRateRequired, LedgerErrors.ExchangeRateNotAllowed,
+            LedgerErrors.InvalidExchangeRate, LedgerErrors.InvalidFee, LedgerErrors.FeeAccountRequired,
+            LedgerErrors.InvalidFeeAccount, LedgerErrors.ConvertedAmountTooSmall
+        ];
+
+        codes.ShouldBe(
+        [
+            "SAME_ACCOUNT_TRANSFER", "EXCHANGE_RATE_REQUIRED", "EXCHANGE_RATE_NOT_ALLOWED", "INVALID_EXCHANGE_RATE",
+            "INVALID_FEE", "FEE_ACCOUNT_REQUIRED", "INVALID_FEE_ACCOUNT", "CONVERTED_AMOUNT_TOO_SMALL"
+        ]);
+    }
 }

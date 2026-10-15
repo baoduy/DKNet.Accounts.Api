@@ -148,10 +148,10 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
 
     public Task<TransferDto> RecordTransferAsync(
         RecordTransferRequest request, string idempotencyKey, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        SendAsync<TransferDto>(HttpMethod.Post, $"/{Version}/transfers", request, idempotencyKey, ct);
 
     public Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        SendAsync<TransferDto>(HttpMethod.Get, $"/{Version}/transfers/{id}", ct: ct);
 
     // ---- Wire plumbing ----
 

@@ -5,7 +5,11 @@ using DKNet.Accounts.App.Tests.Integration.Support;
 using DKNet.Accounts.App.TestSupport;
 using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
+using DKNet.Accounts.AppServices.Transfers.V1.Actions;
+using DKNet.Accounts.Domains.Features.Transfers.Entities;
+using DKNet.Accounts.Domains.Services;
 using DKNet.Accounts.Infra.Contexts;
+using DKNet.EfCore.Specifications.Repositories;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -753,4 +757,196 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
                 .CountAsync(p => p.AccountId == account)).ShouldBe(1);
         }
     }
+
+    #region Transfers (DRK-2276)
+
+    private const string TransfersPath = "/v1/transfers";
+
+    private static async Task ShouldBeRefusedWithAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(status, body);
+        JsonDocument.Parse(body).RootElement.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == code)
+            .ShouldBeTrue($"expected an error carrying code {code}, got: {body}");
+    }
+
+    private async Task<long> TransferCountAsync()
+    {
+        using var scope = fixture.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Transfer>().LongCountAsync();
+    }
+
+    private static RecordTransferCommandHandler TransferHandler(IServiceProvider services, string? callingSystem) =>
+        new(services.GetRequiredService<IRepositorySpec>(), services.GetRequiredService<IMapper>(),
+            services.GetRequiredService<IPostingNumberGenerator>(), services.GetRequiredService<IAccountLockProvider>(),
+            new FixedCallingSystem(callingSystem), services.GetRequiredService<TimeProvider>());
+
+    private sealed class FixedCallingSystem(string? callingSystem) : ICallingSystemAccessor
+    {
+        public string? CallingSystem => callingSystem;
+    }
+
+    /// <summary>§6a D4: a rate that makes the destination's credit larger than any stored amount may be is
+    /// refused AMOUNT_OUT_OF_RANGE by the destination's own posting rules, and nothing is recorded.</summary>
+    [Fact]
+    public async Task Transfer_WhoseConvertedAmountIsAboveTheCeiling_IsRefusedAmountOutOfRange()
+    {
+        var source = await OpenAccountAsync("USD");
+        var destination = await OpenAccountAsync("VND");
+        await RecordAsync(source, "Credit", 1_000_000.00m, "USD");
+        var transfers = await TransferCountAsync();
+        var before = await SnapshotAsync(source);
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 1_000_000.00m,
+            sourceCurrency = "USD",
+            destinationCurrency = "VND",
+            exchangeRate = 9_999_999m,
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.UnprocessableEntity, LedgerErrors.AmountOutOfRange);
+        (await SnapshotAsync(source)).ShouldBe(before);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>An amount above 999,999,999,999.999999 can never be stored, so the handler refuses it before it
+    /// converts it.</summary>
+    [Fact]
+    public async Task Transfer_WhoseAmountIsAboveTheCeiling_IsRefusedAmountOutOfRange()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync();
+        var transfers = await TransferCountAsync();
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 1_000_000_000_000.00m,
+            sourceCurrency = "SGD",
+            destinationCurrency = "SGD",
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.UnprocessableEntity, LedgerErrors.AmountOutOfRange);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>Currency codes are compared without regard to case: a lowercase request is recorded under the
+    /// upper-case codes, and a retry spelling them in upper case is the same transfer, replayed.</summary>
+    [Fact]
+    public async Task Transfer_WithLowercaseCurrencies_IsRecordedUpperCased_AndAnUpperCaseRetryReplaysIt()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        await RecordAsync(source, "Credit", 100.00m);
+        var key = $"tr-{Guid.NewGuid():N}";
+
+        var first = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "sgd", destinationCurrency = "usd", exchangeRate = 0.74m, fee = 0m
+        }, key));
+        var retry = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "SGD", destinationCurrency = "USD", exchangeRate = 0.74m, fee = 0m
+        }, key));
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var recorded = await first.Content.ReadFromJsonAsync<JsonElement>();
+        recorded.GetProperty("sourceCurrency").GetString().ShouldBe("SGD");
+        recorded.GetProperty("destinationCurrency").GetString().ShouldBe("USD");
+        recorded.GetProperty("convertedAmount").GetDecimal().ShouldBe(7.40m);
+        retry.StatusCode.ShouldBe(HttpStatusCode.OK, await retry.Content.ReadAsStringAsync());
+        (await retry.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid()
+            .ShouldBe(recorded.GetProperty("id").GetGuid());
+    }
+
+    /// <summary>R4: a retry under the same key that differs in any one field is a different transfer, refused
+    /// 409. A currency cannot change on its own: it must match its account, so it changes only with the
+    /// account id, which this theory already changes.</summary>
+    [Theory]
+    [InlineData("destination")]
+    [InlineData("amount")]
+    [InlineData("exchangeRate")]
+    [InlineData("fee")]
+    [InlineData("feeAccount")]
+    public async Task Transfer_RetriedUnderItsKeyWithOneFieldChanged_IsRefusedIdempotencyKeyConflict(string field)
+    {
+        var source = await OpenAccountAsync();
+        var usd = await OpenAccountAsync("USD");
+        var otherUsd = await OpenAccountAsync("USD");
+        var fees = await OpenAccountAsync();
+        var otherFees = await OpenAccountAsync();
+        await RecordAsync(source, "Credit", 100.00m);
+        var key = $"tr-{Guid.NewGuid():N}";
+        var original = new Dictionary<string, object?>
+        {
+            ["sourceAccountId"] = source, ["destinationAccountId"] = usd, ["amount"] = 10.00m,
+            ["sourceCurrency"] = "SGD", ["destinationCurrency"] = "USD", ["exchangeRate"] = 0.74m,
+            ["fee"] = 1.00m, ["feeAccountId"] = fees
+        };
+        (await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, original, key))).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var changed = new Dictionary<string, object?>(original);
+        switch (field)
+        {
+            case "destination": changed["destinationAccountId"] = otherUsd; break;
+            case "amount": changed["amount"] = 11.00m; break;
+            case "exchangeRate": changed["exchangeRate"] = 0.75m; break;
+            case "fee": changed["fee"] = 2.00m; break;
+            case "feeAccount": changed["feeAccountId"] = otherFees; break;
+        }
+
+        var transfers = await TransferCountAsync();
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, changed, key));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.Conflict, LedgerErrors.IdempotencyKeyConflict);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>R1: the handler fails closed on a missing key rather than trusting the validator to have run —
+    /// SpecGetPosting skips its key clause on a null key and would match an arbitrary posting.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task TransferHandler_WithNoIdempotencyKey_RefusesWithoutRecording(string? key)
+    {
+        using var scope = fixture.CreateScope();
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub");
+        var transfers = await TransferCountAsync();
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = key
+        }, CancellationToken.None);
+
+        result.IsFailed.ShouldBeTrue();
+        result.Errors.ShouldHaveSingleItem().Message.ShouldBe("An Idempotency-Key header is required to record a transfer.");
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    [Fact]
+    public async Task TransferHandler_WithNoCallingSystem_RefusesAsUnauthenticated()
+    {
+        using var scope = fixture.CreateScope();
+        var handler = TransferHandler(scope.ServiceProvider, null);
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = "k"
+        }, CancellationToken.None);
+
+        result.Errors.ShouldHaveSingleItem().Message.ShouldBe("The caller is not authenticated.");
+    }
+
+    #endregion
 }

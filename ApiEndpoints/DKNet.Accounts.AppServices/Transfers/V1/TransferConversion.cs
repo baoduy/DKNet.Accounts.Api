@@ -5,5 +5,5 @@ namespace DKNet.Accounts.AppServices.Transfers.V1;
 internal static class TransferConversion
 {
     public static decimal Convert(decimal amount, decimal fee, decimal? rate, int destinationPlaces) =>
-        throw new NotImplementedException();
+        Math.Round((amount - fee) * (rate ?? 1m), destinationPlaces, MidpointRounding.AwayFromZero);
 }

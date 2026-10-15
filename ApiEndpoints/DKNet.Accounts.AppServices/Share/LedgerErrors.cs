@@ -37,6 +37,16 @@ public static class LedgerErrors
     public const string AmountOutOfRange = "AMOUNT_OUT_OF_RANGE";
     public const string InvalidLimitAmount = "INVALID_LIMIT_AMOUNT";
 
+    // Transfer refusals (DRK-2276 §3a).
+    public const string SameAccountTransfer = "SAME_ACCOUNT_TRANSFER";
+    public const string ExchangeRateRequired = "EXCHANGE_RATE_REQUIRED";
+    public const string ExchangeRateNotAllowed = "EXCHANGE_RATE_NOT_ALLOWED";
+    public const string InvalidExchangeRate = "INVALID_EXCHANGE_RATE";
+    public const string InvalidFee = "INVALID_FEE";
+    public const string FeeAccountRequired = "FEE_ACCOUNT_REQUIRED";
+    public const string InvalidFeeAccount = "INVALID_FEE_ACCOUNT";
+    public const string ConvertedAmountTooSmall = "CONVERTED_AMOUNT_TOO_SMALL";
+
     /// <summary>The <see cref="FluentResults.Success"/> metadata key marking a successful result as an
     /// idempotent replay (the original outcome returned, nothing new recorded) — the API layer reads this to
     /// return 200, not 201 Created, for a replayed request.</summary>
