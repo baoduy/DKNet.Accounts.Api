@@ -5,7 +5,11 @@ using DKNet.Accounts.Domains.Features.Transfers.Entities;
 namespace DKNet.Accounts.AppServices.Transfers.V1;
 
 /// <summary>A transfer as both transfer routes and an idempotent replay return it (DRK-2276 §3a): every
-/// <see cref="Transfer"/> field except the audit stamps, plus the postings the transfer recorded.</summary>
+/// <see cref="Transfer"/> field except the audit stamps, plus the postings the transfer recorded. Amounts are
+/// written at their own currency's decimal places; the rate is written as it is.</summary>
+[AmountCurrency(nameof(Amount), nameof(SourceCurrency))]
+[AmountCurrency(nameof(Fee), nameof(SourceCurrency))]
+[AmountCurrency(nameof(ConvertedAmount), nameof(DestinationCurrency))]
 [GenerateDto(typeof(Transfer), Exclude =
 [
     nameof(Transfer.CreatedBy), nameof(Transfer.CreatedOn),

@@ -940,6 +940,35 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             .ShouldBe(100_000_000m);
     }
 
+    /// <summary>DRK-2278 row 15: both transfer routes write each amount at its own currency's decimal places,
+    /// whatever scale the caller sent, and the rate as it is.</summary>
+    [Fact]
+    public async Task Transfer_IsWrittenWithEachAmountAtItsCurrencysPlaces_AndTheRateAsItIs()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        var fees = await OpenAccountAsync();
+        await RecordAsync(source, "Credit", 100.00m);
+
+        var recorded = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 100m,
+            sourceCurrency = "SGD", destinationCurrency = "USD", exchangeRate = 0.74m, fee = 2m, feeAccountId = fees
+        }, $"tr-{Guid.NewGuid():N}"));
+        recorded.StatusCode.ShouldBe(HttpStatusCode.Created, await recorded.Content.ReadAsStringAsync());
+        var created = await recorded.Content.ReadFromJsonAsync<JsonElement>();
+        var read = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{TransfersPath}/{created.GetProperty("id").GetGuid()}"));
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        foreach (var body in new[] { created, await read.Content.ReadFromJsonAsync<JsonElement>() })
+        {
+            body.GetProperty("amount").GetRawText().ShouldBe("100.00");
+            body.GetProperty("fee").GetRawText().ShouldBe("2.00");
+            body.GetProperty("convertedAmount").GetRawText().ShouldBe("72.52");
+            body.GetProperty("exchangeRate").GetRawText().ShouldBe("0.74");
+        }
+    }
+
     /// <summary>R4: a key a single posting already used is refused on a transfer by the handler itself — not
     /// left to the database's unique index, which a provider without one (InMemory) never enforces.</summary>
     [Fact]
