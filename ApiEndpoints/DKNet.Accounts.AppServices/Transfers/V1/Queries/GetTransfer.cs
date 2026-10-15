@@ -22,13 +22,21 @@ internal sealed class GetTransferQueryHandler(IRepositorySpec repository, IMappe
 }
 
 /// <summary>The one way a transfer is turned into its response (R8) — shared by the read, the 201 and the
-/// idempotent replay, so all three list the same postings in the same order.</summary>
+/// idempotent replay, so all three list the same postings in the same order and write the rate alike.</summary>
 internal static class TransferReading
 {
     public static async Task<TransferDto> ToDtoAsync(
         IRepositorySpec repository, IMapper mapper, Transfer transfer, CancellationToken cancellationToken)
     {
         var postings = await repository.ToListAsync(new SpecListTransferPostings(transfer.Id), cancellationToken);
-        return mapper.Map<TransferDto>(transfer) with { Postings = [.. postings.Select(mapper.Map<PostingDto>)] };
+        var dto = mapper.Map<TransferDto>(transfer);
+        return dto with
+        {
+            // One form on every route: PostgreSQL reads the rate back at numeric(18,8)'s 8 places, while a
+            // just-recorded transfer still holds it as the caller wrote it. Dividing by a 1 of scale 28 drops
+            // every trailing zero (0.74000000 → 0.74), as PostingSignature does for an amount.
+            ExchangeRate = dto.ExchangeRate / 1.0000000000000000000000000000m,
+            Postings = [.. postings.Select(mapper.Map<PostingDto>)]
+        };
     }
 }

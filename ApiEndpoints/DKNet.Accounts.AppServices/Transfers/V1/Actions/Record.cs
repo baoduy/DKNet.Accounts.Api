@@ -193,15 +193,30 @@ internal sealed class RecordTransferCommandHandler(
             return Result.Fail<TransferDto>(PostingRefusalReason.AmountOutOfRange.ToError());
         }
 
-        var acquired = await AcquireLocksAsync(request, cancellationToken);
-        if (acquired is null)
-        {
-            return Result.Fail<TransferDto>(LedgerErrors.Error(
-                LedgerErrors.LockTimeout, "Timed out waiting to record against one of this transfer's accounts."));
-        }
+        return await RecordUnderLocksAsync(request, callingSystemId, cancellationToken);
+    }
 
+    /// <summary>Takes the account locks, then records, inside the try whose finally releases them: a timeout, a
+    /// cancellation or any other exception part-way through releases every lock already held.</summary>
+    private async Task<IResult<TransferDto>> RecordUnderLocksAsync(
+        RecordTransferRequest request, string callingSystemId, CancellationToken cancellationToken)
+    {
+        var acquired = new List<IDisposable>();
         try
         {
+            try
+            {
+                foreach (var accountId in LockOrder(request))
+                {
+                    acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
+                }
+            }
+            catch (TimeoutException)
+            {
+                return Result.Fail<TransferDto>(LedgerErrors.Error(
+                    LedgerErrors.LockTimeout, "Timed out waiting to record against one of this transfer's accounts."));
+            }
+
             return await RecordAsync(request, callingSystemId, cancellationToken);
         }
         finally
@@ -213,34 +228,11 @@ internal sealed class RecordTransferCommandHandler(
         }
     }
 
-    /// <summary>Locks every distinct account the transfer names, in ascending id order, as a batch does
-    /// (<c>RecordBatch.cs</c>), so two transfers sharing accounts never deadlock. Null, with every lock already
-    /// taken released, when one of them times out.</summary>
-    private async Task<List<IDisposable>?> AcquireLocksAsync(
-        RecordTransferRequest request, CancellationToken cancellationToken)
-    {
-        var accountIds = new[] { request.SourceAccountId, request.DestinationAccountId, request.FeeAccountId }
-            .OfType<Guid>().Distinct().Order().ToList();
-        var acquired = new List<IDisposable>();
-        try
-        {
-            foreach (var accountId in accountIds)
-            {
-                acquired.Add(await locks.AcquireAsync(accountId, PostingLocking.LockTimeout, cancellationToken));
-            }
-
-            return acquired;
-        }
-        catch (TimeoutException)
-        {
-            foreach (var handle in acquired)
-            {
-                handle.Dispose();
-            }
-
-            return null;
-        }
-    }
+    /// <summary>Every distinct account the transfer names, in ascending id order, as a batch locks them
+    /// (<c>RecordBatch.cs</c>), so two transfers sharing accounts never deadlock.</summary>
+    private static IEnumerable<Guid> LockOrder(RecordTransferRequest request) =>
+        new[] { request.SourceAccountId, request.DestinationAccountId, request.FeeAccountId }
+            .OfType<Guid>().Distinct().Order();
 
     /// <summary>R4: a transfer already recorded under this key replays when its content is the same and is
     /// refused when it is not; a posting, batch or reversal recorded under it is always refused. Null when the
