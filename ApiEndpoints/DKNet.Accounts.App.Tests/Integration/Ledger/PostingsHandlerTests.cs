@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using DKNet.Accounts.Api.Configs.Auth;
 using DKNet.Accounts.App.Tests.Integration.Support;
 using DKNet.Accounts.App.TestSupport;
+using DKNet.Accounts.AppServices.Postings.V1.Actions;
 using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
 using DKNet.Accounts.AppServices.Transfers.V1.Actions;
@@ -783,6 +784,18 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             services.GetRequiredService<IPostingNumberGenerator>(), locks ?? services.GetRequiredService<IAccountLockProvider>(),
             new FixedCallingSystem(callingSystem), services.GetRequiredService<TimeProvider>());
 
+    private static RecordPostingBatchCommandHandler BatchHandler(
+        IServiceProvider services, string? callingSystem, IAccountLockProvider? locks = null) =>
+        new(services.GetRequiredService<IRepositorySpec>(), services.GetRequiredService<IMapper>(),
+            services.GetRequiredService<IPostingNumberGenerator>(), locks ?? services.GetRequiredService<IAccountLockProvider>(),
+            new FixedCallingSystem(callingSystem), services.GetRequiredService<TimeProvider>());
+
+    private async Task<long> PostingCountAsync()
+    {
+        using var scope = fixture.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>().LongCountAsync();
+    }
+
     /// <summary>Grants every lock asked for and records it; unless told otherwise, throws
     /// <see cref="OperationCanceledException"/> on the 2nd, as an aborted request does while it waits.</summary>
     private sealed class CancelsOnSecondLock(bool cancels = true) : IAccountLockProvider
@@ -1086,6 +1099,64 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         {
             SourceAccountId = high, DestinationAccountId = low, FeeAccountId = low, Amount = 10.00m,
             SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 1.00m, IdempotencyKey = $"tr-{Guid.NewGuid():N}"
+        }, CancellationToken.None);
+
+        result.Errors.ShouldHaveSingleItem().ShouldBeOfType<DKNet.SlimBus.Extensions.NotFoundError>();
+        locks.Granted.Select(g => g.AccountId).ShouldBe([low, high]);
+        locks.Granted.ShouldAllBe(g => g.Handle.Disposed);
+    }
+
+    /// <summary>DRK-2282: a batch cancelled while it waits for its 2nd account lock releases the lock it already
+    /// holds — a held lock would otherwise block that account with LOCK_TIMEOUT until the process restarts — and
+    /// records nothing.</summary>
+    [Fact]
+    public async Task BatchHandler_CancelledWhileTakingItsLocks_ReleasesTheLocksItHolds_AndRecordsNothing()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock();
+        var handler = BatchHandler(scope.ServiceProvider, "PayHub", locks);
+        var postings = await PostingCountAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => handler.OnHandle(new RecordPostingBatchRequest
+        {
+            Movements =
+            [
+                new PostingBatchMovement
+                {
+                    AccountId = Guid.NewGuid(), Direction = PostingDirection.Debit, Amount = 10.00m, Currency = "SGD",
+                    Category = PostingCategory.Transfer
+                },
+                new PostingBatchMovement
+                {
+                    AccountId = Guid.NewGuid(), Direction = PostingDirection.Credit, Amount = 10.00m, Currency = "SGD",
+                    Category = PostingCategory.Transfer
+                }
+            ]
+        }, CancellationToken.None));
+
+        locks.Granted.ShouldHaveSingleItem().Handle.Disposed.ShouldBeTrue();
+        (await PostingCountAsync()).ShouldBe(postings);
+    }
+
+    /// <summary>A batch locks each distinct account once, in ascending id order, however often and in whatever
+    /// order its movements name it, and releases every lock when the handler returns — here with a not-found
+    /// refusal because the accounts do not exist.</summary>
+    [Fact]
+    public async Task BatchHandler_LocksEachDistinctAccountOnceInAscendingOrder_AndReleasesThemAll()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock(cancels: false);
+        var handler = BatchHandler(scope.ServiceProvider, "PayHub", locks);
+        var low = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var high = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+        var result = await handler.OnHandle(new RecordPostingBatchRequest
+        {
+            Movements = new[] { high, low, high }.Select(accountId => new PostingBatchMovement
+            {
+                AccountId = accountId, Direction = PostingDirection.Credit, Amount = 10.00m, Currency = "SGD",
+                Category = PostingCategory.Transfer
+            }).ToList()
         }, CancellationToken.None);
 
         result.Errors.ShouldHaveSingleItem().ShouldBeOfType<DKNet.SlimBus.Extensions.NotFoundError>();
