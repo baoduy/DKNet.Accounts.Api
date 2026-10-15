@@ -53,7 +53,8 @@ public sealed class CurrencyDecimalPlaces(IServiceScopeFactory scopes)
 /// the response is written, so every route gets it: the hand-written handlers, the generated CRUD routes
 /// (whose EF projections never pass through a handler) and every list and page alike. It applies to each
 /// response type of this assembly that states its <c>Currency</c>: every <see cref="decimal"/> member on it is
-/// an amount in that currency.
+/// an amount in that currency. A type whose amounts are in more than one currency names each amount's
+/// currency with <see cref="AmountCurrencyAttribute"/> instead, and only those amounts are scaled.
 /// </summary>
 public static class CurrencyScaleJson
 {
@@ -82,13 +83,9 @@ public static class CurrencyScaleJson
             return;
         }
 
-        var currencyOf = typeInfo.Properties
-            .FirstOrDefault(p => p.PropertyType == typeof(string) && (p.AttributeProvider as MemberInfo)?.Name == "Currency")
-            ?.Get;
-        if (currencyOf is null)
-        {
-            return;
-        }
+        var named = typeInfo.Type.GetCustomAttributes<AmountCurrencyAttribute>()
+            .ToDictionary(a => a.Amount, a => CurrencyGetter(a.Currency));
+        var sharedCurrency = named.Count == 0 ? CurrencyGetter("Currency") : null;
 
         foreach (var property in typeInfo.Properties)
         {
@@ -97,12 +94,36 @@ public static class CurrencyScaleJson
                 continue;
             }
 
-            property.Get = owner => get(owner) is decimal value ? Scale(value, owner) : null;
+            var currencyOf = named.Count == 0 ? sharedCurrency : named.GetValueOrDefault(MemberName(property) ?? "");
+            if (currencyOf is null)
+            {
+                continue;
+            }
+
+            property.Get = owner => get(owner) is decimal value ? Scale(value, currencyOf(owner)) : null;
         }
 
         return;
 
-        object Scale(decimal value, object owner) =>
-            currencyOf(owner) is string code && decimalPlacesOf(code) is { } places ? ToScale(value, places) : value;
+        Func<object, object?>? CurrencyGetter(string member) =>
+            typeInfo.Properties.FirstOrDefault(p => p.PropertyType == typeof(string) && MemberName(p) == member)?.Get;
+
+        object Scale(decimal value, object? currency) =>
+            currency is string code && decimalPlacesOf(code) is { } places ? ToScale(value, places) : value;
     }
+
+    private static string? MemberName(JsonPropertyInfo property) => (property.AttributeProvider as MemberInfo)?.Name;
+}
+
+/// <summary>
+/// Names the string member that holds the currency of one amount on a response type whose amounts are in more
+/// than one currency (<see cref="CurrencyScaleJson"/>). Once a type carries any of these, only the amounts it
+/// names are scaled; a decimal it does not name, such as a rate, is written as it is.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+internal sealed class AmountCurrencyAttribute(string amount, string currency) : Attribute
+{
+    public string Amount { get; } = amount;
+
+    public string Currency { get; } = currency;
 }

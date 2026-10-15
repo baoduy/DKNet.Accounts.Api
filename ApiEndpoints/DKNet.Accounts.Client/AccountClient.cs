@@ -144,6 +144,15 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         SendAsync<PostingDto>(
             HttpMethod.Post, $"/{Version}/postings/{id}/reverse", new { reason }, idempotencyKey, ct);
 
+    // ---- Transfers (2) ----
+
+    public Task<TransferDto> RecordTransferAsync(
+        RecordTransferRequest request, string idempotencyKey, CancellationToken ct = default) =>
+        SendAsync<TransferDto>(HttpMethod.Post, $"/{Version}/transfers", request, idempotencyKey, ct);
+
+    public Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<TransferDto>(HttpMethod.Get, $"/{Version}/transfers/{id}", ct: ct);
+
     // ---- Wire plumbing ----
 
     private async Task<TResponse> SendAsync<TResponse>(

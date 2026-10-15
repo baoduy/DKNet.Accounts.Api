@@ -69,13 +69,13 @@ public sealed class PostingsPostgresTests(PostgresLedgerApiFixture fixture) : IC
         return _fixtureGroupId.Value;
     }
 
-    private async Task<Guid> OpenAccountAsync()
+    private async Task<Guid> OpenAccountAsync(string currency = "SGD")
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, AccountsPath, new
         {
             groupId = await FixtureGroupIdAsync(),
             name = "Operating",
-            currency = "SGD",
+            currency,
             classification = "Liability",
             permittedToGoNegative = false
         }));
@@ -212,5 +212,37 @@ public sealed class PostingsPostgresTests(PostgresLedgerApiFixture fixture) : IC
         var balanceResponse = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{AccountsPath}/{account2}/balance"));
         var balance = await balanceResponse.Content.ReadFromJsonAsync<JsonElement>();
         balance.GetProperty("balance").GetDecimal().ShouldBe(15m);
+    }
+
+    /// <summary>PR #74 review finding 2: the rate is stored as numeric(18,8), so a read from PostgreSQL carries 8
+    /// places. The 201, the GET and the idempotent replay must still write it in one form — spec §3: a replay
+    /// returns the transfer "in the same shape as when it was recorded".</summary>
+    [Fact]
+    public async Task Transfer_WritesTheRateInOneFormOnTheRecordTheReadAndTheReplay_AgainstRealPostgres()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        (await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
+        {
+            accountId = source, direction = "Credit", amount = 100m, currency = "SGD", category = "Transfer"
+        }))).EnsureSuccessStatusCode();
+        var key = $"tr-{Guid.NewGuid():N}";
+        var transfer = new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 100.00m,
+            sourceCurrency = "SGD", destinationCurrency = "USD", exchangeRate = 0.74m, fee = 0.00m
+        };
+
+        var recorded = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/transfers", transfer, key));
+        recorded.StatusCode.ShouldBe(HttpStatusCode.Created, await recorded.Content.ReadAsStringAsync());
+        var created = await recorded.Content.ReadFromJsonAsync<JsonElement>();
+        var read = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"/v1/transfers/{created.GetProperty("id").GetGuid()}"));
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var replay = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/transfers", transfer, key));
+        replay.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        created.GetProperty("exchangeRate").GetRawText().ShouldBe("0.74");
+        (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("exchangeRate").GetRawText().ShouldBe("0.74");
+        (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("exchangeRate").GetRawText().ShouldBe("0.74");
     }
 }

@@ -16,6 +16,8 @@
         </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
         <PackageReference Include="SlimMessageBus.Host.Outbox.Sql.DbContext"/>
+        <!-- Direct pin over Microsoft.Data.SqlClient's vulnerable transitive System.Security.Cryptography.Pkcs. -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs"/>
     </ItemGroup>
 
     <ItemGroup>

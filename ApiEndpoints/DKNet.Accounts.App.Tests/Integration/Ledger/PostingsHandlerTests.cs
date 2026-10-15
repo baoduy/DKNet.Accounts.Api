@@ -5,7 +5,11 @@ using DKNet.Accounts.App.Tests.Integration.Support;
 using DKNet.Accounts.App.TestSupport;
 using DKNet.Accounts.AppServices.Share;
 using DKNet.Accounts.Domains.Features.Postings.Entities;
+using DKNet.Accounts.AppServices.Transfers.V1.Actions;
+using DKNet.Accounts.Domains.Features.Transfers.Entities;
+using DKNet.Accounts.Domains.Services;
 using DKNet.Accounts.Infra.Contexts;
+using DKNet.EfCore.Specifications.Repositories;
 
 namespace DKNet.Accounts.App.Tests.Integration.Ledger;
 
@@ -753,4 +757,356 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
                 .CountAsync(p => p.AccountId == account)).ShouldBe(1);
         }
     }
+
+    #region Transfers (DRK-2276)
+
+    private const string TransfersPath = "/v1/transfers";
+
+    private static async Task ShouldBeRefusedWithAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(status, body);
+        JsonDocument.Parse(body).RootElement.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == code)
+            .ShouldBeTrue($"expected an error carrying code {code}, got: {body}");
+    }
+
+    private async Task<long> TransferCountAsync()
+    {
+        using var scope = fixture.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Transfer>().LongCountAsync();
+    }
+
+    private static RecordTransferCommandHandler TransferHandler(
+        IServiceProvider services, string? callingSystem, IAccountLockProvider? locks = null) =>
+        new(services.GetRequiredService<IRepositorySpec>(), services.GetRequiredService<IMapper>(),
+            services.GetRequiredService<IPostingNumberGenerator>(), locks ?? services.GetRequiredService<IAccountLockProvider>(),
+            new FixedCallingSystem(callingSystem), services.GetRequiredService<TimeProvider>());
+
+    /// <summary>Grants every lock asked for and records it; unless told otherwise, throws
+    /// <see cref="OperationCanceledException"/> on the 2nd, as an aborted request does while it waits.</summary>
+    private sealed class CancelsOnSecondLock(bool cancels = true) : IAccountLockProvider
+    {
+        public List<(Guid AccountId, Handle Handle)> Granted { get; } = [];
+
+        public Task<IDisposable> AcquireAsync(Guid accountId, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (cancels && Granted.Count > 0)
+            {
+                throw new OperationCanceledException();
+            }
+
+            var handle = new Handle();
+            Granted.Add((accountId, handle));
+            return Task.FromResult<IDisposable>(handle);
+        }
+
+        public sealed class Handle : IDisposable
+        {
+            public bool Disposed { get; private set; }
+
+            public void Dispose() => Disposed = true;
+        }
+    }
+
+    private sealed class FixedCallingSystem(string? callingSystem) : ICallingSystemAccessor
+    {
+        public string? CallingSystem => callingSystem;
+    }
+
+    /// <summary>§6a D4: a rate that makes the destination's credit larger than any stored amount may be is
+    /// refused AMOUNT_OUT_OF_RANGE by the destination's own posting rules, and nothing is recorded.</summary>
+    [Fact]
+    public async Task Transfer_WhoseConvertedAmountIsAboveTheCeiling_IsRefusedAmountOutOfRange()
+    {
+        var source = await OpenAccountAsync("USD");
+        var destination = await OpenAccountAsync("VND");
+        await RecordAsync(source, "Credit", 1_000_000.00m, "USD");
+        var transfers = await TransferCountAsync();
+        var before = await SnapshotAsync(source);
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 1_000_000.00m,
+            sourceCurrency = "USD",
+            destinationCurrency = "VND",
+            exchangeRate = 9_999_999m,
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.UnprocessableEntity, LedgerErrors.AmountOutOfRange);
+        (await SnapshotAsync(source)).ShouldBe(before);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>An amount above 999,999,999,999.999999 can never be stored, so the handler refuses it before it
+    /// converts it: 10,000,000,000,000,000,000 at the largest whole rate would overflow the conversion itself.</summary>
+    [Fact]
+    public async Task Transfer_WhoseAmountIsAboveTheCeiling_IsRefusedAmountOutOfRange()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        var transfers = await TransferCountAsync();
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 10_000_000_000_000_000_000.00m,
+            sourceCurrency = "SGD",
+            destinationCurrency = "USD",
+            exchangeRate = 9_999_999_999m,
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.UnprocessableEntity, LedgerErrors.AmountOutOfRange);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>Currency codes are compared without regard to case: a lowercase request is recorded under the
+    /// upper-case codes, and a retry spelling them in upper case is the same transfer, replayed.</summary>
+    [Fact]
+    public async Task Transfer_WithLowercaseCurrencies_IsRecordedUpperCased_AndAnUpperCaseRetryReplaysIt()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        await RecordAsync(source, "Credit", 100.00m);
+        var key = $"tr-{Guid.NewGuid():N}";
+
+        var first = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "sgd", destinationCurrency = "usd", exchangeRate = 0.74m, fee = 0m
+        }, key));
+        var retry = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "SGD", destinationCurrency = "USD", exchangeRate = 0.74m, fee = 0m
+        }, key));
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var recorded = await first.Content.ReadFromJsonAsync<JsonElement>();
+        recorded.GetProperty("sourceCurrency").GetString().ShouldBe("SGD");
+        recorded.GetProperty("destinationCurrency").GetString().ShouldBe("USD");
+        recorded.GetProperty("convertedAmount").GetDecimal().ShouldBe(7.40m);
+        retry.StatusCode.ShouldBe(HttpStatusCode.OK, await retry.Content.ReadAsStringAsync());
+        (await retry.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid()
+            .ShouldBe(recorded.GetProperty("id").GetGuid());
+    }
+
+    /// <summary>R4: a retry under the same key that differs in any one field is a different transfer, refused
+    /// 409. A currency cannot change on its own: it must match its account, so it changes only with the
+    /// account id, which this theory already changes.</summary>
+    [Theory]
+    [InlineData("destination")]
+    [InlineData("amount")]
+    [InlineData("exchangeRate")]
+    [InlineData("fee")]
+    [InlineData("feeAccount")]
+    public async Task Transfer_RetriedUnderItsKeyWithOneFieldChanged_IsRefusedIdempotencyKeyConflict(string field)
+    {
+        var source = await OpenAccountAsync();
+        var usd = await OpenAccountAsync("USD");
+        var otherUsd = await OpenAccountAsync("USD");
+        var fees = await OpenAccountAsync();
+        var otherFees = await OpenAccountAsync();
+        await RecordAsync(source, "Credit", 100.00m);
+        var key = $"tr-{Guid.NewGuid():N}";
+        var original = new Dictionary<string, object?>
+        {
+            ["sourceAccountId"] = source, ["destinationAccountId"] = usd, ["amount"] = 10.00m,
+            ["sourceCurrency"] = "SGD", ["destinationCurrency"] = "USD", ["exchangeRate"] = 0.74m,
+            ["fee"] = 1.00m, ["feeAccountId"] = fees
+        };
+        (await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, original, key))).StatusCode
+            .ShouldBe(HttpStatusCode.Created);
+        var changed = new Dictionary<string, object?>(original);
+        switch (field)
+        {
+            case "destination": changed["destinationAccountId"] = otherUsd; break;
+            case "amount": changed["amount"] = 11.00m; break;
+            case "exchangeRate": changed["exchangeRate"] = 0.75m; break;
+            case "fee": changed["fee"] = 2.00m; break;
+            case "feeAccount": changed["feeAccountId"] = otherFees; break;
+        }
+
+        var transfers = await TransferCountAsync();
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, changed, key));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.Conflict, LedgerErrors.IdempotencyKeyConflict);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").EnumerateArray()
+            .Select(e => e.GetProperty("message").GetString())
+            .ShouldContain("This idempotency key was already used for a different request.");
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>§3a: the largest rate allowed, 9,999,999,999.99999999, is accepted — 0.01 USD at that rate
+    /// credits 100,000,000 VND, rounded half away from zero to VND's 0 places.</summary>
+    [Fact]
+    public async Task Transfer_AtTheLargestRateAllowed_IsRecorded()
+    {
+        var source = await OpenAccountAsync("USD");
+        var destination = await OpenAccountAsync("VND");
+        await RecordAsync(source, "Credit", 0.01m, "USD");
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source,
+            destinationAccountId = destination,
+            amount = 0.01m,
+            sourceCurrency = "USD",
+            destinationCurrency = "VND",
+            exchangeRate = 9_999_999_999.99999999m,
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("convertedAmount").GetDecimal()
+            .ShouldBe(100_000_000m);
+    }
+
+    /// <summary>DRK-2278 row 15: both transfer routes write each amount at its own currency's decimal places,
+    /// whatever scale the caller sent, and the rate as it is.</summary>
+    [Fact]
+    public async Task Transfer_IsWrittenWithEachAmountAtItsCurrencysPlaces_AndTheRateAsItIs()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync("USD");
+        var fees = await OpenAccountAsync();
+        await RecordAsync(source, "Credit", 100.00m);
+
+        var recorded = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 100m,
+            sourceCurrency = "SGD", destinationCurrency = "USD", exchangeRate = 0.74m, fee = 2m, feeAccountId = fees
+        }, $"tr-{Guid.NewGuid():N}"));
+        recorded.StatusCode.ShouldBe(HttpStatusCode.Created, await recorded.Content.ReadAsStringAsync());
+        var created = await recorded.Content.ReadFromJsonAsync<JsonElement>();
+        var read = await Client.SendAsync(AsPayHub(HttpMethod.Get, $"{TransfersPath}/{created.GetProperty("id").GetGuid()}"));
+        read.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        foreach (var body in new[] { created, await read.Content.ReadFromJsonAsync<JsonElement>() })
+        {
+            body.GetProperty("amount").GetRawText().ShouldBe("100.00");
+            body.GetProperty("fee").GetRawText().ShouldBe("2.00");
+            body.GetProperty("convertedAmount").GetRawText().ShouldBe("72.52");
+            body.GetProperty("exchangeRate").GetRawText().ShouldBe("0.74");
+        }
+    }
+
+    /// <summary>R4: a key a single posting already used is refused on a transfer by the handler itself — not
+    /// left to the database's unique index, which a provider without one (InMemory) never enforces.</summary>
+    [Fact]
+    public async Task Transfer_UnderAKeyASinglePostingAlreadyUsed_IsRefusedIdempotencyKeyConflict()
+    {
+        var source = await OpenAccountAsync();
+        var destination = await OpenAccountAsync();
+        var key = $"k-{Guid.NewGuid():N}";
+        (await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
+        {
+            accountId = source, direction = "Credit", amount = 100.00m, currency = "SGD", category = "Transfer"
+        }, key))).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var transfers = await TransferCountAsync();
+
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, TransfersPath, new
+        {
+            sourceAccountId = source, destinationAccountId = destination, amount = 10.00m,
+            sourceCurrency = "SGD", destinationCurrency = "SGD", fee = 0m
+        }, key));
+
+        await ShouldBeRefusedWithAsync(response, HttpStatusCode.Conflict, LedgerErrors.IdempotencyKeyConflict);
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>R1: the handler fails closed on a missing key rather than trusting the validator to have run —
+    /// SpecGetPosting skips its key clause on a null key and would match an arbitrary posting.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task TransferHandler_WithNoIdempotencyKey_RefusesWithoutRecording(string? key)
+    {
+        using var scope = fixture.CreateScope();
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub");
+        var transfers = await TransferCountAsync();
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = key
+        }, CancellationToken.None);
+
+        result.IsFailed.ShouldBeTrue();
+        result.Errors.ShouldHaveSingleItem().Message.ShouldBe("An Idempotency-Key header is required to record a transfer.");
+        (await TransferCountAsync()).ShouldBe(transfers);
+    }
+
+    /// <summary>PR #74 review finding 1: a request cancelled while it waits for its 2nd account lock releases the
+    /// lock it already holds — a held lock would otherwise block that account until the process restarts — and
+    /// records nothing.</summary>
+    [Fact]
+    public async Task TransferHandler_CancelledWhileTakingItsLocks_ReleasesTheLocksItHolds_AndRecordsNothing()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock();
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub", locks);
+        var transfers = await TransferCountAsync();
+        long postings;
+        using (var countScope = fixture.CreateScope())
+        {
+            postings = await countScope.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>().LongCountAsync();
+        }
+
+        await Should.ThrowAsync<OperationCanceledException>(() => handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = $"tr-{Guid.NewGuid():N}"
+        }, CancellationToken.None));
+
+        locks.Granted.ShouldHaveSingleItem().Handle.Disposed.ShouldBeTrue();
+        (await TransferCountAsync()).ShouldBe(transfers);
+        using var after = fixture.CreateScope();
+        (await after.ServiceProvider.GetRequiredService<CoreDbContext>().Set<Posting>().LongCountAsync()).ShouldBe(postings);
+    }
+
+    /// <summary>Each distinct account is locked once, in ascending id order — the order a batch uses, so two
+    /// writers sharing accounts never deadlock — and every lock is released when the handler returns, here with
+    /// a not-found refusal because the accounts do not exist.</summary>
+    [Fact]
+    public async Task TransferHandler_LocksEachDistinctAccountOnceInAscendingOrder_AndReleasesThemAll()
+    {
+        using var scope = fixture.CreateScope();
+        var locks = new CancelsOnSecondLock(cancels: false);
+        var handler = TransferHandler(scope.ServiceProvider, "PayHub", locks);
+        var low = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var high = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = high, DestinationAccountId = low, FeeAccountId = low, Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 1.00m, IdempotencyKey = $"tr-{Guid.NewGuid():N}"
+        }, CancellationToken.None);
+
+        result.Errors.ShouldHaveSingleItem().ShouldBeOfType<DKNet.SlimBus.Extensions.NotFoundError>();
+        locks.Granted.Select(g => g.AccountId).ShouldBe([low, high]);
+        locks.Granted.ShouldAllBe(g => g.Handle.Disposed);
+    }
+
+    [Fact]
+    public async Task TransferHandler_WithNoCallingSystem_RefusesAsUnauthenticated()
+    {
+        using var scope = fixture.CreateScope();
+        var handler = TransferHandler(scope.ServiceProvider, null);
+
+        var result = await handler.OnHandle(new RecordTransferRequest
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 10.00m,
+            SourceCurrency = "SGD", DestinationCurrency = "SGD", Fee = 0m, IdempotencyKey = "k"
+        }, CancellationToken.None);
+
+        result.Errors.ShouldHaveSingleItem().Message.ShouldBe("The caller is not authenticated.");
+    }
+
+    #endregion
 }

@@ -3,6 +3,7 @@ using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Share;
+using DKNet.Accounts.AppServices.Transfers.V1;
 
 namespace DKNet.Accounts.App.Tests.Unit.Share;
 
@@ -79,6 +80,31 @@ public class CurrencyScaleJsonTests
     public void AnApplicationTypeWithNoCurrency_IsLeftAlone() =>
         JsonSerializer.SerializeToElement(new UpdateAccountRequest { MinimumBalance = 1.5m }, Options)
             .GetProperty("minimumBalance").GetRawText().ShouldBe("1.5");
+
+    /// <summary>DRK-2278 row 15: a transfer's amounts are in 2 currencies. The amount and the fee take the source
+    /// currency's places, the converted amount the destination's, and the rate is written as it is.</summary>
+    [Fact]
+    public void ATransfer_ScalesEachAmountByItsOwnCurrency_AndLeavesTheRateAsItIs()
+    {
+        var transfer = JsonSerializer.SerializeToElement(
+            new TransferDto
+            {
+                SourceCurrency = "SGD",
+                DestinationCurrency = "JPY",
+                Amount = 100m,
+                Fee = 2m,
+                ConvertedAmount = 7252.000000m,
+                ExchangeRate = 74.00000000m,
+                CallingSystem = "PayHub",
+                IdempotencyKey = "k"
+            },
+            Options);
+
+        transfer.GetProperty("amount").GetRawText().ShouldBe("100.00");
+        transfer.GetProperty("fee").GetRawText().ShouldBe("2.00");
+        transfer.GetProperty("convertedAmount").GetRawText().ShouldBe("7252");
+        transfer.GetProperty("exchangeRate").GetRawText().ShouldBe("74.00000000");
+    }
 
     [Fact]
     public void AResolverAlreadyInPlace_KeepsItsOwnModifiers()

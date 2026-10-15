@@ -156,4 +156,24 @@ public sealed class PostingsLockTimeoutTests(LockTimeoutApiFixture fixture) : IC
             .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.LockTimeout)
             .ShouldBeTrue($"expected an error carrying code {LedgerErrors.LockTimeout}, got: {body}");
     }
+
+    [Fact]
+    public async Task Transfer_RefusesWithLockTimeout_WhenAnAccountLockCannotBeAcquired()
+    {
+        var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, "/v1/transfers", new
+        {
+            sourceAccountId = Guid.NewGuid(),
+            destinationAccountId = Guid.NewGuid(),
+            amount = 10m,
+            sourceCurrency = "SGD",
+            destinationCurrency = "SGD",
+            fee = 0m
+        }, $"tr-{Guid.NewGuid():N}"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("errors").EnumerateArray()
+            .Any(e => e.TryGetProperty("code", out var itemCode) && itemCode.GetString() == LedgerErrors.LockTimeout)
+            .ShouldBeTrue($"expected an error carrying code {LedgerErrors.LockTimeout}, got: {body}");
+    }
 }

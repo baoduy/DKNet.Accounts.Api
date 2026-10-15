@@ -48,7 +48,15 @@ internal static class LedgerErrorResponseOptions
         LedgerErrors.IdempotencyKeyConflict,
         LedgerErrors.InvalidDateRange,
         LedgerErrors.AmountOutOfRange,
-        LedgerErrors.InvalidLimitAmount
+        LedgerErrors.InvalidLimitAmount,
+        LedgerErrors.SameAccountTransfer,
+        LedgerErrors.ExchangeRateRequired,
+        LedgerErrors.ExchangeRateNotAllowed,
+        LedgerErrors.InvalidExchangeRate,
+        LedgerErrors.InvalidFee,
+        LedgerErrors.FeeAccountRequired,
+        LedgerErrors.InvalidFeeAccount,
+        LedgerErrors.ConvertedAmountTooSmall
     };
 
     internal static bool IsKnownCode(string? code) => code is not null && KnownCodes.Contains(code);
@@ -63,7 +71,8 @@ internal static class LedgerErrorResponseOptions
         {
             ["IX_AccountGroups_Code"] = LedgerErrors.DuplicateGroupCode,
             ["IX_Currencies_Code"] = LedgerErrors.DuplicateCurrencyCode,
-            ["IX_Postings_CallingSystem_IdempotencyKey"] = LedgerErrors.IdempotencyKeyConflict
+            ["IX_Postings_CallingSystem_IdempotencyKey"] = LedgerErrors.IdempotencyKeyConflict,
+            ["IX_Transfers_CallingSystem_IdempotencyKey"] = LedgerErrors.IdempotencyKeyConflict
         };
 
     /// <summary>Status is derived from a code in this one place (R3) — reused by both the result path

@@ -314,6 +314,14 @@ member on an unhandled error, with the exception's type name. Quote `traceId` wh
 | `422` | `CURRENCY_HOLDS_BALANCE` | Currency deactivation requested while an account denominated in it still holds a balance |
 | `422` | `AMOUNT_OUT_OF_RANGE` | A write would store an amount above 999,999,999,999.999999 — a posting amount, the resulting balance of a posting, batch or reversal, or an account limit. Nothing is written |
 | `422` | `INVALID_LIMIT_AMOUNT` | An overdraft limit or minimum balance has more decimal places than its account's currency. `errors[].field` names the refused limit |
+| `422` | `SAME_ACCOUNT_TRANSFER` | The destination is the source |
+| `422` | `EXCHANGE_RATE_REQUIRED` | The currencies differ and no rate was sent |
+| `422` | `EXCHANGE_RATE_NOT_ALLOWED` | The currencies are the same and a rate was sent |
+| `422` | `INVALID_EXCHANGE_RATE` | Not above 0, more than 8 decimal places, or above 9,999,999,999.99999999 |
+| `422` | `INVALID_FEE` | Below 0, finer than the source currency, or not less than `amount` |
+| `422` | `FEE_ACCOUNT_REQUIRED` | The fee is above 0 and no fee account was sent |
+| `422` | `INVALID_FEE_ACCOUNT` | Not in the source currency, is the source, or sent with a fee of 0 |
+| `422` | `CONVERTED_AMOUNT_TOO_SMALL` | The converted amount rounds to 0 |
 
 Every code above is a constant in `ApiEndpoints/DKNet.Accounts.AppServices/Share/LedgerErrors.cs`; that
 file is the authority if this table and the service ever disagree.
