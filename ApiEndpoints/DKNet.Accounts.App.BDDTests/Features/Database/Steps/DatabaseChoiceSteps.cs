@@ -258,12 +258,21 @@ public sealed class DatabaseChoiceSteps(BddApiFactory sharedHost)
         _keyIndex.GetFilter().ShouldBe("[IdempotencyKey] IS NOT NULL");
     }
 
+    /// <summary>After start, the database's history holds every migration this release carries — the ones the
+    /// earlier release applied and any added since — and nothing is left pending. No migration is named, so a
+    /// later migration keeps this green only by being applied.</summary>
     [Then(@"^no migration is pending$")]
     public async Task ThenNoMigrationIsPending()
     {
         _startupError.ShouldBeNull();
         (await CountCurrenciesAsync()).ShouldBeGreaterThan(0, "the service started without migrating the database");
-        (await ReadMigrationHistoryAsync()).ShouldBe(_historyBeforeStart);
+
+        using var scope = RequireHost().Services.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<CoreDbContext>().Database;
+        var history = await ReadMigrationHistoryAsync();
+        history.ShouldBe(database.GetMigrations().Order(StringComparer.Ordinal).ToArray());
+        _historyBeforeStart.ShouldBeSubsetOf(history, "the earlier release's history rows were not kept");
+        (await database.GetPendingMigrationsAsync()).ShouldBeEmpty();
     }
 
     [Then(@"^the response is 409 ""([^""]+)""$")]

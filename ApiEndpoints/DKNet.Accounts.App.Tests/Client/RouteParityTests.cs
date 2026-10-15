@@ -17,7 +17,7 @@ public sealed class RouteParityTests(LedgerApiFixture fixture) : IClassFixture<L
 
     private static readonly string[] LedgerPathPrefixes =
     [
-        $"{V1}/account-groups", $"{V1}/accounts", $"{V1}/postings", $"{V1}/currencies"
+        $"{V1}/account-groups", $"{V1}/accounts", $"{V1}/postings", $"{V1}/currencies", $"{V1}/transfers"
     ];
 
     [Fact]

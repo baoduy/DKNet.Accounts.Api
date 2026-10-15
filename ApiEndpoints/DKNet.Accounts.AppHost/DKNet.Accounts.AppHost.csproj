@@ -32,6 +32,8 @@
         <PackageReference Include="Aspire.Hosting.RabbitMQ" />
         <PackageReference Include="Aspire.Hosting.SqlServer" />
         <PackageReference Include="Aspire.Hosting.Keycloak" />
+        <!-- Direct pin over Aspire.Hosting.SqlServer's vulnerable transitive System.Security.Cryptography.Pkcs. -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs" />
     </ItemGroup>
 
     <ItemGroup>

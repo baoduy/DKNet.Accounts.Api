@@ -25,7 +25,7 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
 
     private static readonly string[] LedgerPathPrefixes =
     [
-        $"{V1}/account-groups", $"{V1}/accounts", $"{V1}/postings", $"{V1}/currencies"
+        $"{V1}/account-groups", $"{V1}/accounts", $"{V1}/postings", $"{V1}/currencies", $"{V1}/transfers"
     ];
 
     private static readonly IReadOnlyDictionary<(string Method, string Path), string> ExpectedScopes =
@@ -59,7 +59,9 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
             [("POST", $"{V1}/postings/")] = ScopeNames.PostingsWrite,
             [("POST", $"{V1}/postings/batch")] = ScopeNames.PostingsWrite,
             [("GET", $"{V1}/postings/{{id:guid}}")] = ScopeNames.PostingsRead,
-            [("POST", $"{V1}/postings/{{id:guid}}/reverse")] = ScopeNames.PostingsReverse
+            [("POST", $"{V1}/postings/{{id:guid}}/reverse")] = ScopeNames.PostingsReverse,
+            [("POST", $"{V1}/transfers/")] = ScopeNames.PostingsWrite,
+            [("GET", $"{V1}/transfers/{{id:guid}}")] = ScopeNames.PostingsRead
         };
 
     [Fact]
