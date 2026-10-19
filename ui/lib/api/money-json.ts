@@ -127,8 +127,9 @@ export function isZeroAmount(amount: string): boolean {
   return /^[-+]?0(\.0+)?$/.test(amount);
 }
 
-/** A decimal-string amount as an integer count of `10^-scale` units — exact, never via `Number`. */
-function toScaledUnits(amount: string, scale: number): bigint {
+/** A decimal-string amount as an integer count of `10^-scale` units — exact, never via `Number`.
+ * Expects at most `scale` fraction digits: a longer fraction gives a wrong count, and non-numeric text throws. */
+export function toScaledUnits(amount: string, scale: number): bigint {
   const negative = amount.startsWith('-');
   const [intPart, fracPart = ''] = amount.replace(/^[-+]/, '').split('.');
   // `BigInt('')` is 0n, so a missing whole part (`.5`) or fraction reads as 0.

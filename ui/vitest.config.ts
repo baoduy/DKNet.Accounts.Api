@@ -13,6 +13,13 @@ export const CONSOLE_STARTING_FILES = [
   'tests/unit/stand-in-liveness.test.ts',
 ];
 
+/**
+ * DRK-2325: the 2 Transfers files that switch `process.env.TZ` to Singapore at run time. Node applies
+ * a runtime `TZ` change on a process's main thread only, never in a worker thread, so they run in
+ * their own `forks` project — whatever zone the machine itself runs in.
+ */
+export const TIMEZONE_FILES = ['components/transfers/TransfersScreen.list.test.tsx', 'components/transfers/TransfersScreen.detail.test.tsx'];
+
 // `tests/` is the frozen acceptance-test suite (DRK-1669 approval round 2) — unit tests
 // for production modules live beside their source instead, under `lib/`.
 export const UNIT_FILES = ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx', 'lib/**/*.test.ts', 'lib/**/*.test.tsx', 'components/**/*.test.tsx'];
@@ -34,8 +41,9 @@ export default defineConfig({
       { extends: true, test: { name: 'console', pool: 'forks', maxWorkers: 1, sequence: { groupOrder: 0 }, include: CONSOLE_STARTING_FILES } },
       {
         extends: true,
-        test: { name: 'unit', pool: 'threads', sequence: { groupOrder: 1 }, include: UNIT_FILES, exclude: [...configDefaults.exclude, ...CONSOLE_STARTING_FILES] },
+        test: { name: 'unit', pool: 'threads', sequence: { groupOrder: 1 }, include: UNIT_FILES, exclude: [...configDefaults.exclude, ...CONSOLE_STARTING_FILES, ...TIMEZONE_FILES] },
       },
+      { extends: true, test: { name: 'timezone', pool: 'forks', sequence: { groupOrder: 2 }, include: TIMEZONE_FILES } },
     ],
     coverage: {
       provider: 'v8',
