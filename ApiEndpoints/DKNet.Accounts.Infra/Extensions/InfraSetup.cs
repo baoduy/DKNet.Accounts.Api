@@ -37,6 +37,9 @@ public static class InfraSetup
             .AddSingleton(TimeProvider.System)
             .AddSpecRepo<CoreDbContext>()
             .AddEventPublisher<CoreDbContext, EventPublisher>()
+            // Hooks run in registration order; ServiceConfigs registers the audit hook before this, so its stamps
+            // are normalised too.
+            .AddHook<CoreDbContext, StoredPrecisionHook>()
             .AddDbContextWithHook<CoreDbContext>((sp, builder) =>
             {
                 var config = sp.GetRequiredService<IConfiguration>();
