@@ -364,6 +364,16 @@ public sealed class Dknet11ErrorPathSteps(HttpClient client, ScenarioState state
             .ShouldBeFalse();
     }
 
+    /// <summary>DRK-2304 R1: stricter than the step above — no "code" member at all, so a FluentValidation
+    /// validator name (<c>NotEmptyValidator</c>) or a serialized <c>"code": null</c> fails it too.</summary>
+    [Then(@"no error in that list carries a code")]
+    public async Task ThenNoErrorInThatListCarriesACode()
+    {
+        var doc = await ReadJsonAsync(state.Response!);
+        doc.GetProperty("errors").EnumerateArray()
+            .Where(e => e.TryGetProperty("code", out _)).ShouldBeEmpty($"expected no error to carry a code, got: {doc}");
+    }
+
     // "the request is refused as not found" / "the request is refused as not permitted" are matched by
     // LedgerSteps' shared catch-all ("the request is refused(?! with status)(?:.*)"), which asserts against
     // state.ExpectedRefusalStatus — set by WhenSendsADeleteRequestFor / GivenIsSignedInAndHoldsOnlyThe...

@@ -116,6 +116,24 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             new { reason },
             idempotencyKey ?? $"rev-{Guid.NewGuid():N}"));
 
+    /// <summary>DRK-2304 §6a D3: one refusal carrying a ledger code and one carrying none — the ledger code
+    /// still decides the status and reaches its entry; the uncoded entry carries no "code" member.</summary>
+    [Fact]
+    public async Task ListPostings_WithAWideWindowAndAOneCharacterSearch_KeepsOnlyTheLedgerCode()
+    {
+        var response = await Client.SendAsync(
+            AsPayHub(HttpMethod.Get, $"{PostingsPath}?from=2026-01-01&to=2026-09-22&search=A"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors").EnumerateArray().ToList();
+        errors.Count.ShouldBe(2, $"got: {body}");
+        errors.Count(e => e.TryGetProperty("code", out var code) && code.GetString() == "INVALID_DATE_RANGE")
+            .ShouldBe(1, $"got: {body}");
+        var searchError = errors.Single(e => e.GetProperty("field").GetString() == "Search");
+        searchError.TryGetProperty("code", out _).ShouldBeFalse($"got: {body}");
+    }
+
     [Fact]
     public async Task GetPostingById_ReturnsNotFound_ForAnUnknownPosting()
     {
