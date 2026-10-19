@@ -60,7 +60,8 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 {
                     var errors = validation.Errors
                         .Select(e => new ErrorItem(
-                            e.ErrorMessage, string.IsNullOrEmpty(e.ErrorCode) ? null : e.ErrorCode, e.PropertyName))
+                            e.ErrorMessage, LedgerErrorResponseOptions.IsKnownCode(e.ErrorCode) ? e.ErrorCode : null,
+                            e.PropertyName))
                         .ToArray();
                     var errorContext = new ErrorResponseContext { Source = ErrorSource.Validation, Errors = errors };
                     var problem = new ProblemDetails

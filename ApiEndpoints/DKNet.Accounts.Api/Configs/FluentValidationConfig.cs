@@ -28,6 +28,9 @@ internal static class FluentValidationConfig
             options.UnhandledError = context =>
                 LedgerErrorResponseOptions.UnhandledError(context, isDevelopment, httpContextAccessor);
         });
+        // DRK-2304: a rule with no WithErrorCode leaves ErrorCode null instead of FluentValidation's default
+        // (the validator's name, e.g. NotEmptyValidator), so no refusal path answers it as errors[].code.
+        ValidatorOptions.Global.ErrorCodeResolver = _ => null!;
         builder.Services.AddValidatorsFromAssembly(typeof(AppSetup).Assembly, includeInternalTypes: true);
 
         return builder;
