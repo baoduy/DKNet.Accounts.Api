@@ -16,7 +16,7 @@ import { useReportDirty } from '@/components/feedback/use-panel-state';
 import { IdempotencyKeyField } from '@/components/forms/IdempotencyKeyField';
 import { useIdempotencyKey } from '@/components/forms/use-idempotency-key';
 import { Currency } from '@/components/ledger/Currency';
-import { formatAmount } from '@/components/ledger/Money';
+import { formatAmount, isNegativeAmount } from '@/components/ledger/Money';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input, ReadOnlyField } from '@/components/ui/input';
@@ -223,7 +223,7 @@ export function RecordTransferForm({ accounts, sourceAccountId, granted, onClose
         <p className="mt-3 mb-0">
           {estimate !== null ? (
             <>
-              {destination?.accountNumber} gets an estimated <b className="tabular-nums">{`${formatAmount(estimate, destinationPlaces)} ${destination?.currency}`}</b>.
+              {destination?.accountNumber} gets an estimated <b className="tabular-nums">{`${isNegativeAmount(estimate) ? '−' : ''}${formatAmount(estimate, destinationPlaces)} ${destination?.currency}`}</b>.
             </>
           ) : (
             'The estimate cannot be worked out: the amount, the fee and the rate must each be a number.'

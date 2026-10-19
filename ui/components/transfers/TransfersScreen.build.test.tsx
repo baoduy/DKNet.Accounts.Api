@@ -187,6 +187,20 @@ describe('Record transfer', () => {
     expect(JSON.parse(ledger.sends()[0].body!)).toEqual({ sourceAccountId: ID.alice, destinationAccountId: ID.bobSgd, amount: '10.00', sourceCurrency: 'SGD', destinationCurrency: 'SGD', fee: '0' });
   });
 
+  it('keeps the minus sign of an estimate when the fee is above the amount', async () => {
+    await openPanel();
+    await userEvent.selectOptions(inPanel().getByLabelText('Destination account'), OPTION.bobSgd);
+    await userEvent.type(inPanel().getByLabelText('Amount'), '1.00');
+    await userEvent.clear(inPanel().getByLabelText('Fee'));
+    await userEvent.type(inPanel().getByLabelText('Fee'), '2.00');
+    await userEvent.selectOptions(inPanel().getByLabelText('Fee account'), OPTION.feesSgd);
+
+    await userEvent.click(inPanel().getByRole('button', { name: 'Review transfer' }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(within(dialog).getByText(/gets an estimated/)).toHaveTextContent('ACME-000102 gets an estimated −1.00 SGD.');
+  });
+
   it("the confirm step's Back sends nothing and keeps the panel's entries", async () => {
     const ledger = await openPanel();
     await userEvent.selectOptions(inPanel().getByLabelText('Destination account'), OPTION.bobSgd);
