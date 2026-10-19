@@ -91,7 +91,8 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
         (await Client.SendAsync(AsPayHub(HttpMethod.Patch, $"{AccountsPath}/{accountId}", new { status })))
         .EnsureSuccessStatusCode();
 
-    private async Task<Guid> RecordAsync(Guid accountId, string direction, decimal amount, string currency = "SGD")
+    private async Task<Guid> RecordAsync(
+        Guid accountId, string direction, decimal amount, string currency = "SGD", DateOnly? effectiveDate = null)
     {
         var response = await Client.SendAsync(AsPayHub(HttpMethod.Post, PostingsPath, new
         {
@@ -99,7 +100,8 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             direction,
             amount,
             currency,
-            category = "Transfer"
+            category = "Transfer",
+            effectiveDate
         }));
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -133,6 +135,67 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
             .ShouldBe(1, $"got: {body}");
         var searchError = errors.Single(e => e.GetProperty("field").GetString() == "Search");
         searchError.TryGetProperty("code", out _).ShouldBeFalse($"got: {body}");
+    }
+
+    /// <summary>DRK-2318: one account's postings over April 2026, read through the posting list.</summary>
+    private async Task<JsonElement> ListPostingsAsync(Guid accountId, string paging)
+    {
+        var response = await Client.SendAsync(AsPayHub(
+            HttpMethod.Get, $"{PostingsPath}?from=2026-04-01&to=2026-04-30&accountId={accountId}&{paging}"));
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    /// <summary>DRK-2318 R1 (§6a D7): a page number below 1 reads page 1, never a 500.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task ListPostings_APageNumberBelowOne_ReadsTheFirstPage(int pageNumber)
+    {
+        var account = await OpenAccountAsync();
+        var first = await RecordAsync(account, "Credit", 10m, effectiveDate: new DateOnly(2026, 4, 1));
+        var second = await RecordAsync(account, "Credit", 10m, effectiveDate: new DateOnly(2026, 4, 2));
+        await RecordAsync(account, "Credit", 10m, effectiveDate: new DateOnly(2026, 4, 3)); // page 2: excluded
+
+        var doc = await ListPostingsAsync(account, $"pageNumber={pageNumber}&pageSize=2");
+
+        doc.GetProperty("pageNumber").GetInt32().ShouldBe(1);
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+        ids.ShouldBe([first, second]);
+    }
+
+    /// <summary>DRK-2318 R2 (§6a D8): a page size below 1 reads 20 per page, never a 500.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task ListPostings_APageSizeBelowOne_ReadsTwentyPerPage(int pageSize)
+    {
+        var account = await OpenAccountAsync();
+        var created = new List<Guid>();
+        for (var day = 1; day <= 21; day++)
+        {
+            created.Add(await RecordAsync(account, "Credit", 10m, effectiveDate: new DateOnly(2026, 4, day)));
+        }
+
+        var doc = await ListPostingsAsync(account, $"pageSize={pageSize}");
+
+        doc.GetProperty("pageSize").GetInt32().ShouldBe(20);
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+        ids.ShouldBe(created.Take(20));
+    }
+
+    /// <summary>DRK-2318 R3 (§6a D9): a page size above 1000 still reads 1000 per page.</summary>
+    [Fact]
+    public async Task ListPostings_APageSizeAboveOneThousand_ReadsOneThousandPerPage()
+    {
+        var account = await OpenAccountAsync();
+        var only = await RecordAsync(account, "Credit", 10m, effectiveDate: new DateOnly(2026, 4, 1));
+
+        var doc = await ListPostingsAsync(account, "pageSize=1001");
+
+        doc.GetProperty("pageSize").GetInt32().ShouldBe(1000);
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+        ids.ShouldBe([only]);
     }
 
     [Fact]
