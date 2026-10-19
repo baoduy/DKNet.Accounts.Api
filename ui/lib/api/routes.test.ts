@@ -36,7 +36,7 @@ describe('allowedLedgerRoutes', () => {
     // DRK-1728 §3 row 1 — the two status counts Overview reads.
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/accounts/status-counts' });
     expect(routes).toContainEqual({ method: 'GET', pathTemplate: '/account-groups/status-counts' });
-    expect(routes).toHaveLength(28);
+    expect(routes).toHaveLength(31);
   });
 });
 

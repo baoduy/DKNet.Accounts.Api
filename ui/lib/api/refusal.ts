@@ -71,6 +71,40 @@ export function routeRefusal(errors: LedgerError[], codeFields: Record<string, s
 }
 
 /**
+ * DRK-2325 R6 — the Record transfer panel's codes and the control each marks. Only `INSUFFICIENT_FUNDS`
+ * and `ACCOUNT_DORMANT_DEBIT_REFUSED` mark the source: only the source is debited.
+ */
+export const RECORD_TRANSFER_CODE_FIELDS: Record<string, string> = {
+  INVALID_POSTING_AMOUNT: 'amount',
+  CONVERTED_AMOUNT_TOO_SMALL: 'amount',
+  SAME_ACCOUNT_TRANSFER: 'destinationAccountId',
+  EXCHANGE_RATE_REQUIRED: 'exchangeRate',
+  EXCHANGE_RATE_NOT_ALLOWED: 'exchangeRate',
+  INVALID_EXCHANGE_RATE: 'exchangeRate',
+  INVALID_FEE: 'fee',
+  FEE_ACCOUNT_REQUIRED: 'feeAccountId',
+  INVALID_FEE_ACCOUNT: 'feeAccountId',
+  INSUFFICIENT_FUNDS: 'sourceAccountId',
+  ACCOUNT_DORMANT_DEBIT_REFUSED: 'sourceAccountId',
+};
+
+/**
+ * Routes by code alone, whatever an entry's `field` says (DRK-2325 R6): a field the panel has no
+ * control for (`SourceCurrency`, `IdempotencyKey`) would otherwise be dropped. Every other entry
+ * goes to the alert with its `field` taken off, since `RefusalAlert` shows only field-less entries.
+ */
+export function routeRefusalByCode(errors: LedgerError[], codeFields: Record<string, string>): RoutedRefusal {
+  const fieldErrors: Record<string, LedgerError> = {};
+  const alertErrors: LedgerError[] = [];
+  for (const { field: _field, ...error } of errors) {
+    const control = error.code ? codeFields[error.code] : undefined;
+    if (control) fieldErrors[control] = error;
+    else alertErrors.push(error);
+  }
+  return { fieldErrors, alertErrors };
+}
+
+/**
  * A refused read (list or detail) — thrown by `lib/query/groups.ts` and `lib/query/currencies.ts`
  * so the screen can still show the service's own code, or its wording plus the trace (R4),
  * instead of losing everything but a bare message string.

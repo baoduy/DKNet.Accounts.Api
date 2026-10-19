@@ -156,6 +156,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{id}/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the transfers an account is the source, destination or fee account of, newest first, within a UTC recorded-date window of at most 1 year (default: the year up to today). Search over the idempotency key and calling system; order by recordedAt, amount, convertedAmount or fee. */
+        get: operations["listAccountTransfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record one transfer from a source account to a different destination account, converted at the caller's rate when the currencies differ, with the caller's fee taken out of the amount. Idempotency key is required in the header. */
+        post: operations["recordTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one transfer with the postings it recorded. A later reversal is not listed. */
+        get: operations["getTransfer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/currencies": {
         parameters: {
             query?: never;
@@ -527,6 +578,69 @@ export interface components {
         };
         PagedAccountGroupResponse: {
             items: components["schemas"]["AccountGroupDto"][];
+            pageNumber: number;
+            pageSize: number;
+            pageCount: number;
+            totalItemCount: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+        };
+        RecordTransferRequest: {
+            /** Format: uuid */
+            sourceAccountId: string;
+            /** Format: uuid */
+            destinationAccountId: string;
+            amount: string;
+            sourceCurrency: string;
+            destinationCurrency: string;
+            exchangeRate?: string | null;
+            fee: string;
+            /** Format: uuid */
+            feeAccountId?: string | null;
+        };
+        TransferRowDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sourceAccountId: string;
+            /** Format: uuid */
+            destinationAccountId: string;
+            amount: string;
+            sourceCurrency: string;
+            destinationCurrency: string;
+            exchangeRate?: string | null;
+            fee: string;
+            /** Format: uuid */
+            feeAccountId?: string | null;
+            convertedAmount: string;
+            /** Format: date-time */
+            recordedAt: string;
+            callingSystem: string;
+            idempotencyKey: string;
+        };
+        TransferDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sourceAccountId: string;
+            /** Format: uuid */
+            destinationAccountId: string;
+            amount: string;
+            sourceCurrency: string;
+            destinationCurrency: string;
+            exchangeRate?: string | null;
+            fee: string;
+            /** Format: uuid */
+            feeAccountId?: string | null;
+            convertedAmount: string;
+            /** Format: date-time */
+            recordedAt: string;
+            callingSystem: string;
+            idempotencyKey: string;
+            postings: components["schemas"]["PostingDto"][];
+        };
+        PagedResponseOfTransferRowDto: {
+            items: components["schemas"]["TransferRowDto"][];
             pageNumber: number;
             pageSize: number;
             pageCount: number;
@@ -993,6 +1107,118 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RefusalBody"];
                 };
+            };
+        };
+    };
+    listAccountTransfers: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                search?: string;
+                orderBy?: string;
+                desc?: boolean;
+                pageNumber?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedResponseOfTransferRowDto"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    recordTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDto"];
+                };
+            };
+            /** @description Idempotency key conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefusalBody"];
+                };
+            };
+        };
+    };
+    getTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDto"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

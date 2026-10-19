@@ -211,6 +211,56 @@
         }
       }
     },
+    "/accounts/{id}/transfers": {
+      "get": {
+        "operationId": "listAccountTransfers",
+        "summary": "List the transfers an account is the source, destination or fee account of, newest first, within a UTC recorded-date window of at most 1 year (default: the year up to today). Search over the idempotency key and calling system; order by recordedAt, amount, convertedAmount or fee.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "desc", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "pageNumber", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedResponseOfTransferRowDto" } } } },
+          "400": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/transfers": {
+      "post": {
+        "operationId": "recordTransfer",
+        "summary": "Record one transfer from a source account to a different destination account, converted at the caller's rate when the currencies differ, with the caller's fee taken out of the amount. Idempotency key is required in the header.",
+        "security": [{ "bearer": ["postings.write"] }],
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordTransferRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferDto" } } } },
+          "422": { "description": "Refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } },
+          "409": { "description": "Idempotency key conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefusalBody" } } } }
+        }
+      }
+    },
+    "/transfers/{id}": {
+      "get": {
+        "operationId": "getTransfer",
+        "summary": "Read one transfer with the postings it recorded. A later reversal is not listed.",
+        "security": [{ "bearer": ["postings.read"] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferDto" } } } },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
     "/currencies": {
       "get": {
         "operationId": "listCurrencies",
@@ -663,6 +713,72 @@
         "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
         "properties": {
           "items": { "type": "array", "items": { "$ref": "#/components/schemas/AccountGroupDto" } },
+          "pageNumber": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "totalItemCount": { "type": "integer" },
+          "hasNextPage": { "type": "boolean" },
+          "hasPreviousPage": { "type": "boolean" }
+        }
+      },
+      "RecordTransferRequest": {
+        "type": "object",
+        "required": ["sourceAccountId", "destinationAccountId", "amount", "sourceCurrency", "destinationCurrency", "fee"],
+        "properties": {
+          "sourceAccountId": { "type": "string", "format": "uuid" },
+          "destinationAccountId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "string" },
+          "sourceCurrency": { "type": "string" },
+          "destinationCurrency": { "type": "string" },
+          "exchangeRate": { "type": "string", "nullable": true },
+          "fee": { "type": "string" },
+          "feeAccountId": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "TransferRowDto": {
+        "type": "object",
+        "required": ["id", "sourceAccountId", "destinationAccountId", "amount", "sourceCurrency", "destinationCurrency", "fee", "convertedAmount", "recordedAt", "callingSystem", "idempotencyKey"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "sourceAccountId": { "type": "string", "format": "uuid" },
+          "destinationAccountId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "string" },
+          "sourceCurrency": { "type": "string" },
+          "destinationCurrency": { "type": "string" },
+          "exchangeRate": { "type": "string", "nullable": true },
+          "fee": { "type": "string" },
+          "feeAccountId": { "type": "string", "format": "uuid", "nullable": true },
+          "convertedAmount": { "type": "string" },
+          "recordedAt": { "type": "string", "format": "date-time" },
+          "callingSystem": { "type": "string" },
+          "idempotencyKey": { "type": "string" }
+        }
+      },
+      "TransferDto": {
+        "type": "object",
+        "required": ["id", "sourceAccountId", "destinationAccountId", "amount", "sourceCurrency", "destinationCurrency", "fee", "convertedAmount", "recordedAt", "callingSystem", "idempotencyKey", "postings"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "sourceAccountId": { "type": "string", "format": "uuid" },
+          "destinationAccountId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "string" },
+          "sourceCurrency": { "type": "string" },
+          "destinationCurrency": { "type": "string" },
+          "exchangeRate": { "type": "string", "nullable": true },
+          "fee": { "type": "string" },
+          "feeAccountId": { "type": "string", "format": "uuid", "nullable": true },
+          "convertedAmount": { "type": "string" },
+          "recordedAt": { "type": "string", "format": "date-time" },
+          "callingSystem": { "type": "string" },
+          "idempotencyKey": { "type": "string" },
+          "postings": { "type": "array", "items": { "$ref": "#/components/schemas/PostingDto" } }
+        }
+      },
+      "PagedResponseOfTransferRowDto": {
+        "type": "object",
+        "required": ["items", "pageNumber", "pageSize", "pageCount", "totalItemCount", "hasNextPage", "hasPreviousPage"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/TransferRowDto" } },
           "pageNumber": { "type": "integer" },
           "pageSize": { "type": "integer" },
           "pageCount": { "type": "integer" },
