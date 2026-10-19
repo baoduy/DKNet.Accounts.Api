@@ -144,7 +144,7 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
         SendAsync<PostingDto>(
             HttpMethod.Post, $"/{Version}/postings/{id}/reverse", new { reason }, idempotencyKey, ct);
 
-    // ---- Transfers (2) ----
+    // ---- Transfers (3) ----
 
     public Task<TransferDto> RecordTransferAsync(
         RecordTransferRequest request, string idempotencyKey, CancellationToken ct = default) =>
@@ -152,6 +152,11 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
 
     public Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<TransferDto>(HttpMethod.Get, $"/{Version}/transfers/{id}", ct: ct);
+
+    public Task<PagedResult<TransferRow>> ListAccountTransfersAsync(
+        Guid id, AccountTransfersQuery? query = null, CancellationToken ct = default) =>
+        SendAsync<PagedResult<TransferRow>>(
+            HttpMethod.Get, WithAccountTransfersQuery($"/{Version}/accounts/{id}/transfers", query), ct: ct);
 
     // ---- Wire plumbing ----
 
@@ -237,30 +242,7 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
             parameters.Add(("filter", $"{filter.Field}:{filter.Operation}:{filter.Value}"));
         }
 
-        if (!string.IsNullOrEmpty(query.Search))
-        {
-            parameters.Add(("search", query.Search));
-        }
-
-        if (!string.IsNullOrEmpty(query.OrderBy))
-        {
-            parameters.Add(("orderBy", query.OrderBy));
-        }
-
-        if (query.Desc)
-        {
-            parameters.Add(("desc", "true"));
-        }
-
-        if (query.PageNumber is { } pageNumber)
-        {
-            parameters.Add(("pageNumber", pageNumber.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        if (query.PageSize is { } pageSize)
-        {
-            parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
-        }
+        AddListTail(parameters, query.Search, query.OrderBy, query.Desc, query.PageNumber, query.PageSize);
 
         if (query.FromDate is { } fromDate)
         {
@@ -313,32 +295,62 @@ public sealed class AccountClient(HttpClient httpClient) : IAccountClient
             parameters.Add(("status", query.Status));
         }
 
-        if (!string.IsNullOrEmpty(query.Search))
+        AddListTail(parameters, query.Search, query.OrderBy, query.Desc, query.PageNumber, query.PageSize);
+
+        return BuildUri(path, parameters);
+    }
+
+    private static string WithAccountTransfersQuery(string path, AccountTransfersQuery? query)
+    {
+        if (query is null)
         {
-            parameters.Add(("search", query.Search));
+            return path;
         }
 
-        if (!string.IsNullOrEmpty(query.OrderBy))
+        var parameters = new List<(string Key, string Value)>();
+        if (query.From is { } from)
         {
-            parameters.Add(("orderBy", query.OrderBy));
+            parameters.Add(("from", from.ToString("O", CultureInfo.InvariantCulture)));
         }
 
-        if (query.Desc)
+        if (query.To is { } to)
+        {
+            parameters.Add(("to", to.ToString("O", CultureInfo.InvariantCulture)));
+        }
+
+        AddListTail(parameters, query.Search, query.OrderBy, query.Desc, query.PageNumber, query.PageSize);
+        return BuildUri(path, parameters);
+    }
+
+    /// <summary>The search, order and paging parameters every searchable list route reads by the same names.</summary>
+    private static void AddListTail(
+        List<(string Key, string Value)> parameters, string? search, string? orderBy, bool desc, int? pageNumber,
+        int? pageSize)
+    {
+        if (!string.IsNullOrEmpty(search))
+        {
+            parameters.Add(("search", search));
+        }
+
+        if (!string.IsNullOrEmpty(orderBy))
+        {
+            parameters.Add(("orderBy", orderBy));
+        }
+
+        if (desc)
         {
             parameters.Add(("desc", "true"));
         }
 
-        if (query.PageNumber is { } pageNumber)
+        if (pageNumber is { } number)
         {
-            parameters.Add(("pageNumber", pageNumber.ToString(CultureInfo.InvariantCulture)));
+            parameters.Add(("pageNumber", number.ToString(CultureInfo.InvariantCulture)));
         }
 
-        if (query.PageSize is { } pageSize)
+        if (pageSize is { } size)
         {
-            parameters.Add(("pageSize", pageSize.ToString(CultureInfo.InvariantCulture)));
+            parameters.Add(("pageSize", size.ToString(CultureInfo.InvariantCulture)));
         }
-
-        return BuildUri(path, parameters);
     }
 
     private static string WithStatementQuery(string path, StatementQuery? query)

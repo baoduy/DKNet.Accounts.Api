@@ -49,6 +49,7 @@ public sealed class RouteScopeCoverageTests(LedgerApiFixture fixture) : IClassFi
             [("PUT", $"{V1}/accounts/{{id}}")] = ScopeNames.AccountsWrite,
             [("PATCH", $"{V1}/accounts/{{id:guid}}")] = ScopeNames.AccountsWrite,
             [("GET", $"{V1}/accounts/{{id:guid}}/statement")] = ScopeNames.PostingsRead,
+            [("GET", $"{V1}/accounts/{{id:guid}}/transfers")] = ScopeNames.PostingsRead,
             [("GET", $"{V1}/currencies/")] = ScopeNames.AccountsRead,
             [("GET", $"{V1}/currencies/{{id}}")] = ScopeNames.AccountsRead,
             [("POST", $"{V1}/currencies/")] = ScopeNames.AccountsWrite,

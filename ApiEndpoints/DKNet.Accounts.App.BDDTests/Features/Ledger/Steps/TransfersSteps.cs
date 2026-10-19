@@ -452,6 +452,10 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
             RouteShouldExist("POST", "/v{version:apiVersion}/transfers/");
             await NothingChangedAsync();
         }
+        else if (_listed)
+        {
+            RouteShouldExist("GET", ListRoute);
+        }
         else
         {
             RouteShouldExist("GET", "/v{version:apiVersion}/transfers/{id:guid}");
@@ -562,8 +566,8 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
     /// Reads one transfer as the Gherkin words it: <c>100.00 SGD from "A" to "B"</c>, then optionally
     /// <c> at a rate of R</c> and <c> with a F SGD fee</c>, then one tail — <c> to "Fees"</c>, <c> and no rate</c>,
     /// <c> and a rate of R</c>, <c> and "Fees"</c>, <c> and no fee account</c>, <c> and an unknown account</c>,
-    /// <c> with the idempotency key "K"</c> or <c>, but &lt;change&gt;</c>. A transfer that names no fee carries a fee
-    /// of 0; the destination currency is the destination account's.
+    /// <c> with the idempotency key "K"</c>, <c> under the idempotency key "K"</c> or <c>, but &lt;change&gt;</c>. A
+    /// transfer that names no fee carries a fee of 0; the destination currency is the destination account's.
     /// </summary>
     private async Task<TransferRequest> ParseTransferAsync(string text)
     {
@@ -990,7 +994,7 @@ public sealed partial class TransfersSteps(HttpClient sharedClient, ScenarioStat
     [GeneratedRegex(@"^ and a rate of ([\d.]+)$")]
     private static partial Regex RateTail();
 
-    [GeneratedRegex(@"^ with the idempotency key ""([^""]+)""$")]
+    [GeneratedRegex(@"^ (?:with|under) the idempotency key ""([^""]+)""$")]
     private static partial Regex KeyTail();
 
     [GeneratedRegex(@"^, but (.+)$")]

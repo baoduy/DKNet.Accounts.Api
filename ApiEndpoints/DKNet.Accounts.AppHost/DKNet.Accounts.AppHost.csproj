@@ -34,6 +34,8 @@
         <PackageReference Include="Aspire.Hosting.Keycloak" />
         <!-- Direct pin over Aspire.Hosting.SqlServer's vulnerable transitive System.Security.Cryptography.Pkcs. -->
         <PackageReference Include="System.Security.Cryptography.Pkcs" />
+        <!-- Direct pin over Aspire.Hosting's and StreamJsonRpc's vulnerable transitive MessagePack. -->
+        <PackageReference Include="MessagePack" />
     </ItemGroup>
 
     <ItemGroup>
