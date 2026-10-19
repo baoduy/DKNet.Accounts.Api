@@ -54,7 +54,7 @@ import {
 } from './transfers.fixture';
 
 vi.mock('next/navigation', async () => {
-  const fixture = await import('./transfers.fixture');
+  const fixture = await import('./transfers.address');
   return { useSearchParams: () => new URLSearchParams(fixture.address.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/transfers' };
 });
 

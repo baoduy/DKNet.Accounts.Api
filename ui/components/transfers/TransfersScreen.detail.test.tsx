@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { answer, chooseAccount, ID, OPTION, paged, panel, posting, renderScreen, resetScreen, rowCells, setNow, stubLedger, transferRow, type PostingFields } from './transfers.fixture';
 
 vi.mock('next/navigation', async () => {
-  const fixture = await import('./transfers.fixture');
+  const fixture = await import('./transfers.address');
   return { useSearchParams: () => new URLSearchParams(fixture.address.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/transfers' };
 });
 

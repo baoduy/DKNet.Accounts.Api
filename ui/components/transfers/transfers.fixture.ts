@@ -15,8 +15,9 @@ import { createElement } from 'react';
 import { vi } from 'vitest';
 import { TransfersScreen } from './TransfersScreen';
 
-/** The page address the mocked `useSearchParams` reads — set it to reopen a copied link. */
-export const address = { search: '' };
+import { address } from './transfers.address';
+
+export { address };
 
 export const ALL_SCOPES = ['accounts.read', 'postings.read', 'postings.write'];
 

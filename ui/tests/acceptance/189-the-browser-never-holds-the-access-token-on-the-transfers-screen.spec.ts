@@ -18,7 +18,12 @@ import { MAI } from '../support/fixtures';
 import { ledgerRequests, seedCurrencies, seedLedgerAccounts, seedLedgerPostings, seedLedgerTransfers } from '../support/ledger';
 import { signInAs } from '../support/sign-in';
 
-const CANARY_ACCESS_TOKEN = 'MAI-CANARY-ACCESS-TOKEN-189-DO-NOT-EXPOSE';
+const CANARY_LITERAL = 'MAI-CANARY-ACCESS-TOKEN-189-DO-NOT-EXPOSE';
+// A token whose claims grant Mai the 3 scopes (`{"scp":"accounts.read postings.read postings.write"}`),
+// so the console offers Record transfer; the canary literal is its last segment.
+const CANARY_ACCESS_TOKEN = `eyJhbGciOiJub25lIn0.eyJzY3AiOiJhY2NvdW50cy5yZWFkIHBvc3RpbmdzLnJlYWQgcG9zdGluZ3Mud3JpdGUifQ.${CANARY_LITERAL}`;
+/** Neither the whole token nor its canary literal may reach the browser. */
+const SECRETS = [CANARY_ACCESS_TOKEN, CANARY_LITERAL];
 const ALICE = 'a0000000-0000-4000-8000-000000000101';
 const BOB_USD = 'a0000000-0000-4000-8000-000000000201';
 const TRANSFER = 'c0000000-0000-4000-8000-000000000001';
@@ -91,12 +96,16 @@ test('The browser never holds the access token on the Transfers screen', async (
 
   expect(answers.length).toBeGreaterThan(0);
   for (const answer of answers) {
-    expect(await answer.body, answer.url).not.toContain(CANARY_ACCESS_TOKEN);
-    for (const value of Object.values(answer.headers)) expect(value, answer.url).not.toContain(CANARY_ACCESS_TOKEN);
+    const body = await answer.body;
+    for (const secret of SECRETS) {
+      expect(body, answer.url).not.toContain(secret);
+      for (const value of Object.values(answer.headers)) expect(value, answer.url).not.toContain(secret);
+    }
   }
-  expect(await page.content()).not.toContain(CANARY_ACCESS_TOKEN);
+  const content = await page.content();
+  for (const secret of SECRETS) expect(content).not.toContain(secret);
   const storage = await page.evaluate(() => JSON.stringify(window.localStorage) + JSON.stringify(window.sessionStorage));
-  expect(storage).not.toContain(CANARY_ACCESS_TOKEN);
+  for (const secret of SECRETS) expect(storage).not.toContain(secret);
   const sessionCookie = (await context.cookies()).find((cookie) => cookie.name === 'sessionId');
   expect(sessionCookie?.httpOnly).toBe(true);
 });
