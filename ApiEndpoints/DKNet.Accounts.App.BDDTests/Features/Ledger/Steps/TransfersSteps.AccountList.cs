@@ -198,8 +198,12 @@ public sealed partial class TransfersSteps
             .ShouldBe(Dates(dates).Order());
 
     [Then(@"^the request is refused with INVALID_DATE_RANGE$")]
-    public void ThenTheRequestIsRefusedWithInvalidDateRange() =>
+    public void ThenTheRequestIsRefusedWithInvalidDateRange()
+    {
         ShouldBeRefusedWithCode(HttpStatusCode.UnprocessableEntity, "INVALID_DATE_RANGE", null);
+        // DRK-2304 round 1: a refusal's type is its final status' own name (docs/api-contract.md:277-278).
+        Json(state.ResponseBody!).GetProperty("type").GetString().ShouldBe("UnprocessableEntity", state.ResponseBody);
+    }
 
     [Then(@"^the request is accepted$")]
     public void ThenTheRequestIsAccepted() => _ = Items();
@@ -208,6 +212,7 @@ public sealed partial class TransfersSteps
     public void ThenTheRequestIsRefusedAsInvalid()
     {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.BadRequest, state.ResponseBody);
+        Json(state.ResponseBody!).GetProperty("type").GetString().ShouldBe("BadRequest", state.ResponseBody);
         Errors(Json(state.ResponseBody!))
             .Where(e => e.TryGetProperty("code", out var code) && code.ValueKind != JsonValueKind.Null)
             .ShouldBeEmpty($"a 400 carries no error code, got: {state.ResponseBody}");

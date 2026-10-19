@@ -126,6 +126,7 @@ public sealed class PostingsHandlerTests(LedgerApiFixture fixture) : IClassFixtu
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("type").GetString().ShouldBe("UnprocessableEntity");
         var errors = body.GetProperty("errors").EnumerateArray().ToList();
         errors.Count.ShouldBe(2, $"got: {body}");
         errors.Count(e => e.TryGetProperty("code", out var code) && code.GetString() == "INVALID_DATE_RANGE")
