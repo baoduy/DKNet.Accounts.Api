@@ -41,7 +41,7 @@ internal sealed class GetAccountStatementQueryHandler(IRepositorySpec repository
         CancellationToken cancellationToken) =>
         repository.ToPagedListAsync<Posting, PostingDto>(
             new SpecListPostingsForStatement(request.AccountId, request.From, request.To),
-            request.PageIndex ?? GetAccountStatementQuery.DefaultPageIndex,
-            request.PageSize ?? GetAccountStatementQuery.DefaultPageSize,
+            request.PageIndex is > 0 ? request.PageIndex.Value : GetAccountStatementQuery.DefaultPageIndex,
+            request.PageSize is > 0 ? request.PageSize.Value : GetAccountStatementQuery.DefaultPageSize,
             cancellationToken);
 }

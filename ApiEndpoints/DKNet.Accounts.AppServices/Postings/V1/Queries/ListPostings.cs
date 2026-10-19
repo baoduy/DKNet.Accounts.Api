@@ -104,8 +104,8 @@ internal sealed class ListPostingsQueryHandler(IRepositorySpec repository)
             orderByField,
             request.Desc);
 
-        var pageIndex = request.PageNumber ?? DefaultPageIndex;
-        var pageSize = Math.Min(request.PageSize ?? DefaultPageSize, MaxPageSize);
+        var pageIndex = request.PageNumber is > 0 ? request.PageNumber.Value : DefaultPageIndex;
+        var pageSize = request.PageSize is > 0 ? Math.Min(request.PageSize.Value, MaxPageSize) : DefaultPageSize;
 
         return repository.ToPagedListAsync<Posting, PostingDto>(spec, pageIndex, pageSize, cancellationToken);
     }

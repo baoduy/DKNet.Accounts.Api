@@ -159,4 +159,42 @@ public sealed class AccountStatementTests(LedgerApiFixture fixture) : IClassFixt
         var page4 = await ReadStatementAsync(account, "?from=2026-03-01&to=2026-03-31&pageIndex=4&pageSize=10");
         page4.GetProperty("items").GetArrayLength().ShouldBe(0);
     }
+
+    /// <summary>DRK-2318 R1 (§6a D1, D2): a page index below 1 reads page 1, never a 500.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Statement_APageIndexBelowOne_ReadsTheFirstPage(int pageIndex)
+    {
+        var account = await OpenAccountAsync();
+        var first = await RecordAsync(account, new DateOnly(2026, 4, 1));
+        var second = await RecordAsync(account, new DateOnly(2026, 4, 2));
+        await RecordAsync(account, new DateOnly(2026, 4, 3)); // page 2 at 2 per page: excluded
+
+        var doc = await ReadStatementAsync(account, $"?from=2026-04-01&to=2026-04-30&pageIndex={pageIndex}&pageSize=2");
+
+        doc.GetProperty("pageNumber").GetInt32().ShouldBe(1);
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+        ids.ShouldBe([first, second]);
+    }
+
+    /// <summary>DRK-2318 R2 (§6a D5): a page size below 1 reads 20 per page, never a 500.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Statement_APageSizeBelowOne_ReadsTwentyPerPage(int pageSize)
+    {
+        var account = await OpenAccountAsync();
+        var created = new List<Guid>();
+        for (var day = 1; day <= 21; day++)
+        {
+            created.Add(await RecordAsync(account, new DateOnly(2026, 5, day)));
+        }
+
+        var doc = await ReadStatementAsync(account, $"?from=2026-05-01&to=2026-05-31&pageSize={pageSize}");
+
+        doc.GetProperty("pageSize").GetInt32().ShouldBe(20);
+        var ids = doc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+        ids.ShouldBe(created.Take(20));
+    }
 }
