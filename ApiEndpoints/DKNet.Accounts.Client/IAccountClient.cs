@@ -149,7 +149,6 @@ public interface IAccountClient
 
     /// <summary>The transfers <paramref name="id"/> is the source, destination or fee account of, one page at a
     /// time, without their postings.</summary>
-    [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/transfers")]
     Task<PagedResult<TransferRow>> ListAccountTransfersAsync(
         Guid id, AccountTransfersQuery? query = null, CancellationToken ct = default);
 }
