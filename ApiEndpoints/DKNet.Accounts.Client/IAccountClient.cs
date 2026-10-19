@@ -137,7 +137,7 @@ public interface IAccountClient
     Task<PostingDto> ReversePostingAsync(
         Guid id, string reason, string idempotencyKey, CancellationToken ct = default);
 
-    // ---- Transfers (2) ----
+    // ---- Transfers (3) ----
 
     /// <summary>Sends <paramref name="idempotencyKey"/> as the <c>Idempotency-Key</c> request header, never as a
     /// body field.</summary>
@@ -146,4 +146,10 @@ public interface IAccountClient
 
     [AccountRoute("GET", "/v{version:apiVersion}/transfers/{id:guid}")]
     Task<TransferDto> GetTransferAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>The transfers <paramref name="id"/> is the source, destination or fee account of, one page at a
+    /// time, without their postings.</summary>
+    [AccountRoute("GET", "/v{version:apiVersion}/accounts/{id:guid}/transfers")]
+    Task<PagedResult<TransferRow>> ListAccountTransfersAsync(
+        Guid id, AccountTransfersQuery? query = null, CancellationToken ct = default);
 }

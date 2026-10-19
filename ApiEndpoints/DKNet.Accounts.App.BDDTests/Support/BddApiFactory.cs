@@ -122,5 +122,8 @@ public sealed class ScenarioClock : TimeProvider
         _offset = today.ToDateTime(TimeOnly.FromTimeSpan(now.TimeOfDay), DateTimeKind.Utc) - now.UtcDateTime;
     }
 
+    /// <summary>Makes the current moment <paramref name="instant"/>; the clock keeps moving from there.</summary>
+    public void PinNow(DateTimeOffset instant) => _offset = instant - base.GetUtcNow();
+
     public void Reset() => _offset = TimeSpan.Zero;
 }
