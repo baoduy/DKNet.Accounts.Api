@@ -45,9 +45,13 @@
  *   POST   /v1/account-groups/:id/close
  *   POST   /v1/account-groups/:id/activate
  *   GET    /v1/account-groups/:id/balances
+ *   GET    /v1/accounts/:id/transfers   (?from=, ?to=, ?search=, ?orderBy=, ?desc=, ?pageNumber=, ?pageSize= — DRK-2325)
+ *   GET    /v1/transfers/:id
+ *   POST   /v1/transfers                (header: Idempotency-Key)
  *
  * Test control (never part of the generated contract):
- *   POST   /__seed    — replaces the in-memory dataset
+ *   POST   /__seed    — replaces the in-memory dataset (`accounts`, `postings`, `currencies`,
+ *                       `accountGroups`, `transfers`)
  *   POST   /__reset   — clears the dataset and the request log
  *   GET    /__requests — every request this instance has received since the last reset
  *   GET    /__postings — every posting the fake holds, recorded or seeded (DRK-1713 §3 row 2)
@@ -137,6 +141,25 @@ interface PostingRecord {
   reversedByPostingId?: string;
 }
 
+/** DRK-2325 §3 row 10 — a transfer as the service's `TransferDto` carries it; `postingIds` names the
+ * postings it recorded (2, or 4 with a fee). */
+interface TransferRecord {
+  id: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  amount: string;
+  sourceCurrency: string;
+  destinationCurrency: string;
+  exchangeRate: string | null;
+  fee: string;
+  feeAccountId: string | null;
+  convertedAmount: string;
+  recordedAt: string;
+  callingSystem: string;
+  idempotencyKey: string;
+  postingIds: string[];
+}
+
 interface ErrorItem {
   message: string;
   code?: string;
@@ -163,6 +186,8 @@ let accountGroups = new Map<string, AccountGroupFixture>();
 let currencies: CurrencyFixture[] = defaultCurrencies();
 let postings: PostingRecord[] = [];
 let postingCounter = 0;
+let transfers: TransferRecord[] = [];
+const transferIdempotencyResponses = new Map<string, { bodyHash: string; body: unknown }>();
 let accountCounter = 0;
 const idempotencyResponses = new Map<string, { bodyHash: string; status: number; body: unknown }>();
 const reverseIdempotencyResponses = new Map<string, { bodyHash: string; status: number; body: unknown }>();
@@ -201,6 +226,8 @@ function reset(): void {
   currencies = defaultCurrencies();
   postings = [];
   postingCounter = 0;
+  transfers = [];
+  transferIdempotencyResponses.clear();
   accountCounter = 0;
   idempotencyResponses.clear();
   reverseIdempotencyResponses.clear();
@@ -580,6 +607,7 @@ async function handle(request: Request): Promise<Response> {
   if (segments[0] === '__seed' && request.method === 'POST') {
     const seed = (await request.json()) as {
       accounts?: AccountFixture[];
+      transfers?: Array<Omit<TransferRecord, 'postingIds'> & { postingIds?: string[] }>;
       postings?: PostingRecord[];
       currencies?: Array<{ id?: string; code: string; name?: string; decimalPlaces: number; isActive?: boolean }>;
       accountGroups?: Array<{
@@ -596,6 +624,9 @@ async function handle(request: Request): Promise<Response> {
     };
     for (const account of seed.accounts ?? []) {
       accounts.set(account.accountNumber, account);
+    }
+    for (const seeded of seed.transfers ?? []) {
+      transfers = [...transfers.filter((existing) => existing.id !== seeded.id), { ...seeded, postingIds: seeded.postingIds ?? [] }];
     }
     for (const seeded of seed.postings ?? []) {
       // The real service always dates a posting — a seed that names no day is taken as
@@ -665,6 +696,19 @@ async function handle(request: Request): Promise<Response> {
 
   function findAccount(idOrNumber: string): AccountFixture | undefined {
     return accounts.get(idOrNumber) ?? [...accounts.values()].find((a) => a.id === idOrNumber);
+  }
+
+  if (segments[1] === 'accounts' && segments[3] === 'transfers' && segments.length === 4 && request.method === 'GET') {
+    return listAccountTransfers(segments[2], url);
+  }
+
+  if (segments[1] === 'transfers' && segments.length === 3 && request.method === 'GET') {
+    const transfer = transfers.find((candidate) => candidate.id === segments[2]);
+    return transfer ? jsonResponse(transferDto(transfer, true)) : new Response(null, { status: 404 });
+  }
+
+  if (segments[1] === 'transfers' && segments.length === 2 && request.method === 'POST') {
+    return recordTransfer(request, findAccount);
   }
 
   if (segments[1] === 'accounts' && segments[2] === 'balances' && request.method === 'GET') {
@@ -1241,6 +1285,160 @@ async function handle(request: Request): Promise<Response> {
   }
 
   return refusal(404, [{ message: 'Not found.' }]);
+}
+
+function transferDto(transfer: TransferRecord, withPostings: boolean): unknown {
+  return {
+    id: transfer.id,
+    sourceAccountId: transfer.sourceAccountId,
+    destinationAccountId: transfer.destinationAccountId,
+    amount: money(transfer.amount),
+    sourceCurrency: transfer.sourceCurrency,
+    destinationCurrency: transfer.destinationCurrency,
+    exchangeRate: money(transfer.exchangeRate),
+    fee: money(transfer.fee),
+    feeAccountId: transfer.feeAccountId,
+    convertedAmount: money(transfer.convertedAmount),
+    recordedAt: transfer.recordedAt,
+    callingSystem: transfer.callingSystem,
+    idempotencyKey: transfer.idempotencyKey,
+    ...(withPostings ? { postings: postings.filter((posting) => transfer.postingIds.includes(posting.id)).map(postingDto) } : {}),
+  };
+}
+
+const TRANSFER_ORDER_FIELDS: Record<string, (transfer: TransferRecord) => number> = {
+  recordedat: (transfer) => Date.parse(transfer.recordedAt),
+  amount: (transfer) => Number(transfer.amount),
+  convertedamount: (transfer) => Number(transfer.convertedAmount),
+  fee: (transfer) => Number(transfer.fee),
+};
+
+/** `ListAccountTransfersQuery` (DRK-2300): the account on any side, a UTC recorded-date window of
+ * at most 1 year (`to` defaults to today, `from` to 1 year before `to`), a search of 2 characters
+ * or more over the key and the calling system, newest first unless sorted, 20 a page by default. */
+function listAccountTransfers(accountId: string, url: URL): Response {
+  const to = url.searchParams.get('to') ?? today();
+  const yearBefore = new Date(`${to}T00:00:00Z`);
+  yearBefore.setUTCFullYear(yearBefore.getUTCFullYear() - 1);
+  const from = url.searchParams.get('from') ?? yearBefore.toISOString().slice(0, 10);
+  if (from > to) return refusal(422, [{ message: "The recorded-date window must have 'to' on or after 'from' and at most 1 year after it.", code: 'INVALID_DATE_RANGE' }]);
+  const search = url.searchParams.get('search') ?? '';
+  if (search.length === 1) return refusal(400, [{ message: 'A search term must be at least 2 characters.', field: 'Search' }]);
+  const orderBy = (url.searchParams.get('orderBy') ?? '').toLowerCase();
+  if (orderBy && !TRANSFER_ORDER_FIELDS[orderBy]) return refusal(400, [{ message: `'${url.searchParams.get('orderBy')}' is not a field transfers can be ordered by.`, field: 'OrderBy' }]);
+
+  const term = search.toLowerCase();
+  const matching = transfers.filter((transfer) => {
+    const day = transfer.recordedAt.slice(0, 10);
+    const onAnySide = [transfer.sourceAccountId, transfer.destinationAccountId, transfer.feeAccountId].includes(accountId);
+    const searched = !term || transfer.idempotencyKey.toLowerCase().includes(term) || transfer.callingSystem.toLowerCase().includes(term);
+    return onAnySide && day >= from && day <= to && searched;
+  });
+  const key = TRANSFER_ORDER_FIELDS[orderBy || 'recordedat'];
+  const desc = orderBy ? url.searchParams.get('desc') === 'true' : true;
+  const sorted = [...matching].sort((a, b) => (desc ? key(b) - key(a) : key(a) - key(b)));
+  const pageNumber = Math.max(1, Number(url.searchParams.get('pageNumber') ?? 1) || 1);
+  const pageSize = Math.min(1000, Math.max(1, Number(url.searchParams.get('pageSize') ?? 20) || 20));
+  const page = sorted.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+  return jsonResponse(pagedEnvelope(page.map((transfer) => transferDto(transfer, false)), pageNumber, pageSize, sorted.length));
+}
+
+/** (amount − fee) × rate, half away from zero to the destination's places (`TransferConversion.cs`). */
+// ponytail: `Number` maths is enough for a stand-in's sample amounts; the console never reads it as the expected value.
+function convertTransfer(amount: string, fee: string, rate: string | null, places: number): string {
+  const raw = (Number(amount) - Number(fee)) * (rate === null ? 1 : Number(rate));
+  const factor = 10 ** places;
+  return (Math.round(raw * factor + 1e-9) / factor).toFixed(places);
+}
+
+/** `RecordTransferCommandHandler` (`Transfers/V1/Actions/Record.cs`), cut to what the console's
+ * own checks need: the key, the replay, the accounts, then 2 postings — 4 with a fee. */
+async function recordTransfer(request: Request, findAccount: (id: string) => AccountFixture | undefined): Promise<Response> {
+  const idempotencyKey = request.headers.get('idempotency-key')?.toLowerCase();
+  if (!idempotencyKey) return refusal(400, [{ message: "'Idempotency Key' must not be empty.", field: 'IdempotencyKey' }]);
+  const body = (await request.json()) as {
+    sourceAccountId: string;
+    destinationAccountId: string;
+    amount: string | number;
+    sourceCurrency: string;
+    destinationCurrency: string;
+    exchangeRate?: string | number | null;
+    fee: string | number;
+    feeAccountId?: string | null;
+  };
+  const bodyHash = JSON.stringify(body);
+  const replay = transferIdempotencyResponses.get(idempotencyKey);
+  if (replay) {
+    if (replay.bodyHash !== bodyHash) return refusal(409, [{ message: 'This idempotency key has already been used for a different request.', code: 'IDEMPOTENCY_KEY_CONFLICT' }]);
+    return jsonResponse(replay.body, 200);
+  }
+  const named: Array<[string, string | null | undefined]> = [
+    ['SourceAccountId', body.sourceAccountId],
+    ['DestinationAccountId', body.destinationAccountId],
+    ['FeeAccountId', body.feeAccountId],
+  ];
+  for (const [field, id] of named) {
+    if (id && !findAccount(id)) return refusal(404, [{ message: `The account ${id} named by ${field} was not found.` }]);
+  }
+  const source = findAccount(body.sourceAccountId)!;
+  const destination = findAccount(body.destinationAccountId)!;
+  const amount = String(body.amount);
+  const fee = String(body.fee ?? '0');
+  const rate = body.exchangeRate === undefined || body.exchangeRate === null ? null : String(body.exchangeRate);
+  const destinationPlaces = currencies.find((currency) => currency.code === destination.currency)?.decimalPlaces ?? 2;
+  const convertedAmount = convertTransfer(amount, fee, rate, destinationPlaces);
+  const id = randomUUID();
+  const recordedAt = recordedNow();
+  const legs: Array<[AccountFixture, 'Debit' | 'Credit', string, string, string]> = [
+    [source, 'Debit', String(Number(amount) - Number(fee)), source.currency, 'Transfer'],
+    [destination, 'Credit', convertedAmount, destination.currency, 'Transfer'],
+  ];
+  const feeAccount = body.feeAccountId ? findAccount(body.feeAccountId) : undefined;
+  if (feeAccount && Number(fee) > 0) {
+    legs.push([source, 'Debit', fee, source.currency, 'Fee'], [feeAccount, 'Credit', fee, source.currency, 'Fee']);
+  }
+  const postingIds = legs.map(([account, direction, legAmount, currency, category]) => {
+    postingCounter += 1;
+    account.streamPosition += 1;
+    const signed = direction === 'Debit' ? `-${legAmount}` : legAmount;
+    const posting: PostingRecord = {
+      id: randomUUID(),
+      postingNumber: `PST${String(postingCounter).padStart(10, '0')}`,
+      accountId: account.id,
+      streamPosition: account.streamPosition,
+      direction,
+      amount: legAmount,
+      signedAmount: signed,
+      balanceAfter: account.balance,
+      currency,
+      status: 'Posted',
+      category,
+      effectiveDate: today(),
+      recordedAt,
+    };
+    postings.push(posting);
+    return posting.id;
+  });
+  const transfer: TransferRecord = {
+    id,
+    sourceAccountId: source.id,
+    destinationAccountId: destination.id,
+    amount,
+    sourceCurrency: body.sourceCurrency,
+    destinationCurrency: body.destinationCurrency,
+    exchangeRate: rate,
+    fee,
+    feeAccountId: body.feeAccountId ?? null,
+    convertedAmount,
+    recordedAt,
+    callingSystem: 'accounts-console',
+    idempotencyKey,
+    postingIds,
+  };
+  transfers.push(transfer);
+  const responseBody = transferDto(transfer, true);
+  transferIdempotencyResponses.set(idempotencyKey, { bodyHash, body: responseBody });
+  return jsonResponse(responseBody, 201);
 }
 
 /**
