@@ -5,7 +5,8 @@
  * service does — every amount an unquoted JSON number carrying its exact text, every enum value
  * camelCase — and records what the screen asked for.
  *
- * Expected values in the tests are the spec's own literals; nothing here calls production code.
+ * Expected values in the tests are the spec's own literals; no expected value is worked out by
+ * production code — `renderScreen` only draws the screen under test.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within, type RenderResult } from '@testing-library/react';
