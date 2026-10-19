@@ -24,6 +24,7 @@ Feature: DKNet 11.0.0 adoption and one failure path in the accounts service
     Then the response status is 400
     And the response carries one list of errors, each with its message
     And no error in that list carries one of the service's documented refusal codes
+    And no error in that list carries a code
     And the response carries no "detail" member
 
   @integration @guard

@@ -350,6 +350,52 @@ public sealed class AccountClientUnitTests
     }
 
     [Fact]
+    public async Task ListAccountTransfersAsync_BuildsEveryQueryParameter_AndReadsTheRows()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """{"items":[{"id":"55555555-5555-5555-5555-555555555555","sourceAccountId":"22222222-2222-2222-2222-222222222222","destinationAccountId":"66666666-6666-6666-6666-666666666666","amount":20.00,"sourceCurrency":"SGD","destinationCurrency":"SGD","fee":0.00,"convertedAmount":20.00,"recordedAt":"2026-10-19T10:00:00+00:00","callingSystem":"PayHub","idempotencyKey":"refund-778"}],"pageCount":1,"pageNumber":2,"pageSize":10,"totalItemCount":11,"hasNextPage":false,"hasPreviousPage":true}"""
+        };
+        var client = ClientFor(handler);
+
+        var page = await client.ListAccountTransfersAsync(Guid.Parse("22222222-2222-2222-2222-222222222222"), new AccountTransfersQuery
+        {
+            From = new DateOnly(2026, 1, 1),
+            To = new DateOnly(2026, 10, 19),
+            Search = "refund",
+            OrderBy = "amount",
+            Desc = true,
+            PageNumber = 2,
+            PageSize = 10
+        });
+
+        handler.LastRequest!.Method.ShouldBe(HttpMethod.Get);
+        handler.LastRequest.RequestUri!.PathAndQuery.ShouldBe(
+            "/v1/accounts/22222222-2222-2222-2222-222222222222/transfers" +
+            "?from=2026-01-01&to=2026-10-19&search=refund&orderBy=amount&desc=true&pageNumber=2&pageSize=10");
+        page.TotalItemCount.ShouldBe(11);
+        var row = page.Items.ShouldHaveSingleItem();
+        row.Id.ShouldBe(Guid.Parse("55555555-5555-5555-5555-555555555555"));
+        row.IdempotencyKey.ShouldBe("refund-778");
+    }
+
+    [Fact]
+    public async Task ListAccountTransfersAsync_WithNoQuery_SendsThePlainPath()
+    {
+        var handler = new RecordingHandler
+        {
+            ResponseBody = """{"items":[],"pageCount":0,"pageNumber":1,"pageSize":20,"totalItemCount":0,"hasNextPage":false,"hasPreviousPage":false}"""
+        };
+        var client = ClientFor(handler);
+
+        await client.ListAccountTransfersAsync(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        handler.LastRequest!.RequestUri!.PathAndQuery.ShouldBe("/v1/accounts/22222222-2222-2222-2222-222222222222/transfers");
+
+        await client.ListAccountTransfersAsync(Guid.Parse("22222222-2222-2222-2222-222222222222"), new AccountTransfersQuery());
+        handler.LastRequest!.RequestUri!.PathAndQuery.ShouldBe("/v1/accounts/22222222-2222-2222-2222-222222222222/transfers");
+    }
+
+    [Fact]
     public async Task GetCurrencyAsync_ReadsOneCurrencyById()
     {
         var handler = new RecordingHandler { ResponseBody = CurrencyJson };

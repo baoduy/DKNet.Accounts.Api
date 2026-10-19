@@ -1,18 +1,22 @@
+using FluentValidation;
 using DKNet.AspCore.Extensions.Responses;
 using DKNet.Accounts.Api.Configs.Auth;
+using DKNet.Accounts.Api.Configs.GlobalExceptions;
 using DKNet.Accounts.AppServices.Accounts.V1;
 using DKNet.Accounts.AppServices.Accounts.V1.Actions;
 using DKNet.Accounts.AppServices.Accounts.V1.Queries;
 using DKNet.Accounts.AppServices.Crud;
 using DKNet.Accounts.AppServices.Postings.V1;
 using DKNet.Accounts.AppServices.Share.Generics;
+using DKNet.Accounts.AppServices.Transfers.V1;
+using DKNet.Accounts.AppServices.Transfers.V1.Queries;
 using DKNet.Accounts.Domains.Features.Accounts.Entities;
 
 namespace DKNet.Accounts.Api.ApiEndpoints.Accounts;
 
 // Group-level scope declaration (DRK-1556 §3 rows 2): GET needs accounts.read, POST/PUT/PATCH need
-// accounts.write — every route below is one of those four methods except the statement route, which keeps
-// its own postings.read override (R1).
+// accounts.write — every route below is one of those four methods except the statement and transfer list
+// routes, which keep their own postings.read override (R1; DRK-2300 §3a).
 [EndpointGroupScope(ScopeNames.AccountsRead, EndpointHttpMethods.Get)]
 [EndpointGroupScope(ScopeNames.AccountsWrite, EndpointHttpMethods.Post, EndpointHttpMethods.Put, EndpointHttpMethods.Patch)]
 internal sealed class AccountsV1Endpoint : IEndpointConfig
@@ -123,5 +127,50 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
             .RequireScope(group, ScopeNames.PostingsRead)
             .Produces<PagedResponse<PostingDto>>()
             .WithDescription("Read an account's postings as a date-bounded, paged statement in stream order.");
+
+        // Explicit parameters for the same [AsParameters] reason as the statement route above, and the validator
+        // run explicitly as PostingsV1Endpoint's list does: the group's auto-validation filter never sees a query
+        // built inside the lambda. A missing 'to' is today's UTC date, read once here (DRK-2300 R2).
+        group.MapGet("{id:guid}/transfers", async (
+                Guid id,
+                DateOnly? from,
+                DateOnly? to,
+                string? search,
+                string? orderBy,
+                bool? desc,
+                int? pageNumber,
+                int? pageSize,
+                TimeProvider clock,
+                IValidator<ListAccountTransfersQuery> validator,
+                IMessageBus bus,
+                CancellationToken ct) =>
+            {
+                var query = new ListAccountTransfersQuery
+                {
+                    AccountId = id,
+                    From = from,
+                    To = to ?? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime),
+                    Search = search,
+                    OrderBy = orderBy,
+                    Desc = desc ?? false,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+
+                var validation = await validator.ValidateAsync(query, ct);
+                if (!validation.IsValid)
+                {
+                    return validation.ToRefusal();
+                }
+
+                var page = await bus.Send(query, cancellationToken: ct);
+                return Results.Ok(new PagedResponse<TransferRowDto>(page));
+            })
+            .RequireScope(group, ScopeNames.PostingsRead)
+            .Produces<PagedResponse<TransferRowDto>>()
+            .WithDescription(
+                "List the transfers an account is the source, destination or fee account of, newest first, within " +
+                "a UTC recorded-date window of at most 1 year (default: the year up to today). Search over the " +
+                "idempotency key and calling system; order by recordedAt, amount, convertedAmount or fee.");
     }
 }
