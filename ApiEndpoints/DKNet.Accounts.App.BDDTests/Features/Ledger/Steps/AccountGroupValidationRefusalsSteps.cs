@@ -312,6 +312,10 @@ public sealed class AccountGroupValidationRefusalsSteps(HttpClient client, Scena
     {
         var doc = await ReadJsonAsync(state.Response!);
         doc.TryGetProperty("code", out _).ShouldBeFalse();
+        // DRK-2304 R1: the code lives on each errors[] entry — none may carry one, not even the validator's name.
+        var errors = doc.GetProperty("errors").EnumerateArray().ToList();
+        errors.ShouldNotBeEmpty();
+        errors.Where(e => e.TryGetProperty("code", out _)).ShouldBeEmpty($"expected no error to carry a code, got: {doc}");
     }
 
     #endregion

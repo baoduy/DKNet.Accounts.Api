@@ -160,21 +160,7 @@ internal sealed class AccountsV1Endpoint : IEndpointConfig
                 var validation = await validator.ValidateAsync(query, ct);
                 if (!validation.IsValid)
                 {
-                    // Only a ledger code reaches the caller: a short search or an unknown orderBy is a plain 400
-                    // with no code, never FluentValidation's own validator name (DRK-2300 §3a).
-                    var errors = validation.Errors
-                        .Select(e => new ErrorItem(
-                            e.ErrorMessage, LedgerErrorResponseOptions.IsKnownCode(e.ErrorCode) ? e.ErrorCode : null,
-                            e.PropertyName))
-                        .ToArray();
-                    var errorContext = new ErrorResponseContext { Source = ErrorSource.Validation, Errors = errors };
-                    var problem = new ProblemDetails
-                    {
-                        Title = "Request refused.",
-                        Status = LedgerErrorResponseOptions.StatusCode(errorContext) ?? StatusCodes.Status400BadRequest
-                    };
-                    problem.Extensions["errors"] = errors;
-                    return Results.Problem(problem);
+                    return validation.ToRefusal();
                 }
 
                 var page = await bus.Send(query, cancellationToken: ct);

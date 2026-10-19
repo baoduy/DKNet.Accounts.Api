@@ -232,6 +232,7 @@ public sealed class PostingsListingSteps(HttpClient client, ScenarioState state,
     {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         var doc = await ReadJsonAsync(state.Response!);
+        doc.GetProperty("type").GetString().ShouldBe("UnprocessableEntity");
         doc.GetProperty("errors").EnumerateArray()
             .Any(e => e.TryGetProperty("code", out var code) && code.GetString() == "INVALID_DATE_RANGE")
             .ShouldBeTrue($"expected an error carrying code INVALID_DATE_RANGE, got: {doc}");
@@ -267,8 +268,17 @@ public sealed class PostingsListingSteps(HttpClient client, ScenarioState state,
 
     [Then(@"the request is refused because the search term is too short")]
     [Scope(Feature = FeatureName)]
-    public void ThenTheRequestIsRefusedBecauseTheSearchTermIsTooShort() =>
+    public async Task ThenTheRequestIsRefusedBecauseTheSearchTermIsTooShort()
+    {
         state.Response!.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        // DRK-2304 R1: a rule with no ledger code leaves no "code" member — never the validator's name.
+        var doc = await ReadJsonAsync(state.Response!);
+        // DRK-2304 round 1: a refusal's type is its final status' own name (docs/api-contract.md:277-278).
+        doc.GetProperty("type").GetString().ShouldBe("BadRequest");
+        var errors = doc.GetProperty("errors").EnumerateArray().ToList();
+        errors.ShouldNotBeEmpty();
+        errors.Where(e => e.TryGetProperty("code", out _)).ShouldBeEmpty($"expected no error to carry a code, got: {doc}");
+    }
 
     [Then(@"the answer reads 500\.00, then 75\.00, then 10\.00")]
     public async Task ThenTheAnswerReads500Then75Then10()
