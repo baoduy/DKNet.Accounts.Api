@@ -58,19 +58,7 @@ internal sealed class PostingsV1Endpoint : IEndpointConfig
                 var validation = await validator.ValidateAsync(query, ct);
                 if (!validation.IsValid)
                 {
-                    var errors = validation.Errors
-                        .Select(e => new ErrorItem(
-                            e.ErrorMessage, LedgerErrorResponseOptions.IsKnownCode(e.ErrorCode) ? e.ErrorCode : null,
-                            e.PropertyName))
-                        .ToArray();
-                    var errorContext = new ErrorResponseContext { Source = ErrorSource.Validation, Errors = errors };
-                    var problem = new ProblemDetails
-                    {
-                        Title = "Request refused.",
-                        Status = LedgerErrorResponseOptions.StatusCode(errorContext) ?? StatusCodes.Status400BadRequest
-                    };
-                    problem.Extensions["errors"] = errors;
-                    return Results.Problem(problem);
+                    return validation.ToRefusal();
                 }
 
                 var page = await bus.Send(query, cancellationToken: ct);
