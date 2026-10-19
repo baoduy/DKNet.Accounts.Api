@@ -82,3 +82,9 @@ export function listTotalKey(resource: string, params: Record<string, string> = 
 export function recentRecordKey(kind: string, id: string): readonly unknown[] {
   return ['ledger', 'recent', kind, id] as const;
 }
+
+/** DRK-2325 §3 row 2 — one account's transfer list, and one transfer read under the same prefix, so
+ * a recorded transfer (`useRecordTransfer`) refreshes both. */
+export function transfersListKey(filters: Record<string, unknown>): readonly unknown[] {
+  return ['ledger', 'transfers', filters] as const;
+}

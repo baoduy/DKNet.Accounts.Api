@@ -155,6 +155,30 @@ export async function seedLedgerPostings(postings: LedgerPostingFixture[]): Prom
   });
 }
 
+/** DRK-2325 §3 row 10 — one transfer as the ledger holds it; accounts are named by id. */
+export interface LedgerTransferFixture {
+  id: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  amount: string;
+  sourceCurrency: string;
+  destinationCurrency: string;
+  exchangeRate: string | null;
+  fee: string;
+  feeAccountId: string | null;
+  convertedAmount: string;
+  recordedAt: string;
+  callingSystem: string;
+  idempotencyKey: string;
+  /** The postings it recorded, seeded with `seedLedgerPostings`. */
+  postingIds?: string[];
+}
+
+/** DRK-2325 §3 row 10 — seeds transfers into `fake-ledger-service.ts` (upsert by `id`). */
+export async function seedLedgerTransfers(transfers: LedgerTransferFixture[]): Promise<void> {
+  await ledgerFetch('/__seed', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transfers }) });
+}
+
 /** DRK-1697 §3 row 15 — seeds account groups into `fake-ledger-service.ts` (upsert by `code`). */
 export async function seedAccountGroups(groups: AccountGroupFixture[]): Promise<void> {
   await ledgerFetch('/__seed', {

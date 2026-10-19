@@ -11,7 +11,9 @@
     "!lib/**/*.test.ts",
     "!lib/**/*.test.tsx",
     "components/accounts/**/*.tsx",
-    "!components/accounts/**/*.test.tsx"
+    "!components/accounts/**/*.test.tsx",
+    "components/transfers/**/*.tsx",
+    "!components/transfers/**/*.test.tsx"
   ],
   "vitest": { "configFile": "vitest.stryker.config.ts" },
   "thresholds": { "high": 80, "low": 60, "break": null }

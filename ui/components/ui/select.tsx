@@ -17,6 +17,8 @@ export interface SelectProps extends Omit<ComponentProps<'select'>, 'style' | 'c
   disabled?: boolean;
   /** Inline prefix inside the control, e.g. `Status:`. It names the control unless `aria-label` does. */
   label?: string;
+  /** Draws the destructive border and sets `aria-invalid`, as on `Input`. */
+  invalid?: boolean;
   /** Applies to the field shell, not the native control. */
   style?: CSSProperties;
 }
@@ -25,7 +27,7 @@ export interface SelectProps extends Omit<ComponentProps<'select'>, 'style' | 'c
 export const FieldLabelContext = createContext<string | undefined>(undefined);
 
 /** A native single-choice control in the console's field shell. Ported from Design/components/forms/Select.jsx. */
-export function Select({ options, disabled = false, label, style, className, ...props }: SelectProps): JSX.Element {
+export function Select({ options, disabled = false, label, invalid = false, style, className, ...props }: SelectProps): JSX.Element {
   const prefixId = useId();
   const fieldLabelId = useContext(FieldLabelContext);
   const labelledBy = props['aria-label'] ? undefined : label ? prefixId : fieldLabelId;
@@ -36,6 +38,7 @@ export function Select({ options, disabled = false, label, style, className, ...
       className={cn(
         'inline-flex items-center gap-2 rounded-md border border-border-control pr-2 pl-2.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus-ring',
         disabled ? 'bg-muted text-muted-foreground' : 'bg-card text-foreground',
+        invalid && 'border-destructive',
         className,
       )}
     >
@@ -47,6 +50,7 @@ export function Select({ options, disabled = false, label, style, className, ...
       <select
         disabled={disabled}
         aria-labelledby={labelledBy}
+        aria-invalid={invalid || undefined}
         className={cn(
           'min-w-0 flex-1 appearance-none border-0 bg-transparent py-1.75 text-table text-inherit outline-none',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
