@@ -57,9 +57,10 @@ public sealed class AccountTransferListTests
     [InlineData(null, null)]
     [InlineData("", null)]
     [InlineData("pa", null)]
-    [InlineData("RECORDEDAT", null)]
-    [InlineData("convertedamount", null)]
-    [InlineData("Fee", null)]
+    [InlineData(null, "RECORDEDAT")]
+    [InlineData(null, "amount")]
+    [InlineData(null, "convertedamount")]
+    [InlineData(null, "Fee")]
     public void Validator_AcceptsAKnownSortFieldInAnyCase(string? search, string? orderBy)
     {
         var result = new ListAccountTransfersQueryValidator().Validate(Query(search: search, orderBy: orderBy));

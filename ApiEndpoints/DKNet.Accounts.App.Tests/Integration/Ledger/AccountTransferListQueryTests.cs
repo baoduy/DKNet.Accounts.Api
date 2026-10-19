@@ -67,6 +67,19 @@ public sealed class AccountTransferListQueryTests(LedgerApiFixture fixture) : IC
     }
 
     [Fact]
+    public async Task Spec_MatchesAStoredValueOfAnyCase()
+    {
+        // A key stored before keys were lowercased (DRK-2120) and a calling system in its credential's own case.
+        await SeedAsync(
+            NewTransfer(_account, _other, null, 10m, "2026-10-19T10:00:00Z", key: $"PAYROLL-Oct-{_account:N}"),
+            NewTransfer(_account, _other, null, 20m, "2026-10-19T10:00:00Z", callingSystem: "Treasury-Ops"),
+            NewTransfer(_account, _other, null, 30m, "2026-10-19T10:00:00Z", callingSystem: "PayHub"));
+
+        (await AmountsAsync(Spec(search: "payroll"))).ShouldBe([10m]);
+        (await AmountsAsync(Spec(search: "treasury"))).ShouldBe([20m]);
+    }
+
+    [Fact]
     public async Task Spec_SearchesTheCallingSystemWithoutRegardToCase()
     {
         await SeedAsync(
@@ -140,6 +153,22 @@ public sealed class AccountTransferListQueryTests(LedgerApiFixture fixture) : IC
         var row = page.ShouldHaveSingleItem();
         row.Amount.ShouldBe(100m);
         row.ExchangeRate!.Value.ToString(CultureInfo.InvariantCulture).ShouldBe("0.74");
+    }
+
+    [Fact]
+    public async Task Handler_ResolvesTheSortFieldInAnyCase()
+    {
+        await SeedAsync(
+            NewTransfer(_account, _other, null, 20m, "2026-10-19T08:00:00Z"),
+            NewTransfer(_account, _other, null, 10m, "2026-10-19T09:00:00Z"),
+            NewTransfer(_account, _other, null, 30m, "2026-10-19T10:00:00Z"));
+
+        using var scope = fixture.CreateScope();
+        var page = await new ListAccountTransfersQueryHandler(scope.ServiceProvider.GetRequiredService<IRepositorySpec>())
+            .OnHandle(new ListAccountTransfersQuery { AccountId = _account, To = Date("2026-10-19"), OrderBy = "aMOUNT" },
+                CancellationToken.None);
+
+        page.Select(r => r.Amount).ShouldBe([10m, 20m, 30m]);
     }
 
     [Theory]
