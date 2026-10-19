@@ -65,6 +65,8 @@
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="ForEvolve.FluentValidation.AspNetCore.Http" Version="1.0.26" />
     <PackageVersion Include="Mapster.DependencyInjection" Version="10.0.13" />
+    <!-- Pinned above the transitive 2.5.302 (Aspire.Hosting 13.6.1 / StreamJsonRpc 2.25.29) for GHSA-qhrr-8q5h-9q3h (CVE-2026-92707). -->
+    <PackageVersion Include="MessagePack" Version="2.5.307" />
     <PackageVersion Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="8.6.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
