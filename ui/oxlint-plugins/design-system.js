@@ -84,8 +84,9 @@ const COMPONENT_SHAPES = {
   // DRK-1747 §3 row 17 — the design-kit blocks this slice ships, from `Design/_adherence.oxlintrc.json`
   // and each block's `.d.ts`. Extras beyond the `.d.ts`, each needed by a caller (R3): Chip's
   // role/aria-selected/tabIndex (Tabs renders chips as tabs), Select's aria-label (the pager's
-  // `Rows per page`) and invalid (DRK-2325: a refusal marks a select as `Input` marks a field), Dialog's onOpenChange (screens still composing the Radix root, until
-  // stage 3) and onCloseAutoFocus (ConfirmMovement's focus return).
+  // `Rows per page`) and invalid (DRK-2325: a refusal marks a select the way `Input` marks a field),
+  // Dialog's onOpenChange (screens still composing the Radix root, until stage 3) and
+  // onCloseAutoFocus (ConfirmMovement's focus return).
   Chip: { props: ['selected', 'onClick', 'children', 'style', 'role', 'aria-selected', 'tabIndex'] },
   Select: { props: ['options', 'value', 'onChange', 'disabled', 'label', 'style', 'aria-label', 'invalid'] },
   Checkbox: { props: ['checked', 'onChange', 'disabled', 'label', 'style'] },
