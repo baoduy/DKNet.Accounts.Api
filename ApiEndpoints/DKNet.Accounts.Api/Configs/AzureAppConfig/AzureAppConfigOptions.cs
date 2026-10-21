@@ -1,3 +1,4 @@
+using Azure.Data.AppConfiguration;
 using Microsoft.Extensions.Configuration;
 
 namespace DKNet.Accounts.Api.Configs.AzureAppConfig;
@@ -61,7 +62,7 @@ internal sealed class AzureAppConfigOptions
     /// <summary>
     ///     Feature flag prefix to filter feature flags (optional)
     /// </summary>
-    public string FeatureFlagPrefix { get; set; } = string.Empty;
+    public string? FeatureFlagPrefix { get; set; } = string.Empty;
 
     /// <summary>
     ///     Configuration section name
@@ -95,6 +96,24 @@ internal sealed class AzureAppConfigOptions
         TimeSpan.FromSeconds(CacheExpirationInSeconds < MinCacheExpirationInSeconds
             ? DefaultCacheExpirationInSeconds
             : CacheExpirationInSeconds);
+
+    /// <summary>
+    ///     Whether a setting fetched from the store is kept. Non-flag keys are always kept. A feature flag
+    ///     (<c>.appconfig.featureflag/&lt;name&gt;</c>) is kept only when <see cref="LoadFeatureFlags" /> is on and its
+    ///     name starts with <see cref="FeatureFlagPrefix" />, when one is set. This also covers flags the label
+    ///     selector fetches.
+    /// </summary>
+    public bool ShouldLoadSetting(string key)
+    {
+        var flagPrefix = FeatureFlagConfigurationSetting.KeyPrefix;
+        if (!key.StartsWith(flagPrefix, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return LoadFeatureFlags && (string.IsNullOrWhiteSpace(FeatureFlagPrefix) ||
+                                    key.AsSpan(flagPrefix.Length).StartsWith(FeatureFlagPrefix, StringComparison.Ordinal));
+    }
 
     #endregion
 }
