@@ -39,4 +39,14 @@ internal sealed class AzureAppConfigOptions
     public string? Label { get; set; }
 
     #endregion
+
+    #region Methods
+
+    public string ResolveLabel() => throw new NotImplementedException();
+
+    public string? ResolveFeatureFlagFilter() => throw new NotImplementedException();
+
+    public TimeSpan ResolveRefreshInterval() => throw new NotImplementedException();
+
+    #endregion
 }
