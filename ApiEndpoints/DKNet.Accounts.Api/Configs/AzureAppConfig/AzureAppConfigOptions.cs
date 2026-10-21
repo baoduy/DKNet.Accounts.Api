@@ -1,27 +1,62 @@
+using Microsoft.Extensions.Configuration;
+
 namespace DKNet.Accounts.Api.Configs.AzureAppConfig;
 
 /// <summary>
 ///     Configuration options for Azure App Configuration integration
 /// </summary>
-[ExcludeFromCodeCoverage]
 internal sealed class AzureAppConfigOptions
 {
+    #region Fields
+
+    /// <summary>
+    ///     Refresh interval used when <see cref="CacheExpirationInSeconds" /> is absent or below one second
+    /// </summary>
+    private const int DefaultCacheExpirationInSeconds = 300;
+
+    /// <summary>
+    ///     Smallest refresh interval the SDK's <c>SetRefreshInterval</c> accepts, in seconds
+    /// </summary>
+    private const int MinCacheExpirationInSeconds = 1;
+
+    /// <summary>
+    ///     Connection string looked up when <see cref="ConnectionStringName" /> is unset or null
+    /// </summary>
+    private const string DefaultConnectionStringName = "AzureAppConfig";
+
+    private string? _connectionStringName;
+
+    #endregion
+
     #region Properties
 
     /// <summary>
-    ///     Whether to load feature flags from Azure App Configuration
+    ///     Whether to load feature flags from Azure App Configuration. Unset or null loads them.
     /// </summary>
-    public bool LoadFeatureFlags { get; set; } = true;
+    public bool LoadFeatureFlags => LoadFeatureFlagsSetting ?? true;
 
     /// <summary>
-    ///     Cache expiration time for configuration values in Minutes
+    ///     The raw <c>LoadFeatureFlags</c> value as bound. Nullable so a key bound to null (.NET 10 binds null
+    ///     values) keeps the default instead of turning flags off.
     /// </summary>
-    public int RefreshIntervalInMinutes { get; set; } = 300;
+    [ConfigurationKeyName(nameof(LoadFeatureFlags))]
+    public bool? LoadFeatureFlagsSetting { get; set; }
 
     /// <summary>
-    ///     Connection string for Azure App Configuration
+    ///     Refresh interval for configuration values, in seconds. Below one second falls back to 300.
     /// </summary>
-    public string ConnectionStringName { get; set; } = Name;
+    public int CacheExpirationInSeconds { get; set; } = DefaultCacheExpirationInSeconds;
+
+    /// <summary>
+    ///     Name of the <c>ConnectionStrings</c> entry holding the Azure App Configuration endpoint.
+    ///     Unset or null looks up <c>AzureAppConfig</c>.
+    /// </summary>
+    [AllowNull]
+    public string ConnectionStringName
+    {
+        get => _connectionStringName ?? DefaultConnectionStringName;
+        set => _connectionStringName = value;
+    }
 
     /// <summary>
     ///     Feature flag prefix to filter feature flags (optional)
@@ -31,10 +66,10 @@ internal sealed class AzureAppConfigOptions
     /// <summary>
     ///     Configuration section name
     /// </summary>
-    public static string Name => "AzureAppConfig";
+    public static string Name => "AzureAppConfiguration";
 
     /// <summary>
-    ///     Label to filter configuration values (optional)
+    ///     Label to filter configuration values (optional). Blank selects <see cref="SharedConsts.ApiName" />.
     /// </summary>
     public string? Label { get; set; }
 
@@ -42,11 +77,24 @@ internal sealed class AzureAppConfigOptions
 
     #region Methods
 
-    public string ResolveLabel() => throw new NotImplementedException();
+    /// <summary>
+    ///     The label to select keys by: <see cref="Label" />, or <see cref="SharedConsts.ApiName" /> when blank
+    /// </summary>
+    public string ResolveLabel() => string.IsNullOrWhiteSpace(Label) ? SharedConsts.ApiName : Label;
 
-    public string? ResolveFeatureFlagFilter() => throw new NotImplementedException();
+    /// <summary>
+    ///     The feature-flag key filter <c>&lt;prefix&gt;*</c>, or <see langword="null" /> to load all flags
+    /// </summary>
+    public string? ResolveFeatureFlagFilter() =>
+        string.IsNullOrWhiteSpace(FeatureFlagPrefix) ? null : $"{FeatureFlagPrefix}*";
 
-    public TimeSpan ResolveRefreshInterval() => throw new NotImplementedException();
+    /// <summary>
+    ///     The configuration refresh interval: <see cref="CacheExpirationInSeconds" />, or 300 seconds when below one
+    /// </summary>
+    public TimeSpan ResolveRefreshInterval() =>
+        TimeSpan.FromSeconds(CacheExpirationInSeconds < MinCacheExpirationInSeconds
+            ? DefaultCacheExpirationInSeconds
+            : CacheExpirationInSeconds);
 
     #endregion
 }
