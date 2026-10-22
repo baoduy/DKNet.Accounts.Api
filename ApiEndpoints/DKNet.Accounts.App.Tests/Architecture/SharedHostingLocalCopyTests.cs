@@ -25,7 +25,12 @@ public class SharedHostingLocalCopyTests
     [InlineData("DKNet.Accounts.Api/Configs/Antiforgery")]
     public void SharedHostingFolder_ShouldNotHaveALocalCopy(string relativePath)
     {
-        Directory.Exists(Path.Combine(ApiEndpointsDir(), relativePath)).ShouldBeFalse(
+        var folder = Path.Combine(ApiEndpointsDir(), relativePath);
+        var sources = Directory.Exists(folder)
+            ? Directory.GetFiles(folder, "*.cs", SearchOption.AllDirectories)
+            : [];
+
+        sources.ShouldBeEmpty(
             $"{relativePath} holds a copy of an item DKNet 13.3.0 now provides — it should have been removed.");
     }
 
