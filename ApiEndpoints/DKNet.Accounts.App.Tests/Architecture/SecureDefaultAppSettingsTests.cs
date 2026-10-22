@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Configuration;
-using DKNet.Accounts.Api.Configs.RateLimits;
+using DKNet.AspCore.Extensions.RateLimits;
 using DKNet.Accounts.Share.Options;
 
 namespace DKNet.Accounts.App.Tests.Architecture;
@@ -67,7 +67,7 @@ public class SecureDefaultAppSettingsTests
     public void BaseAppSettings_RateLimitSection_BindsExplicitValues_NotClassDefaults()
     {
         var config = LoadBaseConfig();
-        var rateLimit = config.GetSection(RateLimitOptions.Name).Get<RateLimitOptions>();
+        var rateLimit = config.GetSection("RateLimit").Get<RateLimitOptions>();
 
         rateLimit.ShouldNotBeNull();
         rateLimit.DefaultRequestLimit.ShouldBe(100,

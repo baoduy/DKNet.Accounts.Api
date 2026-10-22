@@ -2,8 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
-using DKNet.Accounts.Api.Configs;
-using DKNet.Accounts.Share.Options;
+using DKNet.AspCore.Extensions.Hosting;
 
 namespace DKNet.Accounts.App.Tests.Integration.RequestBounds;
 
@@ -27,7 +26,7 @@ public sealed class RequestLifetimeTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["RequestBounds:RequestTimeoutSeconds"] = "1" })
             .Build();
-        builder.Services.AddRequestBoundsConfig(new FeatureOptions { EnableRequestBounds = true }, configuration);
+        builder.Services.AddRequestBoundsConfig(configuration);
 
         var app = builder.Build();
         app.UseRouting();

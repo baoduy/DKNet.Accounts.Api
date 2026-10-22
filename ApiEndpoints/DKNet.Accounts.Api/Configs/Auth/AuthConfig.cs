@@ -25,7 +25,7 @@ internal static class AuthConfig
     /// </remarks>
     public static IServiceCollection AddAuthConfig(this IServiceCollection services)
     {
-        services.MarkConfigAdded(nameof(AuthConfig));
+        services.MarkFeatureAdded(nameof(AuthConfig));
 
         services.AddAuthentication()
             .AddJwtBearer(options =>
@@ -69,7 +69,7 @@ internal static class AuthConfig
     /// </remarks>
     public static WebApplication UseAuthConfig(this WebApplication app)
     {
-        if (app.Services.IsConfigAdded(nameof(AuthConfig)))
+        if (app.Services.IsFeatureAdded(nameof(AuthConfig)))
         {
             app.UseAuthentication();
             app.UseAuthorization();
