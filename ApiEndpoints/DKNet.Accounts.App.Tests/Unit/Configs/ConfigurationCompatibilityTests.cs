@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using DKNet.Accounts.Api.Configs;
-using DKNet.Accounts.Api.Configs.RateLimits;
+using DKNet.AspCore.Extensions.Hosting;
+using DKNet.AspCore.Extensions.RateLimits;
 using DKNet.Accounts.Share.Options;
 
 namespace DKNet.Accounts.App.Tests.Unit.Configs;
@@ -58,7 +59,7 @@ public class ConfigurationCompatibilityTests
     {
         var config = LegacyConsumerConfig();
 
-        var bounds = config.GetSection(RequestBoundsOptions.Name).Get<RequestBoundsOptions>() ?? new RequestBoundsOptions();
+        var bounds = config.GetSection("RequestBounds").Get<RequestBoundsOptions>() ?? new RequestBoundsOptions();
 
         bounds.RequestTimeoutSeconds.ShouldBe(30);
         bounds.MaxRequestBodySizeBytes.ShouldBe(1 * 1024 * 1024);
@@ -78,7 +79,7 @@ public class ConfigurationCompatibilityTests
         var origins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
         origins.ShouldContain("https://consumer.example");
 
-        var rateLimit = config.GetSection(RateLimitOptions.Name).Get<RateLimitOptions>();
+        var rateLimit = config.GetSection("RateLimit").Get<RateLimitOptions>();
         rateLimit!.DefaultRequestLimit.ShouldBe(250,
             "the consumer's own explicit RateLimit:DefaultRequestLimit must still win over any class default.");
     }

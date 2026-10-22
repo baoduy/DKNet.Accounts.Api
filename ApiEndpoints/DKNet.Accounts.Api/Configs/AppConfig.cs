@@ -1,7 +1,6 @@
 ﻿using DKNet.AspCore.Idempotency;
 using DKNet.AspCore.Idempotency.RedisStore;
 using DKNet.Accounts.Api.Configs.Auth;
-using DKNet.Accounts.Api.Configs.RateLimits;
 using DKNet.Accounts.Api.Configs.Swagger;
 
 namespace DKNet.Accounts.Api.Configs;
@@ -46,9 +45,17 @@ internal static class AppConfig
             services.AddAppVersioning();
         }
 
-        services.AddForwardedHeadersConfig(features, configuration)
-            .AddSecurityHeadersConfig(features)
-            .AddRequestBoundsConfig(features, configuration);
+        if (features.EnableForwardedHeaders)
+        {
+            services.AddForwardedHeadersConfig(configuration);
+        }
+
+        services.AddSecurityHeadersConfig(features);
+
+        if (features.EnableRequestBounds)
+        {
+            services.AddRequestBoundsConfig(configuration);
+        }
 
         services.AddHttpContextAccessor()
             .AddFeatureManagement();
@@ -69,7 +76,7 @@ internal static class AppConfig
         }
 
         return services
-            .AddCrosConfig(configuration)
+            .AddCorsConfig(configuration)
             .AddAllAppServices(configuration, features)
             .AddHealthzConfig(features);
     }
@@ -81,12 +88,14 @@ internal static class AppConfig
         // everything downstream, including the global exception handler, for 200/404/500 responses alike (R5).
         app.UseForwardedHeadersConfig()
             .UseSecurityHeadersConfig()
-            .UseAntiforgeryConfig()
-            .UseCrosConfig()
+            .UseCorsConfig()
             .UseHttpsConfig()
             .UseHealthzConfig();
 
         app.UseRouting();
+
+        //DKNet's antiforgery guard runs the framework's UseAntiforgery, which must come after UseRouting.
+        app.UseAntiforgeryConfig();
         app.UseRequestBoundsConfig();
         app.UseRateLimitConfig();
 
