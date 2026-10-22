@@ -6,8 +6,8 @@ namespace DKNet.Accounts.App.Tests.Integration.SharedHosting;
 
 /// <summary>
 /// DKNet's antiforgery guard issues a readable <c>XSRF-TOKEN</c> cookie on every GET. These requests go over HTTPS
-/// because that cookie is Secure-only (a plain HTTP request is refused with 500), with cookie handling off because
-/// the factory's default handler would consume <c>Set-Cookie</c> before the test sees it.
+/// and must answer 200: the antiforgery cookie is Secure-only, so with the flag on a plain HTTP request is refused
+/// with 500 and no cookie at all — which an absence check alone cannot tell apart from the flag being off.
 /// </summary>
 public sealed class AntiforgeryCookieTests
 {
@@ -15,8 +15,7 @@ public sealed class AntiforgeryCookieTests
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"),
-            HandleCookies = false
+            BaseAddress = new Uri("https://localhost")
         });
 
         var response = await client.GetAsync("/healthz");
