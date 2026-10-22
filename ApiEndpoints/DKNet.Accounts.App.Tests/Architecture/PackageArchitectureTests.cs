@@ -79,7 +79,7 @@ public class PackageArchitectureTests
     /// <summary>
     /// DRK-1556 §5, "Every DKNet package resolves to one release" — pinned at 13.1.2, superseding the 13.0.1
     /// pin and the DRK-1535 stage-1 assertion of 12.0.0; the pin half only, the documentation half belongs to
-    /// the sibling Docs sub-task.
+    /// the sibling Docs sub-task. Now 13.3.0 (DRK-2365: the shared hosting items).
     /// </summary>
     [Fact]
     public void AllDKNetPackageReferences_ShouldResolveToRelease1312()
@@ -93,7 +93,7 @@ public class PackageArchitectureTests
         var doc = XDocument.Load(directoryPackagesPath);
         var distinctVersions = PackagePinGuard.DistinctDkNetVersions(doc);
 
-        distinctVersions.ShouldBe(["13.2.5"]);
+        distinctVersions.ShouldBe(["13.3.0"]);
     }
 
     [Fact]

@@ -7,7 +7,7 @@ namespace DKNet.Accounts.App.Tests.Integration.HostFeatureState;
 /// flags used to be recorded via process-wide statics (e.g. the old <c>AuthConfig.IsAuthConfigAdded</c>) —
 /// whichever host started first decided every other host's middleware for the lifetime of the process. This
 /// must fail against that implementation (the relaxed host would inherit the strict host's authorization
-/// requirement) and pass now that <see cref="DKNet.Accounts.Api.Configs.HostConfigMarker"/> scopes the "was this
+/// requirement) and pass now that <see cref="DKNet.AspCore.Extensions.Hosting.HostFeatureMarker"/> scopes the "was this
 /// config added" flag to each host's own <see cref="IServiceProvider"/>.
 /// </summary>
 /// <remarks>

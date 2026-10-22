@@ -15,8 +15,7 @@ internal static class ServiceConfigs
         FeatureOptions features)
     {
         services
-            .AddSingleton<IHttpContextAccessor, HttpContextAccessor>()
-            .AddSingleton<ISensitiveDataPrincipalAccessor, HttpContextSensitiveDataPrincipalAccessor>()
+            .AddSensitiveDataPrincipalAccessor()
             .AddScoped<IPrincipalProvider, PrincipalProvider>()
             .AddScoped<ICallingSystemAccessor, CallingSystemAccessor>()
             // Also wires DKNet's EfCoreAuditHook onto CoreDbContext: it stamps CreatedBy/CreatedOn from

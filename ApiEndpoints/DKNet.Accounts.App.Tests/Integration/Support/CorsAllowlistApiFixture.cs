@@ -7,7 +7,7 @@ namespace DKNet.Accounts.App.Tests.Integration.Support;
 /// (<c>https://app.example.com</c>), so the default CORS policy is registered and scoped to that origin.
 /// </summary>
 /// <remarks>
-/// Same early-bind constraint as <see cref="AuthOnApiFixture" />: <c>AddCrosConfig</c> reads
+/// Same early-bind constraint as <see cref="AuthOnApiFixture" />: <c>AddCorsConfig</c> reads
 /// <c>Cors:AllowedOrigins</c> from <c>builder.Configuration</c> in <c>Program.cs</c> before
 /// <see cref="TestApiFactoryBase.ConfigureWebHost" />'s <c>ConfigureAppConfiguration</c> override is merged
 /// in, so only an environment variable set ahead of <c>WebApplication.CreateBuilder(args)</c> takes effect.
