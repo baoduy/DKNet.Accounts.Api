@@ -74,10 +74,12 @@ internal static class SecurityHeadersConfig
     private static SecureHeadersMiddlewareConfiguration DocsConfig()
     {
         var config = BaseConfig().UseContentSecurityPolicy();
+        // OwaspHeaders 11 types this as nullable; UseContentSecurityPolicy() above has just set it.
+        var csp = config.ContentSecurityPolicyConfiguration!;
 
         // Mirrors UseDefaultContentSecurityPolicy()'s script-src/object-src 'self', with 'unsafe-inline'
         // added to script-src for Scalar's inline bootstrap.
-        config.ContentSecurityPolicyConfiguration.ScriptSrc =
+        csp.ScriptSrc =
         [
             ContentSecurityPolicyHelpers.CreateSelfDirective(),
             new ContentSecurityPolicyElement
@@ -86,7 +88,7 @@ internal static class SecurityHeadersConfig
                 DirectiveOrUri = "unsafe-inline"
             }
         ];
-        config.ContentSecurityPolicyConfiguration.ObjectSrc =
+        csp.ObjectSrc =
             [ContentSecurityPolicyHelpers.CreateSelfDirective()];
 
         return config.Build();
